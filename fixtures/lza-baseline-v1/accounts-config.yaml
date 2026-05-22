@@ -1,0 +1,16 @@
+accounts:
+  - name: Network
+    ou: Infrastructure
+    description: Central networking account
+  - name: Audit
+    ou: Security
+    description: Audit and compliance account
+  - name: LogArchive
+    ou: Security
+    description: Log archival account
+  - name: SharedServices
+    ou: Infrastructure
+    description: Shared services account
+  - name: SecurityTooling
+    ou: Security
+    description: Security tooling account

@@ -1,0 +1,12 @@
+namespaces:
+  - name: production
+    labels:
+      env: prod
+    annotations:
+      scheduler.alpha.kubernetes.io/node-selector: env=prod
+  - name: staging
+    labels:
+      env: staging
+  - name: monitoring
+    labels:
+      purpose: observability

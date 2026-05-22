@@ -1,0 +1,19 @@
+organization:
+  primaryRegion: eu-central-1
+  organizationName: ExampleCorp
+
+organizationalUnits:
+  - name: Security
+    description: Security baseline OU
+  - name: Infrastructure
+    description: Infrastructure and shared services OU
+  - name: Workloads
+    description: Workload OUs
+  - name: Workloads/Sandbox
+    description: Sandbox workloads
+  - name: Workloads/Dev
+    description: Development workloads
+  - name: Workloads/Test
+    description: Test workloads
+  - name: Workloads/Prod
+    description: Production workloads

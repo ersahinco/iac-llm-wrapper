@@ -1,0 +1,8 @@
+network:
+  topology: hub-spoke
+  cidr: 10.0.0.0/16
+  centralNetworkAccount: Network
+  hubCidr: 10.0.0.0/20
+  spokeCidrs:
+    - 10.1.0.0/16
+    - 10.2.0.0/16

@@ -1,0 +1,3 @@
+# Core framework defaults — kept minimal.
+# Use-case-specific defaults live in pattern directories (e.g., patterns/lza/defaults.yaml).
+defaults: {}

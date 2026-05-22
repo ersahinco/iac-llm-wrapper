@@ -1,0 +1,6 @@
+global:
+  primaryRegion: eu-central-1
+  cloudtrail:
+    organizationTrail: true
+  kms:
+    rotationRequired: true

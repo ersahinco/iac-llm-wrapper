@@ -1,0 +1,24 @@
+defaults:
+  primary_region: eu-central-1
+  audit_retention_days: 2555
+  kms_rotation_required: true
+  s3_block_public_access: true
+  cloudtrail_org_trail: true
+  network_cidr: "10.0.0.0/16"
+
+guardrails:
+  private_cicd_required_endpoints:
+    - s3
+    - sts
+    - kms
+    - logs
+    - ecr.api
+    - ecr.dkr
+    - secretsmanager
+    - ssm
+    - ec2messages
+    - ssmmessages
+
+generator:
+  organization_name: lza-organization
+  role_prefix: lza

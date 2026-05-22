@@ -1,0 +1,9 @@
+security:
+  audit:
+    retentionDays: 2555
+  s3:
+    blockPublicAccess: true
+  logging:
+    centralized: true
+  egressInspection:
+    mode: none
