@@ -58,7 +58,7 @@ class DiscoveryResult:
         return len(self.missing) + len(self.ambiguous) + len(self.inconsistent)
 
     def summarize(self) -> dict[str, Any]:
-        missing_by_priority = {}
+        missing_by_priority: dict[int, list[str]] = {}
         for gap in self.missing:
             missing_by_priority.setdefault(gap.priority, []).append(gap.label)
 

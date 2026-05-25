@@ -37,6 +37,43 @@ from .patterns.lza import generators as _lza_generators  # noqa: F401
 app = typer.Typer(name="intent-engine", help="Knowledge-driven infrastructure decision system")
 
 
+def _available_patterns() -> str:
+    return ", ".join(GLOBAL_REGISTRY.list())
+
+
+def _available_addons() -> str:
+    return ", ".join(ADDON_REGISTRY.list())
+
+
+def _get_pattern_or_exit(pattern: str):
+    if pattern not in GLOBAL_REGISTRY.list():
+        typer.echo(f"Unknown pattern: {pattern}. Available: {_available_patterns()}", err=True)
+        raise typer.Exit(1)
+    return GLOBAL_REGISTRY.get(pattern)
+
+
+def _validate_addons_or_exit(addons: list[str]) -> None:
+    for addon_name in addons:
+        if addon_name not in ADDON_REGISTRY.list():
+            typer.echo(f"Unknown addon: {addon_name}. Available: {_available_addons()}", err=True)
+            raise typer.Exit(1)
+
+
+def _parse_decisions_or_exit(raw_decisions: str | None) -> dict[str, Any] | None:
+    if not raw_decisions:
+        return None
+    try:
+        parsed = json.loads(raw_decisions)
+    except json.JSONDecodeError as exc:
+        typer.echo(f"Invalid --decisions JSON: {exc.msg}", err=True)
+        typer.echo('Example: --decisions "{\\"region\\": \\"eu-central-1\\"}"', err=True)
+        raise typer.Exit(1) from exc
+    if not isinstance(parsed, dict):
+        typer.echo("Invalid --decisions JSON: expected an object at top level", err=True)
+        raise typer.Exit(1)
+    return parsed
+
+
 def _version_callback(value: bool) -> None:
     if value:
         typer.echo("intent-engine 0.1.0")
@@ -63,7 +100,7 @@ def compile(
         ...,
         "--input",
         "-i",
-        help="Markdown design doc or directory",
+        help="Markdown design doc or directory with .md files",
     ),
     output: Path = typer.Option(
         ...,
@@ -105,13 +142,13 @@ def compile(
         "baseline",
         "--pattern",
         "-p",
-        help=f"Pattern to use. Available: {', '.join(GLOBAL_REGISTRY.list())}",
+        help=f"Pattern to use. Available: {_available_patterns()}",
     ),
     addon: list[str] = typer.Option(
         [],
         "--addon",
         "-a",
-        help="Composable addon to layer (repeatable: --addon pci --addon hipaa)",
+        help="Composable addon to layer (repeatable: --addon pci-compliance --addon hipaa)",
     ),
 ) -> None:
     """Compile Markdown design docs into validated intent artifacts.
@@ -124,13 +161,10 @@ def compile(
         typer.echo(f"Error: input path does not exist: {input}", err=True)
         raise typer.Exit(1)
 
-    for a in addon:
-        if a not in ADDON_REGISTRY.list():
-            available = ", ".join(ADDON_REGISTRY.list())
-            typer.echo(f"Unknown addon: {a}. Available: {available}", err=True)
-            raise typer.Exit(1)
+    pattern_obj = _get_pattern_or_exit(pattern)
+    _validate_addons_or_exit(addon)
 
-    graph = GLOBAL_REGISTRY.get(pattern).create_graph()
+    graph = pattern_obj.create_graph()
     if addon:
         graph = ADDON_REGISTRY.compose(graph, addon)
 
@@ -183,13 +217,13 @@ def discover(
         ...,
         "--input",
         "-i",
-        help="Markdown design doc or directory",
+        help="Markdown design doc or directory with .md files",
     ),
     decisions: str = typer.Option(
         None,
         "--decisions",
         "-d",
-        help="JSON string of pre-filled decisions to simulate",
+        help='JSON object of pre-filled decisions, e.g. {"region":"eu-central-1"}',
     ),
     suggest: bool = typer.Option(
         False,
@@ -205,13 +239,13 @@ def discover(
         "baseline",
         "--pattern",
         "-p",
-        help=f"Pattern to use. Available: {', '.join(GLOBAL_REGISTRY.list())}",
+        help=f"Pattern to use. Available: {_available_patterns()}",
     ),
     addon: list[str] = typer.Option(
         [],
         "--addon",
         "-a",
-        help="Composable addon to layer (repeatable: --addon pci --addon hipaa)",
+        help="Composable addon to layer (repeatable: --addon pci-compliance --addon hipaa)",
     ),
 ) -> None:
     """Run discovery analysis on a Markdown design doc or decisions.
@@ -225,13 +259,10 @@ def discover(
         typer.echo(f"Error: input path does not exist: {input}", err=True)
         raise typer.Exit(1)
 
-    for a in addon:
-        if a not in ADDON_REGISTRY.list():
-            available = ", ".join(ADDON_REGISTRY.list())
-            typer.echo(f"Unknown addon: {a}. Available: {available}", err=True)
-            raise typer.Exit(1)
+    pattern_obj = _get_pattern_or_exit(pattern)
+    _validate_addons_or_exit(addon)
 
-    graph = GLOBAL_REGISTRY.get(pattern).create_graph()
+    graph = pattern_obj.create_graph()
     if addon:
         graph = ADDON_REGISTRY.compose(graph, addon)
 
@@ -248,11 +279,10 @@ def discover(
 
     engine = InterviewEngine(graph)
 
-    if decisions:
-        decision_dict = json.loads(decisions)
+    decision_dict = _parse_decisions_or_exit(decisions)
+    if decision_dict:
         engine.run_from_decisions(decision_dict)
 
-    pattern_obj = GLOBAL_REGISTRY.get(pattern)
     discovery = DiscoveryEngine(
         graph,
         extra_consistency_checks=pattern_obj.extra_consistency_checks or [],
@@ -351,7 +381,7 @@ def interview(
         None,
         "--decisions",
         "-d",
-        help="JSON string of pre-filled decisions",
+        help='JSON object of pre-filled decisions, e.g. {"region":"eu-central-1"}',
     ),
     no_defaults: bool = typer.Option(
         False,
@@ -367,29 +397,26 @@ def interview(
         "baseline",
         "--pattern",
         "-p",
-        help=f"Pattern to use. Available: {', '.join(GLOBAL_REGISTRY.list())}",
+        help=f"Pattern to use. Available: {_available_patterns()}",
     ),
     addon: list[str] = typer.Option(
         [],
         "--addon",
         "-a",
-        help="Composable addon to layer (repeatable: --addon pci --addon hipaa)",
+        help="Composable addon to layer (repeatable: --addon pci-compliance --addon hipaa)",
     ),
 ) -> None:
     """Run guided interview to collect infrastructure decisions and produce intent artifacts."""
-    for a in addon:
-        if a not in ADDON_REGISTRY.list():
-            available = ", ".join(ADDON_REGISTRY.list())
-            typer.echo(f"Unknown addon: {a}. Available: {available}", err=True)
-            raise typer.Exit(1)
+    pattern_obj = _get_pattern_or_exit(pattern)
+    _validate_addons_or_exit(addon)
 
-    graph = GLOBAL_REGISTRY.get(pattern).create_graph()
+    graph = pattern_obj.create_graph()
     if addon:
         graph = ADDON_REGISTRY.compose(graph, addon)
     engine = InterviewEngine(graph)
 
-    if decisions:
-        decision_dict = json.loads(decisions)
+    decision_dict = _parse_decisions_or_exit(decisions)
+    if decision_dict:
         engine.run_from_decisions(decision_dict)
 
     if interactive:
@@ -422,7 +449,7 @@ def validate(
         "baseline",
         "--pattern",
         "-p",
-        help=f"Pattern to use. Available: {', '.join(GLOBAL_REGISTRY.list())}",
+        help=f"Pattern to use. Available: {_available_patterns()}",
     ),
 ) -> None:
     """Validate intent artifacts."""
@@ -628,16 +655,18 @@ def catalog(
         if not output:
             typer.echo("Error: --output required for apply", err=True)
             raise typer.Exit(1)
-        current: dict[str, Any] = {}
+        current_apply: dict[str, Any] = {}
         if input:
             with open(input) as f:
-                current = json.load(f)
-        merged = cat.apply_as_defaults(entry, current)
+                current_apply = json.load(f)
+        merged = cat.apply_as_defaults(entry, current_apply)
         with open(output, "w") as f:
             json.dump(merged, f, indent=2)
         typer.echo(f"Merged decisions written to {output}")
-        from_catalog = len(merged) - len(current)
-        typer.echo(f"  {len(merged)} total ({len(current)} current, {from_catalog} from catalog)")
+        from_catalog = len(merged) - len(current_apply)
+        typer.echo(
+            f"  {len(merged)} total ({len(current_apply)} current, {from_catalog} from catalog)"
+        )
 
     else:
         typer.echo(f"Unknown action: {action}. Use: list, show, diff, apply", err=True)
@@ -650,13 +679,13 @@ def template(
         "baseline",
         "--pattern",
         "-p",
-        help=f"Pattern to use. Available: {', '.join(GLOBAL_REGISTRY.list())}",
+        help=f"Pattern to use. Available: {_available_patterns()}",
     ),
     addon: list[str] = typer.Option(
         [],
         "--addon",
         "-a",
-        help="Composable addon to layer (repeatable: --addon pci --addon hipaa)",
+        help="Composable addon to layer (repeatable: --addon pci-compliance --addon hipaa)",
     ),
     output: Path = typer.Option(
         ...,
@@ -666,16 +695,8 @@ def template(
     ),
 ) -> None:
     """Generate a Markdown design doc scaffold from a pattern."""
-    if pattern not in GLOBAL_REGISTRY.list():
-        available = ", ".join(GLOBAL_REGISTRY.list())
-        typer.echo(f"Unknown pattern: {pattern}. Available: {available}", err=True)
-        raise typer.Exit(1)
-
-    for a in addon:
-        if a not in ADDON_REGISTRY.list():
-            available = ", ".join(ADDON_REGISTRY.list())
-            typer.echo(f"Unknown addon: {a}. Available: {available}", err=True)
-            raise typer.Exit(1)
+    _get_pattern_or_exit(pattern)
+    _validate_addons_or_exit(addon)
 
     markdown = generate_template(pattern=pattern, addon_names=addon)
     output.write_text(markdown)

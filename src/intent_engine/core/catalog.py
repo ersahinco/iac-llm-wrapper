@@ -19,6 +19,7 @@ Each catalog entry is a YAML file with:
 
 from __future__ import annotations
 
+import builtins
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -86,10 +87,10 @@ class ConfigCatalog:
             raise KeyError(f"Unknown catalog entry '{name}'. Available: {available}")
         return self._entries[name]
 
-    def list(self) -> list[str]:
+    def list(self) -> builtins.list[str]:
         return sorted(self._entries.keys())
 
-    def list_by_pattern(self, pattern: str) -> list[CatalogEntry]:
+    def list_by_pattern(self, pattern: str) -> builtins.list[CatalogEntry]:
         return [e for e in self._entries.values() if e.pattern == pattern]
 
     def diff(self, entry_name: str, current_decisions: dict[str, Any]) -> dict[str, Any]:

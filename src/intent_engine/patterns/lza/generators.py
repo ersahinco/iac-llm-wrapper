@@ -79,7 +79,7 @@ def gen_global_config(intent: RawIntent, output_dir: Path) -> None:
 def gen_security_config(intent: RawIntent, output_dir: Path) -> None:
     if not hasattr(intent, "security"):
         return
-    data = {
+    data: dict[str, Any] = {
         "security": {
             "audit": {
                 "retentionDays": intent.security.audit_retention_days,
@@ -105,7 +105,7 @@ def gen_security_config(intent: RawIntent, output_dir: Path) -> None:
 def gen_network_config(intent: RawIntent, output_dir: Path) -> None:
     if not hasattr(intent, "network"):
         return
-    data = {
+    data: dict[str, Any] = {
         "network": {
             "topology": intent.network.topology.value if intent.network.topology else "single-vpc",
             "cidr": intent.network.cidr,
@@ -211,7 +211,7 @@ def gen_decision_report(intent: RawIntent, output_dir: Path, graph=None) -> None
 
     # Add WA pillar coverage if graph is provided
     if graph:
-        wa_coverage = {}
+        wa_coverage: dict[str, Any] = {}
         for key, req in graph._requirements.items():
             if req.wa_pillars:
                 value = graph.get(key)

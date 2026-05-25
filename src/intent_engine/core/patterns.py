@@ -7,6 +7,7 @@ New addons can be registered without modifying core code.
 
 from __future__ import annotations
 
+import builtins
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -105,7 +106,7 @@ class PatternRegistry:
             raise KeyError(f"Unknown pattern '{name}'. Available: {available}")
         return self._patterns[name]
 
-    def list(self) -> list[str]:
+    def list(self) -> builtins.list[str]:
         return sorted(self._patterns.keys())
 
     def describe(self, name: str) -> str:
@@ -150,10 +151,10 @@ class AddonRegistry:
             raise KeyError(f"Unknown addon '{name}'. Available: {available}")
         return self._addons[name]
 
-    def list(self) -> list[str]:
+    def list(self) -> builtins.list[str]:
         return sorted(self._addons.keys())
 
-    def resolve_order(self, addon_names: list[str]) -> list[str]:
+    def resolve_order(self, addon_names: builtins.list[str]) -> builtins.list[str]:
         """Topological sort of addon names respecting depends_on."""
         graph: dict[str, set[str]] = {}
         for name in addon_names:
@@ -180,7 +181,7 @@ class AddonRegistry:
         remaining = [n for n in addon_names if n not in ordered]
         return ordered + remaining
 
-    def compose(self, base: RequirementGraph, addon_names: list[str]) -> RequirementGraph:
+    def compose(self, base: RequirementGraph, addon_names: builtins.list[str]) -> RequirementGraph:
         """Apply addon requirements and field maps onto a base graph.
 
         Returns a new graph with addon requirements added and field_map merged.
@@ -197,14 +198,14 @@ class AddonRegistry:
                 result._field_map[key] = field_path
         return result
 
-    def get_field_map(self, addon_names: list[str]) -> dict[str, str | None]:
+    def get_field_map(self, addon_names: builtins.list[str]) -> dict[str, str | None]:
         """Merge field_map entries from multiple addons."""
         merged: dict[str, str | None] = {}
         for name in self.resolve_order(addon_names):
             merged.update(self.get(name).field_map)
         return merged
 
-    def get_section_map(self, addon_names: list[str]) -> dict[str, tuple[str, str | None]]:
+    def get_section_map(self, addon_names: builtins.list[str]) -> dict[str, tuple[str, str | None]]:
         """Merge section_map entries from multiple addons."""
         merged: dict[str, tuple[str, str | None]] = {}
         for name in self.resolve_order(addon_names):

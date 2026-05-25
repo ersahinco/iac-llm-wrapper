@@ -1,8 +1,10 @@
-# intent-engine
+# iac-llm-wrapper
 
-**Knowledge-driven infrastructure decision engine.**
+**LLM-powered infrastructure decision engine.**
 
-Architects describe infrastructure intent in prose. This tool extracts structured decisions, validates them against architectural knowledge graphs, and produces traceable artifacts engineers can act on.
+Architects describe infrastructure intent in prose. The tool extracts structured decisions, validates them against architectural knowledge graphs, and produces traceable artifacts engineers can act on.
+
+At its core is **intent-engine** — a knowledge-driven decision framework that powers extraction, validation, and generation. The `iac-llm-wrapper` package bundles this engine with off-the-shelf patterns for common infrastructure scenarios (landing zones, Kubernetes, compliance).
 
 Not a code generator. Not a Terraform/CDK wrapper. A **decision capture and validation** layer that sits between design documents and provisioning pipelines.
 
@@ -33,21 +35,136 @@ Output ──────── Decision reports, deployment graphs, workload sk
 
 **Every decision is recorded** with timestamp, rationale, compliance context, and tradeoffs. Architects get living documentation. Compliance gets an audit trail. Engineers get a validated decision set to map to their IaC of choice.
 
-## Quick Start
+## Quick Start (Ollama + uv)
+
+Run entirely locally with a 3B parameter model:
 
 ```bash
-pip install intent-engine
-source .venv/bin/activate  # or use your venv of choice
+# 1. Install Ollama and pull a small model
+ollama pull qwen2.5:3b
+ollama serve
 
-# See available patterns
-intent-engine discover -i fixtures/valid-payments.md
+# 2. Set up the project
+uv venv
+source .venv/bin/activate
+uv pip install -e ".[dev,llm]"
 
-# Generate a design doc scaffold from a pattern
-intent-engine template --pattern baseline --output design.md
-
-# Compile a design doc into decision artifacts
-intent-engine compile -i design.md -o out/
+# 3. Compile a design doc with local LLM
+iac-llm-wrapper compile -i fixtures/valid-payments.md -o out/ \
+  --pattern baseline --provider ollama --model qwen2.5:3b
 ```
+
+No API key required. A 3B model (2GB RAM) extracts region, topology, CIDR, accounts, and security settings from Markdown in 8-15 seconds on modern laptops.
+
+### Alternative: Cloud LLM
+
+```bash
+# OpenAI
+export OPENAI_API_KEY=sk-...
+iac-llm-wrapper compile -i design.md -o out/ --provider openai
+
+# Anthropic
+export ANTHROPIC_API_KEY=sk-ant-...
+iac-llm-wrapper compile -i design.md -o out/ --provider anthropic
+```
+
+### Without LLM (Bootstrap Only)
+
+The deterministic fallback applies graph defaults and does keyword matching. It cannot parse free-form prose. Use only for unit tests or when you have no LLM access:
+
+```bash
+INTENT_ENGINE_DISABLE_LLM=1 iac-llm-wrapper compile -i design.md -o out/
+```
+
+Install from PyPI:
+
+```bash
+uv pip install iac-llm-wrapper
+```
+
+## Real-World Usage
+
+### 1. Start with a Design Document
+
+Write infrastructure intent in Markdown (see `fixtures/valid-payments.md` for a full example):
+
+```markdown
+# Payments Landing Zone
+
+## Region
+- primary: eu-central-1
+
+## Topology
+- topology: hub-spoke
+
+## Network
+- cidr: 10.0.0.0/16
+- central_network_account: Network
+
+## Security
+- audit_retention_days: 2555
+- centralized_logging: true
+
+## CI/CD
+- mode: private
+- placement: shared-vpc
+```
+
+### 2. Discover Signals and Gaps
+
+```bash
+iac-llm-wrapper discover -i design.md --pattern baseline --addon pci-compliance
+```
+
+The tool extracts decisions, detects signals (PCI scope, regulated industry, hybrid connectivity), and reports any gaps.
+
+### 3. Diff Against Known-Good Catalog
+
+```bash
+# Generate a catalog entry comparison
+iac-llm-wrapper catalog diff --entry lza-financial --input decisions.json
+```
+
+Shows where your design deviates from proven configurations.
+
+### 4. Compile to Decision Artifacts
+
+```bash
+iac-llm-wrapper compile -i design.md -o out/ --pattern baseline --addon pci-compliance
+```
+
+Output includes:
+- `decision-report.yaml` — all decisions with WA pillar coverage and audit trail
+- `global-config.yaml` — organization and OU structure
+- `accounts-config.yaml` — account definitions
+- `network-config.yaml` — VPC, CIDR, topology
+- `security-config.yaml` — audit, logging, encryption settings
+- `module-inputs.yaml` — mapped Terraform module variables with pinned versions
+- `deployment-graph.yaml` — phased deployment order with dependencies
+
+### 5. Engineer Handoff
+
+Engineers use the decision artifacts alongside sample configurations:
+
+```bash
+# Show sample config with pinned module references
+iac-llm-wrapper catalog show --entry lza-baseline
+```
+
+The `module-inputs.yaml` provides ready-to-use module references:
+```yaml
+moduleInputs:
+  - moduleName: lza-network
+    variables:
+      cidr: 10.0.0.0/16
+      hub_cidr: 10.0.0.0/20
+  - moduleName: lza-security-baseline
+    variables:
+      audit_retention_days: 2555
+      block_public_access: true
+```
+
+Engineers apply these inputs to their Terraform/CDK/CloudFormation modules.
 
 ## Patterns
 
@@ -68,10 +185,41 @@ Patterns define which questions are asked, what defaults apply, and what knowled
 Addons layer additional requirements onto any base pattern:
 
 ```bash
-intent-engine compile -i design.md --pattern baseline --addon pci-compliance --addon hipaa
+iac-llm-wrapper compile -i design.md --pattern baseline --addon pci-compliance --addon hipaa
 ```
 
 Built-in addons: `pci-compliance`, `hipaa`, `self-hosted-cicd`, `hashicorp-vault`, `paloalto-fw`, `hybrid-challenges`.
+
+## Developer Experience
+
+- **CLI-first workflow**: Typer-based CLI with discover/compile/interview/validate/catalog/template/review commands for both architects and platform engineers.
+- **uv for dependency management**: Fast, reproducible local setup and CI parity.
+- **Model-driven type safety**: Pydantic v2 models are the contract for extraction, normalization, validation, and generation.
+- **Fail-closed validation**: Graph-driven violation codes prevent incomplete or contradictory decisions from reaching implementation.
+
+## Quality and Security
+
+Current quality gates:
+
+```bash
+uv run ruff check .
+uv run ruff format --check .
+uv run pytest
+```
+
+Recommended local hooks:
+
+```bash
+uv run pre-commit install
+uv run pre-commit run --all-files
+```
+
+Security posture:
+
+- No cloud API calls and no direct infrastructure deployment from prose.
+- Decision artifacts are auditable (timestamps, rationale, compliance context).
+- CI runs lint, format, and tests across supported Python versions.
+- Dependency and static security checks are part of the roadmap for hardening before broader GA.
 
 ## Extending
 
@@ -138,30 +286,46 @@ See the [extension guide](EXTENSION.md) for the full contract.
 ## Architecture
 
 ```
-src/intent_engine/
-├── cli.py                 # Typer CLI
-├── core/
-│   ├── models.py          # Domain models (pattern-agnostic)
-│   ├── requirements.py    # Requirement + RequirementGraph
-│   ├── extractor.py       # LLM extraction (graph-driven prompts)
-│   ├── interview.py       # Guided question engine
-│   ├── normalizer.py      # Deterministic defaults
-│   ├── validator.py       # Fail-closed validation
-│   ├── discovery.py       # Gap/signal detection
-│   ├── generator.py       # Output registry
-│   ├── compiler.py        # Orchestrator
-│   ├── catalog.py         # Known-good decision sets
-│   ├── llm_caller.py      # OpenAI/Ollama/Anthropic backends
-│   └── patterns.py        # Pattern registry + addon system
-└── patterns/
-    ├── lza/               # Landing Zone Accelerator patterns
-    ├── kubernetes/        # K8s cluster pattern
-    └── ...                # Add yours here
+iac-llm-wrapper/
+└── src/
+    └── intent_engine/     # Core decision engine
+        ├── cli.py         # Typer CLI
+        ├── core/          # Framework: models, graph, extraction, etc.
+        └── patterns/      # Pluggable patterns (LZA, K8s, ...)
 ```
 
 ## Why Not Terraform/CDK/CloudFormation?
 
 Those tools execute infrastructure. This tool **designs infrastructure** — it captures the architectural decisions that should be made *before* provisioning. It produces decision artifacts that engineers use alongside sample configurations and IaC modules. It does not generate deployable infrastructure.
+
+## LLM Testing
+
+Tested with local Ollama models on real design documents:
+
+| Model | Size | Payments LZA | K8s Platform | Enterprise Hybrid |
+|-------|------|-------------|-------------|-------------------|
+| qwen2.5:3b | 3B | ✓ | ✓ | ✓ |
+| llama3.2:3b | 3B | ✓ | — | — |
+
+**What a 3B model can extract:**
+- Region, topology, CIDR blocks
+- Security settings (audit retention, logging, encryption)
+- CI/CD mode and placement
+- Network appliance configuration
+- Kubernetes cluster name, version, node pools
+
+**What it struggles with:**
+- Complex account/OU lists (use `--decisions` JSON)
+- Multi-workload parsing (structured format helps)
+- Implicit requirements (signal detection covers these)
+
+Run the test suite:
+
+```bash
+./scripts/test-llm-extraction.sh qwen2.5:3b
+```
+
+See [docs/LLM_SETUP.md](docs/LLM_SETUP.md) for detailed model setup and troubleshooting.
 
 ## Project Status
 

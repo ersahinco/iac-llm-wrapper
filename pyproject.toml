@@ -1,5 +1,5 @@
 [project]
-name = "intent-engine"
+name = "iac-llm-wrapper"
 version = "0.1.0"
 description = "Knowledge-driven infrastructure decision engine. Capture architectural intent, validate decisions, and produce traceable artifacts."
 readme = "README.md"
@@ -29,17 +29,22 @@ dependencies = [
 ]
 
 [project.urls]
-homepage = "https://github.com/ersahinco/intent-engine"
-repository = "https://github.com/ersahinco/intent-engine"
-documentation = "https://github.com/ersahinco/intent-engine#readme"
+homepage = "https://github.com/ersahinco/iac-llm-wrapper"
+repository = "https://github.com/ersahinco/iac-llm-wrapper"
+documentation = "https://github.com/ersahinco/iac-llm-wrapper#readme"
 
 [project.scripts]
-intent-engine = "intent_engine.cli:app"
+iac-llm-wrapper = "intent_engine.cli:app"
 
 [project.optional-dependencies]
 dev = [
+    "build>=1.0",
     "pytest>=8.0",
+    "pytest-cov>=5.0",
     "ruff>=0.4",
+    "mypy>=1.10",
+    "pip-audit>=2.7",
+    "bandit>=1.7",
     "pre-commit>=3.0",
 ]
 llm = [
@@ -62,6 +67,34 @@ select = ["E", "F", "I", "UP"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+files = [
+    "src/intent_engine/cli.py",
+    "src/intent_engine/core/catalog.py",
+    "src/intent_engine/core/patterns.py",
+    "src/intent_engine/core/requirements.py",
+    "src/intent_engine/core/discovery.py",
+    "src/intent_engine/core/interview.py",
+    "src/intent_engine/core/normalizer.py",
+    "src/intent_engine/core/llm_caller.py",
+    "src/intent_engine/core/suggestion.py",
+    "src/intent_engine/core/extractor.py",
+    "src/intent_engine/core/compiler.py",
+    "src/intent_engine/core/generator.py",
+    "src/intent_engine/core/validator.py",
+    "src/intent_engine/core/model_introspection.py",
+    "src/intent_engine/patterns/kubernetes/__init__.py",
+    "src/intent_engine/patterns/lza/generators.py",
+]
+pretty = true
+show_error_codes = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
 
 [tool.setuptools.packages.find]
 where = ["src"]

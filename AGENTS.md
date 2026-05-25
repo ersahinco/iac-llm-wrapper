@@ -1,6 +1,6 @@
 # AGENTS.md
 
-## Project: intent-engine-wrapper
+## Project: intent-engine
 
 **General-purpose intent-driven configuration framework.** Landing zone accelerator (LZA) is Pattern #1 — the first use case that proves the architecture. The framework captures architectural intent from design documents, validates it against requirements, and produces traceable decision artifacts that engineers map to their provisioning system of choice.
 
@@ -172,24 +172,44 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff.
 <!-- UPDATE THIS SECTION AT END OF EVERY SESSION -->
 
 ### Current Goal
-Clean separation of generic core from use-case patterns; versioned sample config system with real fixture files.
+LLM-first product capability: real design documents, catalog module mapping, LLM-guided extraction, and engineer handoff documentation. LLM is the key accelerator — deterministic fallback exists but is secondary. Local LLM testing is each developer's responsibility.
 
 ### Status
 - **Tests**: 382 passing, 1 skipped (LLM non-determinism)
 - **Lint**: clean
 - **Format**: clean
-- **Last session**: Completed:
-  - **Use-case contamination cleanup**: Stripped all LZA-specific logic from core files into pattern-specific modules:
-    - **`core/validator.py`**: Removed LZA intent-level checks (hub-spoke, egress, cicd, workload, hybrid). Created `patterns/lza/validators.py` with graph-aware `validate_lza_intent()` that checks requirement availability before enforcing rules.
-    - **`core/normalizer.py`**: Removed CI/CD guardrails and central network account derivation (topology cascade now handled by graph via `cascade` rules). Created `patterns/lza/normalizer.py` with `normalize_lza()` reading from `patterns/lza/defaults.yaml`.
-    - **`core/discovery.py`**: Removed `_check_legacy_consistency` and `_detect_legacy_signals`. Added `extra_consistency_checks`/`extra_signal_detectors` hooks to `DiscoveryEngine`. Created `patterns/lza/discovery.py` with LZA handlers.
-    - **`core/extractor.py`**: Removed all `intent_engine.patterns.lza` imports (Workload, NetworkMode, Account, OU, RawIntent). Refactored `_parse_workloads/accounts/ous` to use generic `append_to_list_field`.
-    - **`core/defaults.yaml`**: Stripped to minimal. Created `patterns/lza/defaults.yaml` with LZA-specific defaults.
-    - **`core/patterns.py`**: Removed `_CATEGORY_TO_SECTION`, `_BASELINE_SECTION_ORDER`, `_BASELINE_FREE_FORM_EXAMPLES`.
-    - **`core/suggestion.py`**: Removed hardcoded `("topology", "central_network_account")` priority key check.
-    - **`core/compiler.py`**: Fixed intent-building to apply graph cascades after LLM result parsing.
-    - **Pattern wiring**: LZA patterns in `patterns/lza/__init__.py` now carry `normalizer=normalize_lza`, `validators=[validate_lza_intent]`, and discovery hooks. Generators and catalog are auto-imported for registration.
-    - **Core verification**: No `from intent_engine.patterns.lza` imports remain in any `core/*.py` file. Tests: 382 pass, lint/format clean.
+- **Repo**: `github.com/ersahinco/intent-engine` (private)
+- **Last session**: Updated docs for OSS hardening direction:
+  - README now uses uv-first Quick Start for contributors
+  - README adds Developer Experience and Quality/Security sections
+  - docs/PROMPT.md rewritten as current hardening execution prompt
+  - Emphasis added for type safety, security checks, and CLI UX goals
+  - Added mypy, pip-audit, and bandit to developer tooling and CI
+  - Improved CLI validation UX for pattern/addon/decisions input errors
+  - Added coverage gate in CI (`pytest-cov`, fail-under 80)
+  - Expanded mypy scope to `core/catalog.py` and `core/patterns.py`
+  - Added `SECURITY.md` and `bandit.yaml` policy baseline
+  - Expanded mypy scope to `core/requirements.py`, `core/discovery.py`, and `core/interview.py`
+  - Resolved new type issues in graph intent sync and discovery summary typing
+  - Tuned security policy: removed unnecessary B101 skip (no asserts in src), simplified exception guidance to "fix in code, document only if confirmed false positive"
+  - Added release automation: `release.yml` workflow with PyPI trusted publishing + GitHub Release auto-notes
+  - Added `CHANGELOG.md`, `RELEASING.md`, and PR template
+  - Added `build` to dev dependencies
+  - Expanded mypy scope to `core/normalizer.py`, `core/llm_caller.py`, and `core/suggestion.py`
+  - Added supply-chain hardening: committed `uv.lock`, SBOM generation in CI, SLSA provenance in release workflow
+  - Expanded mypy scope to `core/extractor.py`, `core/compiler.py`, `core/generator.py`, and `core/validator.py`
+  - Added operational controls: `CODEOWNERS`, branch protection guidance in `CONTRIBUTING.md`
+  - Added optional pre-commit CI enforcement workflow (`pre-commit.yml`)
+  - Expanded mypy scope to `core/model_introspection.py`, `patterns/kubernetes/__init__.py`, and `patterns/lza/generators.py`
+  - Fixed ruamel.yaml `sort_keys` usage across generator and kubernetes patterns
+  - Tuned CI performance: split `quality` into `lint` (single Python version) and `test` (matrix), made `pre-commit` PR-only to avoid redundant main-branch runs
+  - Created real-world examples: `fixtures/kubernetes-enterprise.md`, updated README with Real-World Usage section
+  - Added `docs/CAPABILITY.md` documenting honest scope, LLM vs deterministic fallback, module mapping, and catalog usage
+  - Tested LLM extraction with local Ollama models (qwen2.5:3b, llama3.2:3b)
+  - Verified 3B parameter models successfully extract region, topology, CIDR, security settings, K8s config from Markdown
+  - Added `docs/LLM_SETUP.md` with model recommendations, hardware requirements, and troubleshooting
+  - Added `scripts/test-llm-extraction.sh` for automated LLM quality testing
+  - Updated README with Ollama-first Quick Start
 
 ### Done
 | Area | Item |
@@ -218,20 +238,44 @@ Clean separation of generic core from use-case patterns; versioned sample config
 | LZA fixture files | `fixtures/lza-baseline-v1/` with 6 real config files (org, accounts, global, iam, security, network) |
 | K8s fixture files | `fixtures/kubernetes-v1/` with cluster and namespace config |
 | Sample config registrations | `lza-baseline-v1`, `lza-minimal-v1`, `k8s-cluster-v1` with pinned module refs |
+| **OSS release** | LICENSE (Apache 2.0), README.md, CONTRIBUTING.md, CI workflow, pre-commit, .gitignore, pyproject metadata |
+| **Real-world examples** | `fixtures/kubernetes-enterprise.md`, `docs/CAPABILITY.md`, README Real-World Usage section |
+| **LLM testing** | Local Ollama tests with qwen2.5:3b and llama3.2:3b on real design docs |
+| **LLM docs** | `docs/LLM_SETUP.md`, `scripts/test-llm-extraction.sh`, Ollama-first README |
 
 ### Next (prioritized)
-1. [ ] Add model fields for compliance addons (pci-compliance, hipaa) so they sync to intent
-2. [ ] Make catalog entries data-driven from pattern + addon defaults
-3. [ ] Explore runtime compilation: compile a design doc into a deployable decision set
+1. [ ] Improve markdown extractor to parse accounts/OUs/workloads without LLM (deterministic fallback)
+2. [ ] Add more pattern-specific sample configs with real module variable schemas
+3. [ ] Create decision-report → Terraform variables file generator
+4. [ ] Monitor CI runtime and cost as usage grows; consider caching `uv` installations.
+5. [ ] Evaluate adding remaining source files to mypy scope when they change (ongoing incremental policy).
 
 ### Blockers
 - (none)
 
 ### Key Decisions This Session
-- **Test separation by concern**: Use-case-specific tests (importing from `intent_engine.patterns.lza`) live in `tests/patterns/lza/`. Core tests use only generic framework imports and inline test models.
-- **Split files for mixed concerns**: `test_requirements.py`, `test_generator.py`, `test_model_introspection.py`, `test_module_mapping.py` were split into generic core portions (using `SampleModel`/`SampleIntent` inline Pydantic models) and LZA-specific portions.
-- **Pytest model collection**: Helper model classes like `SampleModel` are marked `__test__ = False` to prevent pytest from trying to collect them as test classes.
-- **Versioned sample config system**: `SampleConfig` carries version, release_date, source_url for provenance. `ModuleRef` pins module source + version constraint so consumers can detect staleness. The project does not manage a module repo — it references known-good pins that consumers validate independently.
-- **Fixture files mirror generator output**: LZA fixture YAML files follow the exact structure that `patterns/lza/generators.py` writers produce, making them useful for diff/validation tests.
-- **K8s fixture files**: Follow the structure of `patterns/kubernetes/` generators (`cluster-config.yaml`, `namespace-config.yaml`).
-- **No hardcoded module versions in core**: Module version pins live in pattern init files alongside pattern registration — the core `sample_config.py` has no knowledge of specific modules.
+- **uv-first docs**: Contributor workflow should default to uv while keeping PyPI install simple for users.
+- **Prompt reset**: docs/PROMPT.md now reflects current OSS hardening priorities instead of completed genericity tasks.
+- **Quality posture**: Keep existing ruff/format/pytest gates explicit and stage type/security checks next.
+- **Type-check rollout**: Start with a narrow mypy scope (`src/intent_engine/cli.py`) to establish a passing CI gate, then expand module coverage iteratively.
+- **Security checks in CI**: Add separate `security` job for `pip-audit` and `bandit` so quality failures and security failures are independently visible.
+- **CLI UX principle**: Fail fast with clear errors and practical examples (`--decisions` JSON guidance, explicit pattern/addon availability).
+- **Coverage gate**: Set CI fail-under to 80% as pragmatic baseline (current suite is ~85%).
+- **pip-audit policy**: Use `--skip-editable` for local editable installs while still failing on real dependency vulnerabilities.
+- **Mypy expansion policy**: Expand in small verified slices (2-3 modules) and fix only real typing issues, no broad refactors.
+- **Security policy**: No formal exception workflow needed for a design-time tool. B101 skip removed (no asserts in src). Guidance is fix in code, document only if confirmed false positive.
+- **Release automation**: Tag-driven workflow with PyPI trusted publishing (OIDC) and auto-generated GitHub Release notes. No manual twine uploads.
+- **Supply-chain hardening**: Committed `uv.lock` for reproducible resolution, CycloneDX SBOM generated in CI, SLSA provenance attestations on release artifacts.
+- **LLM testing policy**: Local LLM testing is each developer's responsibility — whether via Ollama or API key. CI may run LLM tests if API keys are configured, but local validation is the gate. `./scripts/test-llm-extraction.sh` validates extraction quality before PRs.
+- **Deterministic fallback scope**: Exists for unit tests and CI bootstrapping only. It applies graph defaults and does keyword matching — it cannot parse free-form prose. Not a production extraction path.
+- **Operational controls**: `CODEOWNERS` for review ownership, branch protection guidance in CONTRIBUTING.md, pre-commit CI as optional but recommended check.
+- **Pre-commit CI**: Separate workflow runs pre-commit on all files to catch issues without requiring local hook installation.
+- **CI matrix**: Split `quality` into `lint` (single Python version) and `test` (matrix) to avoid redundant lint/format/type-check runs. Pre-commit runs on PR only since `main` is protected.
+- **Apache 2.0**: Standard for infrastructure tooling, permissive, OSI-approved.
+- **CI matrix**: 3.11/3.12/3.13 — covers all supported Python versions.
+- **Pre-commit**: ruff lint+format run on every commit; lower friction than CI-only enforcement.
+- **pyproject.toml metadata**: Setuptools.find with `where = ["src"]`, `namespaces = false` — matches existing src-layout.
+- **README tone**: Focus on core capability (decision capture + validation), not LZA specifics. Quick Start → Play (without LLM) → Extend (new pattern, requirement, addon) → CLI reference → Project status.
+- **CONTRIBUTING**: Links to EXTENSION.md as the canonical extension contract. Pre-commit install is optional but documented.
+- **Venv recreation**: Old `.venv` had hardcoded shebang to `/intent-engine/` path; deleted and recreated from scratch. This may affect other developers — AGENTS.md now documents `.venv/bin/python` as the canonical runner.
+- **No .venv in .gitignore for CI**: CI installs via `pip install -e ".[dev,llm]"`; .venv/ is in .gitignore for local dev but irrelevant in CI.

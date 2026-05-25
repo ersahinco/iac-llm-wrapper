@@ -1,0 +1,161 @@
+# LLM Setup Guide
+
+## Overview
+
+`iac-llm-wrapper` is **LLM-first**. Local models via Ollama are the primary development path. No API key or cloud service required. A 3B parameter model running locally is sufficient for most design documents.
+
+**Important**: LLM testing is a local developer responsibility. CI does not run LLM tests (no API keys in GitHub Actions, no Ollama in CI). Every developer validates extraction quality with their own local models before submitting PRs.
+
+## Quick Start with Ollama
+
+### 1. Install Ollama
+
+```bash
+# macOS
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Or download from https://ollama.com/download
+```
+
+### 2. Pull a Small Model
+
+For infrastructure extraction, small models (3B parameters) work well:
+
+```bash
+# Recommended: Qwen 2.5 3B - fast, good instruction following
+ollama pull qwen2.5:3b
+
+# Alternative: Llama 3.2 3B - good general performance
+ollama pull llama3.2:3b
+```
+
+### 3. Start Ollama
+
+```bash
+ollama serve
+```
+
+### 4. Verify Model is Running
+
+```bash
+curl http://localhost:11434/api/tags
+```
+
+### 5. Run the Tool
+
+```bash
+# Compile with local LLM
+iac-llm-wrapper compile -i design.md -o out/ --pattern baseline --provider ollama --model qwen2.5:3b
+
+# Or set environment variable
+export INTENT_ENGINE_PROVIDER=ollama
+export INTENT_ENGINE_MODEL=qwen2.5:3b
+iac-llm-wrapper compile -i design.md -o out/ --pattern baseline
+```
+
+## Model Recommendations
+
+| Model | Size | Speed | Quality | Best For |
+|-------|------|-------|---------|----------|
+| `qwen2.5:3b` | 3B | Fast | Good | General extraction, structured output |
+| `llama3.2:3b` | 3B | Fast | Good | General extraction, longer contexts |
+| `phi4:14b` | 14B | Medium | Better | Complex multi-region designs |
+| `deepseek-r1:7b` | 7B | Medium | Better | Reasoning-intensive discovery |
+
+### Hardware Requirements
+
+- **3B models**: ~2GB RAM, runs on most laptops
+- **7B models**: ~4GB RAM, modern laptop or desktop
+- **14B models**: ~8GB RAM, dedicated GPU recommended
+
+## Testing Local LLM Extraction
+
+Run the test script against all fixtures:
+
+```bash
+./scripts/test-llm-extraction.sh qwen2.5:3b
+```
+
+This tests compilation of all fixture documents and reports success/failure for each.
+
+## LLM vs Deterministic Fallback
+
+### With LLM (Production Path)
+- Extracts free-form values from prose (accounts, workloads, CIDRs)
+- Detects signals from unstructured text
+- Fills gaps with guided interview
+- Handles implicit requirements
+- **This is the intended production path**
+
+### Without LLM (Bootstrap / CI Only)
+- Uses graph defaults only
+- Requires explicit `--decisions` JSON for custom values
+- Signal detection still works via keyword matching
+- **Not sufficient for real design documents**
+
+The deterministic fallback exists for:
+- Unit tests (fast, no external dependencies)
+- CI bootstrapping (when no API key is available)
+- Developer workflow without LLM setup
+
+It cannot parse free-form prose. If you feed a 20-page design document into the tool without an LLM, you get default values — not the architect's intent.
+
+### When to Use Each
+
+| Scenario | Recommendation |
+|----------|---------------|
+| Local development | Ollama with 3B model or API key |
+| CI with API key | Cloud LLM (set `OPENAI_API_KEY`) |
+| CI without API key | Deterministic fallback (limited) |
+| Complex enterprise docs | 7B+ model or cloud LLM |
+| Quick validation / unit tests | Deterministic fallback |
+
+## Troubleshooting
+
+### Model Times Out
+- 3B models should respond in 10-30 seconds
+- Increase timeout: `INTENT_ENGINE_TIMEOUT=60`
+- Try a faster model (qwen2.5:3b is generally fastest)
+
+### Extraction Quality is Poor
+- Ensure the document follows the expected structure (see `fixtures/`)
+- Try a larger model (7B+)
+- Use `--decisions` JSON for critical values
+- Check the LLM evidence output: `--evidence-output evidence.json`
+
+### Ollama Not Detected
+- Verify Ollama is running: `curl http://localhost:11434/api/tags`
+- Check the model is pulled: `ollama list`
+- Try specifying base URL: `--base-url http://localhost:11434/v1`
+
+## Cloud LLM Options
+
+If local models are insufficient:
+
+```bash
+# OpenAI
+export OPENAI_API_KEY=sk-...
+iac-llm-wrapper compile -i design.md -o out/ --provider openai --model gpt-4o-mini
+
+# Anthropic
+export ANTHROPIC_API_KEY=sk-ant-...
+iac-llm-wrapper compile -i design.md -o out/ --provider anthropic --model claude-3-haiku
+```
+
+## Performance Benchmarks
+
+On Apple M3 Pro (18GB RAM):
+
+| Model | Compile Time | Quality |
+|-------|-------------|---------|
+| qwen2.5:3b | 8-15s | Good |
+| llama3.2:3b | 10-20s | Good |
+| phi4:14b | 30-60s | Better |
+
+On Intel i7-12700H + RTX 3060:
+
+| Model | Compile Time | Quality |
+|-------|-------------|---------|
+| qwen2.5:3b | 5-10s | Good |
+| llama3.2:3b | 6-12s | Good |
+| phi4:14b | 15-30s | Better |

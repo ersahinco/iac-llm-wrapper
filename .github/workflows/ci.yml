@@ -7,7 +7,33 @@ on:
     branches: [main]
 
 jobs:
-  lint-test:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        run: |
+          uv pip install --system -e ".[dev,llm]"
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Format check
+        run: uv run ruff format --check .
+
+      - name: Type check
+        run: uv run mypy
+
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -21,16 +47,47 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev,llm]"
-
-      - name: Lint
-        run: ruff check .
-
-      - name: Format check
-        run: ruff format --check .
+          uv pip install --system -e ".[dev,llm]"
 
       - name: Test
-        run: python -m pytest tests/ -v --tb=short
+        run: uv run pytest tests/ -v --tb=short --cov=src/intent_engine --cov-report=term-missing --cov-fail-under=80
+
+  security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        run: |
+          uv pip install --system -e ".[dev,llm]"
+
+      - name: Dependency audit
+        run: uv run pip-audit --skip-editable
+
+      - name: Static security scan
+        run: uv run bandit -c bandit.yaml -r src -q -ll
+
+      - name: Generate SBOM
+        run: |
+          uv pip install --system cyclonedx-bom
+          cyclonedx-py environment -o sbom.json --of json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json

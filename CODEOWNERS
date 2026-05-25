@@ -1,0 +1,8 @@
+# Default owner for the entire repository
+* @ersahinco
+
+# Core framework files require explicit review
+/src/intent_engine/core/ @ersahinco
+
+# CI/CD configuration
+/.github/workflows/ @ersahinco

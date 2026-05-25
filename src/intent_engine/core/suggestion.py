@@ -75,7 +75,7 @@ class SuggestionEngine:
         value: str,
     ) -> list[Suggestion]:
         """Suggest consequences if user sets key=value (non-destructive preview)."""
-        suggestions = []
+        suggestions: list[Suggestion] = []
         req = self.graph._requirements.get(key)
         if not req:
             return suggestions
@@ -104,7 +104,7 @@ class SuggestionEngine:
                         )
                     )
 
-        if had_prev:
+        if had_prev and prev_val is not None:
             self.graph._decisions[key] = prev_val
         else:
             self.graph._decisions.pop(key, None)

@@ -82,7 +82,7 @@ class InterviewEngine:
         self.graph.apply_default(key)
         req = self.graph._requirements[key]
         self._history.append((key, f"{req.default} (default)"))
-        self._log_decision(key, req.default, "defaulted")
+        self._log_decision(key, req.default or "", "defaulted")
 
     def skip(self, key: str, reason: str | None = None) -> None:
         self.graph.skip(key)

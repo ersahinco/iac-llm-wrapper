@@ -71,7 +71,7 @@ class OpenAICompatibleBackend(LLMBackend):
                     continue
                 response.raise_for_status()
                 data = response.json()
-                return data["choices"][0]["message"]["content"]
+                return str(data["choices"][0]["message"]["content"])
             except requests.exceptions.Timeout as exc:
                 last_exc = exc
                 if attempt < max_retries - 1:
@@ -94,6 +94,7 @@ class OpenAICompatibleBackend(LLMBackend):
 
         if last_exc:
             raise last_exc
+        raise RuntimeError("Unexpected: retries exhausted without result")
 
 
 class LLMEvidence:

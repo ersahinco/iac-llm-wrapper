@@ -80,7 +80,6 @@ GLOBAL_REGISTRY = GeneratorRegistry()
 def _yaml_dump(data: Any) -> str:
     yaml = ruamel.yaml.YAML()
     yaml.default_flow_style = False
-    yaml.sort_keys = True
     yaml.indent(mapping=2, sequence=4, offset=2)
     buf = StringIO()
     yaml.dump(data, buf)

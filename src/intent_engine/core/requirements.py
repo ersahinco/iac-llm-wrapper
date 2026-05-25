@@ -334,15 +334,19 @@ class RequirementGraph:
                     cascade_types[target_key] = req.target_type
 
         for key, value in self._decisions.items():
-            req = self._requirements.get(key)
-            if req is not None and req.target_field is not None:
-                parsed = self._convert_value(value, req.target_type, req.target_field)
-                self._set_nested(intent, req.target_field, parsed)
-            elif req is None and key in cascade_types:
+            requirement = self._requirements.get(key)
+            if requirement is not None and requirement.target_field is not None:
+                parsed = self._convert_value(
+                    value,
+                    requirement.target_type,
+                    requirement.target_field,
+                )
+                self._set_nested(intent, requirement.target_field, parsed)
+            elif requirement is None and key in cascade_types:
                 # Cascaded keys — use parent requirement's target_type
                 parsed = self._convert_value(value, cascade_types[key], key)
                 self._set_nested(intent, key, parsed)
-            elif req is None:
+            elif requirement is None:
                 # Unknown cascaded key — set as raw string
                 self._set_nested(intent, key, value)
 

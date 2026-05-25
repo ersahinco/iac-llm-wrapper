@@ -15,9 +15,10 @@ import ruamel.yaml
 _DEFAULTS_FILE = Path(__file__).parent / "defaults.yaml"
 
 
-def _load_guardrails() -> dict:
+def _load_guardrails() -> dict[str, Any]:
     with open(_DEFAULTS_FILE) as f:
-        return ruamel.yaml.YAML(typ="safe").load(f)
+        data = ruamel.yaml.YAML(typ="safe").load(f)
+    return data if isinstance(data, dict) else {}
 
 
 def _set_nested(obj: Any, dotted_path: str, value: Any) -> None:

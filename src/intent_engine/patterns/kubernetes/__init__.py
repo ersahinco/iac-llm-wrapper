@@ -168,7 +168,6 @@ def gen_cluster_config(intent: K8sIntent, output_dir: Path) -> None:
 
     yaml = ruamel.yaml.YAML()
     yaml.default_flow_style = False
-    yaml.sort_keys = True
     yaml.indent(mapping=2, sequence=4, offset=2)
     from io import StringIO
 
@@ -204,7 +203,6 @@ def gen_namespace_config(intent: K8sIntent, output_dir: Path) -> None:
 
     yaml = ruamel.yaml.YAML()
     yaml.default_flow_style = False
-    yaml.sort_keys = True
     yaml.indent(mapping=2, sequence=4, offset=2)
     from io import StringIO
 
@@ -226,7 +224,6 @@ def gen_k8s_decision_report(intent: K8sIntent, output_dir: Path) -> None:
 
     yaml = ruamel.yaml.YAML()
     yaml.default_flow_style = False
-    yaml.sort_keys = True
     yaml.indent(mapping=2, sequence=4, offset=2)
     from io import StringIO
 

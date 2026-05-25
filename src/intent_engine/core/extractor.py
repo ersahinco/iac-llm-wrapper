@@ -331,7 +331,7 @@ class Extractor:
             class _FallbackIntent:
                 pass
 
-            intent = _FallbackIntent()
+            intent: Any = _FallbackIntent()
         else:
             intent = model()
 
