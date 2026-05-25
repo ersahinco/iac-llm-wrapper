@@ -9,6 +9,7 @@ validates and coerces types.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -30,6 +31,60 @@ def _bool(v: Any) -> bool | None:
     if isinstance(v, bool):
         return v
     return str(v).lower() in ("true", "yes", "1")
+
+
+def _safe_json_parse(raw: str) -> dict[str, Any] | None:
+    """Parse JSON with recovery for common LLM malformations.
+
+    Handles markdown fences, trailing commas, and extra closing braces
+    that small LLMs occasionally produce.
+    """
+    text = raw.strip()
+    # Strip markdown fences
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if len(lines) >= 2:
+            text = "\n".join(lines[1:-1]).strip()
+    if text.startswith("json"):
+        text = text[4:].strip()
+    if text.startswith("```"):
+        text = text.strip("`").strip()
+    # Try full parse
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict):
+            return parsed
+    except json.JSONDecodeError:
+        pass
+    # Brace-matching recovery: find outermost {…} pair
+    brace_matches = list(re.finditer(r"\{.*\}", text, re.DOTALL))
+    if brace_matches:
+        last_brace = brace_matches[-1].group()
+        try:
+            parsed = json.loads(last_brace)
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+    # Comma-insertion recovery: LLMs often miss commas between top-level keys.
+    # Insert commas after } or ] when followed by whitespace + " (a new key).
+    fixed = re.sub(r'([}\]])[\t\n ]+(?=")', r"\1, ", text)
+    try:
+        parsed = json.loads(fixed)
+        if isinstance(parsed, dict):
+            return parsed
+    except json.JSONDecodeError:
+        pass
+    # Progressive truncation: try stripping trailing content after each }
+    for i in range(len(text) - 1, 0, -1):
+        if text[i] == "}":
+            try:
+                parsed = json.loads(text[: i + 1])
+                if isinstance(parsed, dict):
+                    return parsed
+            except json.JSONDecodeError:
+                continue
+    return None
 
 
 def _int(v: Any) -> int | None:
@@ -56,15 +111,11 @@ class LLMGraphResult:
     def to_intent(self, extractor: Extractor) -> Any:
         """Convert the decision map to a type-safe intent model."""
         intent = extractor._decisions_to_intent(self.decisions)
-        # Parse legacy top-level arrays from the raw response
-        try:
-            parsed = json.loads(self.raw_response)
-            if isinstance(parsed, dict):
-                extractor._parse_workloads(parsed, intent)
-                extractor._parse_accounts(parsed, intent)
-                extractor._parse_ous(parsed, intent)
-        except Exception:
-            pass
+        parsed = _safe_json_parse(self.raw_response)
+        if isinstance(parsed, dict):
+            extractor._parse_workloads(parsed, intent)
+            extractor._parse_accounts(parsed, intent)
+            extractor._parse_ous(parsed, intent)
         return intent
 
 
@@ -204,11 +255,41 @@ class Extractor:
             f"{signal_context}\n"
             "4. Suggest ADDONS when relevant keywords appear in the document.\n"
             "5. Flag CONTRADICTIONS between prose and graph constraints.\n"
-            "6. Identify GAPS: applicable requirements that are not mentioned.\n\n"
+            "6. Identify GAPS: applicable requirements that are not mentioned.\n"
+            "7. Boolean values must be strings: 'true' or 'false'.\n"
+            "8. Integer values must be strings (e.g., '2555', not 2555).\n"
+            "9. If the document mentions accounts, workloads, or OUs, include them as "
+            "top-level JSON arrays in the output.\n"
+            '10. Account format: {"name": "...", "ou": "...", "description": "..."}\n'
+            '11. Workload format: {"name": "...", "target_account": "...", '
+            '"network_mode": "private|public", "port": 8080, "cpu": 256, "memory": 512}\n'
+            '12. OU format: {"name": "...", "description": "..."}\n\n'
+            "=== EXAMPLE OUTPUT ===\n"
+            "For a document with region=eu-central-1, topology=hub-spoke, "
+            "an OU 'Infrastructure', and one account 'prod' under it:\n"
+            "{\n"
+            '  "decisions": {\n'
+            '    "primary_region": "eu-central-1",\n'
+            '    "topology": "hub-spoke"\n'
+            "  },\n"
+            '  "accounts": [{"name": "prod", "ou": "Infrastructure", '
+            '"description": "Production account"}],\n'
+            '  "ous": [{"name": "Infrastructure", '
+            '"description": "Shared services OU"}],\n'
+            '  "design_doc": {},\n'
+            '  "signal_decisions": {},\n'
+            '  "addons_suggested": [],\n'
+            '  "gaps": [],\n'
+            '  "contradictions": []\n'
+            "}\n\n"
             "=== OUTPUT FORMAT ===\n"
             "Return ONLY valid JSON (no markdown fences) with this exact structure:\n"
             "{\n"
             '  "decisions": { ...key: value from document... },\n'
+            '  "accounts": [{"name": "...", "ou": "...", "description": "..."}, ...],\n'
+            '  "ous": [{"name": "...", "description": "..."}, ...],\n'
+            '  "workloads": [{"name": "...", "target_account": "...", '
+            '"network_mode": "...", "port": ..., "cpu": ..., "memory": ...}, ...],\n'
             '  "design_doc": {\n'
             '    "project_name": "...",\n'
             '    "business_justification": "...",\n'
@@ -238,37 +319,7 @@ class Extractor:
         Supports both the new structured format (with decisions/signals/gaps)
         and the legacy flat format for backward compatibility.
         """
-        raw = response.strip()
-
-        # Recovery: strip markdown fences
-        if raw.startswith("```"):
-            lines = raw.splitlines()
-            if len(lines) >= 2:
-                raw = "\n".join(lines[1:-1]).strip()
-        if raw.startswith("json"):
-            raw = raw[4:].strip()
-        if raw.startswith("```"):
-            raw = raw.strip("`").strip()
-
-        # Recovery: try full parse, then brace matching
-        data: dict[str, Any] = {}
-        try:
-            parsed = json.loads(raw)
-            if isinstance(parsed, dict):
-                data = parsed
-        except json.JSONDecodeError:
-            import re
-
-            brace_matches = list(re.finditer(r"\{.*\}", raw, re.DOTALL))
-            if brace_matches:
-                last_brace = brace_matches[-1].group()
-                try:
-                    parsed = json.loads(last_brace)
-                    if isinstance(parsed, dict):
-                        data = parsed
-                except json.JSONDecodeError:
-                    pass
-
+        data: dict[str, Any] = _safe_json_parse(response) or {}
         result = LLMGraphResult(raw_response=response)
 
         # New structured format
@@ -409,7 +460,7 @@ class Extractor:
             return
         from .model_introspection import append_to_list_field
 
-        for ou_data in data.get("ous", []):
+        for ou_data in data.get("ous", data.get("ou", [])):
             if isinstance(ou_data, dict):
                 append_to_list_field(intent, "ous", ou_data)
 

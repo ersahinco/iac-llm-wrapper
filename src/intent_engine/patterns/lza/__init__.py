@@ -182,7 +182,21 @@ BUILTIN_PATTERNS: list[Pattern] = [
         section_map=dict(_BASELINE_SECTION_MAP),
         section_order=list(_BASELINE_SECTION_ORDER),
         free_form_examples=dict(_BASELINE_FREE_FORM_EXAMPLES),
-        prompt_context="This pattern designs AWS Landing Zone Accelerator configurations.",
+        prompt_context=(
+            "This pattern designs AWS Landing Zone Accelerator configurations. "
+            "The design document uses Markdown sections. Extract values as follows:\n"
+            "- Region section → primary_region\n"
+            "- Topology section → topology (hub-spoke or single-vpc)\n"
+            "- Network section → network_cidr, hub_cidr, central_network_account\n"
+            "- Security section → audit_retention_days, centralized_logging, kms_rotation\n"
+            "- CI/CD section → cicd_mode, cicd_placement\n"
+            "- Organizational Units section → each line is an OU with name, description\n"
+            "- Accounts section → each line is an account with name, ou, description\n"
+            "- Workloads section → each line: name, target_account, network_mode, "
+            "port, cpu, memory\n"
+            "- Hybrid Connectivity section → hybrid_required, hybrid_dns_model, "
+            "hybrid_ip_model, on_prem_cidrs"
+        ),
         required_artifacts=[
             "organization-config.yaml",
             "accounts-config.yaml",

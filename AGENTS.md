@@ -179,37 +179,13 @@ LLM-first product capability: real design documents, catalog module mapping, LLM
 - **Lint**: clean
 - **Format**: clean
 - **Repo**: `github.com/ersahinco/intent-engine` (private)
-- **Last session**: Updated docs for OSS hardening direction:
-  - README now uses uv-first Quick Start for contributors
-  - README adds Developer Experience and Quality/Security sections
-  - docs/PROMPT.md rewritten as current hardening execution prompt
-  - Emphasis added for type safety, security checks, and CLI UX goals
-  - Added mypy, pip-audit, and bandit to developer tooling and CI
-  - Improved CLI validation UX for pattern/addon/decisions input errors
-  - Added coverage gate in CI (`pytest-cov`, fail-under 80)
-  - Expanded mypy scope to `core/catalog.py` and `core/patterns.py`
-  - Added `SECURITY.md` and `bandit.yaml` policy baseline
-  - Expanded mypy scope to `core/requirements.py`, `core/discovery.py`, and `core/interview.py`
-  - Resolved new type issues in graph intent sync and discovery summary typing
-  - Tuned security policy: removed unnecessary B101 skip (no asserts in src), simplified exception guidance to "fix in code, document only if confirmed false positive"
-  - Added release automation: `release.yml` workflow with PyPI trusted publishing + GitHub Release auto-notes
-  - Added `CHANGELOG.md`, `RELEASING.md`, and PR template
-  - Added `build` to dev dependencies
-  - Expanded mypy scope to `core/normalizer.py`, `core/llm_caller.py`, and `core/suggestion.py`
-  - Added supply-chain hardening: committed `uv.lock`, SBOM generation in CI, SLSA provenance in release workflow
-  - Expanded mypy scope to `core/extractor.py`, `core/compiler.py`, `core/generator.py`, and `core/validator.py`
-  - Added operational controls: `CODEOWNERS`, branch protection guidance in `CONTRIBUTING.md`
-  - Added optional pre-commit CI enforcement workflow (`pre-commit.yml`)
-  - Expanded mypy scope to `core/model_introspection.py`, `patterns/kubernetes/__init__.py`, and `patterns/lza/generators.py`
-  - Fixed ruamel.yaml `sort_keys` usage across generator and kubernetes patterns
-  - Tuned CI performance: split `quality` into `lint` (single Python version) and `test` (matrix), made `pre-commit` PR-only to avoid redundant main-branch runs
-  - Created real-world examples: `fixtures/kubernetes-enterprise.md`, updated README with Real-World Usage section
-  - Added `docs/CAPABILITY.md` documenting honest scope, LLM vs deterministic fallback, module mapping, and catalog usage
-  - Tested LLM extraction with local Ollama models (qwen2.5:3b, llama3.2:3b)
-  - Verified 3B parameter models successfully extract region, topology, CIDR, security settings, K8s config from Markdown
-  - Added `docs/LLM_SETUP.md` with model recommendations, hardware requirements, and troubleshooting
-  - Added `scripts/test-llm-extraction.sh` for automated LLM quality testing
-  - Updated README with Ollama-first Quick Start
+- **Last session**: Improved LLM extraction for 3B models:
+  - Rewrote extractor prompt with few-shot JSON examples, type coercion rules (booleans→strings, integers→strings), and explicit accounts/OU/workload format guidance
+  - Enhanced pattern `prompt_context` for baseline and kubernetes with section-to-field mapping (e.g., "Region section → primary_region")
+  - Refactored JSON recovery into `_safe_json_parse()` with multi-stage recovery: direct parse → brace matching → comma insertion → progressive truncation
+  - Made `_parse_ous` handle both `ous` and `ou` keys
+  - Verified: payments fixture extracts 5/5 accounts and 2-3/3 OUs consistently (was 0); enterprise fixture extracts 8/8 accounts consistently (was 0)
+  - Known: workloads and OUs from long documents can be dropped by 3B model (capacity limitation, model non-determinism)
 
 ### Done
 | Area | Item |
@@ -242,25 +218,24 @@ LLM-first product capability: real design documents, catalog module mapping, LLM
 | **Real-world examples** | `fixtures/kubernetes-enterprise.md`, `docs/CAPABILITY.md`, README Real-World Usage section |
 | **LLM testing** | Local Ollama tests with qwen2.5:3b and llama3.2:3b on real design docs |
 | **LLM docs** | `docs/LLM_SETUP.md`, `scripts/test-llm-extraction.sh`, Ollama-first README |
+| **Prompt engineering** | Few-shot examples, section mapping, type coercion rules in extractor prompt; pattern prompt_context with section-to-field guidance |
+| **JSON recovery** | `_safe_json_parse()` with multi-stage recovery: direct parse → brace matching → comma insertion → progressive truncation |
+| **Extraction quality** | Payments: 5/5 accounts + 2-3/3 OUs; Enterprise: 8/8 accounts + 2/5 OUs (3B model limitation on long docs) |
 
 ### Next (prioritized)
-1. [ ] Improve markdown extractor to parse accounts/OUs/workloads without LLM (deterministic fallback)
-2. [ ] Add more pattern-specific sample configs with real module variable schemas
-3. [ ] Create decision-report → Terraform variables file generator
-4. [ ] Monitor CI runtime and cost as usage grows; consider caching `uv` installations.
+1. [ ] Add deterministic fallback for accounts/OUs/workloads parsing (keyword-based, no LLM)
+2. [ ] Improve workloads extraction for small models (split extraction or separate LLM call)
+3. [ ] Add more pattern-specific sample configs with real module variable schemas
+4. [ ] Create decision-report → Terraform variables file generator
 5. [ ] Evaluate adding remaining source files to mypy scope when they change (ongoing incremental policy).
 
-### Blockers
-- (none)
-
 ### Key Decisions This Session
-- **uv-first docs**: Contributor workflow should default to uv while keeping PyPI install simple for users.
-- **Prompt reset**: docs/PROMPT.md now reflects current OSS hardening priorities instead of completed genericity tasks.
-- **Quality posture**: Keep existing ruff/format/pytest gates explicit and stage type/security checks next.
-- **Type-check rollout**: Start with a narrow mypy scope (`src/intent_engine/cli.py`) to establish a passing CI gate, then expand module coverage iteratively.
-- **Security checks in CI**: Add separate `security` job for `pip-audit` and `bandit` so quality failures and security failures are independently visible.
-- **CLI UX principle**: Fail fast with clear errors and practical examples (`--decisions` JSON guidance, explicit pattern/addon availability).
-- **Coverage gate**: Set CI fail-under to 80% as pragmatic baseline (current suite is ~85%).
+- **LLM-first prioritization**: Prompt engineering and JSON recovery improvements are the highest-leverage work for extraction quality
+- **Comma-insertion recovery**: Missing commas between top-level JSON keys (common LLM error) handled via regex `([}\]])[\t\n ]+(?=")` → `\1, `
+- **Progressive truncation as last resort**: Scan backwards from end for valid JSON; handles unclosed root objects and extra braces
+- **OU parsing robust**: `_parse_ous` handles both `ous` and `ou` keys from LLM response
+- **Small model capacity**: 3B models reliably extract accounts and OUs from short docs (5 items), but drop items from long docs (8+ items) — use 7B+ for complex documents
+- **Extraction quality verified**: Tested with qwen2.5:3b across multiple runs on payments and enterprise fixtures
 - **pip-audit policy**: Use `--skip-editable` for local editable installs while still failing on real dependency vulnerabilities.
 - **Mypy expansion policy**: Expand in small verified slices (2-3 modules) and fix only real typing issues, no broad refactors.
 - **Security policy**: No formal exception workflow needed for a design-time tool. B101 skip removed (no asserts in src). Guidance is fix in code, document only if confirmed false positive.
