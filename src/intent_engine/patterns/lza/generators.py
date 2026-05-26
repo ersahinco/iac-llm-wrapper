@@ -205,6 +205,10 @@ def gen_decision_report(intent: RawIntent, output_dir: Path, graph=None) -> None
                 "targetAccount": w.target_account,
                 "networkMode": w.network_mode.value,
                 "runtime": w.runtime,
+                "publicIngress": w.public_ingress,
+                "port": w.port,
+                "cpu": w.cpu,
+                "memory": w.memory,
             }
             for w in intent.workloads
         ]
@@ -359,6 +363,27 @@ def map_lza_intent_to_modules(intent: Any) -> list[ModuleInputs]:
                 ModuleInputs(
                     module_name="lza-security-baseline",
                     variables=sec_vars,
+                )
+            )
+
+    # Workload module inputs
+    if hasattr(intent, "workloads"):
+        for w in intent.workloads:
+            wl_vars: dict[str, Any] = {
+                "name": w.name,
+                "target_account": w.target_account,
+                "network_mode": w.network_mode.value,
+                "runtime": w.runtime,
+                "port": w.port,
+                "cpu": w.cpu,
+                "memory": w.memory,
+            }
+            if w.public_ingress is not None:
+                wl_vars["public_ingress"] = w.public_ingress
+            modules.append(
+                ModuleInputs(
+                    module_name="lza-workload",
+                    variables=wl_vars,
                 )
             )
 

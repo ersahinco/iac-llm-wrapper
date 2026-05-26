@@ -262,7 +262,9 @@ class Extractor:
             "top-level JSON arrays in the output.\n"
             '10. Account format: {"name": "...", "ou": "...", "description": "..."}\n'
             '11. Workload format: {"name": "...", "target_account": "...", '
-            '"network_mode": "private|public", "port": 8080, "cpu": 256, "memory": 512}\n'
+            '"network_mode": "private" (or "public"), '
+            '"runtime": "ecs-fargate" (or "ec2" or "eks"), '
+            '"public_ingress": false, "port": 8080, "cpu": 256, "memory": 512}\n'
             '12. OU format: {"name": "...", "description": "..."}\n\n'
             "=== EXAMPLE OUTPUT ===\n"
             "For a document with region=eu-central-1, topology=hub-spoke, "
@@ -289,7 +291,8 @@ class Extractor:
             '  "accounts": [{"name": "...", "ou": "...", "description": "..."}, ...],\n'
             '  "ous": [{"name": "...", "description": "..."}, ...],\n'
             '  "workloads": [{"name": "...", "target_account": "...", '
-            '"network_mode": "...", "port": ..., "cpu": ..., "memory": ...}, ...],\n'
+            '"network_mode": "private", "runtime": "ecs-fargate", '
+            '"public_ingress": false, "port": 8080, "cpu": 256, "memory": 512}, ...],\n'
             '  "design_doc": {\n'
             '    "project_name": "...",\n'
             '    "business_justification": "...",\n'
