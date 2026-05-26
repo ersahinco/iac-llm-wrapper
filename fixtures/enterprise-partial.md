@@ -27,6 +27,7 @@
 
 - required: true
 - dns_model: route53-resolver
+- ip_model: rfc1918-only
 - on_prem_cidrs: 10.100.0.0/16
 
 ## Workloads
