@@ -1,0 +1,49 @@
+# SPEC
+
+## §G GOAL
+Model-driven intent extraction framework. Design doc → structured decisions → validated artifacts. LZA pattern #1.
+
+## §C CONSTRAINTS
+- Python ≥3.11, Pydantic v2, Typer, ruff, pytest
+- Domain-agnostic core. LZA logic → pattern files, not core
+- LLM extraction via Ollama/OpenAI/Anthropic. Deterministic fallback for CI
+- No AWS API calls, no deployment, no root module generation
+- One SPEC.md at root. No split specs
+
+## §I INTERFACES
+- cli: `intent-engine compile|interview|validate|discover|template|catalog|explain|review`
+- graph: `RequirementGraph` — add, decide, status, apply_decisions, cascade
+- models: `RawIntent` + pattern-specific Pydantic models
+- gen: `GeneratorRegistry` — `register(name, fn, priority, category)`
+- llm: `LLMCaller` — `call(prompt)` → `(response, LLMEvidence)`
+- patterns: `PatternRegistry` + `AddonRegistry` — compose, get, list
+- env: `OPENAI_API_KEY`, `INTENT_ENGINE_PROVIDER`, `INTENT_ENGINE_MODEL`
+- file: `SPEC.md` — spec at repo root
+- file: `FORMAT.md` — spec schema at repo root
+
+## §V INVARIANTS
+V1: ∀ decision → recorded in audit trail with timestamp + rationale
+V2: ∄ compile without validate. Fail-closed on violations
+V3: Adding requirement node → auto-updates LLM prompt + interview + catalog
+V4: Every new pattern → zero core changes (verify: no `patterns/` imports in `core/`)
+V5: Each generator has `hasattr` guard for pattern-specific fields
+V6: Test suite ! pass before push. 428+ tests, ruff clean
+
+## §T TASKS
+id|status|task|cites
+T1|x|Interview save/resume+transcript|V1
+T2|x|Discover --resume + LLM flags|V1
+T3|x|Catalog match after compile|V1
+T4|x|LZA schema fixes (flat IAM, schemaVersion, cross-ref validators)|V1
+T5|x|Terraform tfvars generator|V1
+T6|x|Dead code removal (extract_json, describe, validate_template_output, suggest_for_given)|V3
+T7|x|LLM-unavailable warning + honest scope reframe|V3
+T8|x|Benchmark script for LLM extraction quality|V3
+T9|x|Deterministic fallback for accounts/OUs/workloads (keyword-based)|V4
+T10|.|Improve workloads extraction for small models (split extraction)|V3
+T11|.|More pattern-specific sample configs|V4
+T12|.|Decision-report → Terraform variables mapping|V5
+T13|~|Mypy expansion (remaining src files)|V4
+
+## §B BUGS
+id|date|cause|fix

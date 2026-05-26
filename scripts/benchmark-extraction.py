@@ -9,7 +9,6 @@ Exits non-zero if any fixture falls below quality threshold.
 
 import argparse
 import json
-import os
 import subprocess
 import sys
 import tempfile
@@ -78,6 +77,7 @@ def parse_llm_json(raw_response: str) -> dict | None:
 def evidence_response_text(evidence_path: Path) -> str | None:
     try:
         import ruamel.yaml
+
         yaml = ruamel.yaml.YAML(typ="safe")
         with open(evidence_path) as f:
             data = yaml.load(f)
@@ -117,16 +117,27 @@ def run_one(fixture: dict, model: str, provider: str) -> dict:
         start = time.perf_counter()
         proc = subprocess.run(
             [
-                sys.executable, "-m", "intent_engine", "compile",
-                "--input", str(fixture_path),
-                "--output", tmpdir,
-                "--pattern", fixture["pattern"],
-                "--provider", provider,
-                "--model", model,
+                sys.executable,
+                "-m",
+                "intent_engine",
+                "compile",
+                "--input",
+                str(fixture_path),
+                "--output",
+                tmpdir,
+                "--pattern",
+                fixture["pattern"],
+                "--provider",
+                provider,
+                "--model",
+                model,
                 "--dry-run",
-                "--evidence-output", str(evidence_path),
+                "--evidence-output",
+                str(evidence_path),
             ],
-            capture_output=True, text=True, timeout=600,
+            capture_output=True,
+            text=True,
+            timeout=600,
         )
         latency = time.perf_counter() - start
         result["latency_s"] = round(latency, 1)
@@ -219,7 +230,11 @@ def main():
         ous_str = f"{got_ous}/{exp_ous}" if exp_ous != "-1" else got_ous
         wl_str = f"{got_wl}/{exp_wl}" if exp_wl != "-1" else got_wl
 
-        parse_str = r["parse_err"] if r["parse_err"] else (r["violations"] if r.get("violations") else "none")
+        parse_str = (
+            r["parse_err"]
+            if r["parse_err"]
+            else (r["violations"] if r.get("violations") else "none")
+        )
         if len(parse_str) > 29:
             parse_str = parse_str[:26] + "..."
 

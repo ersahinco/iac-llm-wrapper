@@ -11,7 +11,8 @@ from .extractor import Extractor, LLMGraphResult
 from .generator import generate_all
 from .interview import InterviewEngine
 from .llm_caller import LLMCaller, LLMEvidenceStore
-from .markdown_extractor import extract_from_markdown
+from .markdown_extractor import extract_entities_from_markdown, extract_from_markdown
+from .model_introspection import append_to_list_field
 from .normalizer import normalize
 from .patterns import GLOBAL_REGISTRY
 from .validator import Violation, validate
@@ -155,6 +156,12 @@ def compile_design(
         intent = llm_result.to_intent(extractor)
     else:
         intent = pattern_obj.intent_factory()
+        # Deterministic entity extraction fills accounts/OUs/workloads from
+        # Markdown sections when no LLM is available.
+        entities = extract_entities_from_markdown(text)
+        for entity_type in ("ous", "accounts", "workloads"):
+            for item in entities.get(entity_type, []):
+                append_to_list_field(intent, entity_type, item)
     # Apply graph cascades (topology -> network.topology, etc.)
     graph.apply_to_intent(intent)
 

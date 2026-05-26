@@ -269,6 +269,40 @@ class TestValidator:
         compile_design(FIXTURES / "valid-payments.md", out, llm_caller=llm_caller, dry_run=True)
 
 
+class TestDeterministicEntityExtraction:
+    """Verify deterministic entity extraction works end-to-end (no LLM)."""
+
+    def test_deterministic_path_populates_accounts_ous_workloads(self, tmp_path: Path):
+        out = tmp_path / "output"
+        compile_design(FIXTURES / "valid-payments.md", out, llm_caller=None)
+        assert out.exists()
+
+        # Accounts config should have all 5 accounts from markdown
+        acct = _load_yaml(out / "accounts-config.yaml")
+        names = {a["name"] for a in acct["accounts"]}
+        assert names == {"Network", "Audit", "LogArchive", "SharedServices", "PaymentsProd"}
+
+        # Organization config should have all 3 OUs
+        org = _load_yaml(out / "organization-config.yaml")
+        ou_names = {ou["name"] for ou in org["organizationalUnits"]}
+        assert ou_names == {"Security", "Infrastructure", "Workloads/Prod"}
+
+        # Workload config should exist
+        wl = _load_yaml(out / "workload-payments-api.yaml")
+        assert wl["workload"]["name"] == "payments-api"
+        assert wl["workload"]["account"] == "PaymentsProd"
+
+    def test_deterministic_path_catalog_diff_matches(self, tmp_path: Path):
+        out = tmp_path / "output"
+        compile_design(FIXTURES / "valid-payments.md", out, llm_caller=None)
+        report = _load_yaml(out / "decision-report.yaml")
+        # Core decisions from graph defaults + cascades
+        assert report["primaryRegion"] == "eu-central-1"
+        assert report["topology"] == "hub-spoke"
+        # Network account auto-derived from account name containing "network"
+        assert report["network"]["centralNetworkAccount"] == "Network"
+
+
 class TestValidateGenerated:
     @pytest.fixture(autouse=True)
     def setup(self, tmp_path: Path):

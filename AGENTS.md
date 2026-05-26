@@ -173,20 +173,14 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff.
 <!-- UPDATE THIS SECTION AT END OF EVERY SESSION -->
 
 ### Current Goal
-Dead code cleanup, honest scope reframing, and LLM extraction validation with Ollama for stable release readiness.
+T10: Improve workloads extraction for small models (split extraction)
 
 ### Status
-- **Tests**: 428 passing, 1 skipped (LLM non-determinism)
-- **Lint**: clean (no unused imports)
+- **Tests**: 442 passing, 1 skipped (LLM non-determinism)
+- **Lint**: clean
 - **Format**: clean
 - **Repo**: `github.com/ersahinco/intent-engine` (private)
-- **Last session**: Dead code removal and honest scope reframing:
-  - Removed `extract_graph_result()` (alias for `parse_response`), `extract_json()` (duplicate of `_safe_json_parse`), `Pattern.describe()` (3-line debug helper), `validate_template_output()` (never wired), `SuggestionEngine.suggest_for_given()` (never exposed in CLI)
-  - Removed unused `Pattern` fields: `validator_factory`, `generator_factory`, `llm_schema`
-  - Removed 9 dead-code tests: `test_extract_json_*` (3), `TestTemplateValidation.*` (5), `test_suggest_for_given_triggers_downstream`
-  - Added LLM-unavailable warning to `compile` (stderr when `auto_detect_llm` returns `None`)
-  - Reframed IaC generation scope in AGENTS.md: reference variable files are generated, root modules are not
-  - Documented LZA core coupling as architecture debt
+- **Last session**: Cavekit install + T9: deterministic entity extraction for accounts/OUs/workloads
 
 ### Done
 | Area | Item |
@@ -235,38 +229,35 @@ Dead code cleanup, honest scope reframing, and LLM extraction validation with Ol
 | **LLM-unavailable warning** | `compile` prints warning to stderr when `auto_detect_llm` returns `None` |
 | **Dead code removal** | Removed `extract_graph_result`, `extract_json`, `describe`, `validate_template_output`, `suggest_for_given`, unused Pattern fields |
 | **Honest scope reframe** | AGENTS.md: reference tfvars not root modules, LZA coupling documented as debt, silent fallback now warns |
+| **Cavekit install** | Skills (spec/build/check/caveman/backprop), commands (ck-spec/ck-build/ck-check), SPEC.md, FORMAT.md |
+| **Deterministic entity extraction** | `extract_entities_from_markdown()` parses accounts/OUs/workloads from structured Markdown sections without LLM. Wired into compiler deterministic path. 17 unit + 2 integration tests. Verified: valid-payments.md → 5/5 accounts, 3/3 OUs, 1 workload |
 
 ### Next (prioritized)
-1. [ ] Add deterministic fallback for accounts/OUs/workloads parsing (keyword-based, no LLM)
-2. [ ] Improve workloads extraction for small models (split extraction or separate LLM call)
-3. [ ] Add more pattern-specific sample configs with real module variable schemas
-4. [ ] Create decision-report → Terraform variables file generator
-5. [ ] Evaluate adding remaining source files to mypy scope when they change (ongoing incremental policy).
+1. [ ] Improve workloads extraction for small models (split extraction or separate LLM call)
+2. [ ] Add more pattern-specific sample configs with real module variable schemas
+3. [ ] Create decision-report → Terraform variables file generator
+4. [ ] Evaluate adding remaining source files to mypy scope when they change (ongoing incremental policy).
 
 ### Key Decisions This Session
-- **VS Code schema warning fix**: LZA config filenames (`organization-config.yaml`, etc.) trigger VS Code's YAML extension to auto-apply AWS LZA JSON schemas. Our generators produced custom nested structures (e.g., `security.audit.retentionDays`) that don't match real LZA schemas. Rather than chasing AWS schema changes, we suppress auto-detection with `# yaml-language-server: $schema=none` header — honest positioning since these are intent artifacts, not deployable configs.
-- **IAM config flat structure**: Real LZA IAM Config schema expects `permissionBoundary` and `rolePrefix` at top level, not nested under `iam:`. Fixed generator and all fixtures/tests.
-- **Cross-reference validators**: `validate_lza_artifacts()` validates that workload `targetAccount`, network `centralNetworkAccount`, and account `ou` values reference valid entries in sibling config files. Catches silent misconfigurations before engineers consume artifacts.
-- **Schema versioning**: `schemaVersion: lza-v1` in all config files makes version drift detectable and signals intent vs. real LZA configs.
-- **Lean approach**: One `_write()` change (header + schema_version) propagates to all generators. No per-file changes.
-- **Small model capacity**: 3B models reliably extract accounts and OUs from short docs (5 items), but drop items from long docs (8+ items) — use 7B+ for complex documents
-- **Extraction quality verified**: Tested with qwen2.5:3b across multiple runs on payments and enterprise fixtures
-- **7B model recommended**: `qwen2.5:7b` extracts all fields (accounts, OUs, workloads) where 3B drops items from long docs. Default timeout raised from 30s to 180s for 7B+ local models.
-- **pip-audit policy**: Use `--skip-editable` for local editable installs while still failing on real dependency vulnerabilities.
-- **Mypy expansion policy**: Expand in small verified slices (2-3 modules) and fix only real typing issues, no broad refactors.
-- **Security policy**: No formal exception workflow needed for a design-time tool. B101 skip removed (no asserts in src). Guidance is fix in code, document only if confirmed false positive.
-- **Release automation**: Tag-driven workflow with PyPI trusted publishing (OIDC) and auto-generated GitHub Release notes. No manual twine uploads.
-- **Supply-chain hardening**: Committed `uv.lock` for reproducible resolution, CycloneDX SBOM generated in CI, SLSA provenance attestations on release artifacts.
-- **LLM testing policy**: Local LLM testing is each developer's responsibility — whether via Ollama or API key. CI may run LLM tests if API keys are configured, but local validation is the gate. `./scripts/test-llm-extraction.sh` validates extraction quality before PRs.
-- **Deterministic fallback scope**: Exists for unit tests and CI bootstrapping only. It applies graph defaults and does keyword matching — it cannot parse free-form prose. Not a production extraction path.
-- **Operational controls**: `CODEOWNERS` for review ownership, branch protection guidance in CONTRIBUTING.md, pre-commit CI as optional but recommended check.
-- **Pre-commit CI**: Separate workflow runs pre-commit on all files to catch issues without requiring local hook installation.
-- **CI matrix**: Split `quality` into `lint` (single Python version) and `test` (matrix) to avoid redundant lint/format/type-check runs. Pre-commit runs on PR only since `main` is protected.
-- **Apache 2.0**: Standard for infrastructure tooling, permissive, OSI-approved.
-- **CI matrix**: 3.11/3.12/3.13 — covers all supported Python versions.
-- **Pre-commit**: ruff lint+format run on every commit; lower friction than CI-only enforcement.
-- **pyproject.toml metadata**: Setuptools.find with `where = ["src"]`, `namespaces = false` — matches existing src-layout.
-- **README tone**: Focus on core capability (decision capture + validation), not LZA specifics. Quick Start → Play (without LLM) → Extend (new pattern, requirement, addon) → CLI reference → Project status.
-- **CONTRIBUTING**: Links to EXTENSION.md as the canonical extension contract. Pre-commit install is optional but documented.
-- **Venv recreation**: Old `.venv` had hardcoded shebang to `/intent-engine/` path; deleted and recreated from scratch. This may affect other developers — AGENTS.md now documents `.venv/bin/python` as the canonical runner.
-- **No .venv in .gitignore for CI**: CI installs via `pip install -e ".[dev,llm]"`; .venv/ is in .gitignore for local dev but irrelevant in CI.
+- **Caveman ecosystem adoption**: Three-layer install — cavekit (spec/build/check/backprop skills) for opencode, FORMAT.md + SPEC.md at repo root. Cavemem blocked by Node 26/sqlite native compile. Caveman-code skipped (standalone agent would replace opencode).
+- **Deterministic entity extraction approach**: Added `extract_entities_from_markdown()` to `markdown_extractor.py` (not `extractor.py`) — keeps regex-based Markdown parsing alongside existing `MarkdownExtractor`. Reuses same `append_to_list_field` helper that the LLM path uses. Architecture is clean: both paths converge into the same intent model.
+- **Section regex design**: `_find_section()` uses `re.IGNORECASE` for case-insensitive heading matching, `\s+` for flexible whitespace between heading words, and handles blank lines after headings. Verified against all fixture files.
+- **Type coercion in deterministic path**: Workload fields (`port`, `cpu`, `memory` → int; `public_ingress` → bool) are auto-coerced to match Pydantic model expectations. This matches what the LLM JSON response would provide naturally.
+- **Compiler integration**: Entity extraction fires in the deterministic path (no LLM decisions). When LLM is available, the LLM JSON response path handles accounts/OUs/workloads. Two separate paths, same outcome.
+- **SPEC.md as build dashboard**: T9 tracked through cavekit lifecycle: `.` → `~` → `x`. Build verification includes full test suite, lint, and format on each task completion.
+
+Respond terse like smart caveman. All technical substance stay. Only fluff die.
+
+Rules:
+- Drop: articles (a/an/the), filler (just/really/basically), pleasantries, hedging
+- Fragments OK. Short synonyms. Technical terms exact. Code unchanged.
+- Pattern: [thing] [action] [reason]. [next step].
+- Not: "Sure! I'd be happy to help you with that."
+- Yes: "Bug in auth middleware. Fix:"
+
+Switch level: /caveman lite|full|ultra|wenyan
+Stop: "stop caveman" or "normal mode"
+
+Auto-Clarity: drop caveman for security warnings, irreversible actions, user confused. Resume after.
+
+Boundaries: code/commits/PRs written normal.
