@@ -91,7 +91,9 @@ def gen_security_config(intent: RawIntent, output_dir: Path) -> None:
                 "centralized": intent.security.centralized_logging,
             },
             "egressInspection": {
-                "mode": intent.security.egress_inspection.value,
+                "mode": intent.security.egress_inspection.value
+                if intent.security.egress_inspection
+                else "none",
             },
         },
     }
@@ -135,7 +137,7 @@ def gen_customizations_config(intent: RawIntent, output_dir: Path) -> None:
     if not hasattr(intent, "cicd"):
         return
     customizations = []
-    if intent.cicd.mode.value == "private" and intent.cicd.vpc_endpoints:
+    if intent.cicd.mode and intent.cicd.mode.value == "private" and intent.cicd.vpc_endpoints:
         customizations.append(
             {
                 "name": "private-cicd-endpoints",
@@ -187,23 +189,29 @@ def gen_decision_report(intent: RawIntent, output_dir: Path, graph=None) -> None
             "haMode": intent.network_appliance.ha_mode.value,
         }
     if hasattr(intent, "cicd"):
-        decisions["cicd"] = {
-            "mode": intent.cicd.mode.value,
-            "placement": intent.cicd.placement,
-            "vpcEndpoints": intent.cicd.vpc_endpoints,
-        }
-        if hasattr(intent.cicd, "runner"):
-            decisions["cicd"]["runner"] = {
-                "platform": intent.cicd.runner.platform.value,
-                "tool": intent.cicd.runner.tool.value,
-                "ephemeral": intent.cicd.runner.ephemeral,
+        cicd_mode = intent.cicd.mode
+        if cicd_mode is not None:
+            decisions["cicd"] = {
+                "mode": cicd_mode.value,
+                "placement": intent.cicd.placement,
+                "vpcEndpoints": intent.cicd.vpc_endpoints,
             }
+            if hasattr(intent.cicd, "runner") and intent.cicd.runner:
+                decisions["cicd"]["runner"] = {
+                    "platform": intent.cicd.runner.platform.value
+                    if intent.cicd.runner.platform
+                    else "enterprise",
+                    "tool": intent.cicd.runner.tool.value
+                    if intent.cicd.runner.tool
+                    else "codepipeline",
+                    "ephemeral": intent.cicd.runner.ephemeral,
+                }
     if hasattr(intent, "workloads"):
         decisions["workloads"] = [
             {
                 "name": w.name,
                 "targetAccount": w.target_account,
-                "networkMode": w.network_mode.value,
+                "networkMode": w.network_mode.value if w.network_mode else "private",
                 "runtime": w.runtime,
                 "publicIngress": w.public_ingress,
                 "port": w.port,
@@ -310,7 +318,7 @@ def gen_workload_skeleton(intent: RawIntent, output_dir: Path) -> None:
                 "account": w.target_account,
                 "region": getattr(intent, "primary_region", "unknown"),
                 "runtime": w.runtime,
-                "networkMode": w.network_mode.value,
+                "networkMode": w.network_mode.value if w.network_mode else "private",
                 "publicIngress": w.public_ingress,
                 "service": {
                     "port": w.port,
@@ -321,7 +329,9 @@ def gen_workload_skeleton(intent: RawIntent, output_dir: Path) -> None:
                 },
                 "networking": {
                     "privateSubnets": True,
-                    "publicSubnets": not w.network_mode.value == "private",
+                    "publicSubnets": not (w.network_mode.value == "private")
+                    if w.network_mode
+                    else False,
                     "securityGroups": [f"{w.name}-sg"],
                 },
             },
@@ -372,7 +382,7 @@ def map_lza_intent_to_modules(intent: Any) -> list[ModuleInputs]:
             wl_vars: dict[str, Any] = {
                 "name": w.name,
                 "target_account": w.target_account,
-                "network_mode": w.network_mode.value,
+                "network_mode": w.network_mode.value if w.network_mode else "private",
                 "runtime": w.runtime,
                 "port": w.port,
                 "cpu": w.cpu,

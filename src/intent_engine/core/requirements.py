@@ -334,6 +334,8 @@ class RequirementGraph:
                     cascade_types[target_key] = req.target_type
 
         for key, value in self._decisions.items():
+            if value is None:
+                continue
             requirement = self._requirements.get(key)
             if requirement is not None and requirement.target_field is not None:
                 parsed = self._convert_value(
