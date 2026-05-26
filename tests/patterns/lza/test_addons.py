@@ -162,47 +162,6 @@ class TestAddonTemplateIntegration:
         assert "phi_encryption" in markdown
 
 
-class TestTemplateValidation:
-    def test_template_baseline_validates_clean(self):
-        from intent_engine.core.compiler import generate_template, validate_template_output
-
-        markdown = generate_template(pattern="baseline")
-        warnings = validate_template_output(markdown, pattern="baseline")
-        assert not warnings, f"Expected no warnings: {warnings}"
-
-    def test_template_minimal_validates_clean(self):
-        from intent_engine.core.compiler import generate_template, validate_template_output
-
-        markdown = generate_template(pattern="minimal")
-        warnings = validate_template_output(markdown, pattern="minimal")
-        assert not warnings, f"Expected no warnings: {warnings}"
-
-    def test_template_with_pci_addon_validates_clean(self):
-        from intent_engine.core.compiler import generate_template, validate_template_output
-
-        markdown = generate_template(pattern="baseline", addon_names=["pci-compliance"])
-        warnings = validate_template_output(
-            markdown, pattern="baseline", addon_names=["pci-compliance"]
-        )
-        assert not warnings, f"Expected no warnings: {warnings}"
-
-    def test_template_with_both_addons_validates_clean(self):
-        from intent_engine.core.compiler import generate_template, validate_template_output
-
-        markdown = generate_template(pattern="baseline", addon_names=["pci-compliance", "hipaa"])
-        warnings = validate_template_output(
-            markdown, pattern="baseline", addon_names=["pci-compliance", "hipaa"]
-        )
-        assert not warnings, f"Expected no warnings: {warnings}"
-
-    def test_workload_template_validates_clean(self):
-        from intent_engine.core.compiler import generate_template, validate_template_output
-
-        markdown = generate_template(pattern="workload")
-        warnings = validate_template_output(markdown, pattern="workload")
-        assert not warnings, f"Expected no warnings: {warnings}"
-
-
 class TestNewDomainAddons:
     def test_self_hosted_cicd_addon_registered(self):
         assert "self-hosted-cicd" in ADDON_REGISTRY.list()

@@ -491,7 +491,3 @@ class Extractor:
             pass
 
         return _FallbackIntent()
-
-    def extract_graph_result(self, text: str, llm_response: str) -> LLMGraphResult:
-        """Full graph-traversal extraction returning structured result."""
-        return self.parse_response(llm_response)

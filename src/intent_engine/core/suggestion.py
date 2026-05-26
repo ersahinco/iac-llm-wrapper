@@ -69,59 +69,6 @@ class SuggestionEngine:
         suggestions.sort(key=lambda x: x.priority)
         return suggestions
 
-    def suggest_for_given(
-        self,
-        key: str,
-        value: str,
-    ) -> list[Suggestion]:
-        """Suggest consequences if user sets key=value (non-destructive preview)."""
-        suggestions: list[Suggestion] = []
-        req = self.graph._requirements.get(key)
-        if not req:
-            return suggestions
-
-        had_prev = key in self.graph._decisions
-        prev_val = self.graph._decisions.get(key)
-        prev_status = self.graph._status.get(key)
-
-        self.graph.decide(key, value)
-
-        for k, r in self.graph._requirements.items():
-            st = self.graph.status(k)
-            if st == RequirementStatus.PENDING and self.graph.is_ready(k):
-                if self.graph.is_applicable(k) and k != key:
-                    reason = self.graph.is_applicable_reason(k) or "now required"
-                    suggestions.append(
-                        Suggestion(
-                            key=k,
-                            label=r.label,
-                            question=r.question,
-                            options=r.options,
-                            default=r.default,
-                            hint=r.hint,
-                            context=f"triggered by {key}={value}: {reason}",
-                            priority=3,
-                        )
-                    )
-
-        if had_prev and prev_val is not None:
-            self.graph._decisions[key] = prev_val
-        else:
-            self.graph._decisions.pop(key, None)
-
-        if prev_status is not None:
-            self.graph._status[key] = prev_status
-        elif key in self.graph._status:
-            self.graph._status.pop(key, None)
-
-        for k in list(self.graph._decisions.keys()):
-            if k != key and k in self.graph._requirements:
-                self.graph._status[k] = RequirementStatus.PENDING
-                self.graph._update_blocked()
-
-        suggestions.sort(key=lambda x: x.priority)
-        return suggestions
-
     def preview_path(self) -> list[dict[str, str]]:
         """Preview the full decision path given current decisions."""
         path = []

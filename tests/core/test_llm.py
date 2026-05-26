@@ -40,26 +40,6 @@ class TestLLMCaller:
         assert evidence.response == "hello world"
         assert evidence.prompt == "say hello"
 
-    def test_extract_json_parses_response(self):
-        backend = MockLLMBackend('{"name": "test", "count": 42}')
-        caller = LLMCaller(backend)
-        data, evidence = caller.extract_json("extract test data")
-
-        assert data == {"name": "test", "count": 42}
-        assert evidence.response == '{"name": "test", "count": 42}'
-
-    def test_extract_json_strips_code_fences(self):
-        backend = MockLLMBackend('```json\n{"foo": "bar"}\n```')
-        caller = LLMCaller(backend)
-        data, _ = caller.extract_json("extract")
-        assert data == {"foo": "bar"}
-
-    def test_extract_json_strips_json_prefix(self):
-        backend = MockLLMBackend('json\n{"foo": "bar"}')
-        caller = LLMCaller(backend)
-        data, _ = caller.extract_json("extract")
-        assert data == {"foo": "bar"}
-
 
 class TestLLMEvidence:
     def test_to_dict(self):

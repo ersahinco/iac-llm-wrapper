@@ -9,6 +9,7 @@ egress inspection completeness, hybrid config completeness).
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from intent_engine.core.requirements import RequirementGraph
@@ -142,3 +143,106 @@ def validate_lza_intent(intent: Any, graph: RequirementGraph | None = None) -> l
                 )
 
     return violations
+
+
+def validate_lza_artifacts(output_dir: Path) -> list[str]:
+    """Validate generated LZA artifacts for cross-file consistency.
+
+    Checks:
+    - Workload targetAccount values exist in accounts-config.yaml
+    - Network centralNetworkAccount exists in accounts-config.yaml
+    - Account OU values exist in organization-config.yaml
+    - All config files have required top-level keys
+    """
+    errors: list[str] = []
+    import ruamel.yaml
+
+    yaml = ruamel.yaml.YAML(typ="safe")
+
+    # Load reference files
+    accounts_data = None
+    org_data = None
+
+    accounts_path = output_dir / "accounts-config.yaml"
+    if accounts_path.exists():
+        with open(accounts_path) as f:
+            accounts_data = yaml.load(f)
+
+    org_path = output_dir / "organization-config.yaml"
+    if org_path.exists():
+        with open(org_path) as f:
+            org_data = yaml.load(f)
+
+    # Collect valid account names
+    valid_accounts: set[str] = set()
+    if accounts_data and isinstance(accounts_data, dict):
+        for acct in accounts_data.get("accounts") or []:
+            if isinstance(acct, dict) and "name" in acct:
+                valid_accounts.add(acct["name"])
+
+    # Collect valid OU names
+    valid_ous: set[str] = set()
+    if org_data and isinstance(org_data, dict):
+        for ou in org_data.get("organizationalUnits") or []:
+            if isinstance(ou, dict) and "name" in ou:
+                valid_ous.add(ou["name"])
+
+    # Check workload target accounts
+    for wl_path in sorted(output_dir.glob("workload-*.yaml")):
+        with open(wl_path) as f:
+            wl_data = yaml.load(f)
+        if isinstance(wl_data, dict):
+            workload = wl_data.get("workload", {})
+            target = workload.get("account")
+            if target and target not in valid_accounts:
+                errors.append(
+                    f"Workload '{workload.get('name', wl_path.stem)}' "
+                    f"targetAccount '{target}' not found in accounts-config.yaml"
+                )
+
+    # Check network centralNetworkAccount
+    net_path = output_dir / "network-config.yaml"
+    if net_path.exists():
+        with open(net_path) as f:
+            net_data = yaml.load(f)
+        if isinstance(net_data, dict):
+            network = net_data.get("network", {})
+            central = network.get("centralNetworkAccount")
+            if central and central not in valid_accounts:
+                errors.append(
+                    f"network-config.yaml centralNetworkAccount '{central}' "
+                    f"not found in accounts-config.yaml"
+                )
+
+    # Check account OU references
+    if accounts_data and isinstance(accounts_data, dict):
+        for acct in accounts_data.get("accounts") or []:
+            if isinstance(acct, dict):
+                ou = acct.get("ou")
+                if ou and ou not in valid_ous:
+                    errors.append(
+                        f"Account '{acct.get('name')}' references OU '{ou}' "
+                        f"not found in organization-config.yaml"
+                    )
+
+    # Check top-level keys in config files
+    required_keys = {
+        "organization-config.yaml": ["organization"],
+        "accounts-config.yaml": ["accounts"],
+        "global-config.yaml": ["global"],
+        "security-config.yaml": ["security"],
+        "network-config.yaml": ["network"],
+    }
+    for fname, keys in required_keys.items():
+        fpath = output_dir / fname
+        if fpath.exists():
+            with open(fpath) as f:
+                data = yaml.load(f)
+            if not isinstance(data, dict):
+                errors.append(f"{fname}: expected dict at top level")
+                continue
+            for key in keys:
+                if key not in data:
+                    errors.append(f"{fname}: missing required key '{key}'")
+
+    return errors

@@ -26,12 +26,8 @@ class Pattern:
     graph_factory: Callable[[], RequirementGraph]
     # Intent model factory — the Pydantic model that this pattern produces
     intent_factory: Callable[[], BaseModel] = field(default_factory=lambda: lambda: BaseModel())
-    # Optional: custom validator, generator, or default catalog
-    validator_factory: Callable[[], Any] | None = None
-    generator_factory: Callable[[], Any] | None = None
-    catalog_name: str | None = None  # reference to a ConfigCatalog entry
-    # Schema hints for LLM extraction — auto-derived from graph if None
-    llm_schema: dict[str, Any] | None = None
+    # reference to a ConfigCatalog entry
+    catalog_name: str | None = None
     # Domain context injected into LLM prompts
     prompt_context: str = ""
     # Section mapping for template generation: key -> (section, field_name)
@@ -108,10 +104,6 @@ class PatternRegistry:
 
     def list(self) -> builtins.list[str]:
         return sorted(self._patterns.keys())
-
-    def describe(self, name: str) -> str:
-        p = self.get(name)
-        return f"{p.name}: {p.description}"
 
 
 # Addon system ----------------------------------------------------------------

@@ -40,7 +40,7 @@ def gen_organization_config(intent: RawIntent, output_dir: Path) -> None:
     }
     if org_name:
         data["organization"]["organizationName"] = org_name
-    _write(output_dir, "organization-config.yaml", data)
+    _write(output_dir, "organization-config.yaml", data, schema_version="lza-v1")
 
 
 def gen_accounts_config(intent: RawIntent, output_dir: Path) -> None:
@@ -56,7 +56,7 @@ def gen_accounts_config(intent: RawIntent, output_dir: Path) -> None:
             }
         )
     data = {"accounts": accounts}
-    _write(output_dir, "accounts-config.yaml", data)
+    _write(output_dir, "accounts-config.yaml", data, schema_version="lza-v1")
 
 
 def gen_global_config(intent: RawIntent, output_dir: Path) -> None:
@@ -73,7 +73,7 @@ def gen_global_config(intent: RawIntent, output_dir: Path) -> None:
             },
         },
     }
-    _write(output_dir, "global-config.yaml", data)
+    _write(output_dir, "global-config.yaml", data, schema_version="lza-v1")
 
 
 def gen_security_config(intent: RawIntent, output_dir: Path) -> None:
@@ -101,7 +101,7 @@ def gen_security_config(intent: RawIntent, output_dir: Path) -> None:
         data["security"]["egressInspection"]["pattern"] = intent.security.inspection_pattern
     if intent.security.inspection_vendor:
         data["security"]["egressInspection"]["vendor"] = intent.security.inspection_vendor
-    _write(output_dir, "security-config.yaml", data)
+    _write(output_dir, "security-config.yaml", data, schema_version="lza-v1")
 
 
 def gen_network_config(intent: RawIntent, output_dir: Path) -> None:
@@ -119,7 +119,7 @@ def gen_network_config(intent: RawIntent, output_dir: Path) -> None:
         data["network"]["hubCidr"] = intent.network.hub_cidr
     if intent.network.spoke_cidrs:
         data["network"]["spokeCidrs"] = intent.network.spoke_cidrs
-    _write(output_dir, "network-config.yaml", data)
+    _write(output_dir, "network-config.yaml", data, schema_version="lza-v1")
 
 
 def gen_iam_config(intent: RawIntent, output_dir: Path) -> None:
@@ -127,10 +127,11 @@ def gen_iam_config(intent: RawIntent, output_dir: Path) -> None:
         return
     cfg = _load_lza_generator_config()
     role_prefix = cfg.get("generator", {}).get("role_prefix", "")
-    data: dict[str, Any] = {"iam": {"permissionBoundary": "enabled"}}
+    # LZA IAM Config schema expects flat top-level properties (no "iam:" wrapper)
+    data: dict[str, Any] = {"permissionBoundary": "enabled"}
     if role_prefix:
-        data["iam"]["rolePrefix"] = role_prefix
-    _write(output_dir, "iam-config.yaml", data)
+        data["rolePrefix"] = role_prefix
+    _write(output_dir, "iam-config.yaml", data, schema_version="lza-v1")
 
 
 def gen_customizations_config(intent: RawIntent, output_dir: Path) -> None:
@@ -146,7 +147,7 @@ def gen_customizations_config(intent: RawIntent, output_dir: Path) -> None:
             }
         )
     data = {"customizations": customizations}
-    _write(output_dir, "customizations-config.yaml", data)
+    _write(output_dir, "customizations-config.yaml", data, schema_version="lza-v1")
 
 
 def gen_decision_report(intent: RawIntent, output_dir: Path, graph=None) -> None:

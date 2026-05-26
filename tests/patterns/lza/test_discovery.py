@@ -174,13 +174,6 @@ class TestSuggestionEngine:
         assert s.default == "eu-central-1"
         assert s.hint is not None
 
-    def test_suggest_for_given_triggers_downstream(self):
-        graph = build_lza_baseline_graph()
-        engine = SuggestionEngine(graph)
-        suggestions = engine.suggest_for_given("topology", "hub-spoke")
-        triggered_keys = [s.key for s in suggestions]
-        assert "central_network_account" in triggered_keys
-
     def test_preview_path_shows_all_requirements(self):
         graph = build_lza_baseline_graph()
         engine = SuggestionEngine(graph)

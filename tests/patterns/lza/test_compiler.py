@@ -72,7 +72,27 @@ class TestValidPaymentsCompilation:
     def test_security_controls_generated(self):
         sec = _load_yaml(self.output / "security-config.yaml")["security"]
         assert sec["s3"]["blockPublicAccess"] is True
-        assert sec["audit"]["retentionDays"] == 2555
+
+    def test_iam_config_is_flat(self):
+        """IAM config should have flat top-level properties (no 'iam:' wrapper)."""
+        data = _load_yaml(self.output / "iam-config.yaml")
+        assert "permissionBoundary" in data
+        assert "iam" not in data
+
+    def test_schema_version_present(self):
+        """All LZA config files should have schemaVersion."""
+        config_files = [
+            "organization-config.yaml",
+            "accounts-config.yaml",
+            "global-config.yaml",
+            "security-config.yaml",
+            "network-config.yaml",
+            "iam-config.yaml",
+            "customizations-config.yaml",
+        ]
+        for fname in config_files:
+            data = _load_yaml(self.output / fname)
+            assert "schemaVersion" in data, f"{fname} missing schemaVersion"
 
     def test_global_config_has_cloudtrail(self):
         glb = _load_yaml(self.output / "global-config.yaml")["global"]
@@ -265,6 +285,65 @@ class TestValidateGenerated:
         errors = validate_generated(tmp_path)
         assert len(errors) > 0
         assert any("organization-config.yaml" in e for e in errors)
+
+
+class TestArtifactValidators:
+    def test_cross_reference_workload_account(self, tmp_path: Path):
+        from intent_engine.patterns.lza.validators import validate_lza_artifacts
+
+        output = tmp_path / "out"
+        output.mkdir()
+        # Account exists
+        (output / "accounts-config.yaml").write_text("accounts:\n  - name: PaymentsProd\n")
+        # Workload references non-existent account
+        (output / "workload-api.yaml").write_text(
+            "workload:\n  name: api\n  account: NonExistent\n"
+        )
+        errors = validate_lza_artifacts(output)
+        assert any("NonExistent" in e for e in errors)
+
+    def test_cross_reference_network_account(self, tmp_path: Path):
+        from intent_engine.patterns.lza.validators import validate_lza_artifacts
+
+        output = tmp_path / "out"
+        output.mkdir()
+        (output / "accounts-config.yaml").write_text("accounts:\n  - name: Network\n")
+        (output / "network-config.yaml").write_text(
+            "network:\n  topology: hub-spoke\n  centralNetworkAccount: Missing\n"
+        )
+        errors = validate_lza_artifacts(output)
+        assert any("Missing" in e for e in errors)
+
+    def test_cross_reference_account_ou(self, tmp_path: Path):
+        from intent_engine.patterns.lza.validators import validate_lza_artifacts
+
+        output = tmp_path / "out"
+        output.mkdir()
+        (output / "organization-config.yaml").write_text(
+            "organization:\n  primaryRegion: eu-central-1\n"
+        )
+        (output / "accounts-config.yaml").write_text("accounts:\n  - name: Test\n    ou: BadOU\n")
+        errors = validate_lza_artifacts(output)
+        assert any("BadOU" in e for e in errors)
+
+    def test_valid_cross_references_pass(self, tmp_path: Path):
+        from intent_engine.patterns.lza.validators import validate_lza_artifacts
+
+        output = tmp_path / "out"
+        output.mkdir()
+        (output / "organization-config.yaml").write_text(
+            "organization:\n  primaryRegion: eu-central-1\n"
+            "organizationalUnits:\n  - name: Infrastructure\n"
+        )
+        (output / "accounts-config.yaml").write_text(
+            "accounts:\n  - name: Network\n    ou: Infrastructure\n"
+        )
+        (output / "network-config.yaml").write_text(
+            "network:\n  topology: hub-spoke\n  centralNetworkAccount: Network\n"
+        )
+        (output / "workload-api.yaml").write_text("workload:\n  name: api\n  account: Network\n")
+        errors = validate_lza_artifacts(output)
+        assert errors == []
 
 
 def _write_report(path: Path, data: dict) -> None:

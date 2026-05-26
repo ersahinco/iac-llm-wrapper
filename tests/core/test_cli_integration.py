@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -40,6 +41,27 @@ class TestCLIDiscover:
         result = runner.invoke(app, ["discover", "--input", "fixtures/valid-payments.md", "--path"])
         assert result.exit_code == 0
         assert "primary_region" in result.output
+
+    def test_discover_with_resume(self, tmp_path: Path):
+        # Create a state file with one decision
+        state_path = tmp_path / "state.json"
+        state = {
+            "pattern": "baseline",
+            "decisions": {"primary_region": "us-west-2"},
+            "skipped": [],
+            "history": [["primary_region", "us-west-2"]],
+            "path_log": [],
+            "audit": [],
+        }
+        state_path.write_text(json.dumps(state))
+
+        result = runner.invoke(
+            app,
+            ["discover", "--input", "fixtures/valid-payments.md", "--resume", str(state_path)],
+        )
+        assert result.exit_code == 0
+        # Should not show the primary_region gap since it's already decided
+        assert "us-west-2" in result.output or "Synced" in result.output
 
 
 class TestCLICompile:
@@ -208,7 +230,7 @@ class TestCLIValidate:
             "security:\n  s3:\n    blockPublicAccess: true\n  audit:\n    retentionDays: 2555\n"
         )
         (output_dir / "network-config.yaml").write_text("network:\n  topology: hub-spoke\n")
-        (output_dir / "iam-config.yaml").write_text("iam:\n")
+        (output_dir / "iam-config.yaml").write_text("permissionBoundary: enabled\n")
         (output_dir / "customizations-config.yaml").write_text("customizations:\n")
         (output_dir / "decision-report.yaml").write_text("primaryRegion: eu-central-1\n")
         (output_dir / "deployment-graph.yaml").write_text("phases:\n")

@@ -28,7 +28,7 @@ from .generators import (  # noqa: F401  — registers generators
 from .models import RawIntent
 from .normalizer import normalize_lza
 from .requirements import build_lza_baseline_graph, build_workload_account_graph
-from .validators import validate_lza_intent
+from .validators import validate_lza_artifacts, validate_lza_intent
 
 
 def _baseline_graph_factory() -> RequirementGraph:
@@ -179,6 +179,7 @@ BUILTIN_PATTERNS: list[Pattern] = [
         catalog_name="lza-sample",
         normalizer=normalize_lza,
         validators=[validate_lza_intent],
+        artifact_validators=[validate_lza_artifacts],
         section_map=dict(_BASELINE_SECTION_MAP),
         section_order=list(_BASELINE_SECTION_ORDER),
         free_form_examples=dict(_BASELINE_FREE_FORM_EXAMPLES),

@@ -170,6 +170,12 @@ def compile(
 
     evidence_store = LLMEvidenceStore()
     llm_caller = auto_detect_llm(provider=provider, api_key=api_key, base_url=base_url, model=model)
+    if llm_caller is None:
+        typer.echo(
+            "WARNING: No LLM available — extracting from Markdown only. "
+            "Set OPENAI_API_KEY or run Ollama locally for LLM-powered extraction.",
+            err=True,
+        )
 
     try:
         compile_design(
@@ -195,7 +201,7 @@ def compile(
             "a valid starting template.",
             err=True,
         )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     if dry_run:
         typer.echo("[Dry-run] Validation successful. No files written.")
@@ -203,12 +209,40 @@ def compile(
             import ruamel.yaml
 
             yaml = ruamel.yaml.YAML(typ="safe")
-            with open(evidence_output, "w") as f:
-                yaml.dump(evidence_store.to_dict(), f)
+            with open(evidence_output, "w") as fh:
+                yaml.dump(evidence_store.to_dict(), fh)
             typer.echo(f"LLM evidence written to: {evidence_output}")
         return
 
     typer.echo(f"Compilation successful. Output written to: {output}")
+
+    # Suggest closest catalog entry
+    from .core.catalog_match import find_best_catalog_match
+
+    match = find_best_catalog_match(graph.decisions(), pattern)
+    if match:
+        entry_name = match["entry_name"]
+        diff = match["diff"]
+        typer.echo("")
+        typer.echo(f"=== Catalog Match: {entry_name} ===")
+        if diff["same"]:
+            typer.echo(f"  Same ({len(diff['same'])}): {', '.join(diff['same'].keys())}")
+        if diff["different"]:
+            typer.echo(f"  Different ({len(diff['different'])}):")
+            for k, d in diff["different"].items():
+                typer.echo(f"    {k}: catalog={d['catalog']}, current={d['current']}")
+        if diff["missing_in_current"]:
+            typer.echo(f"  Missing in current ({len(diff['missing_in_current'])}):")
+            for k, v in diff["missing_in_current"].items():
+                typer.echo(f"    {k}: {v}")
+        if diff["extra_in_current"]:
+            typer.echo(f"  Extra in current ({len(diff['extra_in_current'])}):")
+            for k, v in diff["extra_in_current"].items():
+                typer.echo(f"    {k}: {v}")
+        typer.echo(
+            f"  Run 'intent-engine catalog diff --entry {entry_name} "
+            f"--input <decisions.json>' for full details."
+        )
 
 
 @app.command()
@@ -247,6 +281,41 @@ def discover(
         "-a",
         help="Composable addon to layer (repeatable: --addon pci-compliance --addon hipaa)",
     ),
+    provider: str = typer.Option(
+        os.environ.get("INTENT_ENGINE_PROVIDER", "openai"),
+        "--provider",
+        help="LLM provider: openai, ollama, anthropic",
+    ),
+    model: str = typer.Option(
+        os.environ.get("INTENT_ENGINE_MODEL", ""),
+        "--model",
+        help="Model name (defaults to provider's default)",
+    ),
+    base_url: str = typer.Option(
+        os.environ.get("INTENT_ENGINE_BASE_URL", ""),
+        "--base-url",
+        help="Custom endpoint for OpenAI-compatible API",
+    ),
+    api_key: str = typer.Option(
+        os.environ.get("OPENAI_API_KEY", ""),
+        "--api-key",
+        help="API key for LLM provider",
+    ),
+    evidence_output: Path = typer.Option(
+        None,
+        "--evidence-output",
+        help="Path to write LLM call evidence JSON",
+    ),
+    no_llm: bool = typer.Option(
+        False,
+        "--no-llm",
+        help="Disable LLM extraction (deterministic defaults only)",
+    ),
+    resume: Path = typer.Option(
+        None,
+        "--resume",
+        help="Resume from a previously saved interview state file",
+    ),
 ) -> None:
     """Run discovery analysis on a Markdown design doc or decisions.
 
@@ -254,17 +323,29 @@ def discover(
     Use --decisions to simulate decisions before discovering.
     Use --suggest to see which questions would be asked next.
     Use --path to see the full decision path with statuses.
+
+    When an LLM is available, the design doc prose is extracted first
+    to auto-fill decisions before gap analysis. Use --no-llm to skip.
     """
     if not input.exists():
         typer.echo(f"Error: input path does not exist: {input}", err=True)
         raise typer.Exit(1)
 
-    pattern_obj = _get_pattern_or_exit(pattern)
-    _validate_addons_or_exit(addon)
+    if resume:
+        engine = InterviewEngine.load_state(resume)
+        graph = engine.graph
+        pattern = engine.pattern
+        if addon:
+            typer.echo("Warning: --addon ignored when --resume is used", err=True)
+    else:
+        _validate_addons_or_exit(addon)
 
-    graph = pattern_obj.create_graph()
-    if addon:
-        graph = ADDON_REGISTRY.compose(graph, addon)
+        graph = _get_pattern_or_exit(pattern).create_graph()
+        if addon:
+            graph = ADDON_REGISTRY.compose(graph, addon)
+        engine = InterviewEngine(graph)
+
+    pattern_obj = _get_pattern_or_exit(pattern)
 
     if input.is_dir():
         texts = []
@@ -274,10 +355,40 @@ def discover(
     else:
         text = input.read_text()
 
+    use_llm = not no_llm and any(
+        [
+            model,
+            api_key,
+            base_url,
+            os.environ.get("INTENT_ENGINE_PROVIDER"),
+            os.environ.get("INTENT_ENGINE_MODEL"),
+            os.environ.get("INTENT_ENGINE_BASE_URL"),
+            os.environ.get("OPENAI_API_KEY"),
+        ]
+    )
+
+    evidence_store = LLMEvidenceStore()
+
+    if use_llm:
+        from .core.compiler import LLMContextProvider
+
+        llm_caller = auto_detect_llm(
+            provider=provider, api_key=api_key, base_url=base_url, model=model
+        )
+        llm_provider = LLMContextProvider(
+            prose=text,
+            graph=graph,
+            llm_caller=llm_caller,
+            evidence_store=evidence_store,
+        )
+        llm_result = llm_provider.run()
+        if llm_result.decisions:
+            graph.apply_decisions(llm_result.decisions)
+        if llm_result.signal_decisions:
+            graph.apply_decisions(llm_result.signal_decisions)
+
     extractor = Extractor(graph=graph)
     intent = extractor.extract(text)
-
-    engine = InterviewEngine(graph)
 
     decision_dict = _parse_decisions_or_exit(decisions)
     if decision_dict:
@@ -368,6 +479,14 @@ def discover(
             ctx = f" | {item['context']}" if item["context"] else ""
             typer.echo(f"  {status_icon} {item['key']} = {val}{ctx}")
 
+    if evidence_output and evidence_store.entries:
+        import ruamel.yaml
+
+        yaml = ruamel.yaml.YAML(typ="safe")
+        with open(evidence_output, "w") as fh:
+            yaml.dump(evidence_store.to_dict(), fh)
+        typer.echo(f"LLM evidence written to: {evidence_output}")
+
 
 @app.command()
 def interview(
@@ -405,15 +524,38 @@ def interview(
         "-a",
         help="Composable addon to layer (repeatable: --addon pci-compliance --addon hipaa)",
     ),
+    save: Path = typer.Option(
+        None,
+        "--save",
+        help="Save interview state to JSON file for later resume",
+    ),
+    resume: Path = typer.Option(
+        None,
+        "--resume",
+        help="Resume interview from a previously saved state file",
+    ),
+    transcript: Path = typer.Option(
+        None,
+        "--transcript",
+        help="Write interview transcript as Markdown design document",
+    ),
 ) -> None:
     """Run guided interview to collect infrastructure decisions and produce intent artifacts."""
-    pattern_obj = _get_pattern_or_exit(pattern)
-    _validate_addons_or_exit(addon)
+    from .core.interview import InterviewEngine
 
-    graph = pattern_obj.create_graph()
-    if addon:
-        graph = ADDON_REGISTRY.compose(graph, addon)
-    engine = InterviewEngine(graph)
+    if resume:
+        engine = InterviewEngine.load_state(resume)
+        actual_pattern = engine.pattern
+        if pattern != "baseline" or addon:
+            typer.echo("Warning: --pattern and --addon ignored when --resume is used", err=True)
+    else:
+        pattern_obj = _get_pattern_or_exit(pattern)
+        _validate_addons_or_exit(addon)
+        graph = pattern_obj.create_graph()
+        if addon:
+            graph = ADDON_REGISTRY.compose(graph, addon)
+        engine = InterviewEngine(graph, pattern=pattern)
+        actual_pattern = pattern
 
     decision_dict = _parse_decisions_or_exit(decisions)
     if decision_dict:
@@ -424,6 +566,14 @@ def interview(
     elif not no_defaults:
         engine.apply_defaults_for_remaining()
 
+    if save:
+        engine.save_state(save)
+        typer.echo(f"Interview state saved to: {save}")
+
+    if transcript:
+        Path(transcript).write_text(engine.to_markdown())
+        typer.echo(f"Interview transcript written to: {transcript}")
+
     try:
         engine.to_intent()
         typer.echo(engine.summary())
@@ -432,7 +582,7 @@ def interview(
             engine.graph.decisions(),
             output,
             accept_defaults=not no_defaults,
-            pattern=pattern,
+            pattern=actual_pattern,
         )
         typer.echo(f"Compilation successful. Output written to: {output}")
     except CompileError as e:

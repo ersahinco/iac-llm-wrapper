@@ -412,41 +412,6 @@ def generate_template(
     return "\n".join(lines)
 
 
-def validate_template_output(
-    markdown: str,
-    pattern: str = "baseline",
-    addon_names: list[str] | None = None,
-) -> list[str]:
-    """Validate generated template Markdown parses back correctly.
-
-    Checks that all requirement keys from the pattern + addons graph
-    have corresponding entries in the generated Markdown text.
-    Returns a list of warnings.
-    """
-    from .patterns import ADDON_REGISTRY
-
-    warnings: list[str] = []
-    graph = GLOBAL_REGISTRY.get(pattern).create_graph()
-    if addon_names:
-        graph = ADDON_REGISTRY.compose(graph, addon_names)
-
-    section_map = _build_section_map(pattern, addon_names, graph)
-
-    for key, req in graph._requirements.items():
-        info = section_map.get(key)
-        if info is None:
-            continue
-        _, field_name = info
-        needle = field_name if field_name else req.default or key
-        if needle not in markdown:
-            warnings.append(
-                f"Template missing field for '{key}' ({req.label}). "
-                f"Expected '{needle}' in Markdown output."
-            )
-
-    return warnings
-
-
 def explain_report(report_path: Path) -> str:
     yaml_loader = ruamel.yaml.YAML(typ="safe")
     with open(report_path) as f:

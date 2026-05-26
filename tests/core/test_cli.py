@@ -72,7 +72,7 @@ class TestValidateCommand:
             "security:\n  s3:\n    blockPublicAccess: true\n  audit:\n    retentionDays: 2555\n"
         )
         (output / "network-config.yaml").write_text("network:\n  topology: single-vpc\n")
-        (output / "iam-config.yaml").write_text("iam:\n")
+        (output / "iam-config.yaml").write_text("permissionBoundary: enabled\n")
         (output / "customizations-config.yaml").write_text("customizations:\n")
         (output / "decision-report.yaml").write_text("primaryRegion: eu-central-1\n")
         (output / "deployment-graph.yaml").write_text("phases:\n")

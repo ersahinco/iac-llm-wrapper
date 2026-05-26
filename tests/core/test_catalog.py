@@ -160,6 +160,45 @@ class TestConfigCatalogPersistence:
         assert loaded.decisions["topology"] == "hub-spoke"
 
 
+class TestCatalogMatch:
+    def test_find_best_match_exact(self):
+        from intent_engine.core.catalog_match import find_best_catalog_match
+
+        decisions = {
+            "primary_region": "eu-central-1",
+            "topology": "hub-spoke",
+        }
+        match = find_best_catalog_match(decisions, "baseline")
+        assert match is not None
+        assert match["entry_name"] == "lza-baseline"
+        assert match["score"] >= 0
+
+    def test_find_best_match_no_match_for_unknown_pattern(self):
+        from intent_engine.core.catalog_match import find_best_catalog_match
+
+        decisions = {"primary_region": "eu-central-1"}
+        match = find_best_catalog_match(decisions, "nonexistent-pattern")
+        assert match is None
+
+    def test_find_best_match_scores_differences(self):
+        from intent_engine.core.catalog_match import find_best_catalog_match
+
+        # Different topology should increase score
+        decisions_wrong = {
+            "primary_region": "eu-central-1",
+            "topology": "single-vpc",
+        }
+        match_wrong = find_best_catalog_match(decisions_wrong, "baseline")
+
+        decisions_correct = {
+            "primary_region": "eu-central-1",
+            "topology": "hub-spoke",
+        }
+        match_correct = find_best_catalog_match(decisions_correct, "baseline")
+
+        assert match_wrong["score"] > match_correct["score"]
+
+
 class TestGlobalCatalog:
     def test_singleton(self):
         cat1 = get_catalog()

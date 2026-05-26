@@ -191,51 +191,6 @@ class LLMCaller:
         )
         return response, evidence
 
-    def extract_json(
-        self,
-        prompt: str,
-        schema: dict[str, Any] | None = None,
-        **kwargs: Any,
-    ) -> tuple[dict[str, Any], LLMEvidence]:
-        """Call LLM and parse response as JSON, with optional schema context."""
-        if schema:
-            schema_str = json.dumps(schema, indent=2)
-            prompt = (
-                f"Return valid JSON matching this schema:\n{schema_str}\n\nUser request:\n{prompt}"
-            )
-
-        response, evidence = self.call(prompt, **kwargs)
-
-        cleaned = response.strip()
-
-        if cleaned.startswith("```"):
-            lines = cleaned.splitlines()
-            if len(lines) >= 2:
-                cleaned = "\n".join(lines[1:-1])
-        if cleaned.startswith("json"):
-            cleaned = cleaned[4:].strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.strip("`").strip()
-
-        try:
-            data = json.loads(cleaned)
-            return data, evidence
-        except json.JSONDecodeError:
-            import re
-
-            brace_matches = list(re.finditer(r"\{.*\}", cleaned, re.DOTALL))
-            if brace_matches:
-                last_brace = brace_matches[-1].group()
-                try:
-                    data = json.loads(last_brace)
-                    evidence.parse_error = None
-                    return data, evidence
-                except json.JSONDecodeError:
-                    pass
-
-            evidence.parse_error = f"JSONDecodeError: {cleaned[:200]}"
-            return {}, evidence
-
 
 def auto_detect_llm(
     provider: str = "openai",

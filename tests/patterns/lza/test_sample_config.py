@@ -66,7 +66,7 @@ class TestLZASampleConfigFixtures:
         path = FIXTURES / "lza-baseline-v1" / "iam-config.yaml"
         assert path.exists()
         data = ruamel.yaml.YAML(typ="safe").load(path.read_text())
-        assert data["iam"]["permissionBoundary"] == "enabled"
+        assert data["permissionBoundary"] == "enabled"
 
     def test_security_config_exists(self):
         path = FIXTURES / "lza-baseline-v1" / "security-config.yaml"
