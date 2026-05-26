@@ -28,7 +28,7 @@ class OpenAICompatibleBackend(LLMBackend):
         base_url: str = "https://api.openai.com/v1",
         api_key: str | None = None,
         model: str = "gpt-4o-mini",
-        timeout: int = 30,
+        timeout: int = 180,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")

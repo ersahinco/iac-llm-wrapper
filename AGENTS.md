@@ -221,6 +221,7 @@ LLM-first product capability: real design documents, catalog module mapping, LLM
 | **Prompt engineering** | Few-shot examples, section mapping, type coercion rules in extractor prompt; pattern prompt_context with section-to-field guidance |
 | **JSON recovery** | `_safe_json_parse()` with multi-stage recovery: direct parse → brace matching → comma insertion → progressive truncation |
 | **Extraction quality** | Payments: 5/5 accounts + 2-3/3 OUs; Enterprise: 8/8 accounts + 2/5 OUs (3B model limitation on long docs) |
+| **7B model verified** | `qwen2.5:7b` extracts all accounts (8/8), all OUs (5/5), and workloads (2) from enterprise fixture — complete extraction. Default timeout bumped to 180s for local 7B+ models. |
 
 ### Next (prioritized)
 1. [ ] Add deterministic fallback for accounts/OUs/workloads parsing (keyword-based, no LLM)
@@ -236,6 +237,7 @@ LLM-first product capability: real design documents, catalog module mapping, LLM
 - **OU parsing robust**: `_parse_ous` handles both `ous` and `ou` keys from LLM response
 - **Small model capacity**: 3B models reliably extract accounts and OUs from short docs (5 items), but drop items from long docs (8+ items) — use 7B+ for complex documents
 - **Extraction quality verified**: Tested with qwen2.5:3b across multiple runs on payments and enterprise fixtures
+- **7B model recommended**: `qwen2.5:7b` extracts all fields (accounts, OUs, workloads) where 3B drops items from long docs. Default timeout raised from 30s to 180s for 7B+ local models.
 - **pip-audit policy**: Use `--skip-editable` for local editable installs while still failing on real dependency vulnerabilities.
 - **Mypy expansion policy**: Expand in small verified slices (2-3 modules) and fix only real typing issues, no broad refactors.
 - **Security policy**: No formal exception workflow needed for a design-time tool. B101 skip removed (no asserts in src). Guidance is fix in code, document only if confirmed false positive.
