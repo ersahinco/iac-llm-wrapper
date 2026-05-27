@@ -1,0 +1,205 @@
+"""Target contracts for AWS LZA thin-path generation."""
+
+from __future__ import annotations
+
+from intent_engine.core.contracts import (
+    GLOBAL_CONTRACT_REGISTRY,
+    ArtifactContract,
+    DecisionLineage,
+    TargetContract,
+)
+
+AWS_LZA_SAMPLE_CONFIG_CONTRACT = TargetContract(
+    name="aws-lza-sample-configuration",
+    kind="aws-lza-sample-configuration",
+    source_url=(
+        "https://awslabs.github.io/landing-zone-accelerator-on-aws/latest/sample-configurations/"
+    ),
+    artifacts=[
+        ArtifactContract(
+            name="accounts-config.yaml",
+            description="AWS accounts and account vending inputs.",
+            required_paths=[
+                "mandatoryAccounts[]",
+                "mandatoryAccounts[].name",
+                "mandatoryAccounts[].email",
+                "workloadAccounts[]",
+                "workloadAccounts[].name",
+                "workloadAccounts[].email",
+            ],
+        ),
+        ArtifactContract(
+            name="global-config.yaml",
+            description="Global regions, logging, tags, and inherited properties.",
+            required_paths=[
+                "homeRegion",
+                "enabledRegions",
+                "managementAccountAccessRole",
+                "cloudwatchLogRetentionInDays",
+                "controlTower.enable",
+                "logging.account",
+                "logging.cloudtrail.enable",
+                "logging.cloudtrail.organizationTrail",
+                "logging.sessionManager.sendToCloudWatchLogs",
+                "logging.sessionManager.sendToS3",
+            ],
+        ),
+        ArtifactContract(
+            name="iam-config.yaml",
+            description="IAM and IAM Identity Center resources.",
+            required_paths=[
+                "homeRegion",
+                "identityCenter.name",
+                "identityCenter.delegatedAdminAccount",
+                "identityCenter.identityCenterPermissionSets",
+                "identityCenter.identityCenterAssignments",
+            ],
+        ),
+        ArtifactContract(
+            name="network-config.yaml",
+            description="Network resources and connectivity architecture.",
+            required_paths=[
+                "defaultVpc.delete",
+                "endpointPolicies",
+                "transitGateways",
+                "vpcs[]",
+                "vpcs[].name",
+                "vpcs[].account",
+                "vpcs[].region",
+                "vpcs[].cidrs[]",
+                "vpcs[].enableDnsHostnames",
+                "vpcs[].enableDnsSupport",
+                "vpcs[].routeTables",
+                "vpcs[].subnets",
+                "vpcs[].transitGatewayAttachments",
+            ],
+        ),
+        ArtifactContract(
+            name="organization-config.yaml",
+            description="Organizational units and AWS Organizations policies.",
+            required_paths=[
+                "enable",
+                "organizationalUnits",
+                "organizationalUnits[]",
+                "organizationalUnits[].name",
+                "serviceControlPolicies",
+                "taggingPolicies",
+                "backupPolicies",
+            ],
+        ),
+        ArtifactContract(
+            name="security-config.yaml",
+            description="AWS security service configuration.",
+            required_paths=[
+                "accessAnalyzer.enable",
+                "iamPasswordPolicy.allowUsersToChangePassword",
+                "awsConfig.enableConfigurationRecorder",
+                "cloudWatch.metricSets",
+                "cloudWatch.alarmSets",
+                "centralSecurityServices.delegatedAdminAccount",
+                "centralSecurityServices.ebsDefaultVolumeEncryption.enable",
+                "centralSecurityServices.s3PublicAccessBlock.enable",
+                "centralSecurityServices.macie.enable",
+                "centralSecurityServices.macie.publishSensitiveDataFindings",
+                "centralSecurityServices.guardduty.enable",
+                "centralSecurityServices.guardduty.autoEnableOrgMembers",
+                "centralSecurityServices.guardduty.s3Protection.enable",
+                "centralSecurityServices.guardduty.exportConfiguration.enable",
+                "centralSecurityServices.guardduty.exportConfiguration.destinationType",
+                "centralSecurityServices.guardduty.exportConfiguration.exportFrequency",
+                "centralSecurityServices.securityHub.enable",
+                "centralSecurityServices.securityHub.autoEnableOrgMembers",
+                "centralSecurityServices.securityHub.regionAggregation",
+                "centralSecurityServices.securityHub.standards",
+                "centralSecurityServices.ssmAutomation.documentSets",
+            ],
+        ),
+        ArtifactContract(
+            name="customizations-config.yaml",
+            required=False,
+            description="Optional custom applications, appliances, and CloudFormation stacks.",
+        ),
+        ArtifactContract(
+            name="replacements-config.yaml",
+            required=False,
+            description="Optional replacement values across configuration files.",
+        ),
+    ],
+    required_decisions=[
+        "baseline",
+        "org_mode",
+        "home_region",
+        "enabled_regions",
+        "organizational_units",
+        "audit_account",
+        "log_archive_account",
+        "security_tooling_account",
+        "identity_center_delegated_admin_account",
+        "topology",
+        "centralized_logging",
+    ],
+    lineage=[
+        DecisionLineage(
+            decision="org_mode",
+            artifact="global-config.yaml",
+            path="controlTower.enable",
+        ),
+        DecisionLineage(
+            decision="home_region",
+            artifact="global-config.yaml",
+            path="homeRegion",
+        ),
+        DecisionLineage(
+            decision="enabled_regions",
+            artifact="global-config.yaml",
+            path="enabledRegions",
+        ),
+        DecisionLineage(
+            decision="workload_accounts",
+            artifact="accounts-config.yaml",
+            path="workloadAccounts[]",
+        ),
+        DecisionLineage(
+            decision="identity_center_delegated_admin_account",
+            artifact="iam-config.yaml",
+            path="identityCenter.delegatedAdminAccount",
+        ),
+        DecisionLineage(
+            decision="log_archive_account",
+            artifact="global-config.yaml",
+            path="logging.account",
+        ),
+        DecisionLineage(
+            decision="network_cidr",
+            artifact="network-config.yaml",
+            path="vpcs[].cidrs[]",
+        ),
+        DecisionLineage(
+            decision="security_tooling_account",
+            artifact="security-config.yaml",
+            path="centralSecurityServices.delegatedAdminAccount",
+        ),
+        DecisionLineage(
+            decision="centralized_logging",
+            artifact="global-config.yaml",
+            path="logging.cloudtrail.enable",
+        ),
+        DecisionLineage(
+            decision="security_hub_enabled",
+            artifact="security-config.yaml",
+            path="centralSecurityServices.securityHub.enable",
+        ),
+        DecisionLineage(
+            decision="guardduty_enabled",
+            artifact="security-config.yaml",
+            path="centralSecurityServices.guardduty.enable",
+        ),
+        DecisionLineage(
+            decision="compliance_overlay",
+            artifact="security-config.yaml",
+            path="centralSecurityServices.securityHub.standards[]",
+        ),
+    ],
+)
+
+GLOBAL_CONTRACT_REGISTRY.register(AWS_LZA_SAMPLE_CONFIG_CONTRACT)

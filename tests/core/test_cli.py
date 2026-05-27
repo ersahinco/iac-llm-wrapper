@@ -91,6 +91,64 @@ class TestValidateCommand:
         assert result.exit_code == 1
 
 
+class TestContractCommand:
+    def test_contract_list_shows_registered_contracts(self):
+        result = runner.invoke(app, ["contract", "list"])
+
+        assert result.exit_code == 0
+        assert "aws-lza-sample-configuration" in result.stdout
+        assert "Required artifacts: 6" in result.stdout
+
+    def test_contract_show_by_pattern(self):
+        result = runner.invoke(app, ["contract", "show", "--pattern", "aws-lza"])
+
+        assert result.exit_code == 0
+        assert "accounts-config.yaml" in result.stdout
+        assert "network-config.yaml | paths: defaultVpc.delete" in result.stdout
+        assert "customizations-config.yaml" in result.stdout
+        assert "home_region" in result.stdout
+        assert "network_cidr -> network-config.yaml:vpcs[].cidrs[]" in result.stdout
+
+    def test_contract_show_kubernetes_pattern(self):
+        result = runner.invoke(app, ["contract", "show", "--pattern", "kubernetes-cluster"])
+
+        assert result.exit_code == 0
+        assert "kubernetes-cluster-config" in result.stdout
+        assert "cluster-config.yaml | paths: cluster.name, cluster.version" in result.stdout
+        assert "cluster_name -> cluster-config.yaml:cluster.name" in result.stdout
+
+    def test_contract_show_requires_selector(self):
+        result = runner.invoke(app, ["contract", "show"])
+
+        assert result.exit_code == 1
+        assert "--name or --pattern required" in result.output
+
+
+class TestSampleCommand:
+    def test_sample_list_shows_registered_samples(self):
+        result = runner.invoke(app, ["sample", "list", "--pattern", "aws-lza"])
+
+        assert result.exit_code == 0
+        assert "aws-lza-standard-v1" in result.stdout
+        assert "aws-lza-regulated-v1" in result.stdout
+        assert "Contract: aws-lza-sample-configuration" in result.stdout
+
+    def test_sample_show_by_name(self):
+        result = runner.invoke(app, ["sample", "show", "--name", "aws-lza-healthcare-v1"])
+
+        assert result.exit_code == 0
+        assert "Pattern: aws-lza" in result.stdout
+        assert "Upstream variant: healthcare" in result.stdout
+        assert "Source contract: aws-lza-sample-configuration" in result.stdout
+        assert "compliance_overlay = healthcare" in result.stdout
+
+    def test_sample_show_requires_selector(self):
+        result = runner.invoke(app, ["sample", "show"])
+
+        assert result.exit_code == 1
+        assert "--name or --pattern required" in result.output
+
+
 class TestExplainCommand:
     def test_explain_valid_report(self, tmp_path: Path):
         output = tmp_path / "output"

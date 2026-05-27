@@ -19,20 +19,17 @@ from .core.compiler import (
     review_reports,
     validate_generated,
 )
+from .core.contracts import GLOBAL_CONTRACT_REGISTRY, TargetContract
 from .core.discovery import DiscoveryEngine, generate_clarifying_questions
 from .core.extractor import Extractor
 from .core.interview import InterviewEngine
 from .core.llm_caller import LLMEvidenceStore, auto_detect_llm
 from .core.patterns import ADDON_REGISTRY, GLOBAL_REGISTRY
+from .core.sample_config import GLOBAL_SAMPLE_REGISTRY, SampleConfig
 from .core.suggestion import SuggestionEngine
+from .patterns import load_builtin_patterns
 
-# Import domain-specific modules for side-effect registration
-from .patterns import (
-    kubernetes,  # noqa: F401
-    lza,  # noqa: F401
-)
-from .patterns.lza import catalog as _lza_catalog  # noqa: F401
-from .patterns.lza import generators as _lza_generators  # noqa: F401
+load_builtin_patterns()
 
 app = typer.Typer(name="intent-engine", help="Knowledge-driven infrastructure decision system")
 
@@ -72,6 +69,60 @@ def _parse_decisions_or_exit(raw_decisions: str | None) -> dict[str, Any] | None
         typer.echo("Invalid --decisions JSON: expected an object at top level", err=True)
         raise typer.Exit(1)
     return parsed
+
+
+def _contracts_for_pattern_or_exit(pattern: str) -> list[TargetContract]:
+    pattern_obj = _get_pattern_or_exit(pattern)
+    if not pattern_obj.contracts:
+        typer.echo(f"Pattern has no target contracts: {pattern}", err=True)
+        raise typer.Exit(1)
+    return pattern_obj.contracts
+
+
+def _selected_contracts_or_exit(
+    action: str,
+    name: str | None,
+    pattern: str | None,
+) -> list[TargetContract]:
+    if action == "list":
+        return [GLOBAL_CONTRACT_REGISTRY.get(n) for n in GLOBAL_CONTRACT_REGISTRY.list()]
+    if pattern:
+        return _contracts_for_pattern_or_exit(pattern)
+    if name:
+        try:
+            return [GLOBAL_CONTRACT_REGISTRY.get(name)]
+        except KeyError as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(1) from exc
+    typer.echo("Error: --name or --pattern required for show", err=True)
+    raise typer.Exit(1)
+
+
+def _selected_samples_or_exit(
+    action: str,
+    name: str | None,
+    pattern: str | None,
+) -> list[SampleConfig]:
+    if action == "list":
+        if pattern:
+            _get_pattern_or_exit(pattern)
+            return GLOBAL_SAMPLE_REGISTRY.find_by_pattern(pattern)
+        return [GLOBAL_SAMPLE_REGISTRY.get(n) for n in GLOBAL_SAMPLE_REGISTRY.list()]
+    if pattern:
+        _get_pattern_or_exit(pattern)
+        samples = GLOBAL_SAMPLE_REGISTRY.find_by_pattern(pattern)
+        if not samples:
+            typer.echo(f"Pattern has no sample configs: {pattern}", err=True)
+            raise typer.Exit(1)
+        return samples
+    if name:
+        try:
+            return [GLOBAL_SAMPLE_REGISTRY.get(name)]
+        except KeyError as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(1) from exc
+    typer.echo("Error: --name or --pattern required for show", err=True)
+    raise typer.Exit(1)
 
 
 def _version_callback(value: bool) -> None:
@@ -615,6 +666,154 @@ def validate(
         raise typer.Exit(1)
 
     typer.echo("Validation passed. All required files and controls present.")
+
+
+@app.command()
+def contract(
+    action: str = typer.Argument(
+        ...,
+        help="Action: list, show",
+    ),
+    name: str = typer.Option(
+        None,
+        "--name",
+        "-n",
+        help="Contract name (for show)",
+    ),
+    pattern: str = typer.Option(
+        None,
+        "--pattern",
+        "-p",
+        help="Show contracts attached to a pattern",
+    ),
+) -> None:
+    """Inspect target contracts: required decisions, artifacts, and lineage."""
+    if action not in {"list", "show"}:
+        typer.echo(f"Unknown action: {action}. Use: list, show", err=True)
+        raise typer.Exit(1)
+
+    contracts = _selected_contracts_or_exit(action, name, pattern)
+
+    if action == "list":
+        typer.echo("=== Target Contracts ===")
+        typer.echo("")
+        for contract_obj in contracts:
+            typer.echo(f"  {contract_obj.name}")
+            typer.echo(f"    Kind: {contract_obj.kind}")
+            typer.echo(f"    Required artifacts: {len(contract_obj.required_artifacts)}")
+            typer.echo(f"    Optional artifacts: {len(contract_obj.optional_artifacts)}")
+            typer.echo(f"    Required decisions: {len(contract_obj.required_decisions)}")
+            typer.echo(f"    Source: {contract_obj.source_url}")
+            typer.echo("")
+        return
+
+    for contract_obj in contracts:
+        typer.echo(f"=== {contract_obj.name} ===")
+        typer.echo(f"Kind: {contract_obj.kind}")
+        typer.echo(f"Source: {contract_obj.source_url}")
+        typer.echo("")
+        typer.echo("Required artifacts:")
+        for artifact in contract_obj.artifacts:
+            if not artifact.required:
+                continue
+            schema_hint = ""
+            if artifact.required_paths:
+                schema_hint = f" | paths: {', '.join(artifact.required_paths)}"
+            typer.echo(f"  - {artifact.name}{schema_hint}")
+        if contract_obj.optional_artifacts:
+            typer.echo("")
+            typer.echo("Optional artifacts:")
+            for artifact in contract_obj.artifacts:
+                if artifact.required:
+                    continue
+                schema_hint = ""
+                if artifact.required_paths:
+                    schema_hint = f" | paths: {', '.join(artifact.required_paths)}"
+                typer.echo(f"  - {artifact.name}{schema_hint}")
+        typer.echo("")
+        typer.echo("Required decisions:")
+        for decision in contract_obj.required_decisions:
+            typer.echo(f"  - {decision}")
+        if contract_obj.lineage:
+            typer.echo("")
+            typer.echo("Lineage:")
+            for item in contract_obj.lineage:
+                typer.echo(f"  - {item.decision} -> {item.artifact}:{item.path}")
+
+
+@app.command()
+def sample(
+    action: str = typer.Argument(
+        ...,
+        help="Action: list, show",
+    ),
+    name: str = typer.Option(
+        None,
+        "--name",
+        "-n",
+        help="Sample config name (for show)",
+    ),
+    pattern: str = typer.Option(
+        None,
+        "--pattern",
+        "-p",
+        help="List or show sample configs attached to a pattern",
+    ),
+) -> None:
+    """Inspect versioned sample configs: decisions, metadata, and module refs."""
+    if action not in {"list", "show"}:
+        typer.echo(f"Unknown action: {action}. Use: list, show", err=True)
+        raise typer.Exit(1)
+
+    samples = _selected_samples_or_exit(action, name, pattern)
+
+    if action == "list":
+        typer.echo("=== Sample Configs ===")
+        typer.echo("")
+        for sample_obj in samples:
+            typer.echo(f"  {sample_obj.name}")
+            typer.echo(f"    Pattern: {sample_obj.pattern}")
+            typer.echo(f"    Version: {sample_obj.version}")
+            typer.echo(f"    Release: {sample_obj.release_date}")
+            if sample_obj.upstream_variant:
+                typer.echo(f"    Variant: {sample_obj.upstream_variant}")
+            if sample_obj.source_contract:
+                typer.echo(f"    Contract: {sample_obj.source_contract}")
+            typer.echo(f"    Source: {sample_obj.source_url}")
+            typer.echo("")
+        return
+
+    for sample_obj in samples:
+        typer.echo(f"=== {sample_obj.name} ===")
+        typer.echo(f"Pattern: {sample_obj.pattern}")
+        typer.echo(f"Version: {sample_obj.version}")
+        typer.echo(f"Release: {sample_obj.release_date}")
+        if sample_obj.description:
+            typer.echo(f"Description: {sample_obj.description}")
+        if sample_obj.upstream_variant:
+            typer.echo(f"Upstream variant: {sample_obj.upstream_variant}")
+        if sample_obj.source_contract:
+            typer.echo(f"Source contract: {sample_obj.source_contract}")
+        if sample_obj.tags:
+            typer.echo(f"Tags: {', '.join(sample_obj.tags)}")
+        typer.echo(f"Source: {sample_obj.source_url}")
+        typer.echo("")
+        typer.echo("Decisions:")
+        for key, value in sample_obj.decisions.items():
+            typer.echo(f"  - {key} = {value}")
+        if sample_obj.module_refs:
+            typer.echo("")
+            typer.echo("Module refs:")
+            for ref in sample_obj.module_refs:
+                summary = f"{ref.module_name} | {ref.source} | {ref.version}"
+                if ref.description:
+                    summary += f" | {ref.description}"
+                typer.echo(f"  - {summary}")
+        if sample_obj.requires:
+            typer.echo("")
+            typer.echo("Requires:")
+            for dependency in sample_obj.requires:
+                typer.echo(f"  - {dependency}")
 
 
 @app.command()

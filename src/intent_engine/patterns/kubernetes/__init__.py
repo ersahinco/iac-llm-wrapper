@@ -15,13 +15,28 @@ Steps taken:
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
+from intent_engine.core.contracts import (
+    GLOBAL_CONTRACT_REGISTRY,
+    ArtifactContract,
+    DecisionLineage,
+    TargetContract,
+)
 from intent_engine.core.generator import register_generator
 from intent_engine.core.module_mapping import ModuleInputs, register_module_mapper
 from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern
 from intent_engine.core.requirements import Requirement, RequirementGraph
 
 from .models import K8sIntent
+
+
+def _k8s_intent(payload: Any) -> K8sIntent | None:
+    intent = getattr(payload, "intent", payload)
+    if isinstance(intent, K8sIntent):
+        return intent
+    return None
+
 
 # ---------------------------------------------------------------------------
 # Requirement graph
@@ -161,8 +176,9 @@ def _k8s_graph_factory() -> RequirementGraph:
 # ---------------------------------------------------------------------------
 
 
-def gen_cluster_config(intent: K8sIntent, output_dir: Path) -> None:
-    if not hasattr(intent, "cluster_name"):
+def gen_cluster_config(intent: Any, output_dir: Path) -> None:
+    intent = _k8s_intent(intent)
+    if intent is None:
         return
     import ruamel.yaml
 
@@ -196,8 +212,9 @@ def gen_cluster_config(intent: K8sIntent, output_dir: Path) -> None:
     (output_dir / "cluster-config.yaml").write_text(buf.getvalue())
 
 
-def gen_namespace_config(intent: K8sIntent, output_dir: Path) -> None:
-    if not hasattr(intent, "namespace_name"):
+def gen_namespace_config(intent: Any, output_dir: Path) -> None:
+    intent = _k8s_intent(intent)
+    if intent is None:
         return
     import ruamel.yaml
 
@@ -217,8 +234,9 @@ def gen_namespace_config(intent: K8sIntent, output_dir: Path) -> None:
     (output_dir / "namespace-config.yaml").write_text(buf.getvalue())
 
 
-def gen_k8s_decision_report(intent: K8sIntent, output_dir: Path) -> None:
-    if not hasattr(intent, "cluster_name"):
+def gen_k8s_decision_report(intent: Any, output_dir: Path) -> None:
+    intent = _k8s_intent(intent)
+    if intent is None:
         return
     import ruamel.yaml
 
@@ -249,10 +267,31 @@ def gen_k8s_decision_report(intent: K8sIntent, output_dir: Path) -> None:
     (output_dir / "decision-report.yaml").write_text(buf.getvalue())
 
 
-# Register generators (they coexist with other pattern generators thanks to hasattr guards)
-register_generator("k8s-cluster-config", gen_cluster_config, priority=10, category="core")
-register_generator("k8s-namespace-config", gen_namespace_config, priority=11, category="core")
-register_generator("k8s-decision-report", gen_k8s_decision_report, priority=5, category="meta")
+_K8S_GENERATOR_SCOPE = {"kubernetes-cluster"}
+
+
+# Register generators at the pattern boundary; guards inside generators are fallback safety.
+register_generator(
+    "k8s-cluster-config",
+    gen_cluster_config,
+    priority=10,
+    category="core",
+    applies_to=_K8S_GENERATOR_SCOPE,
+)
+register_generator(
+    "k8s-namespace-config",
+    gen_namespace_config,
+    priority=11,
+    category="core",
+    applies_to=_K8S_GENERATOR_SCOPE,
+)
+register_generator(
+    "k8s-decision-report",
+    gen_k8s_decision_report,
+    priority=5,
+    category="meta",
+    applies_to=_K8S_GENERATOR_SCOPE,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -289,13 +328,81 @@ K8S_FREE_FORM_EXAMPLES: dict[str, list[str]] = {
 }
 
 
-def _k8s_artifact_validator(input_dir: Path) -> list[str]:
-    errors: list[str] = []
-    required = ["cluster-config.yaml", "namespace-config.yaml", "decision-report.yaml"]
-    for fname in required:
-        if not (input_dir / fname).exists():
-            errors.append(f"Missing required file: {fname}")
-    return errors
+_K8S_CONTRACT = TargetContract(
+    name="kubernetes-cluster-config",
+    kind="kubernetes-cluster-config",
+    source_url="https://github.com/terraform-aws-modules/terraform-aws-eks",
+    artifacts=[
+        ArtifactContract(
+            name="cluster-config.yaml",
+            description="Cluster, network, and node pool configuration.",
+            required_paths=[
+                "cluster.name",
+                "cluster.version",
+                "cluster.network.podCidr",
+                "cluster.network.serviceCidr",
+                "cluster.nodePools[]",
+                "cluster.nodePools[].name",
+                "cluster.nodePools[].instanceType",
+            ],
+        ),
+        ArtifactContract(
+            name="namespace-config.yaml",
+            description="Primary namespace configuration.",
+            required_paths=["namespaces[]", "namespaces[].name"],
+        ),
+        ArtifactContract(
+            name="decision-report.yaml",
+            description="Kubernetes decision report.",
+            required_paths=["clusterName", "clusterVersion", "network", "nodePool"],
+        ),
+    ],
+    required_decisions=[
+        "cluster_name",
+        "cluster_version",
+        "network_policy_enabled",
+        "pod_cidr",
+        "service_cidr",
+        "node_pool_name",
+        "node_pool_instance_type",
+        "node_pool_min_size",
+        "node_pool_max_size",
+    ],
+    lineage=[
+        DecisionLineage(
+            decision="cluster_name",
+            artifact="cluster-config.yaml",
+            path="cluster.name",
+        ),
+        DecisionLineage(
+            decision="cluster_version",
+            artifact="cluster-config.yaml",
+            path="cluster.version",
+        ),
+        DecisionLineage(
+            decision="pod_cidr",
+            artifact="cluster-config.yaml",
+            path="cluster.network.podCidr",
+        ),
+        DecisionLineage(
+            decision="service_cidr",
+            artifact="cluster-config.yaml",
+            path="cluster.network.serviceCidr",
+        ),
+        DecisionLineage(
+            decision="node_pool_name",
+            artifact="cluster-config.yaml",
+            path="cluster.nodePools[].name",
+        ),
+        DecisionLineage(
+            decision="namespace_name",
+            artifact="namespace-config.yaml",
+            path="namespaces[].name",
+        ),
+    ],
+)
+
+GLOBAL_CONTRACT_REGISTRY.register(_K8S_CONTRACT)
 
 
 def map_k8s_intent_to_modules(intent: K8sIntent) -> list[ModuleInputs]:
@@ -336,8 +443,7 @@ GLOBAL_REGISTRY.register(
             "node_pool_min_size, node_pool_max_size\n"
             "- Namespace section → namespace_name"
         ),
-        required_artifacts=["cluster-config.yaml", "namespace-config.yaml", "decision-report.yaml"],
-        artifact_validators=[_k8s_artifact_validator],
+        contracts=[_K8S_CONTRACT],
     )
 )
 

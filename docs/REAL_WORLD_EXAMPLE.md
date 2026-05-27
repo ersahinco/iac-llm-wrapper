@@ -47,8 +47,11 @@ Output includes:
 Engineers use the decision artifacts alongside the sample configuration:
 
 ```bash
-# Show which sample config matches this pattern
-iac-llm-wrapper catalog show --entry lza-financial
+# Inspect matching sample configs for this pattern
+iac-llm-wrapper sample list --pattern financial-services
+
+# Show one sample config in detail
+iac-llm-wrapper sample show --name lza-baseline-v1
 ```
 
 The `module-inputs.yaml` provides pinned module references:

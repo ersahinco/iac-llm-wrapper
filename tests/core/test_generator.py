@@ -53,6 +53,36 @@ class TestGeneratorRegistry:
         reg.register("cat_gen", fake_gen, category="custom")
         assert "cat_gen" in reg.list()
 
+    def test_scoped_generator_runs_only_for_matching_pattern(self):
+        reg = GeneratorRegistry()
+        called: list[str] = []
+
+        def scoped_gen(intent: object, output_dir: Path) -> None:
+            called.append("scoped")
+
+        def shared_gen(intent: object, output_dir: Path) -> None:
+            called.append("shared")
+
+        reg.register("shared", shared_gen)
+        reg.register("scoped", scoped_gen, applies_to={"aws-lza"})
+
+        reg.generate(object(), Path("/tmp"), pattern="kubernetes-cluster")
+
+        assert called == ["shared"]
+
+    def test_scoped_generator_runs_for_matching_pattern(self):
+        reg = GeneratorRegistry()
+        called: list[str] = []
+
+        def scoped_gen(intent: object, output_dir: Path) -> None:
+            called.append("scoped")
+
+        reg.register("scoped", scoped_gen, applies_to={"aws-lza"})
+
+        reg.generate(object(), Path("/tmp"), pattern="aws-lza")
+
+        assert called == ["scoped"]
+
 
 class TestHCLValue:
     def test_string(self):

@@ -30,3 +30,14 @@ class TestLZABuiltinGenerators:
 
         assert (output_dir / "decision-report.yaml").exists()
         assert (output_dir / "organization-config.yaml").exists()
+
+    def test_lza_generators_skip_other_patterns(self, tmp_path: Path):
+        from intent_engine.core.generator import generate_all
+
+        intent = RawIntent()
+        output_dir = tmp_path / "out"
+
+        generate_all(intent, output_dir, pattern="kubernetes-cluster")
+
+        assert not (output_dir / "organization-config.yaml").exists()
+        assert not (output_dir / "decision-report.yaml").exists()

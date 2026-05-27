@@ -27,9 +27,19 @@ class SampleConfig(BaseModel):
 
     name: str
     pattern: str
+    description: str = Field(default="", description="Short human-readable summary")
     version: str = Field(description="Sample config version (semver)")
     release_date: str = Field(description="ISO-8601 release date")
     source_url: str = Field(description="URL to upstream source of these config files")
+    source_contract: str | None = Field(
+        default=None,
+        description="Registered target contract or upstream schema family this sample follows",
+    )
+    upstream_variant: str | None = Field(
+        default=None,
+        description="Named upstream variant or baseline used to derive this sample",
+    )
+    tags: list[str] = Field(default_factory=list, description="Searchable metadata labels")
     decisions: dict[str, Any] = Field(default_factory=dict)
     module_refs: list[ModuleRef] = Field(default_factory=list)
     requires: list[str] = Field(

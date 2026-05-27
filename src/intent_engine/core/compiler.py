@@ -181,7 +181,7 @@ def compile_design(
 
     # 2h. Generate artifacts
     payload = _build_payload(intent, pattern, llm_result.design_doc)
-    generate_all(payload, output_dir)
+    generate_all(payload, output_dir, pattern=pattern)
 
 
 def compile_from_interview(
@@ -204,7 +204,7 @@ def compile_from_interview(
     violations = validate(intent, graph=graph, extra_validators=pattern_obj.validators)
     if violations:
         raise CompileError(violations)
-    generate_all(_build_payload(intent, pattern), output_dir)
+    generate_all(_build_payload(intent, pattern), output_dir, pattern=pattern)
 
     # Write decision audit trail for traceability
     audit = graph.audit_log()
@@ -218,21 +218,42 @@ def compile_from_interview(
             yaml.dump({"auditTrail": audit}, f)
 
 
-def validate_generated(input_dir: Path, pattern: str = "baseline") -> list[str]:
-    errors = []
+def validate_generated_violations(input_dir: Path, pattern: str = "baseline") -> list[Violation]:
+    violations: list[Violation] = []
+    from .contracts import ContractValidator
     from .patterns import GLOBAL_REGISTRY
 
     pattern_obj = GLOBAL_REGISTRY.get(pattern)
-    required_files = pattern_obj.required_artifacts or []
-    for fname in required_files:
+    for fname in list(dict.fromkeys(pattern_obj.required_artifacts + pattern_obj.extra_artifacts)):
         if not (input_dir / fname).exists():
-            errors.append(f"Missing required file: {fname}")
+            violations.append(
+                Violation(
+                    code="REQUIRED_ARTIFACT_MISSING",
+                    message=f"Missing required file: {fname}",
+                )
+            )
+
+    # Run contract-driven artifact validators
+    for contract in pattern_obj.contracts:
+        violations.extend(ContractValidator(contract).validate_artifacts(input_dir))
 
     # Run pattern-specific artifact validators
     for validator in pattern_obj.artifact_validators:
-        errors.extend(validator(input_dir))
+        for message in validator(input_dir):
+            violations.append(Violation(code="ARTIFACT_VALIDATION_FAILED", message=message))
 
-    return errors
+    deduped: list[Violation] = []
+    seen_messages: set[str] = set()
+    for violation in violations:
+        if violation.message in seen_messages:
+            continue
+        seen_messages.add(violation.message)
+        deduped.append(violation)
+    return deduped
+
+
+def validate_generated(input_dir: Path, pattern: str = "baseline") -> list[str]:
+    return [violation.message for violation in validate_generated_violations(input_dir, pattern)]
 
 
 def review_reports(before_path: Path, after_path: Path) -> dict:

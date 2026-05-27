@@ -22,6 +22,8 @@ class TestKubernetesPattern:
         p = GLOBAL_REGISTRY.get("kubernetes-cluster")
         assert p.description
         assert p.intent_factory is not None
+        assert [contract.name for contract in p.contracts] == ["kubernetes-cluster-config"]
+        assert "cluster-config.yaml" in p.expected_artifacts()
 
     def test_compile_from_interview_creates_artifacts(self, tmp_path: Path):
         decisions = {
@@ -92,15 +94,54 @@ class TestKubernetesPattern:
         output = tmp_path / "output"
         output.mkdir()
         # Create fake artifacts
-        (output / "cluster-config.yaml").write_text("cluster:\n")
-        (output / "namespace-config.yaml").write_text("namespaces:\n")
-        (output / "decision-report.yaml").write_text("clusterName: prod\n")
+        (output / "cluster-config.yaml").write_text(
+            "cluster:\n"
+            "  name: prod-k8s\n"
+            "  version: '1.30'\n"
+            "  network:\n"
+            "    podCidr: 10.244.0.0/16\n"
+            "    serviceCidr: 10.96.0.0/12\n"
+            "  nodePools:\n"
+            "    - name: primary\n"
+            "      instanceType: t3.large\n"
+        )
+        (output / "namespace-config.yaml").write_text("namespaces:\n  - name: production\n")
+        (output / "decision-report.yaml").write_text(
+            "clusterName: prod\n"
+            "clusterVersion: '1.30'\n"
+            "network:\n"
+            "  podCidr: 10.244.0.0/16\n"
+            "  serviceCidr: 10.96.0.0/12\n"
+            "nodePool:\n"
+            "  name: primary\n"
+            "  instanceType: t3.large\n"
+        )
 
         result = runner.invoke(
             app, ["validate", "--input", str(output), "--pattern", "kubernetes-cluster"]
         )
         assert result.exit_code == 0
         assert "Validation passed" in result.stdout
+
+    def test_validate_command_catches_contract_drift(self, tmp_path: Path):
+        from typer.testing import CliRunner
+
+        from intent_engine.cli import app
+
+        output = tmp_path / "output"
+        output.mkdir()
+        (output / "cluster-config.yaml").write_text("cluster:\n  name: prod-k8s\n")
+        (output / "namespace-config.yaml").write_text("namespaces:\n  - name: production\n")
+        (output / "decision-report.yaml").write_text(
+            "clusterName: prod\nclusterVersion: '1.30'\nnetwork: {}\nnodePool: {}\n"
+        )
+
+        result = CliRunner().invoke(
+            app, ["validate", "--input", str(output), "--pattern", "kubernetes-cluster"]
+        )
+
+        assert result.exit_code == 1
+        assert "cluster-config.yaml missing required path: cluster.version" in result.output
 
     def test_interview_engine_produces_intent(self):
         from intent_engine.core.interview import InterviewEngine
@@ -114,3 +155,14 @@ class TestKubernetesPattern:
         assert intent.cluster_version == "1.29"
         assert intent.network_policy_enabled is True
         assert intent.node_pool_min_size == 1
+
+    def test_kubernetes_generators_skip_other_patterns(self, tmp_path: Path):
+        from intent_engine.core.generator import generate_all
+        from intent_engine.patterns.kubernetes import K8sIntent
+
+        output = tmp_path / "output"
+        generate_all(K8sIntent(), output, pattern="baseline")
+
+        assert not (output / "cluster-config.yaml").exists()
+        assert not (output / "namespace-config.yaml").exists()
+        assert not (output / "decision-report.yaml").exists()

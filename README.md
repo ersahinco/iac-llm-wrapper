@@ -147,8 +147,11 @@ Output includes:
 Engineers use the decision artifacts alongside sample configurations:
 
 ```bash
-# Show sample config with pinned module references
-iac-llm-wrapper catalog show --entry lza-baseline
+# List available sample configs
+iac-llm-wrapper sample list
+
+# Show sample config with pinned module references and decisions
+iac-llm-wrapper sample show --name lza-baseline-v1
 ```
 
 The `module-inputs.yaml` provides ready-to-use module references:

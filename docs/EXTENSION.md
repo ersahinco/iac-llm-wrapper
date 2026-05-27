@@ -50,7 +50,7 @@ class K8sIntent(BaseModel):
 Create a factory function that builds a `RequirementGraph`:
 
 ```python
-from intent_engine.requirements import Requirement, RequirementGraph
+from intent_engine.core.requirements import Requirement, RequirementGraph
 
 def build_k8s_graph() -> RequirementGraph:
     g = RequirementGraph()
@@ -76,27 +76,53 @@ Rules:
 Register output generators that write your artifacts:
 
 ```python
-from intent_engine.generator import register_generator
+from intent_engine.core.generator import register_generator
 from pathlib import Path
+from your_pattern.models import K8sIntent
 
 def gen_cluster_config(intent, output_dir: Path) -> None:
-    if not hasattr(intent, "cluster_name"):
+    model = getattr(intent, "intent", intent)
+    if not isinstance(model, K8sIntent):
         return
-    data = {"cluster": {"name": intent.cluster_name}}
+    data = {"cluster": {"name": model.cluster_name}}
     (output_dir / "cluster-config.yaml").write_text(yaml_dump(data))
 
-register_generator("k8s-cluster", gen_cluster_config, priority=10)
+register_generator(
+    "k8s-cluster",
+    gen_cluster_config,
+    priority=10,
+    applies_to={"kubernetes-cluster"},
+)
 ```
 
-Important: Always add `hasattr` guards so your generator skips intents from other patterns.
+Important: register generators with `applies_to={"your-pattern"}`. Keep lightweight runtime
+guards only as fallback safety.
 
 ### 4. Register the Pattern
 
 Register a `Pattern` in `GLOBAL_REGISTRY`:
 
 ```python
-from intent_engine.patterns import GLOBAL_REGISTRY, Pattern
-from intent_engine.kubernetes_models import K8sIntent
+from intent_engine.core.contracts import ArtifactContract, TargetContract
+from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern
+from your_pattern.models import K8sIntent
+
+contract = TargetContract(
+    name="kubernetes-cluster-config",
+    kind="kubernetes-cluster-config",
+    source_url="https://example.com/k8s-contract",
+    artifacts=[
+        ArtifactContract(
+            name="cluster-config.yaml",
+            required_paths=["cluster.name", "cluster.version"],
+        ),
+        ArtifactContract(
+            name="decision-report.yaml",
+            required_paths=["clusterName"],
+        ),
+    ],
+    required_decisions=["cluster_name", "cluster_version"],
+)
 
 GLOBAL_REGISTRY.register(Pattern(
     name="kubernetes-cluster",
@@ -106,7 +132,7 @@ GLOBAL_REGISTRY.register(Pattern(
     section_map={"cluster_name": ("Cluster", "name")},
     section_order=["Cluster"],
     prompt_context="This pattern designs Kubernetes clusters.",
-    required_artifacts=["cluster-config.yaml", "decision-report.yaml"],
+    contracts=[contract],
 ))
 ```
 
@@ -118,8 +144,9 @@ Pattern metadata fields:
 - `free_form_examples` — Free-form Markdown examples for templates
 - `validators` — List of extra validator functions `intent -> list[Violation]`
 - `normalizer` — Optional normalizer override function
-- `required_artifacts` — Files checked by `intent-engine validate --pattern <name>`
-- `artifact_validators` — Custom validators for artifact directories
+- `contracts` — Target contracts for required files, required paths, decisions, and lineage
+- `required_artifacts` — Legacy/simple file checks when no contract exists
+- `artifact_validators` — Custom cross-file validators only when contracts cannot express the rule
 
 ### 5. Add Defaults to `defaults.yaml`
 

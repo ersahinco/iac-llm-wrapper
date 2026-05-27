@@ -14,6 +14,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from .contracts import ContractValidator, TargetContract
 from .requirements import Requirement, RequirementGraph
 
 
@@ -44,6 +45,10 @@ class Pattern:
     artifact_validators: list[Callable[[Any], list[str]]] = field(default_factory=list)
     # Required artifact file names for CLI validate command
     required_artifacts: list[str] = field(default_factory=list)
+    # Extra artifacts produced by pattern generators beyond target contract files
+    extra_artifacts: list[str] = field(default_factory=list)
+    # Target contracts that drive decisions, validation, and generated artifacts
+    contracts: list[TargetContract] = field(default_factory=list)
     # Pattern-specific discovery hooks
     extra_consistency_checks: list[Any] = field(default_factory=list)
     extra_signal_detectors: list[Any] = field(default_factory=list)
@@ -54,6 +59,14 @@ class Pattern:
         if isinstance(model, type) and issubclass(model, BaseModel):
             graph._intent_model = model
         return graph
+
+    def expected_artifacts(self) -> list[str]:
+        artifacts: list[str] = []
+        for contract in self.contracts:
+            artifacts.extend(contract.required_artifacts)
+        artifacts.extend(self.required_artifacts)
+        artifacts.extend(self.extra_artifacts)
+        return list(dict.fromkeys(artifacts))
 
 
 class PatternRegistry:
@@ -90,6 +103,10 @@ class PatternRegistry:
         errors: list[str] = []
         for req in graph._requirements.values():
             errors.extend(validate_requirement_against_model(req, model))
+        for contract in pattern.contracts:
+            validator = ContractValidator(contract)
+            for violation in validator.validate_contract() + validator.validate_graph(graph):
+                errors.append(f"Contract '{contract.name}': {violation.message}")
         if errors:
             msg = "Pattern '{}' schema validation failed:\n  - {}".format(
                 pattern.name, "\n  - ".join(errors)

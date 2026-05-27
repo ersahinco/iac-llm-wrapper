@@ -76,9 +76,11 @@ class InterviewEngine:
         )
 
     def answer(self, key: str, value: Any) -> None:
-        self.graph.decide(key, str(value))
-        self._history.append((key, str(value)))
-        self._log_decision(key, str(value), "decided")
+        req = self.graph._requirements[key]
+        serialized = self.graph.stringify_decision_value(value, req.target_type)
+        self.graph.decide(key, serialized)
+        self._history.append((key, serialized))
+        self._log_decision(key, serialized, "decided")
 
     def accept_default(self, key: str) -> None:
         self.graph.apply_default(key)

@@ -170,6 +170,18 @@ _BASELINE_SECTION_MAP: dict[str, tuple[str, str | None]] = {
     "hybrid_on_prem_cidrs": ("Hybrid Connectivity", "on_prem_cidrs"),
 }
 
+_LZA_REQUIRED_ARTIFACTS = [
+    "organization-config.yaml",
+    "accounts-config.yaml",
+    "global-config.yaml",
+    "security-config.yaml",
+    "network-config.yaml",
+    "iam-config.yaml",
+    "customizations-config.yaml",
+    "decision-report.yaml",
+    "deployment-graph.yaml",
+]
+
 BUILTIN_PATTERNS: list[Pattern] = [
     Pattern(
         name="baseline",
@@ -198,17 +210,7 @@ BUILTIN_PATTERNS: list[Pattern] = [
             "- Hybrid Connectivity section → hybrid_required, hybrid_dns_model, "
             "hybrid_ip_model, on_prem_cidrs"
         ),
-        required_artifacts=[
-            "organization-config.yaml",
-            "accounts-config.yaml",
-            "global-config.yaml",
-            "security-config.yaml",
-            "network-config.yaml",
-            "iam-config.yaml",
-            "customizations-config.yaml",
-            "decision-report.yaml",
-            "deployment-graph.yaml",
-        ],
+        required_artifacts=list(_LZA_REQUIRED_ARTIFACTS),
     ),
     Pattern(
         name="workload",
@@ -281,17 +283,7 @@ BUILTIN_PATTERNS: list[Pattern] = [
         section_order=list(_BASELINE_SECTION_ORDER),
         free_form_examples=dict(_BASELINE_FREE_FORM_EXAMPLES),
         prompt_context="This pattern designs hybrid enterprise AWS landing zone configurations.",
-        required_artifacts=[
-            "organization-config.yaml",
-            "accounts-config.yaml",
-            "global-config.yaml",
-            "security-config.yaml",
-            "network-config.yaml",
-            "iam-config.yaml",
-            "customizations-config.yaml",
-            "decision-report.yaml",
-            "deployment-graph.yaml",
-        ],
+        required_artifacts=list(_LZA_REQUIRED_ARTIFACTS),
     ),
     Pattern(
         name="financial-services",
@@ -305,17 +297,7 @@ BUILTIN_PATTERNS: list[Pattern] = [
         section_order=list(_BASELINE_SECTION_ORDER),
         free_form_examples=dict(_BASELINE_FREE_FORM_EXAMPLES),
         prompt_context="This pattern designs financial services AWS landing zone configurations.",
-        required_artifacts=[
-            "organization-config.yaml",
-            "accounts-config.yaml",
-            "global-config.yaml",
-            "security-config.yaml",
-            "network-config.yaml",
-            "iam-config.yaml",
-            "customizations-config.yaml",
-            "decision-report.yaml",
-            "deployment-graph.yaml",
-        ],
+        required_artifacts=list(_LZA_REQUIRED_ARTIFACTS),
     ),
     Pattern(
         name="healthcare",
@@ -329,17 +311,7 @@ BUILTIN_PATTERNS: list[Pattern] = [
         section_order=list(_BASELINE_SECTION_ORDER),
         free_form_examples=dict(_BASELINE_FREE_FORM_EXAMPLES),
         prompt_context="This pattern designs healthcare AWS landing zone configurations.",
-        required_artifacts=[
-            "organization-config.yaml",
-            "accounts-config.yaml",
-            "global-config.yaml",
-            "security-config.yaml",
-            "network-config.yaml",
-            "iam-config.yaml",
-            "customizations-config.yaml",
-            "decision-report.yaml",
-            "deployment-graph.yaml",
-        ],
+        required_artifacts=list(_LZA_REQUIRED_ARTIFACTS),
     ),
 ]
 

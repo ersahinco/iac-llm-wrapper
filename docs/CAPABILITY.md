@@ -61,10 +61,10 @@ Versioned, pinned sample configurations provide proven starting points:
 
 ```bash
 # List available sample configs
-iac-llm-wrapper catalog list
+iac-llm-wrapper sample list
 
-# Show config with module references
-iac-llm-wrapper catalog show --entry lza-baseline
+# Show config with module references and decisions
+iac-llm-wrapper sample show --name lza-baseline-v1
 
 # Diff current decisions against a proven config
 iac-llm-wrapper catalog diff --entry lza-financial --input decisions.json

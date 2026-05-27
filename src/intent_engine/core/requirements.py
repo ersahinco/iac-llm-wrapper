@@ -254,7 +254,16 @@ class RequirementGraph:
             else:
                 self.skip(key)
 
-    def apply_decisions(self, decisions: dict[str, str]) -> list[str]:
+    @staticmethod
+    def stringify_decision_value(value: Any, target_type: str) -> str:
+        """Serialize structured prefill values into graph-friendly strings."""
+        if target_type == "bool" and isinstance(value, bool):
+            return "true" if value else "false"
+        if target_type in ("cidr_list", "string_list") and isinstance(value, list):
+            return ",".join(str(item) for item in value)
+        return str(value)
+
+    def apply_decisions(self, decisions: dict[str, Any]) -> list[str]:
         """Apply a batch of decisions to the graph, respecting gates.
 
         Returns the list of keys that were successfully applied.
@@ -270,7 +279,8 @@ class RequirementGraph:
             if not self.is_applicable(key):
                 self.skip(key, self.is_applicable_reason(key))
                 continue
-            self.decide(key, value)
+            req = self._requirements[key]
+            self.decide(key, self.stringify_decision_value(value, req.target_type))
             applied.append(key)
         return applied
 
@@ -303,7 +313,7 @@ class RequirementGraph:
             return int(value)
         if target_type == "bool":
             return value.lower() in ("true", "yes", "1")
-        if target_type == "cidr_list":
+        if target_type in ("cidr_list", "string_list"):
             return [c.strip() for c in value.split(",") if c.strip()]
         # Enum types — resolve from intent model module if available
         if self._intent_model is not None:

@@ -22,14 +22,6 @@ from typing import Any
 
 import ruamel.yaml
 
-_DEFAULTS_FILE = Path(__file__).parent / "defaults.yaml"
-
-
-def _load_generator_config() -> dict:
-    with open(_DEFAULTS_FILE) as f:
-        return ruamel.yaml.YAML(typ="safe").load(f) or {}
-
-
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
@@ -43,6 +35,7 @@ class RegisteredGenerator:
     fn: GeneratorFn
     priority: int  # lower = earlier
     category: str  # e.g., "core", "security", "workload"
+    applies_to: set[str] | None = None
 
 
 class GeneratorRegistry:
@@ -57,12 +50,16 @@ class GeneratorRegistry:
         fn: GeneratorFn,
         priority: int = 50,
         category: str = "general",
+        applies_to: list[str] | set[str] | None = None,
     ) -> None:
-        self._generators.append(RegisteredGenerator(name, fn, priority, category))
+        scope = set(applies_to) if applies_to else None
+        self._generators.append(RegisteredGenerator(name, fn, priority, category, scope))
         self._generators.sort(key=lambda g: g.priority)
 
-    def generate(self, intent: Any, output_dir: Path) -> None:
+    def generate(self, intent: Any, output_dir: Path, pattern: str | None = None) -> None:
         for gen in self._generators:
+            if pattern is not None and gen.applies_to is not None and pattern not in gen.applies_to:
+                continue
             gen.fn(intent, output_dir)
 
     def list(self) -> list[str]:
@@ -104,12 +101,13 @@ def register_generator(
     fn: GeneratorFn,
     priority: int = 50,
     category: str = "custom",
+    applies_to: list[str] | set[str] | None = None,
 ) -> None:
     """Register a custom generator without modifying core code."""
-    GLOBAL_REGISTRY.register(name, fn, priority, category)
+    GLOBAL_REGISTRY.register(name, fn, priority, category, applies_to)
 
 
-def generate_all(intent: Any, output_dir: Path) -> None:
+def generate_all(intent: Any, output_dir: Path, pattern: str | None = None) -> None:
     from .module_mapping import DesignDocument, IaCIntentPayload
 
     if isinstance(intent, IaCIntentPayload):
@@ -120,7 +118,7 @@ def generate_all(intent: Any, output_dir: Path) -> None:
             module_inputs=[],
             intent=intent,
         )
-    GLOBAL_REGISTRY.generate(payload, output_dir)
+    GLOBAL_REGISTRY.generate(payload, output_dir, pattern=pattern)
 
 
 def gen_design_doc(intent: Any, output_dir: Path) -> None:

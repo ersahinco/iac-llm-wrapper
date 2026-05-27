@@ -173,14 +173,14 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff.
 <!-- UPDATE THIS SECTION AT END OF EVERY SESSION -->
 
 ### Current Goal
-T10: Improve workloads extraction for small models (split extraction)
+T14: AWS LZA thin path: contract-driven handoff
 
 ### Status
-- **Tests**: 442 passing, 1 skipped (LLM non-determinism)
+- **Tests**: 492 passing, 1 skipped (LLM non-determinism)
 - **Lint**: clean
 - **Format**: clean
 - **Repo**: `github.com/ersahinco/intent-engine` (private)
-- **Last session**: Cavekit install + T9: deterministic entity extraction for accounts/OUs/workloads
+- **Last session**: Deepened AWS LZA schema-backed placeholders, fixed delegated-admin drift, removed stale runbook wording
 
 ### Done
 | Area | Item |
@@ -231,20 +231,67 @@ T10: Improve workloads extraction for small models (split extraction)
 | **Honest scope reframe** | AGENTS.md: reference tfvars not root modules, LZA coupling documented as debt, silent fallback now warns |
 | **Cavekit install** | Skills (spec/build/check/caveman/backprop), commands (ck-spec/ck-build/ck-check), SPEC.md, FORMAT.md |
 | **Deterministic entity extraction** | `extract_entities_from_markdown()` parses accounts/OUs/workloads from structured Markdown sections without LLM. Wired into compiler deterministic path. 17 unit + 2 integration tests. Verified: valid-payments.md → 5/5 accounts, 3/3 OUs, 1 workload |
+| **AWS LZA thin path** | Added `aws-lza` pattern with `AwsLzaIntent`, `TargetContract`, `ContractValidator`, `ContractRegistry`, graph-driven questions, validators, LZA handoff YAML emitters, lineage manifest, deployment runbook, sample config registration, and tests. No core changes to existing flows. |
+| **AWS LZA schema alignment** | `aws-lza` now emits official-style LZA top-level sections (`mandatoryAccounts`, `controlTower`, `defaultVpc`, `centralSecurityServices`, etc.) instead of custom placeholder shapes like `accounts[]` or `network.topology`. |
+| **AWS LZA fixture variants** | Added `aws-lza-regulated-v1` and `aws-lza-healthcare-v1` generated fixture bundles plus per-fixture `README.md` docs, alongside refreshed `aws-lza-standard-v1`. |
+| **AWS LZA subsection alignment** | `aws-lza` now emits upstream-backed subsections like `identityCenterPermissionSets`, VPC `routeTables`/`subnets`, GuardDuty export settings, and Security Hub org toggles. |
+| **Sample config metadata** | `SampleConfig` now supports generic `description`, `source_contract`, `upstream_variant`, and `tags` metadata so contract-backed variants stay discoverable without AWS-specific core wiring. |
+| **Sample config CLI** | Added `intent-engine sample list/show` for registry-backed sample inspection by name or pattern, including metadata, decisions, and module references. |
+| **Contract CLI** | `intent-engine contract list/show` exposes registered target contracts, required/optional artifacts, required paths, required decisions, source URL, and decision lineage. |
+| **Contract schema checks** | `ArtifactContract.required_paths` lets target contracts validate generated YAML shape without pattern-specific artifact validators. |
+| **Contract path semantics** | Plain contract paths now mean field presence, while `[]` means non-empty list. This makes schema checks closer to real JSON/YAML required-field behavior and reduces fake filler data pressure. |
+| **Structured prefill coercion** | `RequirementGraph.apply_decisions()` / interview prefill now serialize list and bool values correctly, so registered sample decisions can compile without manual comma-string conversion. |
+| **Lineage validation** | `ContractValidator.validate_artifacts()` verifies decision lineage paths exist in structured generated artifacts. |
+| **K8s contract migration** | Removed Kubernetes custom artifact validator; `kubernetes-cluster` now uses `TargetContract` for required files, paths, decisions, and lineage. |
+| **Generator scoping** | Registered generators support `applies_to`; LZA/K8s/AWS LZA generators are scoped at registry boundary with internal guards only as fallback safety. |
+| **Pattern loader cleanup** | CLI now calls `load_builtin_patterns()`; built-in module side effects live in `patterns/__init__.py`, not generic CLI imports. |
+| **Debt removal** | LZA required artifact names are centralized in `_LZA_REQUIRED_ARTIFACTS`; unused core generator defaults loader removed. |
+| **Generator scoping tests** | Core tests now lock `applies_to` behavior so scoped generators do not run for other patterns. |
 
 ### Next (prioritized)
 1. [ ] Improve workloads extraction for small models (split extraction or separate LLM call)
-2. [ ] Add more pattern-specific sample configs with real module variable schemas
-3. [ ] Create decision-report → Terraform variables file generator
-4. [ ] Evaluate adding remaining source files to mypy scope when they change (ongoing incremental policy).
+2. [ ] Evaluate adding remaining source files to mypy scope when they change (ongoing incremental policy).
+3. [ ] Consider richer generic sample-config discovery helpers (`find_by_tag`, contract-aware listing) if more contract-backed patterns land.
+4. [ ] Decide whether contract-backed fixtures should be generated by helper script to reduce manual refresh steps.
+5. [ ] Decide whether contract validation should support value assertions, not only path presence, for high-signal lineage fields.
 
 ### Key Decisions This Session
-- **Caveman ecosystem adoption**: Three-layer install — cavekit (spec/build/check/backprop skills) for opencode, FORMAT.md + SPEC.md at repo root. Cavemem blocked by Node 26/sqlite native compile. Caveman-code skipped (standalone agent would replace opencode).
-- **Deterministic entity extraction approach**: Added `extract_entities_from_markdown()` to `markdown_extractor.py` (not `extractor.py`) — keeps regex-based Markdown parsing alongside existing `MarkdownExtractor`. Reuses same `append_to_list_field` helper that the LLM path uses. Architecture is clean: both paths converge into the same intent model.
-- **Section regex design**: `_find_section()` uses `re.IGNORECASE` for case-insensitive heading matching, `\s+` for flexible whitespace between heading words, and handles blank lines after headings. Verified against all fixture files.
-- **Type coercion in deterministic path**: Workload fields (`port`, `cpu`, `memory` → int; `public_ingress` → bool) are auto-coerced to match Pydantic model expectations. This matches what the LLM JSON response would provide naturally.
-- **Compiler integration**: Entity extraction fires in the deterministic path (no LLM decisions). When LLM is available, the LLM JSON response path handles accounts/OUs/workloads. Two separate paths, same outcome.
-- **SPEC.md as build dashboard**: T9 tracked through cavekit lifecycle: `.` → `~` → `x`. Build verification includes full test suite, lint, and format on each task completion.
+- **Delegated-admin drift removal**: `security_tooling_account` now feeds `security-config.yaml:centralSecurityServices.delegatedAdminAccount`. Previous `audit_account` mapping contradicted requirement intent and hid security-tooling lineage.
+- **Schema-backed subsection depth**: AWS LZA handoff now includes official empty or boolean subsections that engineers must later fill, such as Identity Center permission-set arrays, VPC route-table/subnet arrays, GuardDuty export config, and Security Hub org toggles.
+- **Runbook drift cleanup**: Removed stale guidance about placeholder `policies/` and `ssm/` file paths because default thin-path output does not emit them. Runbook now points at real completion work: emails, Identity Center assignments, VPC structures, security exports.
+- **Generic sample CLI over AWS one-off UI**: Added `sample list/show` at CLI layer instead of leaving sample variants discoverable only through tests or overloading catalog commands. This resolves stale docs and keeps sample registry first-class.
+- **Doc drift removal**: Updated README and capability/example docs to use `sample` commands for sample configs and left catalog commands focused on catalog entries. Sample-config guidance no longer points at wrong CLI surface.
+- **Generic sample metadata**: Added contract-aware metadata to `SampleConfig` instead of inventing AWS-only fields. This keeps sample variants data-model-driven and reusable for future contract-backed patterns.
+- **Fixture variants as review assets**: Added generated `aws-lza-standard-v1`, `aws-lza-regulated-v1`, and `aws-lza-healthcare-v1` fixture bundles with README docs so variant drift is visible in-repo, not hidden in tests.
+- **Structured decision prefill support**: Sample-config `decisions` may contain lists/bools; core prefill paths now serialize them based on requirement target type before graph application. This removes silent mismatch between registry data and compile path.
+- **Schema-presence semantics**: `ContractValidator` now treats plain dotted paths as required field presence and reserves `[]` for non-empty list enforcement. This prevents contract checks from forcing meaningless stub items when official schemas allow empty arrays or empty objects.
+- **Official LZA shape over custom shape**: `aws-lza` handoff artifacts now target official LZA-required top-level sections (`mandatoryAccounts`, `logging`, `identityCenter`, `defaultVpc`, `organizationalUnits`, `centralSecurityServices`) instead of internal convenience structures.
+- **Thin-path placeholder policy**: AWS LZA generator emits minimal official-shape placeholders such as derived account emails, empty policy lists, and empty handoff subsections, then runbook explicitly tells engineers what customer-specific data must be filled before deployment.
+- **Thin AWS path**: `aws-lza` emits LZA handoff artifacts and runbook context, not a parallel Terraform/Terragrunt landing-zone stack.
+- **Contract-driven core**: AWS LZA sample configurations are treated as source contracts/data models. Provider-specific orchestration stays in the pattern layer.
+- **Target contract extraction**: `AWS_LZA_SAMPLE_CONFIG_CONTRACT` now centralizes mandatory/optional LZA artifacts and decision lineage so pattern metadata, validation, runbook, and manifest do not duplicate contract knowledge.
+- **ContractValidator**: Added reusable core validator for target contracts: validates required decisions, required artifacts, and lineage references. This is the generic bridge for LZA sample configs, Terraform module schemas, org catalogs, and future custom workloads.
+- **Contract graph drift guard**: `ContractValidator.validate_graph()` ensures contract-required and lineage decisions have matching graph nodes. `aws-lza` fails fast if contract and graph diverge.
+- **Contract registry**: `GLOBAL_CONTRACT_REGISTRY` lets future targets register discoverable contracts such as `terraform-aws-vpc`, `terraform-aws-eks`, org catalogs, or custom workload contracts.
+- **Pattern contract metadata**: `Pattern.contracts` makes target contracts first-class pattern metadata. Pattern registration validates contract definition + graph alignment, and generated artifact validation runs contract checks automatically.
+- **Debt cleanup**: Added `Pattern.expected_artifacts()` and `extra_artifacts` so contract artifacts stay single-source. Added `string_list` target type and moved AWS region/OU/account list decisions off misleading `cidr_list`.
+- **Generator scoping**: Added `applies_to` metadata to registered generators and compiler now passes the selected pattern to generation. LZA, K8s, and AWS LZA generators are pattern-scoped, reducing reliance on broad global guard behavior.
+- **Contract CLI**: Added `intent-engine contract list/show` so target contracts are discoverable from CLI. `show --pattern aws-lza` reveals mandatory/optional LZA artifacts, required decisions, source URL, and decision-to-artifact lineage.
+- **Contract required paths**: Added reusable `ArtifactContract.required_paths`; generated artifact validation now catches malformed YAML and missing nested/list paths from contract metadata. `lineage-manifest.yaml` now includes artifact contracts with `requiredPaths`.
+- **Lineage path validation**: Generated artifact validation now checks contract lineage paths for structured artifacts, skips non-YAML/unschematized artifacts, and avoids duplicate noise when schema validation already failed.
+- **K8s contract migration**: Removed `_k8s_artifact_validator`; Kubernetes now uses contract-driven artifact validation. `validate_generated_violations()` uses `pattern.expected_artifacts()` as the single required-file source and dedupes user-facing messages.
+- **Extension contract docs**: `EXTENSION.md` now recommends `TargetContract` + `applies_to` first, with `required_artifacts`/`artifact_validators` reserved for legacy/simple or cross-file rules.
+- **Pattern registration cleanup**: Added `load_builtin_patterns()` so CLI no longer imports individual pattern modules directly. Pattern-specific registration side effects stay in the pattern package.
+- **K8s generator guard cleanup**: K8s generators now unwrap `IaCIntentPayload` and guard on concrete `K8sIntent`, matching AWS LZA style instead of loose `hasattr` checks.
+- **Duplication removal**: Replaced repeated LZA required artifact lists with `_LZA_REQUIRED_ARTIFACTS`. Removed unused `_load_generator_config()` from core generator.
+- **Contract CLI coverage**: Added CLI coverage for `contract show --pattern kubernetes-cluster` so K8s contract migration remains visible.
+- **LZA artifact validator simplification**: Removed duplicate top-level key checks from `validate_lza_artifacts`; it now focuses on cross-file consistency while file/path validation lives in core/contract flow.
+- **Generator scoping guardrail**: Added core tests for `applies_to` matching and non-matching behavior. Updated stale LZA generator docstring to point to registry-level scoping.
+- **Contract validation simplification**: `ContractValidator.validate_artifacts()` now loads each YAML artifact once and reuses parsed data for required-path and lineage checks. Generated validation no longer checks contract files separately before contract validation; pattern file checks cover only legacy/simple and extra artifacts.
+- **Artifact validation cleanup**: Internal generated-artifact validation now uses `Violation`; `validate_generated()` remains a backwards-compatible message wrapper.
+- **AWS LZA golden fixture**: Added `fixtures/aws-lza-standard-v1/` and a golden test so default AWS LZA handoff artifacts are reviewable and drift-protected.
+- **Borrowed from rxt-code-accelerator**: Kept Pydantic spec discipline, graph validation, lineage manifest, preflight/runbook mindset, and golden-test direction. Did not import Azure generator shape or wrapper parity.
+- **Generator isolation**: AWS generators now guard on concrete `AwsLzaIntent`, not loose `hasattr`, because the global generator registry runs every generator for every pattern.
 
 Respond terse like smart caveman. All technical substance stay. Only fluff die.
 

@@ -1,8 +1,8 @@
 """LZA-specific output generators.
 
 These generators produce configuration artifacts for the LZA (Landing Zone
-Accelerator) use case. They coexist with other pattern generators through
-hasattr guards.
+Accelerator) use case. Registry-level pattern scoping is the main isolation
+boundary; lightweight guards remain as fallback safety.
 """
 
 from __future__ import annotations
@@ -401,26 +401,89 @@ def map_lza_intent_to_modules(intent: Any) -> list[ModuleInputs]:
     return modules
 
 
-# Register module mappers for LZA patterns
-for _lza_pattern in (
+_LZA_GENERATOR_SCOPE = {
     "baseline",
     "minimal",
     "workload",
     "hybrid-enterprise",
     "financial-services",
     "healthcare",
-):
+}
+
+
+# Register module mappers for LZA patterns
+for _lza_pattern in _LZA_GENERATOR_SCOPE:
     register_module_mapper(_lza_pattern, map_lza_intent_to_modules)
 
 
-# Register generators (they coexist with other pattern generators thanks to hasattr guards)
-register_generator("organization", gen_organization_config, priority=10, category="core")
-register_generator("accounts", gen_accounts_config, priority=11, category="core")
-register_generator("global", gen_global_config, priority=12, category="core")
-register_generator("security", gen_security_config, priority=20, category="security")
-register_generator("network", gen_network_config, priority=21, category="network")
-register_generator("iam", gen_iam_config, priority=30, category="security")
-register_generator("customizations", gen_customizations_config, priority=40, category="core")
-register_generator("decision-report", gen_decision_report, priority=5, category="meta")
-register_generator("deployment-graph", gen_deployment_graph, priority=6, category="meta")
-register_generator("workload-skeletons", gen_workload_skeleton, priority=50, category="workload")
+# Register generators at the pattern boundary; guards inside generators are fallback safety.
+register_generator(
+    "organization",
+    gen_organization_config,
+    priority=10,
+    category="core",
+    applies_to=_LZA_GENERATOR_SCOPE,
+)
+register_generator(
+    "accounts",
+    gen_accounts_config,
+    priority=11,
+    category="core",
+    applies_to=_LZA_GENERATOR_SCOPE,
+)
+register_generator(
+    "global",
+    gen_global_config,
+    priority=12,
+    category="core",
+    applies_to=_LZA_GENERATOR_SCOPE,
+)
+register_generator(
+    "security",
+    gen_security_config,
+    priority=20,
+    category="security",
+    applies_to=_LZA_GENERATOR_SCOPE,
+)
+register_generator(
+    "network",
+    gen_network_config,
+    priority=21,
+    category="network",
+    applies_to=_LZA_GENERATOR_SCOPE,
+)
+register_generator(
+    "iam",
+    gen_iam_config,
+    priority=30,
+    category="security",
+    applies_to=_LZA_GENERATOR_SCOPE,
+)
+register_generator(
+    "customizations",
+    gen_customizations_config,
+    priority=40,
+    category="core",
+    applies_to=_LZA_GENERATOR_SCOPE,
+)
+register_generator(
+    "decision-report",
+    gen_decision_report,
+    priority=5,
+    category="meta",
+    applies_to=_LZA_GENERATOR_SCOPE,
+)
+register_generator(
+    "deployment-graph",
+    gen_deployment_graph,
+    priority=6,
+    category="meta",
+    applies_to=_LZA_GENERATOR_SCOPE,
+)
+register_generator(
+    "workload-skeletons",
+    gen_workload_skeleton,
+    priority=50,
+    category="workload",
+    applies_to=_LZA_GENERATOR_SCOPE,
+)

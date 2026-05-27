@@ -363,7 +363,7 @@ class Extractor:
                     coerced[key] = str(int(float(raw_val)))
                 except (ValueError, TypeError):
                     coerced[key] = str(raw_val)
-            elif target_type == "cidr_list":
+            elif target_type in ("cidr_list", "string_list"):
                 if isinstance(raw_val, list):
                     coerced[key] = ",".join(str(c) for c in raw_val)
                 else:
@@ -414,7 +414,7 @@ class Extractor:
                     parsed_val = _int(raw_val)
                 elif target_type == "bool":
                     parsed_val = _bool(raw_val)
-                elif target_type == "cidr_list":
+                elif target_type in ("cidr_list", "string_list"):
                     if isinstance(raw_val, str):
                         parsed_val = [c.strip() for c in raw_val.split(",") if c.strip()]
                     elif isinstance(raw_val, list):

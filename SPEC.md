@@ -11,10 +11,11 @@ Model-driven intent extraction framework. Design doc → structured decisions �
 - One SPEC.md at root. No split specs
 
 ## §I INTERFACES
-- cli: `intent-engine compile|interview|validate|discover|template|catalog|explain|review`
+- cli: `intent-engine compile|interview|validate|discover|template|catalog|contract|explain|review`
 - graph: `RequirementGraph` — add, decide, status, apply_decisions, cascade
 - models: `RawIntent` + pattern-specific Pydantic models
-- gen: `GeneratorRegistry` — `register(name, fn, priority, category)`
+- gen: `GeneratorRegistry` — `register(name, fn, priority, category, applies_to)`
+- contracts: `TargetContract` — artifacts, required_paths, required_decisions, lineage
 - llm: `LLMCaller` — `call(prompt)` → `(response, LLMEvidence)`
 - patterns: `PatternRegistry` + `AddonRegistry` — compose, get, list
 - env: `OPENAI_API_KEY`, `INTENT_ENGINE_PROVIDER`, `INTENT_ENGINE_MODEL`
@@ -26,8 +27,8 @@ V1: ∀ decision → recorded in audit trail with timestamp + rationale
 V2: ∄ compile without validate. Fail-closed on violations
 V3: Adding requirement node → auto-updates LLM prompt + interview + catalog
 V4: Every new pattern → zero core changes (verify: no `patterns/` imports in `core/`)
-V5: Each generator has `hasattr` guard for pattern-specific fields
-V6: Test suite ! pass before push. 428+ tests, ruff clean
+V5: Pattern generators scoped by `applies_to`; internal guards only fallback safety
+V6: Test suite ! pass before push. 460+ tests, ruff clean
 
 ## §T TASKS
 id|status|task|cites
@@ -44,6 +45,7 @@ T10|.|Improve workloads extraction for small models (split extraction)|V3
 T11|.|More pattern-specific sample configs|V4
 T12|.|Decision-report → Terraform variables mapping|V5
 T13|~|Mypy expansion (remaining src files)|V4
+T14|~|AWS LZA thin path: model-driven contract, YAML emitter, lineage manifest|V4,V5
 
 ## §B BUGS
 id|date|cause|fix

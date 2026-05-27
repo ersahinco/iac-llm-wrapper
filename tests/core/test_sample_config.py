@@ -20,6 +20,10 @@ class TestSampleConfig:
         )
         assert cfg.name == "test"
         assert cfg.pattern == "test-pattern"
+        assert cfg.description == ""
+        assert cfg.source_contract is None
+        assert cfg.upstream_variant is None
+        assert cfg.tags == []
         assert cfg.decisions == {}
 
     def test_create_with_decisions(self):
@@ -51,6 +55,23 @@ class TestSampleConfig:
         assert len(cfg.module_refs) == 1
         assert cfg.module_refs[0].module_name == "test-module"
         assert cfg.module_refs[0].version == "~> 1.0"
+
+    def test_create_with_metadata(self):
+        cfg = SampleConfig(
+            name="test",
+            pattern="aws-lza",
+            description="Regulated sample",
+            version="1.0.0",
+            release_date="2026-05-27",
+            source_url="https://example.com",
+            source_contract="aws-lza-sample-configuration",
+            upstream_variant="standard",
+            tags=["regulated", "aws"],
+        )
+        assert cfg.description == "Regulated sample"
+        assert cfg.source_contract == "aws-lza-sample-configuration"
+        assert cfg.upstream_variant == "standard"
+        assert cfg.tags == ["regulated", "aws"]
 
     def test_diff_identical(self):
         cfg = SampleConfig(

@@ -152,7 +152,6 @@ def validate_lza_artifacts(output_dir: Path) -> list[str]:
     - Workload targetAccount values exist in accounts-config.yaml
     - Network centralNetworkAccount exists in accounts-config.yaml
     - Account OU values exist in organization-config.yaml
-    - All config files have required top-level keys
     """
     errors: list[str] = []
     import ruamel.yaml
@@ -224,25 +223,5 @@ def validate_lza_artifacts(output_dir: Path) -> list[str]:
                         f"Account '{acct.get('name')}' references OU '{ou}' "
                         f"not found in organization-config.yaml"
                     )
-
-    # Check top-level keys in config files
-    required_keys = {
-        "organization-config.yaml": ["organization"],
-        "accounts-config.yaml": ["accounts"],
-        "global-config.yaml": ["global"],
-        "security-config.yaml": ["security"],
-        "network-config.yaml": ["network"],
-    }
-    for fname, keys in required_keys.items():
-        fpath = output_dir / fname
-        if fpath.exists():
-            with open(fpath) as f:
-                data = yaml.load(f)
-            if not isinstance(data, dict):
-                errors.append(f"{fname}: expected dict at top level")
-                continue
-            for key in keys:
-                if key not in data:
-                    errors.append(f"{fname}: missing required key '{key}'")
 
     return errors
