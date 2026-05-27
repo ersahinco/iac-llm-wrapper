@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from intent_engine.core.contracts import (
     ArtifactContract,
+    ArtifactValueAssertion,
     ContractRegistry,
     ContractValidator,
     DecisionLineage,
@@ -46,6 +47,9 @@ def _yaml_contract() -> TargetContract:
             ArtifactContract(
                 name="config.yaml",
                 required_paths=["region", "accounts[]", "accounts[].name"],
+                value_assertions=[
+                    ArtifactValueAssertion(path="region", equals="eu-central-1"),
+                ],
             ),
         ],
         required_decisions=["region"],
@@ -76,6 +80,30 @@ class TestContractValidator:
 
         violations = ContractValidator(contract).validate_contract()
         assert {violation.code for violation in violations} == {"CONTRACT_LINEAGE_ARTIFACT_UNKNOWN"}
+
+    def test_invalid_assertion_definition_fails(self):
+        contract = TargetContract(
+            name="bad-assertions",
+            kind="yaml-config",
+            source_url="https://example.com/config",
+            artifacts=[
+                ArtifactContract(
+                    name="config.yaml",
+                    value_assertions=[
+                        ArtifactValueAssertion(path="region"),
+                        ArtifactValueAssertion(path="mode", equals="a", one_of=["a", "b"]),
+                    ],
+                )
+            ],
+            required_decisions=["region"],
+        )
+
+        violations = ContractValidator(contract).validate_contract()
+
+        assert {violation.code for violation in violations} == {
+            "CONTRACT_ASSERTION_RULE_REQUIRED",
+            "CONTRACT_ASSERTION_AMBIGUOUS",
+        }
 
     def test_missing_required_decision_fails(self):
         violations = ContractValidator(_contract()).validate_intent(ExampleIntent())
@@ -148,6 +176,43 @@ class TestContractValidator:
 
         assert [violation.message for violation in violations] == [
             "config.yaml missing required path: accounts[].name"
+        ]
+
+    def test_asserted_value_mismatch_fails(self, tmp_path: Path):
+        (tmp_path / "config.yaml").write_text("region: us-east-1\naccounts:\n  - name: Prod\n")
+
+        violations = ContractValidator(_yaml_contract()).validate_artifacts(tmp_path)
+
+        assert [violation.message for violation in violations] == [
+            "config.yaml expected region == 'eu-central-1'"
+        ]
+        assert {violation.code for violation in violations} == {
+            "CONTRACT_ARTIFACT_ASSERTION_FAILED"
+        }
+
+    def test_list_item_assertion_uses_all_resolved_values(self, tmp_path: Path):
+        contract = TargetContract(
+            name="dns-flags",
+            kind="yaml-config",
+            source_url="https://example.com/config",
+            artifacts=[
+                ArtifactContract(
+                    name="config.yaml",
+                    value_assertions=[
+                        ArtifactValueAssertion(path="vpcs[].enableDnsSupport", equals=True),
+                    ],
+                )
+            ],
+            required_decisions=["region"],
+        )
+        (tmp_path / "config.yaml").write_text(
+            "vpcs:\n  - enableDnsSupport: true\n  - enableDnsSupport: false\n"
+        )
+
+        violations = ContractValidator(contract).validate_artifacts(tmp_path)
+
+        assert [violation.message for violation in violations] == [
+            "config.yaml expected vpcs[].enableDnsSupport == True"
         ]
 
     def test_invalid_yaml_artifact_fails(self, tmp_path: Path):

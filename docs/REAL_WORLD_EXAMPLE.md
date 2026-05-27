@@ -41,6 +41,7 @@ Output includes:
 - `iam-config.yaml` — permission boundaries and role prefixes
 - `customizations-config.yaml` — VPC endpoints for private CI/CD
 - `module-inputs.yaml` — mapped Terraform module variables
+- `sample-recommendations.yaml` — persisted closest reference bundles for handoff
 
 ## Step 4: Engineer Handoff
 
@@ -49,6 +50,7 @@ Engineers use the decision artifacts alongside the sample configuration:
 ```bash
 # Inspect matching sample configs for this pattern
 iac-llm-wrapper sample list --pattern financial-services
+iac-llm-wrapper sample list --tag regulated
 
 # Show one sample config in detail
 iac-llm-wrapper sample show --name lza-baseline-v1
@@ -57,6 +59,10 @@ iac-llm-wrapper sample show --name lza-baseline-v1
 The `module-inputs.yaml` provides pinned module references:
 - `terraform-aws-modules/vpc/aws ~> 5.0` for networking
 - `terraform-aws-modules/security-group/aws ~> 5.0` for security baseline
+
+The generated `sample-recommendations.yaml` preserves closest reference bundles in the
+handoff output so engineers can recover proven starting points later without re-running
+the interview session.
 
 Engineers apply these inputs to their Terraform/CDK/CloudFormation modules.
 

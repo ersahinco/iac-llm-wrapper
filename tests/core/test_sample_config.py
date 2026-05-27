@@ -73,6 +73,17 @@ class TestSampleConfig:
         assert cfg.upstream_variant == "standard"
         assert cfg.tags == ["regulated", "aws"]
 
+    def test_fixture_name_uses_override_when_present(self):
+        cfg = SampleConfig(
+            name="test",
+            pattern="aws-lza",
+            version="1.0.0",
+            release_date="2026-05-27",
+            source_url="https://example.com",
+            fixture_dir="custom-fixture",
+        )
+        assert cfg.fixture_name == "custom-fixture"
+
     def test_diff_identical(self):
         cfg = SampleConfig(
             name="test",
@@ -191,6 +202,118 @@ class TestSampleConfigRegistry:
         assert len(p1_samples) == 2
         assert p1_samples[0].name == "a"
         assert p1_samples[1].name == "b"
+
+    def test_find_by_contract(self):
+        reg = SampleConfigRegistry()
+        reg.register(
+            SampleConfig(
+                name="a",
+                pattern="p1",
+                version="1.0.0",
+                release_date="2025-01-01",
+                source_url="https://example.com",
+                source_contract="contract-a",
+            )
+        )
+        reg.register(
+            SampleConfig(
+                name="b",
+                pattern="p1",
+                version="1.0.0",
+                release_date="2025-01-01",
+                source_url="https://example.com",
+                source_contract="contract-b",
+            )
+        )
+
+        matches = reg.find_by_contract("contract-a")
+
+        assert [sample.name for sample in matches] == ["a"]
+
+    def test_find_by_tag(self):
+        reg = SampleConfigRegistry()
+        reg.register(
+            SampleConfig(
+                name="a",
+                pattern="p1",
+                version="1.0.0",
+                release_date="2025-01-01",
+                source_url="https://example.com",
+                tags=["regulated", "aws"],
+            )
+        )
+        reg.register(
+            SampleConfig(
+                name="b",
+                pattern="p1",
+                version="1.0.0",
+                release_date="2025-01-01",
+                source_url="https://example.com",
+                tags=["kubernetes"],
+            )
+        )
+
+        matches = reg.find_by_tag("AWS")
+
+        assert [sample.name for sample in matches] == ["a"]
+
+    def test_compare_to_normalizes_bool_and_list_shapes(self):
+        cfg = SampleConfig(
+            name="test",
+            pattern="aws-lza",
+            version="1.0.0",
+            release_date="2026-05-27",
+            source_url="https://example.com",
+            decisions={
+                "centralized_logging": "true",
+                "enabled_regions": ["eu-central-1", "eu-west-1"],
+            },
+        )
+
+        diff = cfg.compare_to(
+            {
+                "centralized_logging": True,
+                "enabled_regions": "eu-central-1, eu-west-1",
+                "extra": "value",
+            }
+        )
+
+        assert set(diff["same"]) == {"centralized_logging", "enabled_regions"}
+        assert diff["different"] == {}
+        assert diff["missing_in_current"] == {}
+        assert diff["extra_in_current"] == {"extra": "value"}
+
+    def test_find_best_matches_prefers_more_exact_overlap(self):
+        reg = SampleConfigRegistry()
+        reg.register(
+            SampleConfig(
+                name="close",
+                pattern="aws-lza",
+                version="1.0.0",
+                release_date="2026-05-27",
+                source_url="https://example.com",
+                decisions={"baseline": "standard", "centralized_logging": "true"},
+            )
+        )
+        reg.register(
+            SampleConfig(
+                name="far",
+                pattern="aws-lza",
+                version="1.0.0",
+                release_date="2026-05-27",
+                source_url="https://example.com",
+                decisions={"baseline": "healthcare", "centralized_logging": "false"},
+            )
+        )
+
+        matches = reg.find_best_matches(
+            {"baseline": "standard", "centralized_logging": True},
+            pattern="aws-lza",
+        )
+
+        assert [match.sample.name for match in matches] == ["close", "far"]
+        assert matches[0].same_count == 2
+        assert matches[1].different_count == 2
 
     def test_global_registry_importable(self):
         from intent_engine.core.sample_config import GLOBAL_SAMPLE_REGISTRY

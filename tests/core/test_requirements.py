@@ -243,3 +243,29 @@ class TestRequirementGraph:
         assert applied == ["regions", "enabled"]
         assert g.get("regions") == "eu-central-1,eu-west-1"
         assert g.get("enabled") == "true"
+
+    def test_typed_decisions_restores_structured_values(self):
+        g = RequirementGraph()
+        g.add(
+            Requirement(
+                key="regions",
+                label="Regions",
+                question="Regions?",
+                target_type="string_list",
+            )
+        )
+        g.add(
+            Requirement(
+                key="enabled",
+                label="Enabled",
+                question="Enabled?",
+                target_type="bool",
+            )
+        )
+
+        g.apply_decisions({"regions": ["eu-central-1", "eu-west-1"], "enabled": True})
+
+        assert g.typed_decisions() == {
+            "regions": ["eu-central-1", "eu-west-1"],
+            "enabled": True,
+        }

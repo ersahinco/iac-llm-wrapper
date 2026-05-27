@@ -1,0 +1,51 @@
+auditTrail:
+- timestamp: '2026-05-27T16:51:57.950878+00:00'
+  key: cluster_name
+  value: prod-k8s
+  how: decided
+  reason:
+- timestamp: '2026-05-27T16:51:57.950899+00:00'
+  key: cluster_version
+  value: '1.30'
+  how: decided
+  reason:
+- timestamp: '2026-05-27T16:51:57.950906+00:00'
+  key: network_policy_enabled
+  value: 'true'
+  how: decided
+  reason:
+- timestamp: '2026-05-27T16:51:57.950911+00:00'
+  key: pod_cidr
+  value: 10.244.0.0/16
+  how: decided
+  reason:
+- timestamp: '2026-05-27T16:51:57.950917+00:00'
+  key: service_cidr
+  value: 10.96.0.0/12
+  how: decided
+  reason:
+- timestamp: '2026-05-27T16:51:57.950923+00:00'
+  key: node_pool_name
+  value: primary
+  how: decided
+  reason:
+- timestamp: '2026-05-27T16:51:57.950927+00:00'
+  key: node_pool_instance_type
+  value: t3.large
+  how: decided
+  reason:
+- timestamp: '2026-05-27T16:51:57.950932+00:00'
+  key: node_pool_min_size
+  value: '2'
+  how: decided
+  reason:
+- timestamp: '2026-05-27T16:51:57.950936+00:00'
+  key: node_pool_max_size
+  value: '5'
+  how: decided
+  reason:
+- timestamp: '2026-05-27T16:51:57.950940+00:00'
+  key: namespace_name
+  value: production
+  how: decided
+  reason:

@@ -4,8 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from intent_engine.core.generator import GeneratorRegistry, _hcl_value, gen_tfvars
+from intent_engine.core.generator import (
+    GeneratorRegistry,
+    _hcl_value,
+    gen_sample_recommendations,
+    gen_tfvars,
+)
 from intent_engine.core.module_mapping import IaCIntentPayload, ModuleInputs
+from intent_engine.core.sample_config import GLOBAL_SAMPLE_REGISTRY, SampleConfig
 
 
 class TestGeneratorRegistry:
@@ -160,3 +166,43 @@ class TestGenTFVars:
         assert "# Module: mod-b" in content
         assert "x = 1" in content
         assert "y = false" in content
+
+
+class TestGenSampleRecommendations:
+    def test_writes_file_when_pattern_has_sample_matches(self, tmp_path: Path):
+        GLOBAL_SAMPLE_REGISTRY.register(
+            SampleConfig(
+                name="test-sample-rec-v1",
+                pattern="test-pattern-rec",
+                version="1.0.0",
+                release_date="2026-05-27",
+                source_url="https://example.com",
+                decisions={"region": "eu-central-1", "enabled": "true"},
+            )
+        )
+        payload = IaCIntentPayload(
+            design_doc=None,  # type: ignore[arg-type]
+            module_inputs=[],
+            intent=None,
+            pattern="test-pattern-rec",
+            decisions={"region": "eu-central-1", "enabled": True},
+        )
+
+        gen_sample_recommendations(payload, tmp_path)
+
+        out = tmp_path / "sample-recommendations.yaml"
+        assert out.exists()
+        content = out.read_text()
+        assert "test-sample-rec-v1" in content
+        assert "sameDecisionCount: 2" in content
+
+    def test_skips_without_pattern_decisions(self, tmp_path: Path):
+        payload = IaCIntentPayload(
+            design_doc=None,  # type: ignore[arg-type]
+            module_inputs=[],
+            intent=None,
+        )
+
+        gen_sample_recommendations(payload, tmp_path)
+
+        assert not (tmp_path / "sample-recommendations.yaml").exists()

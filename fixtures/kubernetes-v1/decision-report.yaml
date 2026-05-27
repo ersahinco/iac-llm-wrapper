@@ -1,0 +1,12 @@
+clusterName: prod-k8s
+clusterVersion: '1.30'
+network:
+  podCidr: 10.244.0.0/16
+  serviceCidr: 10.96.0.0/12
+  networkPolicyEnabled: true
+nodePool:
+  name: primary
+  instanceType: t3.large
+  minSize: 2
+  maxSize: 5
+namespace: production

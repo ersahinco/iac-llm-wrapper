@@ -2,16 +2,28 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import ruamel.yaml
 
-import intent_engine.patterns.aws_lza  # noqa: F401 — triggers sample registration
-import intent_engine.patterns.kubernetes  # noqa: F401 — triggers sample registration
 from intent_engine.core.compiler import compile_from_interview
 from intent_engine.core.sample_config import GLOBAL_SAMPLE_REGISTRY
+from intent_engine.patterns import load_builtin_patterns
 
 FIXTURES = Path(__file__).parent.parent.parent / "fixtures"
+load_builtin_patterns()
+
+
+def _normalized_artifact_text(file_name: str, text: str) -> str:
+    if file_name != "decision-audit.yaml":
+        return text
+    return re.sub(
+        r"(^\s*-?\s*timestamp:\s*).+$",
+        r"\1<TIMESTAMP>",
+        text,
+        flags=re.MULTILINE,
+    )
 
 
 class TestAwsLzaSampleConfigRegistered:
@@ -89,6 +101,7 @@ class TestK8sSampleConfigRegistered:
     def test_k8s_cluster_v1_registered(self):
         cfg = GLOBAL_SAMPLE_REGISTRY.get("k8s-cluster-v1")
         assert cfg.pattern == "kubernetes-cluster"
+        assert cfg.fixture_name == "kubernetes-v1"
         assert cfg.version == "1.0.0"
         assert cfg.decisions["cluster_name"] == "prod-k8s"
 
@@ -136,9 +149,35 @@ class TestSampleConfigConsistency:
     def test_registered_samples_with_fixture_dirs(self):
         """Samples with fixture dirs should have valid directories."""
         for name in GLOBAL_SAMPLE_REGISTRY.list():
-            expected_dir = FIXTURES / name
+            cfg = GLOBAL_SAMPLE_REGISTRY.get(name)
+            expected_dir = FIXTURES / cfg.fixture_name
             if expected_dir.exists():
                 assert expected_dir.is_dir(), f"{name} fixture path is not a directory"
+
+    def test_fixture_bundles_match_fresh_compile(self, tmp_path: Path):
+        for name in GLOBAL_SAMPLE_REGISTRY.list():
+            cfg = GLOBAL_SAMPLE_REGISTRY.get(name)
+            fixture_dir = FIXTURES / cfg.fixture_name
+            if not fixture_dir.exists():
+                continue
+
+            output_dir = tmp_path / cfg.fixture_name
+            compile_from_interview(cfg.decisions, output_dir, pattern=cfg.pattern)
+
+            expected_files = {
+                path.name: _normalized_artifact_text(path.name, path.read_text())
+                for path in output_dir.iterdir()
+                if path.is_file()
+            }
+            fixture_files = {
+                path.name: _normalized_artifact_text(path.name, path.read_text())
+                for path in fixture_dir.iterdir()
+                if path.is_file() and path.name != "README.md"
+            }
+
+            assert fixture_files.keys() == expected_files.keys(), name
+            for file_name, expected_text in expected_files.items():
+                assert fixture_files[file_name] == expected_text, f"{name}/{file_name}"
 
     def test_all_samples_have_module_versions(self):
         """Every module ref should have a version and source."""

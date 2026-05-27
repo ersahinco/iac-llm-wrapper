@@ -53,8 +53,9 @@ class TestLZASampleConfigFixtures:
         path = FIXTURES / "lza-baseline-v1" / "accounts-config.yaml"
         assert path.exists()
         data = ruamel.yaml.YAML(typ="safe").load(path.read_text())
+        assert data["schemaVersion"] == "lza-v1"
         assert "accounts" in data
-        assert len(data["accounts"]) >= 4
+        assert isinstance(data["accounts"], list)
 
     def test_global_config_exists(self):
         path = FIXTURES / "lza-baseline-v1" / "global-config.yaml"

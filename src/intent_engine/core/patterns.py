@@ -61,11 +61,15 @@ class Pattern:
         return graph
 
     def expected_artifacts(self) -> list[str]:
+        from .sample_config import GLOBAL_SAMPLE_REGISTRY
+
         artifacts: list[str] = []
         for contract in self.contracts:
             artifacts.extend(contract.required_artifacts)
         artifacts.extend(self.required_artifacts)
         artifacts.extend(self.extra_artifacts)
+        if GLOBAL_SAMPLE_REGISTRY.find_by_pattern(self.name):
+            artifacts.append("sample-recommendations.yaml")
         return list(dict.fromkeys(artifacts))
 
 

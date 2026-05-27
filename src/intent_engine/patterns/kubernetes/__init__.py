@@ -461,6 +461,7 @@ GLOBAL_SAMPLE_REGISTRY.register(
     SampleConfig(
         name="k8s-cluster-v1",
         pattern="kubernetes-cluster",
+        fixture_dir="kubernetes-v1",
         version="1.0.0",
         release_date="2025-06-01",
         source_url="https://github.com/terraform-aws-modules/terraform-aws-eks",

@@ -22,6 +22,18 @@ class ArtifactContract(BaseModel):
     required: bool = True
     description: str = ""
     required_paths: list[str] = Field(default_factory=list, serialization_alias="requiredPaths")
+    value_assertions: list[ArtifactValueAssertion] = Field(
+        default_factory=list,
+        serialization_alias="valueAssertions",
+    )
+
+
+class ArtifactValueAssertion(BaseModel):
+    """Literal value assertions for generated artifact paths."""
+
+    path: str
+    equals: Any | None = None
+    one_of: list[Any] = Field(default_factory=list, serialization_alias="oneOf")
 
 
 class DecisionLineage(BaseModel):
@@ -61,6 +73,28 @@ class ContractValidator:
         violations: list[Violation] = []
         known_artifacts = {artifact.name for artifact in self.contract.artifacts}
         known_decisions = set(self.contract.required_decisions)
+        for artifact in self.contract.artifacts:
+            for assertion in artifact.value_assertions:
+                if assertion.equals is None and not assertion.one_of:
+                    violations.append(
+                        Violation(
+                            code="CONTRACT_ASSERTION_RULE_REQUIRED",
+                            message=(
+                                f"Artifact assertion for '{artifact.name}:{assertion.path}' "
+                                "must define equals or oneOf."
+                            ),
+                        )
+                    )
+                if assertion.equals is not None and assertion.one_of:
+                    violations.append(
+                        Violation(
+                            code="CONTRACT_ASSERTION_AMBIGUOUS",
+                            message=(
+                                f"Artifact assertion for '{artifact.name}:{assertion.path}' "
+                                "cannot define both equals and oneOf."
+                            ),
+                        )
+                    )
         for item in self.contract.lineage:
             if item.artifact not in known_artifacts:
                 violations.append(
@@ -157,6 +191,10 @@ class ContractValidator:
             if shape_violations:
                 schema_invalid_artifacts.add(artifact.name)
             violations.extend(shape_violations)
+            assertion_violations = self._validate_artifact_assertions(artifact, data)
+            if assertion_violations:
+                schema_invalid_artifacts.add(artifact.name)
+            violations.extend(assertion_violations)
         violations.extend(self._validate_lineage_paths(data_by_artifact, schema_invalid_artifacts))
         return violations
 
@@ -178,6 +216,49 @@ class ContractValidator:
                     )
                 )
         return shape_violations
+
+    def _validate_artifact_assertions(
+        self,
+        artifact: ArtifactContract,
+        data: dict[str, Any],
+    ) -> list[Violation]:
+        if not artifact.value_assertions:
+            return []
+
+        violations: list[Violation] = []
+        for assertion in artifact.value_assertions:
+            values = self._path_values(data, assertion.path)
+            if not values:
+                violations.append(
+                    Violation(
+                        code="CONTRACT_ARTIFACT_ASSERTION_FAILED",
+                        message=f"{artifact.name} missing asserted path: {assertion.path}",
+                    )
+                )
+                continue
+            if assertion.equals is not None:
+                expected = self._normalize_value(assertion.equals)
+                if not all(self._normalize_value(value) == expected for value in values):
+                    violations.append(
+                        Violation(
+                            code="CONTRACT_ARTIFACT_ASSERTION_FAILED",
+                            message=(
+                                f"{artifact.name} expected {assertion.path} == {assertion.equals!r}"
+                            ),
+                        )
+                    )
+                continue
+            allowed = {self._normalize_value(value) for value in assertion.one_of}
+            if not all(self._normalize_value(value) in allowed for value in values):
+                violations.append(
+                    Violation(
+                        code="CONTRACT_ARTIFACT_ASSERTION_FAILED",
+                        message=(
+                            f"{artifact.name} expected {assertion.path} in {assertion.one_of!r}"
+                        ),
+                    )
+                )
+        return violations
 
     def _validate_lineage_paths(
         self,
@@ -241,6 +322,9 @@ class ContractValidator:
     def _path_exists(self, data: Any, path: str) -> bool:
         return self._path_parts_exist(data, path.split("."))
 
+    def _path_values(self, data: Any, path: str) -> list[Any]:
+        return self._path_part_values(data, path.split("."))
+
     def _path_parts_exist(self, current: Any, parts: list[str]) -> bool:
         if not parts:
             # Plain dotted paths model schema presence. Use the [] suffix when a
@@ -263,6 +347,47 @@ class ContractValidator:
         if not isinstance(current, dict) or part not in current:
             return False
         return self._path_parts_exist(current[part], rest)
+
+    def _path_part_values(self, current: Any, parts: list[str]) -> list[Any]:
+        if not parts:
+            return [current]
+
+        part = parts[0]
+        rest = parts[1:]
+        if part.endswith("[]"):
+            key = part[:-2]
+            if not isinstance(current, dict) or key not in current:
+                return []
+            items = current[key]
+            if not isinstance(items, list) or not items:
+                return []
+            if not rest:
+                return list(items)
+            values: list[Any] = []
+            for item in items:
+                values.extend(self._path_part_values(item, rest))
+            return values
+
+        if not isinstance(current, dict) or part not in current:
+            return []
+        return self._path_part_values(current[part], rest)
+
+    def _normalize_value(self, value: Any) -> Any:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, list):
+            return tuple(self._normalize_value(item) for item in value)
+        if isinstance(value, dict):
+            return tuple(sorted((key, self._normalize_value(item)) for key, item in value.items()))
+        if isinstance(value, str):
+            normalized = value.strip()
+            lowered = normalized.lower()
+            if lowered == "true":
+                return True
+            if lowered == "false":
+                return False
+            return normalized
+        return value
 
     def _get_dotted(self, obj: Any, dotted_path: str) -> Any:
         current = obj

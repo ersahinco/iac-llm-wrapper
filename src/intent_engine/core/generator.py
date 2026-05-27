@@ -197,6 +197,56 @@ def gen_tfvars(intent: Any, output_dir: Path) -> None:
     (output_dir / "terraform.tfvars").write_text("\n".join(lines))
 
 
+def gen_sample_recommendations(intent: Any, output_dir: Path) -> None:
+    """Write sample-recommendations.yaml when pattern-backed samples exist."""
+    if not hasattr(intent, "pattern") or not hasattr(intent, "decisions"):
+        return
+
+    pattern = getattr(intent, "pattern", "")
+    decisions = getattr(intent, "decisions", {})
+    if not pattern or not decisions:
+        return
+
+    from .sample_config import GLOBAL_SAMPLE_REGISTRY, SampleConfig
+
+    matches = GLOBAL_SAMPLE_REGISTRY.find_best_matches(decisions, pattern=pattern, limit=3)
+    if not matches:
+        return
+
+    data = {
+        "pattern": pattern,
+        "currentDecisions": SampleConfig.to_builtin(decisions),
+        "recommendations": [
+            {
+                "name": match.sample.name,
+                "description": match.sample.description,
+                "version": match.sample.version,
+                "releaseDate": match.sample.release_date,
+                "sourceUrl": match.sample.source_url,
+                "sourceContract": match.sample.source_contract,
+                "upstreamVariant": match.sample.upstream_variant,
+                "tags": match.sample.tags,
+                "sameDecisionCount": match.same_count,
+                "differentDecisionCount": match.different_count,
+                "missingDecisionCount": match.missing_count,
+                "totalSampleDecisions": match.total_sample_decisions,
+                "sameDecisions": sorted(match.diff["same"].keys()),
+                "differentDecisions": SampleConfig.to_builtin(match.diff["different"]),
+                "missingDecisions": SampleConfig.to_builtin(match.diff["missing_in_current"]),
+                "extraCurrentDecisions": SampleConfig.to_builtin(match.diff["extra_in_current"]),
+            }
+            for match in matches
+        ],
+    }
+    _write(output_dir, "sample-recommendations.yaml", data)
+
+
 register_generator("design-doc", gen_design_doc, priority=4, category="meta")
 register_generator("module-inputs", gen_module_inputs, priority=5, category="meta")
+register_generator(
+    "sample-recommendations",
+    gen_sample_recommendations,
+    priority=5,
+    category="meta",
+)
 register_generator("terraform-tfvars", gen_tfvars, priority=5, category="meta")

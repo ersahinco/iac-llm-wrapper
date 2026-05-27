@@ -102,15 +102,17 @@ def _selected_samples_or_exit(
     action: str,
     name: str | None,
     pattern: str | None,
+    contract: str | None = None,
+    tag: str | None = None,
 ) -> list[SampleConfig]:
     if action == "list":
         if pattern:
             _get_pattern_or_exit(pattern)
-            return GLOBAL_SAMPLE_REGISTRY.find_by_pattern(pattern)
-        return [GLOBAL_SAMPLE_REGISTRY.get(n) for n in GLOBAL_SAMPLE_REGISTRY.list()]
+        samples = GLOBAL_SAMPLE_REGISTRY.find(pattern=pattern, contract=contract, tag=tag)
+        return samples
     if pattern:
         _get_pattern_or_exit(pattern)
-        samples = GLOBAL_SAMPLE_REGISTRY.find_by_pattern(pattern)
+        samples = GLOBAL_SAMPLE_REGISTRY.find(pattern=pattern, contract=contract, tag=tag)
         if not samples:
             typer.echo(f"Pattern has no sample configs: {pattern}", err=True)
             raise typer.Exit(1)
@@ -123,6 +125,31 @@ def _selected_samples_or_exit(
             raise typer.Exit(1) from exc
     typer.echo("Error: --name or --pattern required for show", err=True)
     raise typer.Exit(1)
+
+
+def _emit_sample_matches(pattern: str, decisions: dict[str, Any]) -> None:
+    matches = GLOBAL_SAMPLE_REGISTRY.find_best_matches(decisions, pattern=pattern, limit=3)
+    if not matches:
+        return
+
+    typer.echo("")
+    typer.echo("=== Sample Match ===")
+    for idx, match in enumerate(matches, 1):
+        sample = match.sample
+        typer.echo(
+            "  "
+            f"{idx}. {sample.name} | same {match.same_count}/{match.total_sample_decisions}"
+            f" | different {match.different_count}"
+            f" | missing {match.missing_count}"
+        )
+        if sample.source_contract:
+            typer.echo(f"     Contract: {sample.source_contract}")
+        if sample.upstream_variant:
+            typer.echo(f"     Variant: {sample.upstream_variant}")
+        if sample.tags:
+            typer.echo(f"     Tags: {', '.join(sample.tags)}")
+
+    typer.echo(f"  Run 'intent-engine sample show --name {matches[0].sample.name}' for details.")
 
 
 def _version_callback(value: bool) -> None:
@@ -294,6 +321,8 @@ def compile(
             f"  Run 'intent-engine catalog diff --entry {entry_name} "
             f"--input <decisions.json>' for full details."
         )
+
+    _emit_sample_matches(pattern, graph.typed_decisions())
 
 
 @app.command()
@@ -636,6 +665,7 @@ def interview(
             pattern=actual_pattern,
         )
         typer.echo(f"Compilation successful. Output written to: {output}")
+        _emit_sample_matches(actual_pattern, engine.graph.typed_decisions())
     except CompileError as e:
         typer.echo("Compilation failed with violations:", err=True)
         for v in e.violations:
@@ -719,7 +749,11 @@ def contract(
             schema_hint = ""
             if artifact.required_paths:
                 schema_hint = f" | paths: {', '.join(artifact.required_paths)}"
-            typer.echo(f"  - {artifact.name}{schema_hint}")
+            assertion_hint = ""
+            if artifact.value_assertions:
+                paths = ", ".join(item.path for item in artifact.value_assertions)
+                assertion_hint = f" | assertions: {paths}"
+            typer.echo(f"  - {artifact.name}{schema_hint}{assertion_hint}")
         if contract_obj.optional_artifacts:
             typer.echo("")
             typer.echo("Optional artifacts:")
@@ -729,7 +763,11 @@ def contract(
                 schema_hint = ""
                 if artifact.required_paths:
                     schema_hint = f" | paths: {', '.join(artifact.required_paths)}"
-                typer.echo(f"  - {artifact.name}{schema_hint}")
+                assertion_hint = ""
+                if artifact.value_assertions:
+                    paths = ", ".join(item.path for item in artifact.value_assertions)
+                    assertion_hint = f" | assertions: {paths}"
+                typer.echo(f"  - {artifact.name}{schema_hint}{assertion_hint}")
         typer.echo("")
         typer.echo("Required decisions:")
         for decision in contract_obj.required_decisions:
@@ -759,13 +797,26 @@ def sample(
         "-p",
         help="List or show sample configs attached to a pattern",
     ),
+    contract: str = typer.Option(
+        None,
+        "--contract",
+        help="Filter sample configs by source contract",
+    ),
+    tag: str = typer.Option(
+        None,
+        "--tag",
+        help="Filter sample configs by metadata tag",
+    ),
 ) -> None:
     """Inspect versioned sample configs: decisions, metadata, and module refs."""
     if action not in {"list", "show"}:
         typer.echo(f"Unknown action: {action}. Use: list, show", err=True)
         raise typer.Exit(1)
 
-    samples = _selected_samples_or_exit(action, name, pattern)
+    samples = _selected_samples_or_exit(action, name, pattern, contract, tag)
+    if action == "list" and not samples:
+        typer.echo("No sample configs matched current filters.", err=True)
+        raise typer.Exit(1)
 
     if action == "list":
         typer.echo("=== Sample Configs ===")

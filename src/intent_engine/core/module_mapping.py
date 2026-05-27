@@ -9,7 +9,7 @@ This layer implements the Double-Object Extraction Schema:
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -58,6 +58,8 @@ class IaCIntentPayload:
     design_doc: DesignDocument
     module_inputs: list[ModuleInputs]
     intent: Any
+    pattern: str = ""
+    decisions: dict[str, Any] = field(default_factory=dict)
 
     def __getattr__(self, name: str) -> Any:
         """Proxy attribute access to the underlying intent model.
@@ -65,7 +67,7 @@ class IaCIntentPayload:
         This allows existing generators to work unchanged when they receive
         an IaCIntentPayload instead of a raw intent object.
         """
-        if name in ("design_doc", "module_inputs", "intent"):
+        if name in ("design_doc", "module_inputs", "intent", "pattern", "decisions"):
             return object.__getattribute__(self, name)
         return getattr(self.intent, name)
 

@@ -53,7 +53,8 @@ Engineers:
 1. Copy the `variables` block into their Terraform module call
 2. Reference the `source` and `version` for module pinning
 3. Use `decision-report.yaml` for compliance audit trails
-4. Follow `deployment-graph.yaml` for phased rollout order
+4. Use `sample-recommendations.yaml` for persisted reference-bundle guidance
+5. Follow `deployment-graph.yaml` for phased rollout order
 
 ## Sample Config Registry
 
@@ -62,6 +63,10 @@ Versioned, pinned sample configurations provide proven starting points:
 ```bash
 # List available sample configs
 iac-llm-wrapper sample list
+
+# Filter by tag or contract
+iac-llm-wrapper sample list --tag regulated
+iac-llm-wrapper sample list --contract aws-lza-sample-configuration
 
 # Show config with module references and decisions
 iac-llm-wrapper sample show --name lza-baseline-v1
@@ -72,6 +77,10 @@ iac-llm-wrapper catalog diff --entry lza-financial --input decisions.json
 # Apply catalog defaults to current decisions
 iac-llm-wrapper catalog apply --entry lza-baseline --input current.json --output merged.json
 ```
+
+`compile` and `interview` also print closest sample matches for the chosen pattern so
+architects can start from proven variants and engineers can jump straight to detailed
+sample metadata.
 
 ## Signal Detection in Action
 

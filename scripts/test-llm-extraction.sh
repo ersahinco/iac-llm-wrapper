@@ -64,6 +64,10 @@ for fixture_pattern in "${FIXTURES[@]}"; do
         if [ -f "$test_output/module-inputs.yaml" ]; then
             echo "  ✓ module-inputs.yaml generated"
         fi
+
+        if [ -f "$test_output/sample-recommendations.yaml" ]; then
+            echo "  ✓ sample-recommendations.yaml generated"
+        fi
         
         PASSED=$((PASSED + 1))
     else

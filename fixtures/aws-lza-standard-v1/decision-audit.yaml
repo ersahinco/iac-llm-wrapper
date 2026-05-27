@@ -1,0 +1,91 @@
+auditTrail:
+- timestamp: '2026-05-27T16:51:57.916799+00:00'
+  key: baseline
+  value: standard
+  how: decided
+  reason:
+- timestamp: '2026-05-27T16:51:57.916826+00:00'
+  key: org_mode
+  value: control-tower
+  how: decided
+  reason:
+- timestamp: '2026-05-27T16:51:57.916836+00:00'
+  key: home_region
+  value: eu-central-1
+  how: decided
+  reason:
+- timestamp: '2026-05-27T16:51:57.916845+00:00'
+  key: enabled_regions
+  value: eu-central-1
+  how: decided
+  reason:
+- timestamp: '2026-05-27T16:51:57.916854+00:00'
+  key: organizational_units
+  value: Security,Infrastructure,Workloads
+  how: decided
+  reason:
+- timestamp: '2026-05-27T16:51:57.916863+00:00'
+  key: workload_accounts
+  value: Prod
+  how: decided
+  reason:
+- timestamp: '2026-05-27T16:51:57.916870+00:00'
+  key: security_tooling_account
+  value: SecurityTooling
+  how: decided
+  reason:
+- timestamp: '2026-05-27T16:51:57.916878+00:00'
+  key: identity_center_delegated_admin_account
+  value: SecurityTooling
+  how: decided
+  reason:
+- timestamp: '2026-05-27T16:51:57.916886+00:00'
+  key: topology
+  value: hub-spoke
+  how: decided
+  reason:
+- timestamp: '2026-05-27T16:51:57.916893+00:00'
+  key: centralized_logging
+  value: 'true'
+  how: decided
+  reason:
+- timestamp: '2026-05-27T16:51:57.916901+00:00'
+  key: security_hub_enabled
+  value: 'true'
+  how: decided
+  reason:
+- timestamp: '2026-05-27T16:51:57.916908+00:00'
+  key: guardduty_enabled
+  value: 'true'
+  how: decided
+  reason:
+- timestamp: '2026-05-27T16:51:57.916921+00:00'
+  key: organization_name
+  value: ExampleCorp
+  how: defaulted
+  reason: default value
+- timestamp: '2026-05-27T16:51:57.916932+00:00'
+  key: audit_account
+  value: Audit
+  how: defaulted
+  reason: default value
+- timestamp: '2026-05-27T16:51:57.916941+00:00'
+  key: log_archive_account
+  value: LogArchive
+  how: defaulted
+  reason: default value
+- timestamp: '2026-05-27T16:51:57.916949+00:00'
+  key: network_account
+  value: Network
+  how: defaulted
+  reason: default value
+- timestamp: '2026-05-27T16:51:57.916957+00:00'
+  key: network_cidr
+  value: 10.0.0.0/16
+  how: defaulted
+  reason: default value
+- timestamp: '2026-05-27T16:51:57.916964+00:00'
+  key: compliance_overlay
+  value: none
+  how: defaulted
+  reason: default value

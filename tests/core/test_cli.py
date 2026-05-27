@@ -76,6 +76,7 @@ class TestValidateCommand:
         (output / "customizations-config.yaml").write_text("customizations:\n")
         (output / "decision-report.yaml").write_text("primaryRegion: eu-central-1\n")
         (output / "deployment-graph.yaml").write_text("phases:\n")
+        (output / "sample-recommendations.yaml").write_text("recommendations: []\n")
         result = runner.invoke(app, ["validate", "--input", str(output)])
         assert result.exit_code == 0
         assert "Validation passed" in result.stdout
@@ -105,6 +106,7 @@ class TestContractCommand:
         assert result.exit_code == 0
         assert "accounts-config.yaml" in result.stdout
         assert "network-config.yaml | paths: defaultVpc.delete" in result.stdout
+        assert "assertions: defaultVpc.delete" in result.stdout
         assert "customizations-config.yaml" in result.stdout
         assert "home_region" in result.stdout
         assert "network_cidr -> network-config.yaml:vpcs[].cidrs[]" in result.stdout
@@ -133,6 +135,23 @@ class TestSampleCommand:
         assert "aws-lza-regulated-v1" in result.stdout
         assert "Contract: aws-lza-sample-configuration" in result.stdout
 
+    def test_sample_list_filters_by_tag(self):
+        result = runner.invoke(app, ["sample", "list", "--tag", "regulated"])
+
+        assert result.exit_code == 0
+        assert "aws-lza-regulated-v1" in result.stdout
+        assert "aws-lza-standard-v1" not in result.stdout
+
+    def test_sample_list_filters_by_contract(self):
+        result = runner.invoke(
+            app,
+            ["sample", "list", "--contract", "aws-lza-sample-configuration"],
+        )
+
+        assert result.exit_code == 0
+        assert "aws-lza-standard-v1" in result.stdout
+        assert "k8s-cluster-v1" not in result.stdout
+
     def test_sample_show_by_name(self):
         result = runner.invoke(app, ["sample", "show", "--name", "aws-lza-healthcare-v1"])
 
@@ -147,6 +166,12 @@ class TestSampleCommand:
 
         assert result.exit_code == 1
         assert "--name or --pattern required" in result.output
+
+    def test_sample_list_empty_filter_fails(self):
+        result = runner.invoke(app, ["sample", "list", "--tag", "does-not-exist"])
+
+        assert result.exit_code == 1
+        assert "No sample configs matched current filters." in result.output
 
 
 class TestExplainCommand:
@@ -209,6 +234,18 @@ class TestInterviewCommand:
         with open(report_path) as f:
             report = yaml.load(f)
         assert report["primaryRegion"] == "eu-central-1"
+
+    def test_interview_prints_sample_match_for_aws_lza(self, tmp_path: Path):
+        output = tmp_path / "output"
+        result = runner.invoke(
+            app,
+            ["interview", "--output", str(output), "--pattern", "aws-lza"],
+        )
+
+        assert result.exit_code == 0
+        assert "=== Sample Match ===" in result.stdout
+        assert "aws-lza-standard-v1" in result.stdout
+        assert "intent-engine sample show --name aws-lza-standard-v1" in result.stdout
 
     def test_interview_missing_required_fails(self, tmp_path: Path):
         output = tmp_path / "output"

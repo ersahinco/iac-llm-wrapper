@@ -1,6 +1,6 @@
 cluster:
   name: prod-k8s
-  version: "1.30"
+  version: '1.30'
   network:
     podCidr: 10.244.0.0/16
     serviceCidr: 10.96.0.0/12
@@ -10,4 +10,3 @@ cluster:
       instanceType: t3.large
       minSize: 2
       maxSize: 5
-      diskSizeGb: 100

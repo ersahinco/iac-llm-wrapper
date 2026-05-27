@@ -58,6 +58,7 @@ class TestValidPaymentsCompilation:
             "iam-config.yaml",
             "customizations-config.yaml",
             "decision-report.yaml",
+            "sample-recommendations.yaml",
             "deployment-graph.yaml",
         ]
         for fname in required:

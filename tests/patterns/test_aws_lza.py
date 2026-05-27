@@ -26,6 +26,7 @@ class TestAwsLzaPattern:
         assert pattern.contracts == [AWS_LZA_SAMPLE_CONFIG_CONTRACT]
         assert pattern.required_artifacts == []
         assert "lineage-manifest.yaml" in pattern.expected_artifacts()
+        assert "sample-recommendations.yaml" in pattern.expected_artifacts()
         for artifact in AWS_LZA_SAMPLE_CONFIG_CONTRACT.required_artifacts:
             assert artifact in pattern.expected_artifacts()
 
@@ -110,6 +111,12 @@ class TestAwsLzaPattern:
         assert security["centralSecurityServices"]["securityHub"]["autoEnableOrgMembers"] is True
         assert security["centralSecurityServices"]["securityHub"]["regionAggregation"] is True
 
+        recommendations = yaml.load((output / "sample-recommendations.yaml").read_text())
+        assert recommendations["pattern"] == "aws-lza"
+        recommendation_names = [item["name"] for item in recommendations["recommendations"]]
+        assert "aws-lza-standard-v1" in recommendation_names
+        assert "aws-lza-regulated-v1" in recommendation_names
+
         lineage = yaml.load((output / "lineage-manifest.yaml").read_text())
         assert lineage["sourceContract"]["kind"] == "aws-lza-sample-configuration"
         assert lineage["sourceContract"]["url"] == AWS_LZA_SAMPLE_CONFIG_CONTRACT.source_url
@@ -154,6 +161,7 @@ class TestAwsLzaPattern:
             "organization-config.yaml",
             "security-config.yaml",
             "lineage-manifest.yaml",
+            "sample-recommendations.yaml",
         ]:
             assert yaml.load((output / name).read_text()) == yaml.load(
                 (fixture_dir / name).read_text()
@@ -210,6 +218,7 @@ class TestAwsLzaPattern:
 
         assert "Missing required file: accounts-config.yaml" in errors
         assert "Missing required file: lineage-manifest.yaml" in errors
+        assert "Missing required file: sample-recommendations.yaml" in errors
 
     def test_contract_artifact_validation_catches_schema_drift(self, tmp_path: Path):
         from intent_engine.core.compiler import validate_generated

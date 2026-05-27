@@ -140,6 +140,7 @@ Output includes:
 - `network-config.yaml` — VPC, CIDR, topology
 - `security-config.yaml` — audit, logging, encryption settings
 - `module-inputs.yaml` — mapped Terraform module variables with pinned versions
+- `sample-recommendations.yaml` — closest pinned reference bundles for handoff
 - `deployment-graph.yaml` — phased deployment order with dependencies
 
 ### 5. Engineer Handoff
@@ -149,6 +150,10 @@ Engineers use the decision artifacts alongside sample configurations:
 ```bash
 # List available sample configs
 iac-llm-wrapper sample list
+
+# Narrow by contract or metadata tag
+iac-llm-wrapper sample list --contract aws-lza-sample-configuration
+iac-llm-wrapper sample list --tag regulated
 
 # Show sample config with pinned module references and decisions
 iac-llm-wrapper sample show --name lza-baseline-v1
@@ -168,6 +173,14 @@ moduleInputs:
 ```
 
 Engineers apply these inputs to their Terraform/CDK/CloudFormation modules.
+`sample-recommendations.yaml` preserves best matching reference bundles in output
+directory so engineers can recover proven starting points later without re-running
+interview session.
+After `compile` or `interview`, the CLI also prints closest sample matches for the
+selected pattern to speed architect baseline selection and engineer handoff.
+Checked-in sample fixture bundles can be refreshed with
+`uv run python scripts/sync-sample-fixtures.py` and drift-checked with
+`uv run python scripts/sync-sample-fixtures.py --check`.
 
 ## Patterns
 

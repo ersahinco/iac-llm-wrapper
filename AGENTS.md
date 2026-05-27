@@ -173,14 +173,14 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff.
 <!-- UPDATE THIS SECTION AT END OF EVERY SESSION -->
 
 ### Current Goal
-T14: AWS LZA thin path: contract-driven handoff
+T15: Lean contract-driven handoff maturity
 
 ### Status
-- **Tests**: 492 passing, 1 skipped (LLM non-determinism)
+- **Tests**: 509 passing, 1 skipped (LLM non-determinism)
 - **Lint**: clean
 - **Format**: clean
 - **Repo**: `github.com/ersahinco/intent-engine` (private)
-- **Last session**: Deepened AWS LZA schema-backed placeholders, fixed delegated-admin drift, removed stale runbook wording
+- **Last session**: Added contract value assertions, synced sample fixture bundles, and hardened fixture drift detection
 
 ### Done
 | Area | Item |
@@ -206,8 +206,8 @@ T14: AWS LZA thin path: contract-driven handoff
 | Addon field_map wiring | `RequirementGraph._field_map` merged during `AddonRegistry.compose`; used by `sync_intent_to_graph` |
 | LZA test isolation | All LZA-specific tests live in `tests/patterns/lza/`; core tests have zero LZA imports |
 | Sample config system | `SampleConfig` + `SampleConfigRegistry` with versioned pins, source URLs, module refs |
-| LZA fixture files | `fixtures/lza-baseline-v1/` with 6 real config files (org, accounts, global, iam, security, network) |
-| K8s fixture files | `fixtures/kubernetes-v1/` with cluster and namespace config |
+| LZA fixture files | `fixtures/lza-baseline-v1/` full generated handoff bundle with sync/check coverage |
+| K8s fixture files | `fixtures/kubernetes-v1/` full generated handoff bundle with sync/check coverage |
 | Sample config registrations | `lza-baseline-v1`, `lza-minimal-v1`, `k8s-cluster-v1` with pinned module refs |
 | **OSS release** | LICENSE (Apache 2.0), README.md, CONTRIBUTING.md, CI workflow, pre-commit, .gitignore, pyproject metadata |
 | **Real-world examples** | `fixtures/kubernetes-enterprise.md`, `docs/CAPABILITY.md`, README Real-World Usage section |
@@ -237,8 +237,11 @@ T14: AWS LZA thin path: contract-driven handoff
 | **AWS LZA subsection alignment** | `aws-lza` now emits upstream-backed subsections like `identityCenterPermissionSets`, VPC `routeTables`/`subnets`, GuardDuty export settings, and Security Hub org toggles. |
 | **Sample config metadata** | `SampleConfig` now supports generic `description`, `source_contract`, `upstream_variant`, and `tags` metadata so contract-backed variants stay discoverable without AWS-specific core wiring. |
 | **Sample config CLI** | Added `intent-engine sample list/show` for registry-backed sample inspection by name or pattern, including metadata, decisions, and module references. |
+| **Sample matching** | Generic sample matching now ranks closest sample configs from typed graph decisions and prints recommendations after `compile`/`interview`. CLI list also filters by `--tag` and `--contract`. |
+| **Persisted sample handoff** | Patterns with registered sample configs now emit `sample-recommendations.yaml` as output artifact so engineers retain baseline guidance after terminal session ends. |
 | **Contract CLI** | `intent-engine contract list/show` exposes registered target contracts, required/optional artifacts, required paths, required decisions, source URL, and decision lineage. |
 | **Contract schema checks** | `ArtifactContract.required_paths` lets target contracts validate generated YAML shape without pattern-specific artifact validators. |
+| **Contract value assertions** | `ArtifactContract.value_assertions` now validates stable downstream literal values such as org-trail toggles, DNS flags, and GuardDuty export settings. |
 | **Contract path semantics** | Plain contract paths now mean field presence, while `[]` means non-empty list. This makes schema checks closer to real JSON/YAML required-field behavior and reduces fake filler data pressure. |
 | **Structured prefill coercion** | `RequirementGraph.apply_decisions()` / interview prefill now serialize list and bool values correctly, so registered sample decisions can compile without manual comma-string conversion. |
 | **Lineage validation** | `ContractValidator.validate_artifacts()` verifies decision lineage paths exist in structured generated artifacts. |
@@ -247,15 +250,28 @@ T14: AWS LZA thin path: contract-driven handoff
 | **Pattern loader cleanup** | CLI now calls `load_builtin_patterns()`; built-in module side effects live in `patterns/__init__.py`, not generic CLI imports. |
 | **Debt removal** | LZA required artifact names are centralized in `_LZA_REQUIRED_ARTIFACTS`; unused core generator defaults loader removed. |
 | **Generator scoping tests** | Core tests now lock `applies_to` behavior so scoped generators do not run for other patterns. |
+| **Fixture sync helper** | `scripts/sync-sample-fixtures.py` regenerates sample fixture bundles from registered sample decisions, prunes stale generated files, and supports `--check` drift detection. |
+| **Fixture drift guard** | Sample fixture tests now compile each registered sample and compare checked-in bundles against fresh generated output, with timestamp normalization for `decision-audit.yaml`. |
 
 ### Next (prioritized)
-1. [ ] Improve workloads extraction for small models (split extraction or separate LLM call)
+1. [ ] Improve workloads extraction for small models (split extraction or separate LLM call).
 2. [ ] Evaluate adding remaining source files to mypy scope when they change (ongoing incremental policy).
-3. [ ] Consider richer generic sample-config discovery helpers (`find_by_tag`, contract-aware listing) if more contract-backed patterns land.
-4. [ ] Decide whether contract-backed fixtures should be generated by helper script to reduce manual refresh steps.
-5. [ ] Decide whether contract validation should support value assertions, not only path presence, for high-signal lineage fields.
+3. [ ] Decide whether sample recommendations should feed deployment runbooks or decision reports directly, not only standalone artifact.
+4. [ ] Decide whether sample fixture sync/check should run in CI by default or stay manual script + tests.
+5. [ ] Tighten `aws-lza` emitted YAML against official LZA sample config schemas beyond current required paths/assertions.
 
 ### Key Decisions This Session
+- **Contracts assert values, not only presence**: Added generic `ArtifactContract.value_assertions` so downstream handoff validation can enforce stable literal values without new pattern-specific validators.
+- **AWS invariants belong in contract metadata**: AWS LZA now encodes fixed booleans/strings like org-trail enablement, default VPC deletion, DNS flags, and GuardDuty export settings inside target contract metadata.
+- **Fixture bundles must match real compiler output**: Added `scripts/sync-sample-fixtures.py` to regenerate sample bundles from registered sample decisions and prune stale generated files. No more manual copy drift.
+- **Fixture naming is data, not hidden convention**: `SampleConfig.fixture_dir` / `fixture_name` makes fixture location explicit so new modules can ship sample bundles without CLI/test special cases.
+- **Drift tests normalize only volatile timestamps**: Fixture comparison keeps full content equality for generated bundles while scrubbing `decision-audit.yaml` timestamps, avoiding false failures without hiding real drift.
+- **Artifact over terminal-only hint**: Sample recommendations now persist in `sample-recommendations.yaml` instead of living only in CLI stdout. This keeps architect baseline guidance attached to engineer handoff bundles.
+- **Generic recommendation artifact**: Sample handoff artifact is emitted by core generator logic using payload pattern + typed decisions, not by AWS LZA/Kubernetes custom generators. New patterns inherit behavior by registering sample configs.
+- **Validation keeps handoff bundle honest**: `Pattern.expected_artifacts()` now includes `sample-recommendations.yaml` whenever sample configs exist for that pattern, so validate catches drift or accidental omission.
+- **Typed decision reuse**: Added `RequirementGraph.typed_decisions()` so downstream recommendation and handoff code can consume normalized booleans/lists without reimplementing graph parsing logic.
+- **Generic sample recommender over pattern-specific hints**: Sample matching lives in `SampleConfig`/`SampleConfigRegistry`, not in AWS LZA or LZA pattern code. This keeps new modules/data models expandable without new CLI branches.
+- **Architect-to-engineer continuity**: `compile` and `interview` now print closest sample configs immediately after successful generation. Architects get baseline guidance at decision time; engineers get direct jump-off path to pinned reference bundles.
 - **Delegated-admin drift removal**: `security_tooling_account` now feeds `security-config.yaml:centralSecurityServices.delegatedAdminAccount`. Previous `audit_account` mapping contradicted requirement intent and hid security-tooling lineage.
 - **Schema-backed subsection depth**: AWS LZA handoff now includes official empty or boolean subsections that engineers must later fill, such as Identity Center permission-set arrays, VPC route-table/subnet arrays, GuardDuty export config, and Security Hub org toggles.
 - **Runbook drift cleanup**: Removed stale guidance about placeholder `policies/` and `ssm/` file paths because default thin-path output does not emit them. Runbook now points at real completion work: emails, Identity Center assignments, VPC structures, security exports.

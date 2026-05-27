@@ -28,6 +28,7 @@ class CompileError(Exception):
 def _build_payload(
     intent: Any,
     pattern: str,
+    decisions: dict[str, Any] | None = None,
     design_doc_data: dict[str, Any] | None = None,
 ) -> Any:
     """Wrap intent in IaCIntentPayload with design doc and module inputs."""
@@ -45,6 +46,8 @@ def _build_payload(
         design_doc=design_doc,
         module_inputs=module_inputs,
         intent=intent,
+        pattern=pattern,
+        decisions=decisions or {},
     )
 
 
@@ -180,7 +183,7 @@ def compile_design(
         return
 
     # 2h. Generate artifacts
-    payload = _build_payload(intent, pattern, llm_result.design_doc)
+    payload = _build_payload(intent, pattern, graph.typed_decisions(), llm_result.design_doc)
     generate_all(payload, output_dir, pattern=pattern)
 
 
@@ -204,7 +207,11 @@ def compile_from_interview(
     violations = validate(intent, graph=graph, extra_validators=pattern_obj.validators)
     if violations:
         raise CompileError(violations)
-    generate_all(_build_payload(intent, pattern), output_dir, pattern=pattern)
+    generate_all(
+        _build_payload(intent, pattern, graph.typed_decisions()),
+        output_dir,
+        pattern=pattern,
+    )
 
     # Write decision audit trail for traceability
     audit = graph.audit_log()
@@ -224,7 +231,7 @@ def validate_generated_violations(input_dir: Path, pattern: str = "baseline") ->
     from .patterns import GLOBAL_REGISTRY
 
     pattern_obj = GLOBAL_REGISTRY.get(pattern)
-    for fname in list(dict.fromkeys(pattern_obj.required_artifacts + pattern_obj.extra_artifacts)):
+    for fname in pattern_obj.expected_artifacts():
         if not (input_dir / fname).exists():
             violations.append(
                 Violation(

@@ -27,6 +27,7 @@ artifacts:
       - workloadAccounts[]
       - workloadAccounts[].name
       - workloadAccounts[].email
+    valueAssertions: []
   - name: global-config.yaml
     required: true
     description: Global regions, logging, tags, and inherited properties.
@@ -41,6 +42,16 @@ artifacts:
       - logging.cloudtrail.organizationTrail
       - logging.sessionManager.sendToCloudWatchLogs
       - logging.sessionManager.sendToS3
+    valueAssertions:
+      - path: logging.cloudtrail.organizationTrail
+        equals: true
+        oneOf: []
+      - path: logging.sessionManager.sendToCloudWatchLogs
+        equals: true
+        oneOf: []
+      - path: logging.sessionManager.sendToS3
+        equals: true
+        oneOf: []
   - name: iam-config.yaml
     required: true
     description: IAM and IAM Identity Center resources.
@@ -50,6 +61,7 @@ artifacts:
       - identityCenter.delegatedAdminAccount
       - identityCenter.identityCenterPermissionSets
       - identityCenter.identityCenterAssignments
+    valueAssertions: []
   - name: network-config.yaml
     required: true
     description: Network resources and connectivity architecture.
@@ -67,6 +79,16 @@ artifacts:
       - vpcs[].routeTables
       - vpcs[].subnets
       - vpcs[].transitGatewayAttachments
+    valueAssertions:
+      - path: defaultVpc.delete
+        equals: true
+        oneOf: []
+      - path: vpcs[].enableDnsHostnames
+        equals: true
+        oneOf: []
+      - path: vpcs[].enableDnsSupport
+        equals: true
+        oneOf: []
   - name: organization-config.yaml
     required: true
     description: Organizational units and AWS Organizations policies.
@@ -78,6 +100,10 @@ artifacts:
       - serviceControlPolicies
       - taggingPolicies
       - backupPolicies
+    valueAssertions:
+      - path: enable
+        equals: true
+        oneOf: []
   - name: security-config.yaml
     required: true
     description: AWS security service configuration.
@@ -103,15 +129,41 @@ artifacts:
       - centralSecurityServices.securityHub.regionAggregation
       - centralSecurityServices.securityHub.standards
       - centralSecurityServices.ssmAutomation.documentSets
+    valueAssertions:
+      - path: centralSecurityServices.ebsDefaultVolumeEncryption.enable
+        equals: true
+        oneOf: []
+      - path: centralSecurityServices.s3PublicAccessBlock.enable
+        equals: true
+        oneOf: []
+      - path: centralSecurityServices.guardduty.autoEnableOrgMembers
+        equals: true
+        oneOf: []
+      - path: 
+          centralSecurityServices.guardduty.exportConfiguration.destinationType
+        equals: S3
+        oneOf: []
+      - path: 
+          centralSecurityServices.guardduty.exportConfiguration.exportFrequency
+        equals: ONE_HOUR
+        oneOf: []
+      - path: centralSecurityServices.securityHub.autoEnableOrgMembers
+        equals: true
+        oneOf: []
+      - path: centralSecurityServices.securityHub.regionAggregation
+        equals: true
+        oneOf: []
   - name: customizations-config.yaml
     required: false
     description: Optional custom applications, appliances, and CloudFormation 
       stacks.
     requiredPaths: []
+    valueAssertions: []
   - name: replacements-config.yaml
     required: false
     description: Optional replacement values across configuration files.
     requiredPaths: []
+    valueAssertions: []
 lineage:
   - decision: org_mode
     artifact: global-config.yaml

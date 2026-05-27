@@ -44,6 +44,7 @@ class TestKubernetesPattern:
         assert (output / "cluster-config.yaml").exists()
         assert (output / "namespace-config.yaml").exists()
         assert (output / "decision-report.yaml").exists()
+        assert (output / "sample-recommendations.yaml").exists()
         assert (output / "module-inputs.yaml").exists()
 
         # Verify module inputs content
@@ -116,6 +117,7 @@ class TestKubernetesPattern:
             "  name: primary\n"
             "  instanceType: t3.large\n"
         )
+        (output / "sample-recommendations.yaml").write_text("recommendations: []\n")
 
         result = runner.invoke(
             app, ["validate", "--input", str(output), "--pattern", "kubernetes-cluster"]
@@ -135,6 +137,7 @@ class TestKubernetesPattern:
         (output / "decision-report.yaml").write_text(
             "clusterName: prod\nclusterVersion: '1.30'\nnetwork: {}\nnodePool: {}\n"
         )
+        (output / "sample-recommendations.yaml").write_text("recommendations: []\n")
 
         result = CliRunner().invoke(
             app, ["validate", "--input", str(output), "--pattern", "kubernetes-cluster"]

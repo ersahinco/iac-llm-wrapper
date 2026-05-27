@@ -234,6 +234,7 @@ class TestCLIValidate:
         (output_dir / "customizations-config.yaml").write_text("customizations:\n")
         (output_dir / "decision-report.yaml").write_text("primaryRegion: eu-central-1\n")
         (output_dir / "deployment-graph.yaml").write_text("phases:\n")
+        (output_dir / "sample-recommendations.yaml").write_text("recommendations: []\n")
 
         result = runner.invoke(app, ["validate", "--input", str(output_dir)])
         assert result.exit_code == 0, result.output

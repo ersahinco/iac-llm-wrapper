@@ -5,6 +5,7 @@ from __future__ import annotations
 from intent_engine.core.contracts import (
     GLOBAL_CONTRACT_REGISTRY,
     ArtifactContract,
+    ArtifactValueAssertion,
     DecisionLineage,
     TargetContract,
 )
@@ -43,6 +44,14 @@ AWS_LZA_SAMPLE_CONFIG_CONTRACT = TargetContract(
                 "logging.sessionManager.sendToCloudWatchLogs",
                 "logging.sessionManager.sendToS3",
             ],
+            value_assertions=[
+                ArtifactValueAssertion(path="logging.cloudtrail.organizationTrail", equals=True),
+                ArtifactValueAssertion(
+                    path="logging.sessionManager.sendToCloudWatchLogs",
+                    equals=True,
+                ),
+                ArtifactValueAssertion(path="logging.sessionManager.sendToS3", equals=True),
+            ],
         ),
         ArtifactContract(
             name="iam-config.yaml",
@@ -73,6 +82,11 @@ AWS_LZA_SAMPLE_CONFIG_CONTRACT = TargetContract(
                 "vpcs[].subnets",
                 "vpcs[].transitGatewayAttachments",
             ],
+            value_assertions=[
+                ArtifactValueAssertion(path="defaultVpc.delete", equals=True),
+                ArtifactValueAssertion(path="vpcs[].enableDnsHostnames", equals=True),
+                ArtifactValueAssertion(path="vpcs[].enableDnsSupport", equals=True),
+            ],
         ),
         ArtifactContract(
             name="organization-config.yaml",
@@ -86,6 +100,7 @@ AWS_LZA_SAMPLE_CONFIG_CONTRACT = TargetContract(
                 "taggingPolicies",
                 "backupPolicies",
             ],
+            value_assertions=[ArtifactValueAssertion(path="enable", equals=True)],
         ),
         ArtifactContract(
             name="security-config.yaml",
@@ -112,6 +127,36 @@ AWS_LZA_SAMPLE_CONFIG_CONTRACT = TargetContract(
                 "centralSecurityServices.securityHub.regionAggregation",
                 "centralSecurityServices.securityHub.standards",
                 "centralSecurityServices.ssmAutomation.documentSets",
+            ],
+            value_assertions=[
+                ArtifactValueAssertion(
+                    path="centralSecurityServices.ebsDefaultVolumeEncryption.enable",
+                    equals=True,
+                ),
+                ArtifactValueAssertion(
+                    path="centralSecurityServices.s3PublicAccessBlock.enable",
+                    equals=True,
+                ),
+                ArtifactValueAssertion(
+                    path="centralSecurityServices.guardduty.autoEnableOrgMembers",
+                    equals=True,
+                ),
+                ArtifactValueAssertion(
+                    path="centralSecurityServices.guardduty.exportConfiguration.destinationType",
+                    equals="S3",
+                ),
+                ArtifactValueAssertion(
+                    path="centralSecurityServices.guardduty.exportConfiguration.exportFrequency",
+                    equals="ONE_HOUR",
+                ),
+                ArtifactValueAssertion(
+                    path="centralSecurityServices.securityHub.autoEnableOrgMembers",
+                    equals=True,
+                ),
+                ArtifactValueAssertion(
+                    path="centralSecurityServices.securityHub.regionAggregation",
+                    equals=True,
+                ),
             ],
         ),
         ArtifactContract(

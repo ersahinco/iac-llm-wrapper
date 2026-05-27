@@ -65,3 +65,14 @@ class TestIaCIntentPayload:
         payload = IaCIntentPayload(design_doc=dd, module_inputs=mi, intent=SampleIntent())
         assert payload.design_doc.project_name == "x"
         assert len(payload.module_inputs) == 1
+
+    def test_access_pattern_and_decisions_fields(self):
+        payload = IaCIntentPayload(
+            design_doc=DesignDocument(),
+            module_inputs=[],
+            intent=SampleIntent(),
+            pattern="aws-lza",
+            decisions={"baseline": "standard"},
+        )
+        assert payload.pattern == "aws-lza"
+        assert payload.decisions["baseline"] == "standard"

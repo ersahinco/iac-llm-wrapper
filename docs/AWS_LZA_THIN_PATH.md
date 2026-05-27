@@ -118,8 +118,8 @@ intent-engine contract show --pattern aws-lza
 ```
 
 This shows required artifacts, optional artifacts, required YAML paths, required
-decisions, source URL, and decision-to-artifact lineage. The command reads registered
-contract metadata rather than hardcoding AWS LZA details.
+decisions, source URL, value assertions, and decision-to-artifact lineage. The command
+reads registered contract metadata rather than hardcoding AWS LZA details.
 
 ## Current Fixture Variants
 
@@ -131,6 +131,8 @@ Current AWS LZA review fixtures live under `fixtures/`:
 
 Each fixture directory includes generated handoff artifacts plus a short `README.md`
 describing source contract, upstream variant, and review expectations.
+Refresh all sample fixture bundles with `uv run python scripts/sync-sample-fixtures.py`.
+Use `--check` in CI or local review to catch stale generated files.
 
 ## Borrow From rxt-code-accelerator
 
@@ -165,9 +167,10 @@ MVP should produce a useful handoff without owning deployment:
 - `lineage-manifest.yaml` mapping decisions to emitted files, required artifact paths,
   and YAML lineage paths
 - `decision-report.yaml` with audit trail and rationale
+- `sample-recommendations.yaml` with persisted closest sample-config matches for handoff
 - `deployment-runbook.md` with prerequisites and sequence
-- generated-artifact validation that fails closed when required paths or lineage paths
-  disappear from emitted YAML
+- generated-artifact validation that fails closed when required paths, asserted values,
+  or lineage paths disappear from emitted YAML
 
 Current emitted YAML targets official LZA-style top-level sections such as:
 

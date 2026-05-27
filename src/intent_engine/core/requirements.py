@@ -242,6 +242,22 @@ class RequirementGraph:
     def decisions(self) -> dict[str, str]:
         return dict(self._decisions)
 
+    def typed_decisions(self) -> dict[str, Any]:
+        typed: dict[str, Any] = {}
+        for key, value in self._decisions.items():
+            if value is None:
+                continue
+            req = self._requirements.get(key)
+            if req is not None:
+                typed[key] = self._convert_value(
+                    value,
+                    req.target_type,
+                    req.target_field or key,
+                )
+            else:
+                typed[key] = value
+        return typed
+
     def apply_defaults_for_remaining(self) -> None:
         while True:
             pending = self.pending()

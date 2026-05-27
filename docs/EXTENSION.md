@@ -144,7 +144,10 @@ Pattern metadata fields:
 - `free_form_examples` — Free-form Markdown examples for templates
 - `validators` — List of extra validator functions `intent -> list[Violation]`
 - `normalizer` — Optional normalizer override function
-- `contracts` — Target contracts for required files, required paths, decisions, and lineage
+- `contracts` — Target contracts for required files, required paths, value assertions,
+  decisions, and lineage
+- `sample-recommendations.yaml` — Generic artifact emitted automatically when sample configs
+  exist for the pattern
 - `required_artifacts` — Legacy/simple file checks when no contract exists
 - `artifact_validators` — Custom cross-file validators only when contracts cannot express the rule
 
