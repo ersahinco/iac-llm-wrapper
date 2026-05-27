@@ -1,90 +1,90 @@
 auditTrail:
-- timestamp: '2026-05-27T16:51:57.801913+00:00'
+- timestamp: '2026-05-27T23:09:02.320248+00:00'
   key: baseline
   value: healthcare
   how: decided
   reason:
-- timestamp: '2026-05-27T16:51:57.802741+00:00'
+- timestamp: '2026-05-27T23:09:02.320436+00:00'
   key: org_mode
   value: control-tower
   how: decided
   reason:
-- timestamp: '2026-05-27T16:51:57.802776+00:00'
+- timestamp: '2026-05-27T23:09:02.320449+00:00'
   key: home_region
   value: eu-central-1
   how: decided
   reason:
-- timestamp: '2026-05-27T16:51:57.802807+00:00'
+- timestamp: '2026-05-27T23:09:02.320460+00:00'
   key: enabled_regions
   value: eu-central-1
   how: decided
   reason:
-- timestamp: '2026-05-27T16:51:57.802835+00:00'
+- timestamp: '2026-05-27T23:09:02.320469+00:00'
   key: organizational_units
   value: Security,Infrastructure,Workloads
   how: decided
   reason:
-- timestamp: '2026-05-27T16:51:57.802951+00:00'
+- timestamp: '2026-05-27T23:09:02.320478+00:00'
   key: workload_accounts
   value: ClinicalProd
   how: decided
   reason:
-- timestamp: '2026-05-27T16:51:57.802970+00:00'
+- timestamp: '2026-05-27T23:09:02.320486+00:00'
   key: security_tooling_account
   value: SecurityTooling
   how: decided
   reason:
-- timestamp: '2026-05-27T16:51:57.802978+00:00'
+- timestamp: '2026-05-27T23:09:02.320493+00:00'
   key: identity_center_delegated_admin_account
   value: SecurityTooling
   how: decided
   reason:
-- timestamp: '2026-05-27T16:51:57.802986+00:00'
+- timestamp: '2026-05-27T23:09:02.320501+00:00'
   key: topology
   value: hub-spoke
   how: decided
   reason:
-- timestamp: '2026-05-27T16:51:57.802995+00:00'
+- timestamp: '2026-05-27T23:09:02.320508+00:00'
   key: centralized_logging
   value: 'true'
   how: decided
   reason:
-- timestamp: '2026-05-27T16:51:57.803003+00:00'
+- timestamp: '2026-05-27T23:09:02.320515+00:00'
   key: security_hub_enabled
   value: 'true'
   how: decided
   reason:
-- timestamp: '2026-05-27T16:51:57.803010+00:00'
+- timestamp: '2026-05-27T23:09:02.320522+00:00'
   key: guardduty_enabled
   value: 'true'
   how: decided
   reason:
-- timestamp: '2026-05-27T16:51:57.803016+00:00'
+- timestamp: '2026-05-27T23:09:02.320528+00:00'
   key: compliance_overlay
   value: healthcare
   how: decided
   reason:
-- timestamp: '2026-05-27T16:51:57.803033+00:00'
+- timestamp: '2026-05-27T23:09:02.320543+00:00'
   key: organization_name
   value: ExampleCorp
   how: defaulted
   reason: default value
-- timestamp: '2026-05-27T16:51:57.803046+00:00'
+- timestamp: '2026-05-27T23:09:02.320555+00:00'
   key: audit_account
   value: Audit
   how: defaulted
   reason: default value
-- timestamp: '2026-05-27T16:51:57.803055+00:00'
+- timestamp: '2026-05-27T23:09:02.320564+00:00'
   key: log_archive_account
   value: LogArchive
   how: defaulted
   reason: default value
-- timestamp: '2026-05-27T16:51:57.803063+00:00'
+- timestamp: '2026-05-27T23:09:02.320572+00:00'
   key: network_account
   value: Network
   how: defaulted
   reason: default value
-- timestamp: '2026-05-27T16:51:57.803071+00:00'
+- timestamp: '2026-05-27T23:09:02.320579+00:00'
   key: network_cidr
   value: 10.0.0.0/16
   how: defaulted

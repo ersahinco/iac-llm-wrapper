@@ -113,19 +113,40 @@ AWS_LZA_SAMPLE_CONFIG_CONTRACT = TargetContract(
                 "cloudWatch.alarmSets",
                 "centralSecurityServices.delegatedAdminAccount",
                 "centralSecurityServices.ebsDefaultVolumeEncryption.enable",
+                "centralSecurityServices.ebsDefaultVolumeEncryption.excludeRegions",
                 "centralSecurityServices.s3PublicAccessBlock.enable",
+                "centralSecurityServices.s3PublicAccessBlock.excludeAccounts",
+                "centralSecurityServices.scpRevertChangesConfig.enable",
+                "centralSecurityServices.scpRevertChangesConfig.snsTopicName",
                 "centralSecurityServices.macie.enable",
+                "centralSecurityServices.macie.excludeRegions",
+                "centralSecurityServices.macie.policyFindingsPublishingFrequency",
                 "centralSecurityServices.macie.publishSensitiveDataFindings",
                 "centralSecurityServices.guardduty.enable",
                 "centralSecurityServices.guardduty.autoEnableOrgMembers",
+                "centralSecurityServices.guardduty.excludeRegions",
                 "centralSecurityServices.guardduty.s3Protection.enable",
+                "centralSecurityServices.guardduty.s3Protection.excludeRegions",
+                "centralSecurityServices.guardduty.eksProtection.enable",
+                "centralSecurityServices.guardduty.eksProtection.excludeRegions",
                 "centralSecurityServices.guardduty.exportConfiguration.enable",
+                "centralSecurityServices.guardduty.exportConfiguration.overrideExisting",
                 "centralSecurityServices.guardduty.exportConfiguration.destinationType",
                 "centralSecurityServices.guardduty.exportConfiguration.exportFrequency",
+                "centralSecurityServices.guardduty.lifecycleRules",
+                "centralSecurityServices.snsSubscriptions",
                 "centralSecurityServices.securityHub.enable",
                 "centralSecurityServices.securityHub.autoEnableOrgMembers",
                 "centralSecurityServices.securityHub.regionAggregation",
-                "centralSecurityServices.securityHub.standards",
+                "centralSecurityServices.securityHub.snsTopicName",
+                "centralSecurityServices.securityHub.notificationLevel",
+                "centralSecurityServices.securityHub.excludeRegions",
+                "centralSecurityServices.securityHub.standards[]",
+                "centralSecurityServices.securityHub.standards[].name",
+                "centralSecurityServices.securityHub.standards[].deploymentTargets"
+                ".organizationalUnits[]",
+                "centralSecurityServices.securityHub.standards[].controlsToDisable",
+                "centralSecurityServices.ssmAutomation.excludeRegions",
                 "centralSecurityServices.ssmAutomation.documentSets",
             ],
             value_assertions=[
@@ -138,7 +159,27 @@ AWS_LZA_SAMPLE_CONFIG_CONTRACT = TargetContract(
                     equals=True,
                 ),
                 ArtifactValueAssertion(
+                    path="centralSecurityServices.scpRevertChangesConfig.enable",
+                    equals=True,
+                ),
+                ArtifactValueAssertion(
+                    path="centralSecurityServices.scpRevertChangesConfig.snsTopicName",
+                    equals="Security",
+                ),
+                ArtifactValueAssertion(
+                    path="centralSecurityServices.macie.policyFindingsPublishingFrequency",
+                    equals="FIFTEEN_MINUTES",
+                ),
+                ArtifactValueAssertion(
                     path="centralSecurityServices.guardduty.autoEnableOrgMembers",
+                    equals=True,
+                ),
+                ArtifactValueAssertion(
+                    path="centralSecurityServices.guardduty.eksProtection.enable",
+                    equals=True,
+                ),
+                ArtifactValueAssertion(
+                    path="centralSecurityServices.guardduty.exportConfiguration.overrideExisting",
                     equals=True,
                 ),
                 ArtifactValueAssertion(
@@ -147,7 +188,7 @@ AWS_LZA_SAMPLE_CONFIG_CONTRACT = TargetContract(
                 ),
                 ArtifactValueAssertion(
                     path="centralSecurityServices.guardduty.exportConfiguration.exportFrequency",
-                    equals="ONE_HOUR",
+                    equals="FIFTEEN_MINUTES",
                 ),
                 ArtifactValueAssertion(
                     path="centralSecurityServices.securityHub.autoEnableOrgMembers",
@@ -156,6 +197,14 @@ AWS_LZA_SAMPLE_CONFIG_CONTRACT = TargetContract(
                 ArtifactValueAssertion(
                     path="centralSecurityServices.securityHub.regionAggregation",
                     equals=True,
+                ),
+                ArtifactValueAssertion(
+                    path="centralSecurityServices.securityHub.snsTopicName",
+                    equals="Security",
+                ),
+                ArtifactValueAssertion(
+                    path="centralSecurityServices.securityHub.notificationLevel",
+                    equals="HIGH",
                 ),
             ],
         ),

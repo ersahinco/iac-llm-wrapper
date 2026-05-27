@@ -107,14 +107,42 @@ def _workload_accounts(intent: AwsLzaIntent) -> list[dict[str, str]]:
 
 
 def _security_hub_standards(intent: AwsLzaIntent) -> list[dict[str, Any]]:
-    standards = [{"name": "AWS Foundational Security Best Practices v1.0.0", "enable": True}]
+    standards = [
+        {
+            "name": "AWS Foundational Security Best Practices v1.0.0",
+            "enable": True,
+            "deploymentTargets": {"organizationalUnits": ["Root"]},
+            "controlsToDisable": [],
+        }
+    ]
     overlay = str(intent.compliance_overlay)
     if overlay == "regulated":
-        standards.append({"name": "NIST Special Publication 800-53 Revision 5", "enable": True})
+        standards.append(
+            {
+                "name": "NIST Special Publication 800-53 Revision 5",
+                "enable": True,
+                "deploymentTargets": {"organizationalUnits": ["Root"]},
+                "controlsToDisable": [],
+            }
+        )
     elif overlay == "financial-services":
-        standards.append({"name": "PCI DSS v4.0.1", "enable": True})
+        standards.append(
+            {
+                "name": "PCI DSS v4.0.1",
+                "enable": True,
+                "deploymentTargets": {"organizationalUnits": ["Root"]},
+                "controlsToDisable": [],
+            }
+        )
     elif overlay == "healthcare":
-        standards.append({"name": "NIST Special Publication 800-53 Revision 5", "enable": True})
+        standards.append(
+            {
+                "name": "NIST Special Publication 800-53 Revision 5",
+                "enable": True,
+                "deploymentTargets": {"organizationalUnits": ["Root"]},
+                "controlsToDisable": [],
+            }
+        )
     return standards
 
 
@@ -130,8 +158,9 @@ def _identity_center_config(intent: AwsLzaIntent) -> dict[str, Any]:
 def _guardduty_export_configuration(intent: AwsLzaIntent) -> dict[str, Any]:
     return {
         "enable": intent.centralized_logging,
+        "overrideExisting": True,
         "destinationType": "S3",
-        "exportFrequency": "ONE_HOUR",
+        "exportFrequency": "FIFTEEN_MINUTES",
     }
 
 
@@ -140,8 +169,10 @@ def _guardduty_config(intent: AwsLzaIntent) -> dict[str, Any]:
         "enable": intent.guardduty_enabled,
         "autoEnableOrgMembers": True,
         "excludeRegions": [],
-        "s3Protection": {"enable": intent.centralized_logging},
+        "s3Protection": {"enable": intent.centralized_logging, "excludeRegions": []},
+        "eksProtection": {"enable": True, "excludeRegions": []},
         "exportConfiguration": _guardduty_export_configuration(intent),
+        "lifecycleRules": [],
     }
 
 
@@ -150,6 +181,9 @@ def _security_hub_config(intent: AwsLzaIntent) -> dict[str, Any]:
         "enable": intent.security_hub_enabled,
         "autoEnableOrgMembers": True,
         "regionAggregation": True,
+        "snsTopicName": "Security",
+        "notificationLevel": "HIGH",
+        "excludeRegions": [],
         "standards": _security_hub_standards(intent),
     }
 
@@ -540,16 +574,20 @@ def gen_lza_security_config(intent: Any, output_dir: Path) -> None:
         },
         "centralSecurityServices": {
             "delegatedAdminAccount": intent.security_tooling_account,
-            "ebsDefaultVolumeEncryption": {"enable": True},
-            "s3PublicAccessBlock": {"enable": True},
+            "ebsDefaultVolumeEncryption": {"enable": True, "excludeRegions": []},
+            "s3PublicAccessBlock": {"enable": True, "excludeAccounts": []},
+            "scpRevertChangesConfig": {"enable": True, "snsTopicName": "Security"},
             "macie": {
                 "enable": str(intent.compliance_overlay) != "none",
+                "excludeRegions": [],
+                "policyFindingsPublishingFrequency": "FIFTEEN_MINUTES",
                 "publishSensitiveDataFindings": str(intent.compliance_overlay)
                 in {"regulated", "financial-services", "healthcare"},
             },
             "guardduty": _guardduty_config(intent),
+            "snsSubscriptions": [],
             "securityHub": _security_hub_config(intent),
-            "ssmAutomation": {"documentSets": []},
+            "ssmAutomation": {"excludeRegions": [], "documentSets": []},
         },
     }
     _write_yaml(output_dir, "security-config.yaml", data)

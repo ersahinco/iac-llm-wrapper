@@ -102,14 +102,57 @@ class TestAwsLzaPattern:
 
         security = yaml.load((output / "security-config.yaml").read_text())
         assert security["centralSecurityServices"]["delegatedAdminAccount"] == "SecurityTooling"
+        assert security["centralSecurityServices"]["ebsDefaultVolumeEncryption"] == {
+            "enable": True,
+            "excludeRegions": [],
+        }
+        assert security["centralSecurityServices"]["s3PublicAccessBlock"] == {
+            "enable": True,
+            "excludeAccounts": [],
+        }
+        assert security["centralSecurityServices"]["scpRevertChangesConfig"] == {
+            "enable": True,
+            "snsTopicName": "Security",
+        }
+        assert security["centralSecurityServices"]["macie"] == {
+            "enable": False,
+            "excludeRegions": [],
+            "policyFindingsPublishingFrequency": "FIFTEEN_MINUTES",
+            "publishSensitiveDataFindings": False,
+        }
         assert security["centralSecurityServices"]["guardduty"]["autoEnableOrgMembers"] is True
         assert security["centralSecurityServices"]["guardduty"]["exportConfiguration"] == {
             "enable": True,
+            "overrideExisting": True,
             "destinationType": "S3",
-            "exportFrequency": "ONE_HOUR",
+            "exportFrequency": "FIFTEEN_MINUTES",
         }
+        assert security["centralSecurityServices"]["guardduty"]["s3Protection"] == {
+            "enable": True,
+            "excludeRegions": [],
+        }
+        assert security["centralSecurityServices"]["guardduty"]["eksProtection"] == {
+            "enable": True,
+            "excludeRegions": [],
+        }
+        assert security["centralSecurityServices"]["guardduty"]["lifecycleRules"] == []
+        assert security["centralSecurityServices"]["snsSubscriptions"] == []
         assert security["centralSecurityServices"]["securityHub"]["autoEnableOrgMembers"] is True
         assert security["centralSecurityServices"]["securityHub"]["regionAggregation"] is True
+        assert security["centralSecurityServices"]["securityHub"]["snsTopicName"] == "Security"
+        assert security["centralSecurityServices"]["securityHub"]["notificationLevel"] == "HIGH"
+        assert security["centralSecurityServices"]["securityHub"]["excludeRegions"] == []
+        assert security["centralSecurityServices"]["securityHub"]["standards"][0][
+            "deploymentTargets"
+        ] == {"organizationalUnits": ["Root"]}
+        assert (
+            security["centralSecurityServices"]["securityHub"]["standards"][0]["controlsToDisable"]
+            == []
+        )
+        assert security["centralSecurityServices"]["ssmAutomation"] == {
+            "excludeRegions": [],
+            "documentSets": [],
+        }
 
         recommendations = yaml.load((output / "sample-recommendations.yaml").read_text())
         assert recommendations["pattern"] == "aws-lza"
@@ -234,7 +277,7 @@ class TestAwsLzaPattern:
         assert "network-config.yaml missing required path: defaultVpc.delete" in errors
         assert "network-config.yaml missing required path: vpcs[]" in errors
 
-    def test_contract_artifact_validation_catches_lineage_drift(self, tmp_path: Path):
+    def test_contract_artifact_validation_catches_security_hub_schema_drift(self, tmp_path: Path):
         from intent_engine.core.compiler import validate_generated
 
         output = tmp_path / "output"
@@ -254,34 +297,58 @@ class TestAwsLzaPattern:
             "  delegatedAdminAccount: SecurityTooling\n"
             "  ebsDefaultVolumeEncryption:\n"
             "    enable: true\n"
+            "    excludeRegions: []\n"
             "  s3PublicAccessBlock:\n"
             "    enable: true\n"
+            "    excludeAccounts: []\n"
+            "  scpRevertChangesConfig:\n"
+            "    enable: true\n"
+            "    snsTopicName: Security\n"
             "  macie:\n"
             "    enable: false\n"
+            "    excludeRegions: []\n"
+            "    policyFindingsPublishingFrequency: FIFTEEN_MINUTES\n"
             "    publishSensitiveDataFindings: false\n"
+            "  snsSubscriptions: []\n"
             "  guardduty:\n"
             "    enable: true\n"
             "    autoEnableOrgMembers: true\n"
+            "    excludeRegions: []\n"
             "    s3Protection:\n"
             "      enable: true\n"
+            "      excludeRegions: []\n"
+            "    eksProtection:\n"
+            "      enable: true\n"
+            "      excludeRegions: []\n"
             "    exportConfiguration:\n"
             "      enable: true\n"
+            "      overrideExisting: true\n"
             "      destinationType: S3\n"
-            "      exportFrequency: ONE_HOUR\n"
+            "      exportFrequency: FIFTEEN_MINUTES\n"
+            "    lifecycleRules: []\n"
             "  securityHub:\n"
             "    enable: true\n"
             "    autoEnableOrgMembers: true\n"
             "    regionAggregation: true\n"
+            "    snsTopicName: Security\n"
+            "    notificationLevel: HIGH\n"
+            "    excludeRegions: []\n"
             "    standards: []\n"
             "  ssmAutomation:\n"
+            "    excludeRegions: []\n"
             "    documentSets: []\n"
         )
 
         errors = validate_generated(output, pattern="aws-lza")
 
         assert (
-            "Lineage path missing for decision 'compliance_overlay': "
-            "security-config.yaml:centralSecurityServices.securityHub.standards[]"
+            "security-config.yaml missing required path: "
+            "centralSecurityServices.securityHub.standards[]"
+        ) in errors
+        assert (
+            "security-config.yaml missing required path: "
+            "centralSecurityServices.securityHub.standards[].deploymentTargets"
+            ".organizationalUnits[]"
         ) in errors
 
     def test_aws_generators_are_pattern_scoped(self, tmp_path: Path):

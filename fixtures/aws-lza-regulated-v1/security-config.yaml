@@ -22,10 +22,17 @@ centralSecurityServices:
   delegatedAdminAccount: SecurityTooling
   ebsDefaultVolumeEncryption:
     enable: true
+    excludeRegions: []
   s3PublicAccessBlock:
     enable: true
+    excludeAccounts: []
+  scpRevertChangesConfig:
+    enable: true
+    snsTopicName: Security
   macie:
     enable: true
+    excludeRegions: []
+    policyFindingsPublishingFrequency: FIFTEEN_MINUTES
     publishSensitiveDataFindings: true
   guardduty:
     enable: true
@@ -33,18 +40,37 @@ centralSecurityServices:
     excludeRegions: []
     s3Protection:
       enable: true
+      excludeRegions: []
+    eksProtection:
+      enable: true
+      excludeRegions: []
     exportConfiguration:
       enable: true
+      overrideExisting: true
       destinationType: S3
-      exportFrequency: ONE_HOUR
+      exportFrequency: FIFTEEN_MINUTES
+    lifecycleRules: []
+  snsSubscriptions: []
   securityHub:
     enable: true
     autoEnableOrgMembers: true
     regionAggregation: true
+    snsTopicName: Security
+    notificationLevel: HIGH
+    excludeRegions: []
     standards:
       - name: AWS Foundational Security Best Practices v1.0.0
         enable: true
+        deploymentTargets:
+          organizationalUnits:
+            - Root
+        controlsToDisable: []
       - name: NIST Special Publication 800-53 Revision 5
         enable: true
+        deploymentTargets:
+          organizationalUnits:
+            - Root
+        controlsToDisable: []
   ssmAutomation:
+    excludeRegions: []
     documentSets: []

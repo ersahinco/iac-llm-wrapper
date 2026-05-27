@@ -181,14 +181,18 @@ Current emitted YAML targets official LZA-style top-level sections such as:
 - `organization-config.yaml`: `enable`, `organizationalUnits`, policy lists
 - `security-config.yaml`: `accessAnalyzer`, `iamPasswordPolicy`, `awsConfig`, `cloudWatch`, `centralSecurityServices`
 
-Current placeholders also keep a few upstream-backed substructures visible instead of hiding
-them behind custom wrapper fields:
+Current emitted substructures stay close to upstream LZA shapes instead of hiding them behind
+custom wrapper fields:
 
 - `iam-config.yaml`: `identityCenterPermissionSets`, `identityCenterAssignments`
 - `network-config.yaml`: VPC `enableDnsHostnames`, `enableDnsSupport`, `routeTables`, `subnets`,
   `transitGatewayAttachments`
-- `security-config.yaml`: GuardDuty `autoEnableOrgMembers` plus explicit export settings,
-  Security Hub `autoEnableOrgMembers` and `regionAggregation`
+- `security-config.yaml`: GuardDuty `autoEnableOrgMembers`, `overrideExisting`,
+  `exportFrequency`, `s3Protection`, `eksProtection`, and empty `lifecycleRules`;
+  Security Hub `autoEnableOrgMembers`, `regionAggregation`, `snsTopicName`,
+  `notificationLevel`, and standards with `deploymentTargets` plus `controlsToDisable`;
+  `scpRevertChangesConfig`, `snsSubscriptions`, `ssmAutomation.excludeRegions`,
+  and Macie publishing frequency
 
 Default handoff stays lean: no fake policy files, no synthetic customizations bundle, no parallel
 Terraform/Terragrunt landing-zone stack.

@@ -180,7 +180,7 @@ T15: Lean contract-driven handoff maturity
 - **Lint**: clean
 - **Format**: clean
 - **Repo**: `github.com/ersahinco/intent-engine` (private)
-- **Last session**: Backfilled deterministic entities into LLM path for small-model workload/account/OU drops and widened mypy scope again
+- **Last session**: Tightened AWS LZA security-config schema against upstream sample shape, refreshed fixture bundles, kept full gate green
 
 ### Done
 | Area | Item |
@@ -235,6 +235,7 @@ T15: Lean contract-driven handoff maturity
 | **AWS LZA schema alignment** | `aws-lza` now emits official-style LZA top-level sections (`mandatoryAccounts`, `controlTower`, `defaultVpc`, `centralSecurityServices`, etc.) instead of custom placeholder shapes like `accounts[]` or `network.topology`. |
 | **AWS LZA fixture variants** | Added `aws-lza-regulated-v1` and `aws-lza-healthcare-v1` generated fixture bundles plus per-fixture `README.md` docs, alongside refreshed `aws-lza-standard-v1`. |
 | **AWS LZA subsection alignment** | `aws-lza` now emits upstream-backed subsections like `identityCenterPermissionSets`, VPC `routeTables`/`subnets`, GuardDuty export settings, and Security Hub org toggles. |
+| **AWS LZA security schema depth** | `security-config.yaml` now carries richer upstream-backed shapes for GuardDuty, Security Hub standards, SCP revert notifications, Macie frequencies, SSM automation, and related empty-list/exclude-region fields, with contract assertions guarding key literals. |
 | **Sample config metadata** | `SampleConfig` now supports generic `description`, `source_contract`, `upstream_variant`, and `tags` metadata so contract-backed variants stay discoverable without AWS-specific core wiring. |
 | **Sample config CLI** | Added `intent-engine sample list/show` for registry-backed sample inspection by name or pattern, including metadata, decisions, and module references. |
 | **Sample matching** | Generic sample matching now ranks closest sample configs from typed graph decisions and prints recommendations after `compile`/`interview`. CLI list also filters by `--tag` and `--contract`. |
@@ -256,8 +257,9 @@ T15: Lean contract-driven handoff maturity
 | **LLM-path deterministic backfill** | Compiler now merges deterministic Markdown accounts/OUs/workloads into LLM-produced intent, backfilling dropped or partial named entities from small models without duplicating explicit items. |
 
 ### Next (prioritized)
-1. [ ] Tighten `aws-lza` emitted YAML against official LZA sample config schemas beyond current required paths/assertions.
+1. [ ] Continue narrowing remaining `aws-lza` field gaps against official LZA sample config schemas, especially network/global/IAM subsections not yet asserted.
 2. [ ] Evaluate adding remaining source files to mypy scope when they change (ongoing incremental policy).
+3. [ ] Decide whether fixture drift `--check` belongs in CI for faster, more explicit failure mode.
 3. [ ] Decide whether sample recommendations should feed deployment runbooks or decision reports directly, not only standalone artifact.
 4. [ ] Decide whether sample fixture sync/check should run in CI by default or stay manual script + tests.
 5. [ ] Decide whether small-model extraction still needs separate workload-only LLM pass after deterministic backfill results settle.
