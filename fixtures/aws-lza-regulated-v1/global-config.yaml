@@ -5,14 +5,25 @@ enabledRegions:
   - eu-central-1
   - eu-west-1
 managementAccountAccessRole: AWSControlTowerExecution
+terminationProtection: true
 cloudwatchLogRetentionInDays: 2555
+cdkOptions:
+  centralizeBuckets: true
+  useManagementAccessRole: true
 controlTower:
   enable: true
+snsTopics: []
+tags: []
 logging:
   account: LogArchive
+  centralizedLoggingRegion: eu-central-1
   cloudtrail:
     enable: true
     organizationTrail: true
   sessionManager:
     sendToCloudWatchLogs: true
     sendToS3: true
+  centralLogBucket:
+    lifecycleRules: []
+  accessLogBucket:
+    lifecycleRules: []

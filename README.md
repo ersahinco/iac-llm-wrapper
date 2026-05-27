@@ -135,9 +135,9 @@ iac-llm-wrapper compile -i design.md -o out/ --pattern baseline --addon pci-comp
 
 Output includes:
 - `decision-report.yaml` — all decisions with WA pillar coverage and audit trail
-- `global-config.yaml` — organization and OU structure
+- `global-config.yaml` — region, logging, and global guardrail intent
 - `accounts-config.yaml` — account definitions
-- `network-config.yaml` — VPC, CIDR, topology
+- `network-config.yaml` — VPC, CIDR, and connectivity intent
 - `security-config.yaml` — audit, logging, encryption settings
 - `module-inputs.yaml` — mapped Terraform module variables with pinned versions
 - `sample-recommendations.yaml` — closest pinned reference bundles for handoff

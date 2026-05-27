@@ -105,7 +105,7 @@ class TestContractCommand:
 
         assert result.exit_code == 0
         assert "accounts-config.yaml" in result.stdout
-        assert "network-config.yaml | paths: defaultVpc.delete" in result.stdout
+        assert "network-config.yaml | paths: homeRegion" in result.stdout
         assert "assertions: defaultVpc.delete" in result.stdout
         assert "customizations-config.yaml" in result.stdout
         assert "home_region" in result.stdout

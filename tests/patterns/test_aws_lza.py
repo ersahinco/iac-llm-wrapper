@@ -93,12 +93,40 @@ class TestAwsLzaPattern:
         assert iam["identityCenter"]["identityCenterPermissionSets"] == []
         assert iam["identityCenter"]["identityCenterAssignments"] == []
 
+        global_config = yaml.load((output / "global-config.yaml").read_text())
+        assert global_config["terminationProtection"] is True
+        assert global_config["cdkOptions"] == {
+            "centralizeBuckets": True,
+            "useManagementAccessRole": True,
+        }
+        assert global_config["snsTopics"] == []
+        assert global_config["tags"] == []
+        assert global_config["logging"]["centralizedLoggingRegion"] == "eu-central-1"
+        assert global_config["logging"]["centralLogBucket"] == {"lifecycleRules": []}
+        assert global_config["logging"]["accessLogBucket"] == {"lifecycleRules": []}
+
         network = yaml.load((output / "network-config.yaml").read_text())
+        assert network["homeRegion"] == "eu-central-1"
+        assert network["defaultVpc"] == {"delete": True, "excludeAccounts": []}
         assert network["vpcs"][0]["enableDnsHostnames"] is True
         assert network["vpcs"][0]["enableDnsSupport"] is True
+        assert network["vpcs"][0]["instanceTenancy"] == "default"
         assert network["vpcs"][0]["routeTables"] == []
         assert network["vpcs"][0]["subnets"] == []
+        assert network["vpcs"][0]["natGateways"] == []
         assert network["vpcs"][0]["transitGatewayAttachments"] == []
+        assert network["vpcs"][0]["tags"] == []
+        assert network["centralNetworkServices"] == {
+            "delegatedAdminAccount": "Network",
+            "gatewayLoadBalancers": [],
+            "ipams": [],
+            "networkFirewall": {"firewalls": [], "policies": [], "rules": []},
+            "route53Resolver": {"endpoints": [], "firewallRuleGroups": []},
+        }
+        assert network["transitGateways"][0]["shareTargets"] == {
+            "organizationalUnits": ["Infrastructure", "Workloads"]
+        }
+        assert network["transitGateways"][0]["tags"] == []
 
         security = yaml.load((output / "security-config.yaml").read_text())
         assert security["centralSecurityServices"]["delegatedAdminAccount"] == "SecurityTooling"
@@ -166,7 +194,9 @@ class TestAwsLzaPattern:
         assert "iam-config.yaml" in lineage["sourceContract"]["mandatoryConfigFiles"]
         artifact_contracts = {item["name"]: item for item in lineage["artifacts"]}
         assert artifact_contracts["network-config.yaml"]["requiredPaths"] == [
+            "homeRegion",
             "defaultVpc.delete",
+            "defaultVpc.excludeAccounts",
             "endpointPolicies",
             "transitGateways",
             "vpcs[]",
@@ -176,9 +206,12 @@ class TestAwsLzaPattern:
             "vpcs[].cidrs[]",
             "vpcs[].enableDnsHostnames",
             "vpcs[].enableDnsSupport",
+            "vpcs[].instanceTenancy",
             "vpcs[].routeTables",
             "vpcs[].subnets",
+            "vpcs[].natGateways",
             "vpcs[].transitGatewayAttachments",
+            "vpcs[].tags",
         ]
         assert any(item["decision"] == "security_tooling_account" for item in lineage["lineage"])
         assert any(item["decision"] == "network_cidr" for item in lineage["lineage"])
@@ -236,6 +269,19 @@ class TestAwsLzaPattern:
         result = runner.invoke(app, ["validate", "--input", str(output), "--pattern", "aws-lza"])
         assert result.exit_code == 0
         assert "Validation passed" in result.stdout
+
+    def test_single_vpc_handoff_does_not_require_hub_spoke_artifacts(self, tmp_path: Path):
+        from intent_engine.core.compiler import validate_generated
+
+        output = tmp_path / "output"
+        compile_from_interview({"topology": "single-vpc"}, output, pattern="aws-lza")
+
+        yaml = ruamel.yaml.YAML(typ="safe")
+        network = yaml.load((output / "network-config.yaml").read_text())
+
+        assert "centralNetworkServices" not in network
+        assert network["transitGateways"] == []
+        assert validate_generated(output, pattern="aws-lza") == []
 
     def test_contract_artifact_validation_has_no_duplicate_errors(self, tmp_path: Path):
         from intent_engine.core.compiler import validate_generated, validate_generated_violations

@@ -20,6 +20,6 @@ Thin-path AWS LZA fixture for commercial baseline handoff.
 ## What to review
 
 - Official-shape top-level LZA sections exist across six mandatory config files.
-- IAM and network files keep empty official subsections (`identityCenterPermissionSets`, VPC `routeTables`/`subnets`) visible for handoff completion.
+- Global and network files keep official handoff subsections visible (`cdkOptions`, log-bucket lifecycle arrays, VPC `routeTables`/`subnets`, central network service placeholders).
 - Placeholder account emails remain synthetic and must be replaced before deployment.
 - `security-config.yaml` enables foundational controls without regulated overlay standards.

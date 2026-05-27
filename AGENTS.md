@@ -176,11 +176,11 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff.
 T15: Lean contract-driven handoff maturity
 
 ### Status
-- **Tests**: 514 passing, 1 skipped (LLM non-determinism)
+- **Tests**: 515 passing, 1 skipped (LLM non-determinism)
 - **Lint**: clean
 - **Format**: clean
 - **Repo**: `github.com/ersahinco/intent-engine` (private)
-- **Last session**: Tightened AWS LZA security-config schema against upstream sample shape, refreshed fixture bundles, kept full gate green
+- **Last session**: Tightened AWS LZA global/network handoff shape, widened mypy to AWS LZA emitter, refreshed fixtures, kept full gate green
 
 ### Done
 | Area | Item |
@@ -236,6 +236,7 @@ T15: Lean contract-driven handoff maturity
 | **AWS LZA fixture variants** | Added `aws-lza-regulated-v1` and `aws-lza-healthcare-v1` generated fixture bundles plus per-fixture `README.md` docs, alongside refreshed `aws-lza-standard-v1`. |
 | **AWS LZA subsection alignment** | `aws-lza` now emits upstream-backed subsections like `identityCenterPermissionSets`, VPC `routeTables`/`subnets`, GuardDuty export settings, and Security Hub org toggles. |
 | **AWS LZA security schema depth** | `security-config.yaml` now carries richer upstream-backed shapes for GuardDuty, Security Hub standards, SCP revert notifications, Macie frequencies, SSM automation, and related empty-list/exclude-region fields, with contract assertions guarding key literals. |
+| **AWS LZA global/network depth** | `global-config.yaml` now includes termination protection, CDK options, SNS/tag arrays, centralized logging region, and log-bucket lifecycle placeholders; `network-config.yaml` now includes home region, default VPC exclusions, VPC tenancy/NAT/tag placeholders, hub-spoke central network service placeholders, and TGW share targets. |
 | **Sample config metadata** | `SampleConfig` now supports generic `description`, `source_contract`, `upstream_variant`, and `tags` metadata so contract-backed variants stay discoverable without AWS-specific core wiring. |
 | **Sample config CLI** | Added `intent-engine sample list/show` for registry-backed sample inspection by name or pattern, including metadata, decisions, and module references. |
 | **Sample matching** | Generic sample matching now ranks closest sample configs from typed graph decisions and prints recommendations after `compile`/`interview`. CLI list also filters by `--tag` and `--contract`. |
@@ -253,18 +254,20 @@ T15: Lean contract-driven handoff maturity
 | **Generator scoping tests** | Core tests now lock `applies_to` behavior so scoped generators do not run for other patterns. |
 | **Fixture sync helper** | `scripts/sync-sample-fixtures.py` regenerates sample fixture bundles from registered sample decisions, prunes stale generated files, and supports `--check` drift detection. |
 | **Fixture drift guard** | Sample fixture tests now compile each registered sample and compare checked-in bundles against fresh generated output, with timestamp normalization for `decision-audit.yaml`. |
-| **Incremental mypy expansion** | `uv run --extra dev mypy` now covers core contracts, sample config registry, module payload mapping, and AWS LZA contract metadata in addition to previous typed files. |
+| **Incremental mypy expansion** | `uv run --extra dev mypy` now covers core contracts, sample config registry, module payload mapping, AWS LZA emitter code, and AWS LZA contract metadata in addition to previous typed files. |
 | **LLM-path deterministic backfill** | Compiler now merges deterministic Markdown accounts/OUs/workloads into LLM-produced intent, backfilling dropped or partial named entities from small models without duplicating explicit items. |
 
 ### Next (prioritized)
-1. [ ] Continue narrowing remaining `aws-lza` field gaps against official LZA sample config schemas, especially network/global/IAM subsections not yet asserted.
+1. [ ] Continue narrowing remaining `aws-lza` field gaps against official LZA sample config schemas, especially IAM permission set/assignment detail when real customer identity inputs exist.
 2. [ ] Evaluate adding remaining source files to mypy scope when they change (ongoing incremental policy).
 3. [ ] Decide whether fixture drift `--check` belongs in CI for faster, more explicit failure mode.
-3. [ ] Decide whether sample recommendations should feed deployment runbooks or decision reports directly, not only standalone artifact.
-4. [ ] Decide whether sample fixture sync/check should run in CI by default or stay manual script + tests.
+4. [ ] Decide whether sample recommendations should feed deployment runbooks or decision reports directly, not only standalone artifact.
 5. [ ] Decide whether small-model extraction still needs separate workload-only LLM pass after deterministic backfill results settle.
 
 ### Key Decisions This Session
+- **Global/network LZA shape deepened without deploy ownership**: Added upstream-style CDK/logging/network placeholders and contract checks, but still emits handoff YAML only.
+- **Branch-specific contract pressure avoided**: Hub-spoke-only central network services and TGW details are emitted and tested, but not unconditional contract requirements, so `single-vpc` handoff still validates.
+- **Mypy follows touched stable code**: Added `patterns/aws_lza/__init__.py` to typed scope after tightening emitter behavior.
 - **Deterministic entities now reinforce LLM path**: Accounts, OUs, and workloads parsed from structured Markdown are merged into compiled intent even when an LLM response exists, so small models dropping whole entities no longer erase engineer handoff artifacts.
 - **Named-entity merge beats duplicate append**: Added generic list-item merge by `name`, filling only fields that were missing or default-derived on existing items while preserving explicitly extracted values.
 - **Mypy scope widened again, not blindly**: Added contracts/sample/module-mapping/AWS LZA contract files to configured mypy scope and fixed `Any` leaks before expanding further.

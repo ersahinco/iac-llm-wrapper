@@ -19,6 +19,7 @@ Thin-path AWS LZA fixture for regulated commercial path.
 
 ## What to review
 
+- Global and network files keep official handoff subsections visible (`cdkOptions`, log-bucket lifecycle arrays, VPC `routeTables`/`subnets`, central network service placeholders).
 - `security-config.yaml` adds `NIST Special Publication 800-53 Revision 5` beside AWS foundational standard in Security Hub.
 - Macie sensitive-data publishing flips on for regulated path.
 - Placeholder account emails still require engineer replacement before deployment.

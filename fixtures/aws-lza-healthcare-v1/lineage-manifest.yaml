@@ -35,14 +35,31 @@ artifacts:
       - homeRegion
       - enabledRegions
       - managementAccountAccessRole
+      - terminationProtection
       - cloudwatchLogRetentionInDays
+      - cdkOptions.centralizeBuckets
+      - cdkOptions.useManagementAccessRole
       - controlTower.enable
+      - snsTopics
+      - tags
       - logging.account
+      - logging.centralizedLoggingRegion
       - logging.cloudtrail.enable
       - logging.cloudtrail.organizationTrail
       - logging.sessionManager.sendToCloudWatchLogs
       - logging.sessionManager.sendToS3
+      - logging.centralLogBucket.lifecycleRules
+      - logging.accessLogBucket.lifecycleRules
     valueAssertions:
+      - path: terminationProtection
+        equals: true
+        oneOf: []
+      - path: cdkOptions.centralizeBuckets
+        equals: true
+        oneOf: []
+      - path: cdkOptions.useManagementAccessRole
+        equals: true
+        oneOf: []
       - path: logging.cloudtrail.organizationTrail
         equals: true
         oneOf: []
@@ -66,7 +83,9 @@ artifacts:
     required: true
     description: Network resources and connectivity architecture.
     requiredPaths:
+      - homeRegion
       - defaultVpc.delete
+      - defaultVpc.excludeAccounts
       - endpointPolicies
       - transitGateways
       - vpcs[]
@@ -76,9 +95,12 @@ artifacts:
       - vpcs[].cidrs[]
       - vpcs[].enableDnsHostnames
       - vpcs[].enableDnsSupport
+      - vpcs[].instanceTenancy
       - vpcs[].routeTables
       - vpcs[].subnets
+      - vpcs[].natGateways
       - vpcs[].transitGatewayAttachments
+      - vpcs[].tags
     valueAssertions:
       - path: defaultVpc.delete
         equals: true
@@ -88,6 +110,9 @@ artifacts:
         oneOf: []
       - path: vpcs[].enableDnsSupport
         equals: true
+        oneOf: []
+      - path: vpcs[].instanceTenancy
+        equals: default
         oneOf: []
   - name: organization-config.yaml
     required: true

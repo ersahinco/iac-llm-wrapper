@@ -175,7 +175,7 @@ MVP should produce a useful handoff without owning deployment:
 Current emitted YAML targets official LZA-style top-level sections such as:
 
 - `accounts-config.yaml`: `mandatoryAccounts`, `workloadAccounts`
-- `global-config.yaml`: `homeRegion`, `enabledRegions`, `controlTower`, `logging`
+- `global-config.yaml`: `homeRegion`, `enabledRegions`, `controlTower`, `cdkOptions`, `logging`
 - `iam-config.yaml`: `homeRegion`, `identityCenter`
 - `network-config.yaml`: `defaultVpc`, `centralNetworkServices`, `transitGateways`, `vpcs`
 - `organization-config.yaml`: `enable`, `organizationalUnits`, policy lists
@@ -186,7 +186,11 @@ custom wrapper fields:
 
 - `iam-config.yaml`: `identityCenterPermissionSets`, `identityCenterAssignments`
 - `network-config.yaml`: VPC `enableDnsHostnames`, `enableDnsSupport`, `routeTables`, `subnets`,
-  `transitGatewayAttachments`
+  `natGateways`, `transitGatewayAttachments`, and `tags`; hub-spoke handoff also includes
+  Transit Gateway `shareTargets`, central network service placeholders for IPAM, Route 53
+  Resolver, Network Firewall, and Gateway Load Balancers
+- `global-config.yaml`: `terminationProtection`, CDK bucket/role options, SNS topic/tag arrays,
+  centralized logging region, and empty lifecycle-rule lists for central and access log buckets
 - `security-config.yaml`: GuardDuty `autoEnableOrgMembers`, `overrideExisting`,
   `exportFrequency`, `s3Protection`, `eksProtection`, and empty `lifecycleRules`;
   Security Hub `autoEnableOrgMembers`, `regionAggregation`, `snsTopicName`,

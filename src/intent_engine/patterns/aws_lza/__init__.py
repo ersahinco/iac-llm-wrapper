@@ -196,9 +196,29 @@ def _core_vpc_config(intent: AwsLzaIntent) -> dict[str, Any]:
         "cidrs": [intent.network_cidr],
         "enableDnsHostnames": True,
         "enableDnsSupport": True,
+        "instanceTenancy": "default",
         "routeTables": [],
         "subnets": [],
+        "natGateways": [],
         "transitGatewayAttachments": [],
+        "tags": [],
+    }
+
+
+def _central_network_services_config(intent: AwsLzaIntent) -> dict[str, Any]:
+    return {
+        "delegatedAdminAccount": intent.network_account,
+        "gatewayLoadBalancers": [],
+        "ipams": [],
+        "networkFirewall": {
+            "firewalls": [],
+            "policies": [],
+            "rules": [],
+        },
+        "route53Resolver": {
+            "endpoints": [],
+            "firewallRuleGroups": [],
+        },
     }
 
 
@@ -532,10 +552,18 @@ def gen_lza_global_config(intent: Any, output_dir: Path) -> None:
         "homeRegion": intent.home_region,
         "enabledRegions": intent.enabled_regions,
         "managementAccountAccessRole": _management_access_role(intent),
+        "terminationProtection": True,
         "cloudwatchLogRetentionInDays": 2555,
+        "cdkOptions": {
+            "centralizeBuckets": True,
+            "useManagementAccessRole": True,
+        },
         "controlTower": {"enable": str(intent.org_mode) == "control-tower"},
+        "snsTopics": [],
+        "tags": [],
         "logging": {
             "account": intent.log_archive_account,
+            "centralizedLoggingRegion": intent.home_region,
             "cloudtrail": {
                 "enable": intent.centralized_logging,
                 "organizationTrail": intent.centralized_logging,
@@ -544,6 +572,8 @@ def gen_lza_global_config(intent: Any, output_dir: Path) -> None:
                 "sendToCloudWatchLogs": intent.centralized_logging,
                 "sendToS3": intent.centralized_logging,
             },
+            "centralLogBucket": {"lifecycleRules": []},
+            "accessLogBucket": {"lifecycleRules": []},
         },
     }
     _write_yaml(output_dir, "global-config.yaml", data)
@@ -609,13 +639,14 @@ def gen_lza_network_config(intent: Any, output_dir: Path) -> None:
     if intent is None:
         return
     data = {
-        "defaultVpc": {"delete": True},
+        "homeRegion": intent.home_region,
+        "defaultVpc": {"delete": True, "excludeAccounts": []},
         "endpointPolicies": [],
         "transitGateways": [],
         "vpcs": [_core_vpc_config(intent)],
     }
     if intent.topology == "hub-spoke":
-        data["centralNetworkServices"] = {"delegatedAdminAccount": intent.network_account}
+        data["centralNetworkServices"] = _central_network_services_config(intent)
         data["transitGateways"] = [
             {
                 "name": "Core",
@@ -628,6 +659,8 @@ def gen_lza_network_config(intent: Any, output_dir: Path) -> None:
                 "defaultRouteTablePropagation": "disable",
                 "autoAcceptSharingAttachments": "enable",
                 "routeTables": [{"name": "Core", "routes": []}],
+                "shareTargets": {"organizationalUnits": [_INFRASTRUCTURE_OU, _WORKLOADS_OU]},
+                "tags": [],
             }
         ]
     _write_yaml(output_dir, "network-config.yaml", data)

@@ -34,9 +34,9 @@ iac-llm-wrapper compile -i fixtures/valid-payments.md -o out/ --pattern baseline
 
 Output includes:
 - `decision-report.yaml` — all decisions with WA pillar coverage and audit trail
-- `global-config.yaml` — organization and OU structure
+- `global-config.yaml` — region, logging, and global guardrail intent
 - `accounts-config.yaml` — account definitions
-- `network-config.yaml` — VPC, CIDR, topology
+- `network-config.yaml` — VPC, CIDR, and connectivity intent
 - `security-config.yaml` — audit, logging, encryption settings
 - `iam-config.yaml` — permission boundaries and role prefixes
 - `customizations-config.yaml` — VPC endpoints for private CI/CD

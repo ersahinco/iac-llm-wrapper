@@ -88,6 +88,7 @@ files = [
     "src/intent_engine/core/sample_config.py",
     "src/intent_engine/core/validator.py",
     "src/intent_engine/core/model_introspection.py",
+    "src/intent_engine/patterns/aws_lza/__init__.py",
     "src/intent_engine/patterns/aws_lza/contracts.py",
     "src/intent_engine/patterns/kubernetes/__init__.py",
     "src/intent_engine/patterns/lza/generators.py",
