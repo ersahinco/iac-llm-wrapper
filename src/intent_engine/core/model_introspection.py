@@ -265,3 +265,56 @@ def append_to_list_field(
         return True
     except Exception:
         return False
+
+
+def merge_into_list_field(
+    intent: BaseModel,
+    dotted_path: str,
+    item_data: dict[str, Any],
+    dedupe_key: str = "name",
+) -> bool:
+    """Append or backfill a list[Model] field on an intent.
+
+    If an existing item with the same `dedupe_key` exists, only fields explicitly
+    provided by `item_data` are merged, and only when the current item did not
+    explicitly set them or currently holds an empty value.
+    """
+    try:
+        _, annotation = resolve_field_info(type(intent), dotted_path)
+        item_model = list_annotation_item_model(annotation)
+        if item_model is None:
+            return False
+
+        instance = item_model(**item_data)
+        parts = dotted_path.split(".")
+        obj = intent
+        for part in parts[:-1]:
+            obj = getattr(obj, part)
+        lst = getattr(obj, parts[-1])
+
+        if dedupe_key not in item_data:
+            lst.append(instance)
+            return True
+
+        dedupe_value = item_data[dedupe_key]
+        for idx, existing in enumerate(lst):
+            if getattr(existing, dedupe_key, None) != dedupe_value:
+                continue
+
+            explicit_existing = set(getattr(existing, "model_fields_set", set()))
+            updates: dict[str, Any] = {}
+            for field_name in getattr(instance, "model_fields_set", set()):
+                if field_name == dedupe_key:
+                    continue
+                current_value = getattr(existing, field_name, None)
+                if field_name not in explicit_existing or current_value in (None, "", [], {}):
+                    updates[field_name] = getattr(instance, field_name)
+
+            if updates:
+                lst[idx] = existing.model_copy(update=updates)
+            return True
+
+        lst.append(instance)
+        return True
+    except Exception:
+        return False

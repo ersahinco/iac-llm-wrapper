@@ -12,7 +12,7 @@ from .generator import generate_all
 from .interview import InterviewEngine
 from .llm_caller import LLMCaller, LLMEvidenceStore
 from .markdown_extractor import extract_entities_from_markdown, extract_from_markdown
-from .model_introspection import append_to_list_field
+from .model_introspection import append_to_list_field, merge_into_list_field
 from .normalizer import normalize
 from .patterns import GLOBAL_REGISTRY
 from .validator import Violation, validate
@@ -23,6 +23,16 @@ class CompileError(Exception):
         self.violations = violations
         msgs = "; ".join(f"{v.code}: {v.message}" for v in violations)
         super().__init__(msgs)
+
+
+def _merge_extracted_entities(intent: Any, entities: dict[str, list[dict[str, Any]]]) -> None:
+    """Merge deterministic entities into intent without duplicating named items."""
+    for entity_type in ("ous", "accounts", "workloads"):
+        if not hasattr(intent, entity_type):
+            continue
+        for item in entities.get(entity_type, []):
+            if not merge_into_list_field(intent, entity_type, item):
+                append_to_list_field(intent, entity_type, item)
 
 
 def _build_payload(
@@ -122,6 +132,7 @@ def compile_design(
     # Layer 0: Deterministic Markdown pre-processing
     # ------------------------------------------------------------------
     markdown_decisions = extract_from_markdown(text, graph)
+    markdown_entities = extract_entities_from_markdown(text)
     if markdown_decisions:
         graph.apply_decisions(markdown_decisions)
 
@@ -159,12 +170,8 @@ def compile_design(
         intent = llm_result.to_intent(extractor)
     else:
         intent = pattern_obj.intent_factory()
-        # Deterministic entity extraction fills accounts/OUs/workloads from
-        # Markdown sections when no LLM is available.
-        entities = extract_entities_from_markdown(text)
-        for entity_type in ("ous", "accounts", "workloads"):
-            for item in entities.get(entity_type, []):
-                append_to_list_field(intent, entity_type, item)
+    # Deterministic entities backfill items that small models often omit.
+    _merge_extracted_entities(intent, markdown_entities)
     # Apply graph cascades (topology -> network.topology, etc.)
     graph.apply_to_intent(intent)
 

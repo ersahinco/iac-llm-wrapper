@@ -11,6 +11,7 @@ from intent_engine.core.model_introspection import (
     discover_model_fields,
     field_exists,
     list_annotation_item_model,
+    merge_into_list_field,
     resolve_field_info,
 )
 from intent_engine.patterns.lza.models import RawIntent, Topology, Workload
@@ -101,3 +102,53 @@ class TestAppendToListField:
         intent = RawIntent()
         ok = append_to_list_field(intent, "primary_region", {"name": "x"})
         assert ok is False
+
+
+class TestMergeIntoListField:
+    def test_appends_when_name_missing(self):
+        intent = RawIntent()
+
+        ok = merge_into_list_field(intent, "workloads", {"name": "api", "target_account": "Prod"})
+
+        assert ok is True
+        assert len(intent.workloads) == 1
+        assert intent.workloads[0].target_account == "Prod"
+
+    def test_backfills_only_missing_fields(self):
+        intent = RawIntent()
+        append_to_list_field(intent, "workloads", {"name": "api"})
+
+        ok = merge_into_list_field(
+            intent,
+            "workloads",
+            {
+                "name": "api",
+                "target_account": "Prod",
+                "network_mode": "public",
+                "port": 9000,
+            },
+        )
+
+        assert ok is True
+        assert len(intent.workloads) == 1
+        assert intent.workloads[0].target_account == "Prod"
+        assert intent.workloads[0].network_mode.value == "public"
+        assert intent.workloads[0].port == 9000
+
+    def test_preserves_explicit_existing_fields(self):
+        intent = RawIntent()
+        append_to_list_field(
+            intent,
+            "workloads",
+            {"name": "api", "target_account": "Prod", "network_mode": "private"},
+        )
+
+        merge_into_list_field(
+            intent,
+            "workloads",
+            {"name": "api", "target_account": "Shadow", "network_mode": "public"},
+        )
+
+        assert len(intent.workloads) == 1
+        assert intent.workloads[0].target_account == "Prod"
+        assert intent.workloads[0].network_mode.value == "private"

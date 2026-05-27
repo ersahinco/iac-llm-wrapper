@@ -303,6 +303,42 @@ class TestDeterministicEntityExtraction:
         # Network account auto-derived from account name containing "network"
         assert report["network"]["centralNetworkAccount"] == "Network"
 
+    def test_llm_path_backfills_missing_workload_list(self, tmp_path: Path):
+        out = tmp_path / "output"
+        response = (
+            '{"decisions": {"primary_region": "eu-central-1", "topology": "hub-spoke", '
+            '"network_cidr": "10.0.0.0/16", "central_network_account": "Network", '
+            '"hub_cidr": "10.0.0.0/20", "audit_retention_days": "2555", '
+            '"centralized_logging": "true", "egress_inspection": "none", '
+            '"cicd_mode": "private", "cicd_placement": "shared-vpc"}}'
+        )
+        llm_caller = LLMCaller(MockLLMBackend(response))
+
+        compile_design(FIXTURES / "valid-payments.md", out, llm_caller=llm_caller)
+
+        wl = _load_yaml(out / "workload-payments-api.yaml")
+        assert wl["workload"]["name"] == "payments-api"
+        assert wl["workload"]["account"] == "PaymentsProd"
+
+    def test_llm_path_backfills_partial_workload_fields(self, tmp_path: Path):
+        out = tmp_path / "output"
+        response = (
+            '{"decisions": {"primary_region": "eu-central-1", "topology": "hub-spoke", '
+            '"network_cidr": "10.0.0.0/16", "central_network_account": "Network", '
+            '"hub_cidr": "10.0.0.0/20", "audit_retention_days": "2555", '
+            '"centralized_logging": "true", "egress_inspection": "none", '
+            '"cicd_mode": "private", "cicd_placement": "shared-vpc"}, '
+            '"workloads": [{"name": "payments-api"}]}'
+        )
+        llm_caller = LLMCaller(MockLLMBackend(response))
+
+        compile_design(FIXTURES / "valid-payments.md", out, llm_caller=llm_caller)
+
+        wl = _load_yaml(out / "workload-payments-api.yaml")
+        assert wl["workload"]["name"] == "payments-api"
+        assert wl["workload"]["account"] == "PaymentsProd"
+        assert wl["workload"]["networkMode"] == "private"
+
 
 class TestValidateGenerated:
     @pytest.fixture(autouse=True)

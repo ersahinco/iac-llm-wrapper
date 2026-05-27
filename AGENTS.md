@@ -176,11 +176,11 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff.
 T15: Lean contract-driven handoff maturity
 
 ### Status
-- **Tests**: 509 passing, 1 skipped (LLM non-determinism)
+- **Tests**: 514 passing, 1 skipped (LLM non-determinism)
 - **Lint**: clean
 - **Format**: clean
 - **Repo**: `github.com/ersahinco/intent-engine` (private)
-- **Last session**: Added contract value assertions, synced sample fixture bundles, and hardened fixture drift detection
+- **Last session**: Backfilled deterministic entities into LLM path for small-model workload/account/OU drops and widened mypy scope again
 
 ### Done
 | Area | Item |
@@ -252,15 +252,22 @@ T15: Lean contract-driven handoff maturity
 | **Generator scoping tests** | Core tests now lock `applies_to` behavior so scoped generators do not run for other patterns. |
 | **Fixture sync helper** | `scripts/sync-sample-fixtures.py` regenerates sample fixture bundles from registered sample decisions, prunes stale generated files, and supports `--check` drift detection. |
 | **Fixture drift guard** | Sample fixture tests now compile each registered sample and compare checked-in bundles against fresh generated output, with timestamp normalization for `decision-audit.yaml`. |
+| **Incremental mypy expansion** | `uv run --extra dev mypy` now covers core contracts, sample config registry, module payload mapping, and AWS LZA contract metadata in addition to previous typed files. |
+| **LLM-path deterministic backfill** | Compiler now merges deterministic Markdown accounts/OUs/workloads into LLM-produced intent, backfilling dropped or partial named entities from small models without duplicating explicit items. |
 
 ### Next (prioritized)
-1. [ ] Improve workloads extraction for small models (split extraction or separate LLM call).
+1. [ ] Tighten `aws-lza` emitted YAML against official LZA sample config schemas beyond current required paths/assertions.
 2. [ ] Evaluate adding remaining source files to mypy scope when they change (ongoing incremental policy).
 3. [ ] Decide whether sample recommendations should feed deployment runbooks or decision reports directly, not only standalone artifact.
 4. [ ] Decide whether sample fixture sync/check should run in CI by default or stay manual script + tests.
-5. [ ] Tighten `aws-lza` emitted YAML against official LZA sample config schemas beyond current required paths/assertions.
+5. [ ] Decide whether small-model extraction still needs separate workload-only LLM pass after deterministic backfill results settle.
 
 ### Key Decisions This Session
+- **Deterministic entities now reinforce LLM path**: Accounts, OUs, and workloads parsed from structured Markdown are merged into compiled intent even when an LLM response exists, so small models dropping whole entities no longer erase engineer handoff artifacts.
+- **Named-entity merge beats duplicate append**: Added generic list-item merge by `name`, filling only fields that were missing or default-derived on existing items while preserving explicitly extracted values.
+- **Mypy scope widened again, not blindly**: Added contracts/sample/module-mapping/AWS LZA contract files to configured mypy scope and fixed `Any` leaks before expanding further.
+- **Mypy expansion stays incremental**: Added high-value newly-stable files to typed scope (`core/contracts.py`, `core/sample_config.py`, `core/module_mapping.py`, `patterns/aws_lza/contracts.py`) instead of forcing whole-repo typing churn.
+- **Type seams fixed before scope growth**: Typed `_get_pattern_or_exit()` and removed `list` shadowing in sample registry so new mypy coverage catches signal, not avoidable noise.
 - **Contracts assert values, not only presence**: Added generic `ArtifactContract.value_assertions` so downstream handoff validation can enforce stable literal values without new pattern-specific validators.
 - **AWS invariants belong in contract metadata**: AWS LZA now encodes fixed booleans/strings like org-trail enablement, default VPC deletion, DNS flags, and GuardDuty export settings inside target contract metadata.
 - **Fixture bundles must match real compiler output**: Added `scripts/sync-sample-fixtures.py` to regenerate sample bundles from registered sample decisions and prune stale generated files. No more manual copy drift.

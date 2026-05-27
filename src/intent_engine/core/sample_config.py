@@ -8,6 +8,7 @@ safely when module sources are updated.
 
 from __future__ import annotations
 
+import builtins
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -115,7 +116,7 @@ class SampleConfig(BaseModel):
         if isinstance(current_value, list) or isinstance(sample_value, list):
             current_value = cls._coerce_list_like(current_value)
             sample_value = cls._coerce_list_like(sample_value)
-        return cls._canonical_value(current_value) == cls._canonical_value(sample_value)
+        return bool(cls._canonical_value(current_value) == cls._canonical_value(sample_value))
 
     def compare_to(self, other_decisions: dict[str, Any]) -> dict[str, Any]:
         same: dict[str, Any] = {}
@@ -169,16 +170,16 @@ class SampleConfigRegistry:
             raise KeyError(f"Unknown sample config: {name}")
         return self._samples[name]
 
-    def list(self) -> list[str]:
+    def list(self) -> builtins.list[str]:
         return sorted(self._samples.keys())
 
-    def find_by_pattern(self, pattern: str) -> list[SampleConfig]:
+    def find_by_pattern(self, pattern: str) -> builtins.list[SampleConfig]:
         return self.find(pattern=pattern)
 
-    def find_by_contract(self, contract: str) -> list[SampleConfig]:
+    def find_by_contract(self, contract: str) -> builtins.list[SampleConfig]:
         return self.find(contract=contract)
 
-    def find_by_tag(self, tag: str) -> list[SampleConfig]:
+    def find_by_tag(self, tag: str) -> builtins.list[SampleConfig]:
         return self.find(tag=tag)
 
     def find(
@@ -187,7 +188,7 @@ class SampleConfigRegistry:
         pattern: str | None = None,
         contract: str | None = None,
         tag: str | None = None,
-    ) -> list[SampleConfig]:
+    ) -> builtins.list[SampleConfig]:
         samples = list(self._samples.values())
         if pattern is not None:
             samples = [sample for sample in samples if sample.pattern == pattern]
@@ -210,8 +211,8 @@ class SampleConfigRegistry:
         contract: str | None = None,
         tag: str | None = None,
         limit: int = 3,
-    ) -> list[SampleMatch]:
-        ranked: list[SampleMatch] = []
+    ) -> builtins.list[SampleMatch]:
+        ranked: builtins.list[SampleMatch] = []
         for sample in self.find(pattern=pattern, contract=contract, tag=tag):
             diff = sample.compare_to(current_decisions)
             ranked.append(

@@ -24,7 +24,7 @@ from .core.discovery import DiscoveryEngine, generate_clarifying_questions
 from .core.extractor import Extractor
 from .core.interview import InterviewEngine
 from .core.llm_caller import LLMEvidenceStore, auto_detect_llm
-from .core.patterns import ADDON_REGISTRY, GLOBAL_REGISTRY
+from .core.patterns import ADDON_REGISTRY, GLOBAL_REGISTRY, Pattern
 from .core.sample_config import GLOBAL_SAMPLE_REGISTRY, SampleConfig
 from .core.suggestion import SuggestionEngine
 from .patterns import load_builtin_patterns
@@ -42,7 +42,7 @@ def _available_addons() -> str:
     return ", ".join(ADDON_REGISTRY.list())
 
 
-def _get_pattern_or_exit(pattern: str):
+def _get_pattern_or_exit(pattern: str) -> Pattern:
     if pattern not in GLOBAL_REGISTRY.list():
         typer.echo(f"Unknown pattern: {pattern}. Available: {_available_patterns()}", err=True)
         raise typer.Exit(1)
