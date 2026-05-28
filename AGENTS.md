@@ -77,7 +77,7 @@ uv run python scripts/sync-sample-fixtures.py --check
 - `cascade` rules: e.g., deciding `topology` auto-sets `network.topology`.
 - `hint` field on every requirement gives the architect context for answering.
 - Interview presents questions in topological order — dependencies resolved first. Same decisions = same question sequence every time.
-- Three CLI modes: `--decisions` (JSON pre-fill), `--interactive` (prompted), or defaults-only.
+- Three CLI modes: `--decisions` (JSON pre-fill), `--interactive` (prompted), or deterministic fallback.
 - Path log tracks every skip and blocked reason with dependency context.
 - Patterns determine which decisions exist in the graph. `--pattern minimal` asks 4 questions; `--pattern baseline` asks 16; `--pattern financial-services` asks 19; `--pattern kubernetes-cluster` asks 10.
 
@@ -181,7 +181,7 @@ T15: Lean contract-driven handoff maturity
 - **Lint**: clean
 - **Format**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Refreshed deterministic fallback docs/CLI text and added clean pattern support files to mypy scope, kept full gate green
+- **Last session**: Simplified mypy gate to cover all source, fixed stale deterministic fallback wording, kept full gate green
 
 ### Done
 | Area | Item |
@@ -259,7 +259,7 @@ T15: Lean contract-driven handoff maturity
 | **Fixture drift CI gate** | CI now runs `uv run python scripts/sync-sample-fixtures.py --check` explicitly so generated fixture drift fails fast and visibly. |
 | **Pre-commit gate alignment** | Pre-commit now runs the same scoped `uv run --extra dev mypy` and sample fixture drift check as local/CI gates instead of a broader mirror-mypy invocation. |
 | **Whitespace-stable YAML generation** | Core and AWS LZA YAML dumpers strip trailing whitespace, so generated fixtures no longer fight whitespace hooks. |
-| **Incremental mypy expansion** | `uv run --extra dev mypy` now covers catalog matching, fixture sync tooling, extraction benchmark tooling, core contracts, sample config registry, Markdown extractor, module payload mapping, LZA support modules, AWS LZA emitter/model code, and AWS LZA contract metadata in addition to previous typed files. |
+| **Source mypy coverage** | `uv run --extra dev mypy` now covers all `src/intent_engine` source plus fixture sync and extraction benchmark tooling. |
 | **LLM-path deterministic backfill** | Compiler now merges deterministic Markdown accounts/OUs/workloads into LLM-produced intent, backfilling dropped or partial named entities from small models without duplicating explicit items. |
 | **Markdown extractor type coverage** | Deterministic Markdown extraction is now in mypy scope, protecting the small-model backfill path from silent type drift. |
 | **Extraction benchmark type coverage** | `scripts/benchmark-extraction.py` is now in mypy scope, protecting the local small-model quality benchmark from untyped JSON/YAML drift. |
@@ -268,12 +268,12 @@ T15: Lean contract-driven handoff maturity
 
 ### Next (prioritized)
 1. [ ] Continue narrowing remaining `aws-lza` field gaps against official LZA sample config schemas, especially IAM permission set/assignment detail when real customer identity inputs exist.
-2. [ ] Evaluate adding remaining source files to mypy scope when they change (ongoing incremental policy).
-3. [ ] Decide whether small-model extraction still needs separate workload-only LLM pass after deterministic backfill results settle.
+2. [ ] Decide whether small-model extraction still needs separate workload-only LLM pass after deterministic backfill results settle.
 
 ### Key Decisions This Session
-- **Fallback wording must track implementation**: Docs and CLI text now describe deterministic mode as defaults plus structured Markdown entity recovery, not defaults-only.
-- **Pattern support files can enter typed scope gradually**: Added clean LZA normalizer/discovery/validators and pattern model files to mypy scope without forcing whole-repo typing churn.
+- **Mypy source scope should not be hand-maintained anymore**: Replaced long per-file mypy list with `src/intent_engine`, so new source modules enter the type gate by default.
+- **Deterministic fallback wording must stay precise**: Removed stale language that ignored structured Markdown entity recovery.
+- **Fallback wording must track implementation**: Docs and CLI text now describe deterministic mode as graph defaults plus structured Markdown entity recovery.
 - **Catalog suggestions are user-facing enough for type coverage**: Added `core/catalog_match.py` to mypy scope because compile output depends on it for closest catalog guidance.
 - **Fixture sync is gate code**: Added `scripts/sync-sample-fixtures.py` to mypy scope because it now runs in CI and pre-commit.
 - **Fallback docs must match behavior**: README and LLM setup docs now say deterministic mode can recover structured account/OU/workload sections but still cannot interpret arbitrary prose.
