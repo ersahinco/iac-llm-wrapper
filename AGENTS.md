@@ -145,7 +145,8 @@ See `EXTENSION.md` for the exact contract for adding new use cases. The litmus t
 - `fixtures/valid-payments.md` — complete payments landing zone (compiles successfully)
 - `fixtures/invalid-design.md` — hub-spoke without Network account (fails with violations)
 - `fixtures/enterprise-full.md` — complex enterprise with hybrid, compliance, multi-account
-- `fixtures/enterprise-partial.md` — partial enterprise with gaps and signals
+- `fixtures/usability/` — role trials for architect gaps, engineer handoff, and BYOM module flow
+- `fixtures/eval/` — extraction gold corpus with expected artifact outcomes
 
 ## How It Works (Model-Driven Flow)
 
@@ -184,7 +185,7 @@ T15: Lean contract-driven handoff maturity
 - **Lint**: clean
 - **Format**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Clarified legacy LZA vs thin `aws-lza`, moved role usability trials to `aws-lza`, fixed graph gate ordering, kept full gate green
+- **Last session**: Made CLI default `aws-lza`, removed stale legacy doc/scripts, kept full gate green
 
 ### Done
 | Area | Item |
@@ -214,9 +215,9 @@ T15: Lean contract-driven handoff maturity
 | K8s fixture files | `fixtures/kubernetes-v1/` full generated handoff bundle with sync/check coverage |
 | Sample config registrations | `lza-baseline-v1`, `lza-minimal-v1`, `k8s-cluster-v1` with pinned module refs |
 | **OSS release** | LICENSE (Apache 2.0), README.md, CONTRIBUTING.md, CI workflow, pre-commit, .gitignore, pyproject metadata |
-| **Real-world examples** | `fixtures/kubernetes-enterprise.md`, `docs/CAPABILITY.md`, README Real-World Usage section |
+| **Role/eval examples** | `fixtures/usability/`, `fixtures/eval/`, `docs/CAPABILITY.md`, README Real-World Usage section |
 | **LLM testing** | Local Ollama tests with qwen2.5:3b and llama3.2:3b on real design docs |
-| **LLM docs** | `docs/LLM_SETUP.md`, `scripts/test-llm-extraction.sh`, Ollama-first README |
+| **LLM docs** | `docs/LLM_SETUP.md`, eval-loop commands, Ollama-first README |
 | **Prompt engineering** | Few-shot examples, section mapping, type coercion rules in extractor prompt; pattern prompt_context with section-to-field guidance |
 | **JSON recovery** | `_safe_json_parse()` with multi-stage recovery: direct parse → brace matching → comma insertion → progressive truncation |
 | **Extraction quality** | Payments: 5/5 accounts + 3/3 OUs; Enterprise: 8/8 accounts + 5/5 OUs + 4/4 workloads (7B model) — 3B models drop items on long docs |
@@ -275,12 +276,13 @@ T15: Lean contract-driven handoff maturity
 | **Discover Markdown sync** | `discover --no-llm` now applies deterministic Markdown decisions before gap analysis, matching compile behavior. |
 | **LLM-path deterministic backfill** | Compiler now merges deterministic Markdown accounts/OUs/workloads into LLM-produced intent, backfilling dropped or partial named entities from small models without duplicating explicit items. |
 | **Markdown extractor type coverage** | Deterministic Markdown extraction is now in mypy scope, protecting the small-model backfill path from silent type drift. |
-| **Extraction benchmark type coverage** | `scripts/benchmark-extraction.py` is now in mypy scope, protecting the local small-model quality benchmark from untyped JSON/YAML drift. |
 | **Fixture sync type coverage** | `scripts/sync-sample-fixtures.py` is now in mypy scope, protecting the CI/pre-commit fixture drift gate from untyped path drift. |
 | **Catalog match type coverage** | `core/catalog_match.py` is now in mypy scope, protecting CLI catalog recommendations from untyped drift. |
+| **Default pattern cleanup** | CLI defaults now use `aws-lza`; legacy LZA tests and examples opt into `baseline` explicitly where user-facing. |
+| **Dead script/doc removal** | Removed unreferenced legacy real-world doc plus stale `test-llm-extraction.sh` and `benchmark-extraction.py`; eval scripts are the quality path. |
 
 ### Next (prioritized)
-1. [ ] Run `scripts/evaluate-extraction.py --llm` and `scripts/evaluate-usability.py --llm` against local 3B/7B models after `aws-lza` usability realignment and record misses before adding more extraction code.
+1. [ ] Run `scripts/evaluate-extraction.py --llm` and `scripts/evaluate-usability.py --llm` against local 3B/7B models after CLI default cleanup and record misses before adding more extraction code.
 2. [ ] Add one non-Terraform BYOM trial (CDK or CloudFormation) if Terraform VPC trial stays clean.
 3. [ ] Continue narrowing remaining `aws-lza` field gaps against official LZA sample config schemas, especially IAM permission set/assignment detail when real customer identity inputs exist.
 4. [ ] Decide whether to retire or move legacy LZA research patterns after `aws-lza` covers required landing-zone trials.
@@ -292,6 +294,8 @@ T15: Lean contract-driven handoff maturity
 - **Model defaults are not extracted evidence**: Discovery no longer treats a model default as a user decision when the graph has no default for that requirement.
 - **Role trials should test product path**: LZA architect and engineer usability trials now validate `aws-lza` config files, lineage, runbook, and sample recommendations, and assert no Terraform/tfvars handoff is emitted for LZA.
 - **Docs must reduce pattern confusion**: README, capability docs, and LLM setup now steer new landing-zone users to `aws-lza`; legacy examples are labeled as regression/research material.
+- **Default path should be product path**: CLI defaults now use `aws-lza`; old `baseline` behavior remains available by explicit `--pattern baseline`, while core helper defaults stay backward-compatible until legacy LZA removal.
+- **One eval path beats stale scripts**: Removed shell/benchmark scripts that duplicated eval behavior and referenced missing fixtures. `evaluate-extraction.py` and `evaluate-usability.py` are the supported loops.
 - **Deterministic is plumbing, LLM is product value**: Usability runner now has `--llm` mode so local/provider models prove real architect and engineer experience.
 - **LLM use must be observable**: `evaluate-usability.py --llm` now requires LLM evidence files with calls, prompt, response, and expected model; `--evidence-dir` preserves them for inspection.
 - **CI stays deterministic**: Role trials still run deterministically in CI to avoid slow/flaky model dependency, while `--llm` remains the required local quality evidence path.
@@ -309,8 +313,6 @@ T15: Lean contract-driven handoff maturity
 - **Catalog suggestions are user-facing enough for type coverage**: Added `core/catalog_match.py` to mypy scope because compile output depends on it for closest catalog guidance.
 - **Fixture sync is gate code**: Added `scripts/sync-sample-fixtures.py` to mypy scope because it now runs in CI and pre-commit.
 - **Fallback docs must match behavior**: README and LLM setup docs now say deterministic mode can recover structured account/OU/workload sections but still cannot interpret arbitrary prose.
-- **Small-model benchmark is part of quality system**: Added `scripts/benchmark-extraction.py` to mypy scope because it is the local evidence path for extraction quality decisions.
-- **Benchmark parsing now fails closed on shape**: JSON/YAML loads now verify mapping/list/string shapes before returning data, avoiding hidden `Any` propagation.
 - **Small-model support depends on deterministic parser health**: Added `core/markdown_extractor.py` to mypy scope because this code backs the small-model entity recovery path.
 - **Type fix kept behavior unchanged**: Renamed the optional requirement lookup variable before option normalization so mypy can prove the code is safe without changing extraction output.
 - **Fixture drift belongs in CI now**: Tests already compare generated bundles, but explicit `sync-sample-fixtures.py --check` gives faster failure and clearer maintainer action.

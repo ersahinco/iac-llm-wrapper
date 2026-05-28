@@ -19,7 +19,15 @@ class TestCompileCommand:
         output = tmp_path / "output"
         result = runner.invoke(
             app,
-            ["compile", "--input", str(FIXTURES / "valid-payments.md"), "--output", str(output)],
+            [
+                "compile",
+                "--input",
+                str(FIXTURES / "valid-payments.md"),
+                "--output",
+                str(output),
+                "--pattern",
+                "baseline",
+            ],
         )
         assert result.exit_code == 0
         assert "Compilation successful" in result.stdout
@@ -36,6 +44,8 @@ class TestCompileCommand:
                 str(output),
                 "--decisions",
                 '{"topology": "hub-spoke", "cicd_mode": "private"}',
+                "--pattern",
+                "baseline",
                 "--no-defaults",
             ],
         )
@@ -77,7 +87,7 @@ class TestValidateCommand:
         (output / "decision-report.yaml").write_text("primaryRegion: eu-central-1\n")
         (output / "deployment-graph.yaml").write_text("phases:\n")
         (output / "sample-recommendations.yaml").write_text("recommendations: []\n")
-        result = runner.invoke(app, ["validate", "--input", str(output)])
+        result = runner.invoke(app, ["validate", "--input", str(output), "--pattern", "baseline"])
         assert result.exit_code == 0
         assert "Validation passed" in result.stdout
 
@@ -187,6 +197,8 @@ class TestExplainCommand:
                 '{"topology": "hub-spoke", "primary_region": "eu-central-1", '
                 '"network_cidr": "10.0.0.0/16", "central_network_account": "Network", '
                 '"hub_cidr": "10.0.0.0/20"}',
+                "--pattern",
+                "baseline",
             ],
         )
         report = output / "decision-report.yaml"
@@ -221,7 +233,7 @@ class TestInterviewCommand:
         output = tmp_path / "output"
         result = runner.invoke(
             app,
-            ["interview", "--output", str(output)],
+            ["interview", "--output", str(output), "--pattern", "baseline"],
         )
         assert result.exit_code == 0
         assert "Compilation successful" in result.stdout
@@ -244,8 +256,6 @@ class TestInterviewCommand:
                 "interview",
                 "--output",
                 str(output),
-                "--pattern",
-                "aws-lza",
                 "--decisions",
                 decisions,
             ],
@@ -265,7 +275,16 @@ class TestInterviewCommand:
         )
         result = runner.invoke(
             app,
-            ["interview", "--output", str(output), "--decisions", decisions, "--no-defaults"],
+            [
+                "interview",
+                "--output",
+                str(output),
+                "--decisions",
+                decisions,
+                "--pattern",
+                "baseline",
+                "--no-defaults",
+            ],
         )
         assert result.exit_code == 1
         assert "HUB_SPOKE_NETWORK_ACCOUNT_REQUIRED" in result.output

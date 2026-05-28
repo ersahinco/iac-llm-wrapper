@@ -374,17 +374,19 @@ Tested with local Ollama models on real design documents:
 - Multi-workload parsing (structured format helps)
 - Implicit requirements (signal detection covers these)
 
-Run the test suite:
+Run deterministic and LLM-backed eval loops:
 
 ```bash
-./scripts/test-llm-extraction.sh qwen2.5:3b
+uv run python scripts/evaluate-extraction.py
+uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b
+uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b
 ```
 
 See [docs/LLM_SETUP.md](docs/LLM_SETUP.md) for detailed model setup and troubleshooting.
 
 ## Project Status
 
-Alpha. 382+ tests. Core architecture is stable. Pattern library is growing. Contributions welcome.
+Alpha. 522+ tests. Core architecture is stable. Pattern library is growing. Contributions welcome.
 
 ## License
 

@@ -70,13 +70,16 @@ iac-llm-wrapper compile -i design.md -o out/ --pattern aws-lza
 
 ## Testing Local LLM Extraction
 
-Run the test script against all fixtures:
+Run deterministic and LLM-backed eval loops:
 
 ```bash
-./scripts/test-llm-extraction.sh qwen2.5:3b
+uv run python scripts/evaluate-extraction.py
+uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b
+uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b
 ```
 
-This tests compilation of all fixture documents and reports success/failure for each.
+These compile checked-in role/eval fixtures, compare generated artifacts against expected
+outcomes, and verify LLM evidence when `--llm` is enabled.
 
 ## LLM vs Deterministic Fallback
 

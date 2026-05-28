@@ -34,6 +34,8 @@ load_builtin_patterns()
 
 app = typer.Typer(name="intent-engine", help="Knowledge-driven infrastructure decision system")
 
+DEFAULT_PATTERN = "aws-lza"
+
 
 def _available_patterns() -> str:
     return ", ".join(GLOBAL_REGISTRY.list())
@@ -230,7 +232,7 @@ def compile(
         help="Extract and validate without generating files",
     ),
     pattern: str = typer.Option(
-        "baseline",
+        DEFAULT_PATTERN,
         "--pattern",
         "-p",
         help=f"Pattern to use. Available: {_available_patterns()}",
@@ -358,7 +360,7 @@ def discover(
         help="Preview the full decision path with current state",
     ),
     pattern: str = typer.Option(
-        "baseline",
+        DEFAULT_PATTERN,
         "--pattern",
         "-p",
         help=f"Pattern to use. Available: {_available_patterns()}",
@@ -599,7 +601,7 @@ def interview(
         help="Run interactive interview mode",
     ),
     pattern: str = typer.Option(
-        "baseline",
+        DEFAULT_PATTERN,
         "--pattern",
         "-p",
         help=f"Pattern to use. Available: {_available_patterns()}",
@@ -632,7 +634,7 @@ def interview(
     if resume:
         engine = InterviewEngine.load_state(resume)
         actual_pattern = engine.pattern
-        if pattern != "baseline" or addon:
+        if pattern != DEFAULT_PATTERN or addon:
             typer.echo("Warning: --pattern and --addon ignored when --resume is used", err=True)
     else:
         pattern_obj = _get_pattern_or_exit(pattern)
@@ -683,7 +685,7 @@ def interview(
 def validate(
     input: Path = typer.Option(..., "--input", "-i", help="Directory containing intent artifacts"),
     pattern: str = typer.Option(
-        "baseline",
+        DEFAULT_PATTERN,
         "--pattern",
         "-p",
         help=f"Pattern to use. Available: {_available_patterns()}",
@@ -1082,7 +1084,7 @@ def catalog(
 @app.command()
 def template(
     pattern: str = typer.Option(
-        "baseline",
+        DEFAULT_PATTERN,
         "--pattern",
         "-p",
         help=f"Pattern to use. Available: {_available_patterns()}",

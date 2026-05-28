@@ -38,7 +38,17 @@ class TestCLIDiscover:
         assert result.exit_code == 0
 
     def test_discover_with_path(self):
-        result = runner.invoke(app, ["discover", "--input", "fixtures/valid-payments.md", "--path"])
+        result = runner.invoke(
+            app,
+            [
+                "discover",
+                "--input",
+                "fixtures/valid-payments.md",
+                "--path",
+                "--pattern",
+                "baseline",
+            ],
+        )
         assert result.exit_code == 0
         assert "primary_region" in result.output
 
@@ -85,12 +95,21 @@ class TestCLICompile:
         monkeypatch.setenv("INTENT_ENGINE_DISABLE_LLM", "1")
         output_dir = tmp_path / "out"
         result = runner.invoke(
-            app, ["compile", "--input", "fixtures/valid-payments.md", "--output", str(output_dir)]
+            app,
+            [
+                "compile",
+                "--input",
+                "fixtures/usability/engineer-handoff-lza.md",
+                "--output",
+                str(output_dir),
+            ],
         )
-        # With deterministic fallback, compile succeeds from defaults and structured entities.
+        # Default pattern is aws-lza, so this uses the thin handoff path.
         assert result.exit_code == 0, result.output
         assert output_dir.exists()
         assert (output_dir / "decision-report.yaml").exists()
+        assert (output_dir / "lineage-manifest.yaml").exists()
+        assert not (output_dir / "terraform.tfvars").exists()
 
     def test_compile_invalid_design_fails(self, tmp_path: Path):
         output_dir = tmp_path / "out"
@@ -117,7 +136,7 @@ class TestCLICompile:
             [
                 "compile",
                 "--input",
-                "fixtures/valid-payments.md",
+                "fixtures/usability/engineer-handoff-lza.md",
                 "--output",
                 str(output_dir),
                 "--dry-run",
@@ -252,7 +271,9 @@ class TestCLIValidate:
         (output_dir / "deployment-graph.yaml").write_text("phases:\n")
         (output_dir / "sample-recommendations.yaml").write_text("recommendations: []\n")
 
-        result = runner.invoke(app, ["validate", "--input", str(output_dir)])
+        result = runner.invoke(
+            app, ["validate", "--input", str(output_dir), "--pattern", "baseline"]
+        )
         assert result.exit_code == 0, result.output
 
     def test_validate_missing_files(self, tmp_path: Path):
@@ -366,9 +387,9 @@ class TestCLITemplate:
         assert result.exit_code == 0, result.output
         assert (out_dir / "decision-report.yaml").exists()
 
-    def test_template_default_pattern_is_baseline(self, tmp_path: Path):
+    def test_template_default_pattern_is_aws_lza(self, tmp_path: Path):
         output = tmp_path / "design.md"
         result = runner.invoke(app, ["template", "--output", str(output)])
         assert result.exit_code == 0
         content = output.read_text()
-        assert "baseline pattern" in content
+        assert "aws-lza pattern" in content
