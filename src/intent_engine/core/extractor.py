@@ -102,7 +102,6 @@ class LLMGraphResult:
     decisions: dict[str, str] = field(default_factory=dict)
     design_doc: dict[str, Any] = field(default_factory=dict)
     signal_decisions: dict[str, str] = field(default_factory=dict)
-    addons_suggested: list[str] = field(default_factory=list)
     gaps: list[dict[str, Any]] = field(default_factory=list)
     contradictions: list[dict[str, Any]] = field(default_factory=list)
     raw_response: str = ""
@@ -126,11 +125,11 @@ class Extractor:
 
     The LLM is prompted to *traverse the graph*: read prose, skip nodes that
     don't apply based on applies_if gates, flag contradictions, detect
-    signals, and suggest addons. It returns structured JSON with decisions,
-    signals, addons, gaps, and contradictions.
+    signals. It returns structured JSON with decisions, signals, gaps, and
+    contradictions.
     """
 
-    def __init__(self, graph=None, pattern: str = "baseline") -> None:
+    def __init__(self, graph=None, pattern: str = "aws-lza") -> None:
         if graph is None:
             from .patterns import GLOBAL_REGISTRY
 
@@ -255,19 +254,18 @@ class Extractor:
             "1. Map each sentence in the document to relevant graph nodes.\n"
             "2. Skip nodes whose 'applies_if' gate is NOT satisfied by earlier decisions.\n"
             f"{signal_context}\n"
-            "4. Suggest ADDONS when relevant keywords appear in the document.\n"
-            "5. Flag CONTRADICTIONS between prose and graph constraints.\n"
-            "6. Identify GAPS: applicable requirements that are not mentioned.\n"
-            "7. Boolean values must be strings: 'true' or 'false'.\n"
-            "8. Integer values must be strings (e.g., '2555', not 2555).\n"
-            "9. If the document mentions accounts, workloads, or OUs, include them as "
+            "4. Flag CONTRADICTIONS between prose and graph constraints.\n"
+            "5. Identify GAPS: applicable requirements that are not mentioned.\n"
+            "6. Boolean values must be strings: 'true' or 'false'.\n"
+            "7. Integer values must be strings (e.g., '2555', not 2555).\n"
+            "8. If the document mentions accounts, workloads, or OUs, include them as "
             "top-level JSON arrays in the output.\n"
-            '10. Account format: {"name": "...", "ou": "...", "description": "..."}\n'
-            '11. Workload format: {"name": "...", "target_account": "...", '
+            '9. Account format: {"name": "...", "ou": "...", "description": "..."}\n'
+            '10. Workload format: {"name": "...", "target_account": "...", '
             '"network_mode": "private" (or "public"), '
             '"runtime": "ecs-fargate" (or "ec2" or "eks"), '
             '"public_ingress": false, "port": 8080, "cpu": 256, "memory": 512}\n'
-            '12. OU format: {"name": "...", "description": "..."}\n\n'
+            '11. OU format: {"name": "...", "description": "..."}\n\n'
             "=== EXAMPLE OUTPUT ===\n"
             "For a document with region=eu-central-1, topology=hub-spoke, "
             "an OU 'Infrastructure', and one account 'prod' under it:\n"
@@ -282,7 +280,6 @@ class Extractor:
             '"description": "Shared services OU"}],\n'
             '  "design_doc": {},\n'
             '  "signal_decisions": {},\n'
-            '  "addons_suggested": [],\n'
             '  "gaps": [],\n'
             '  "contradictions": []\n'
             "}\n\n"
@@ -302,7 +299,6 @@ class Extractor:
             '    "compliance_tags": ["..."]\n'
             "  },\n"
             '  "signal_decisions": { ...key: value inferred from signals... },\n'
-            '  "addons_suggested": ["addon-name", ...],\n'
             '  "gaps": [\n'
             '    {"key": "requirement_key", "reason": "why it is missing", '
             '"suggestion": "what to ask"}\n'
@@ -332,7 +328,6 @@ class Extractor:
             result.decisions = self._coerce_decisions(data.get("decisions", {}))
             result.design_doc = data.get("design_doc", {})
             result.signal_decisions = self._coerce_decisions(data.get("signal_decisions", {}))
-            result.addons_suggested = data.get("addons_suggested", [])
             result.gaps = data.get("gaps", [])
             result.contradictions = data.get("contradictions", [])
             return result

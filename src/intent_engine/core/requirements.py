@@ -65,8 +65,6 @@ class RequirementGraph:
         self._decisions: dict[str, str] = {}
         self._status: dict[str, RequirementStatus] = {}
         self._audit_log: list[dict[str, Any]] = []
-        # Optional addon field_map overrides: key -> intent_field_path
-        self._field_map: dict[str, str | None] = {}
         # Optional intent model for auto-deriving target_field/target_type
         self._intent_model = intent_model
 

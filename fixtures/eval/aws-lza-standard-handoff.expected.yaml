@@ -1,0 +1,39 @@
+version: 1
+name: aws-lza-standard-handoff
+input: aws-lza-standard-handoff.md
+pattern: aws-lza
+expect:
+  compile: pass
+  values:
+    pattern: aws-lza
+    baseline: standard
+    orgMode: control-tower
+    organizationName: ExampleCorp
+    homeRegion: eu-central-1
+    network.topology: hub-spoke
+    network.cidr: 10.50.0.0/16
+    security.centralizedLogging: true
+    security.securityHubEnabled: true
+    security.guardDutyEnabled: true
+    security.complianceOverlay: none
+  counts:
+    enabledRegions: 1
+    organizationalUnits: 3
+  names:
+    enabledRegions:
+      - eu-central-1
+    organizationalUnits:
+      - Security
+      - Infrastructure
+      - Workloads
+  artifacts:
+    - accounts-config.yaml
+    - global-config.yaml
+    - iam-config.yaml
+    - network-config.yaml
+    - organization-config.yaml
+    - security-config.yaml
+    - decision-report.yaml
+    - lineage-manifest.yaml
+    - deployment-runbook.md
+    - sample-recommendations.yaml

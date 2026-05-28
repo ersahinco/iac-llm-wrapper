@@ -37,21 +37,13 @@ which engineers use with their provisioning system:
 
 ```yaml
 moduleInputs:
-  - moduleName: lza-network
+  - moduleName: terraform-aws-vpc
     source: terraform-aws-modules/vpc/aws
     version: "~> 5.0"
     variables:
-      cidr: 10.0.0.0/16
-      hub_cidr: 10.0.0.0/20
+      name: orders-vpc
+      cidr: 10.30.0.0/16
       enable_nat_gateway: true
-      enable_vpn_gateway: false
-  - moduleName: lza-security-baseline
-    source: terraform-aws-modules/security-group/aws
-    version: "~> 5.0"
-    variables:
-      audit_retention_days: 2555
-      block_public_access: true
-      enable_cloudtrail: true
 ```
 
 Engineers:
@@ -95,9 +87,6 @@ When analyzing design documents, the tool detects architectural signals from tex
 | "SAP", "Oracle" | `network_segmentation`, `kms_key_spec` | Enterprise workload patterns |
 | "multi-cloud", "GCP" | `network_segmentation`, `data_residency` | Cross-cloud governance |
 
-Legacy catalog diff/apply still exists for older LZA research patterns. New
-contract-backed work should prefer `sample` and `contract`.
-
 ## Reference Entries
 
 | Reference Entry | Pattern | Use Case | Contract / Module References |
@@ -105,22 +94,17 @@ contract-backed work should prefer `sample` and `contract`.
 | `aws-lza-standard-v1` | aws-lza | Standard Control Tower landing zone | AWS LZA sample configuration |
 | `aws-lza-regulated-v1` | aws-lza | Regulated Control Tower landing zone | AWS LZA sample configuration |
 | `aws-lza-healthcare-v1` | aws-lza | Healthcare landing zone | AWS LZA sample configuration |
-| `lza-minimal` | minimal | 1-2 accounts, no compliance | VPC module |
-| `lza-baseline` | baseline | Standard enterprise, 5+ accounts | VPC, security-group |
-| `lza-hybrid-enterprise` | hybrid-enterprise | On-prem + strict egress | VPC, security-group, Direct Connect |
-| `lza-financial` | financial-services | PCI-DSS, SOX, payment data | VPC, security-group, KMS HSM |
-| `lza-healthcare` | healthcare | HIPAA, PHI, BAA | VPC, security-group, PHI logging |
+| `k8s-cluster-v1` | kubernetes-cluster | EKS-style cluster handoff | Terraform EKS/VPC module refs |
+| `terraform-vpc-basic-v1` | terraform-vpc | BYOM VPC module handoff | Terraform VPC module refs |
 
 ## Known Limitations (Honest Scope)
 
 1. **LLM extraction quality depends on the model**: GPT-4 class models work well; smaller local models (3B) handle standard fields reliably but can still miss complex workload details in long documents.
 2. **Deterministic fallback is limited extraction**: Without LLM, graph defaults apply and structured Markdown sections can recover named accounts, OUs, and workloads. It still cannot interpret arbitrary free-form prose. This is a bootstrap path, not production.
 3. **Does not generate deployable IaC by default**: `aws-lza` emits accelerator handoff files; module patterns emit variables for existing IaC modules. Engineers still own Terraform/CDK/CloudFormation deployment.
-4. **Catalog modules are references, not implementations**: Module refs point to public Terraform registry modules as examples. Organizations maintain their own module libraries.
+4. **Module refs are references, not implementations**: Module refs point to public Terraform registry modules as examples. Organizations maintain their own module libraries.
 
 ## Next Capability Improvements
 
-- Better small-model workload extraction on long design documents
 - More sample configs with real module variable schemas
-- Catalog diff visualization (not just JSON)
 - Pattern-specific signal keyword expansion

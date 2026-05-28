@@ -159,7 +159,7 @@ MVP should produce a useful handoff without owning deployment:
 
 - `aws-lza` pattern
 - `AwsLzaIntent` Pydantic model
-- LZA baseline catalog references
+- LZA sample references
 - requirements for organization, accounts, OUs, regions, network, logging, security,
   IAM, CI/CD, and compliance overlay
 - validators for cross-file references and missing required decisions
@@ -221,7 +221,7 @@ This keeps custom generation as a feature, not the default architecture.
 
 - Adding `aws-lza` does not require changes to core extraction, interview, validation,
   normalization, or generation modules.
-- A minimal LZA fixture compiles to LZA YAML, decision report, lineage manifest, and
+- An AWS LZA sample fixture compiles to LZA YAML, decision report, lineage manifest, and
   runbook.
 - A regulated fixture selects the correct overlay decisions and fails closed when required
   accounts or controls are missing.

@@ -13,7 +13,7 @@ These files are generic and must not contain use-case-specific logic:
 - `interview.py` — Topological question ordering
 - `cli.py` — Generic CLI; `--pattern` selects the use case
 - `generator.py` — Pluggable output generators (registry pattern)
-- `patterns.py` — `PatternRegistry` and `AddonRegistry`
+- `patterns.py` — `PatternRegistry`
 - `requirements.py` — `RequirementGraph` with dependencies, gates, cascade
 
 ## What Is the Pattern Layer?
@@ -24,7 +24,7 @@ Everything use-case specific lives here:
 - **Pattern graph factories** — Define decisions as `Requirement` nodes
 - **Registered generators** — Define output artifacts
 - **`defaults.yaml`** — Define defaults and guardrails
-- **Catalog entries** — Define known-good decision sets
+- **Sample configs** — Define versioned, known-good decision sets
 - **CLI `--pattern` flag** — Selects which use case to run
 
 ## Adding a New Use Case

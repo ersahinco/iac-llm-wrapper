@@ -9,7 +9,6 @@ from typing import Any
 
 import typer
 
-from .core.catalog import get_catalog
 from .core.compiler import (
     CompileError,
     compile_design,
@@ -25,7 +24,7 @@ from .core.extractor import Extractor
 from .core.interview import InterviewEngine
 from .core.llm_caller import LLMEvidenceStore, auto_detect_llm
 from .core.markdown_extractor import extract_from_markdown
-from .core.patterns import ADDON_REGISTRY, GLOBAL_REGISTRY, Pattern
+from .core.patterns import GLOBAL_REGISTRY, Pattern
 from .core.sample_config import GLOBAL_SAMPLE_REGISTRY, SampleConfig
 from .core.suggestion import SuggestionEngine
 from .patterns import load_builtin_patterns
@@ -39,10 +38,6 @@ DEFAULT_PATTERN = "aws-lza"
 
 def _available_patterns() -> str:
     return ", ".join(GLOBAL_REGISTRY.list())
-
-
-def _available_addons() -> str:
-    return ", ".join(ADDON_REGISTRY.list())
 
 
 def _write_evidence_output(evidence_output: Path | None, evidence_store: LLMEvidenceStore) -> None:
@@ -62,20 +57,6 @@ def _get_pattern_or_exit(pattern: str) -> Pattern:
         typer.echo(f"Unknown pattern: {pattern}. Available: {_available_patterns()}", err=True)
         raise typer.Exit(1)
     return GLOBAL_REGISTRY.get(pattern)
-
-
-def _validate_addons_or_exit(addons: list[str], pattern: Pattern | None = None) -> None:
-    for addon_name in addons:
-        if addon_name not in ADDON_REGISTRY.list():
-            typer.echo(f"Unknown addon: {addon_name}. Available: {_available_addons()}", err=True)
-            raise typer.Exit(1)
-    if addons and pattern is not None and not pattern.allow_addons:
-        typer.echo(
-            f"Pattern '{pattern.name}' does not support addons. "
-            "Use a pattern that explicitly declares addon support.",
-            err=True,
-        )
-        raise typer.Exit(1)
 
 
 def _parse_decisions_or_exit(raw_decisions: str | None) -> dict[str, Any] | None:
@@ -244,12 +225,6 @@ def compile(
         "-p",
         help=f"Pattern to use. Available: {_available_patterns()}",
     ),
-    addon: list[str] = typer.Option(
-        [],
-        "--addon",
-        "-a",
-        help="Composable addon to layer (repeatable: --addon pci-compliance --addon hipaa)",
-    ),
 ) -> None:
     """Compile Markdown design docs into validated intent artifacts.
 
@@ -261,12 +236,7 @@ def compile(
         typer.echo(f"Error: input path does not exist: {input}", err=True)
         raise typer.Exit(1)
 
-    pattern_obj = _get_pattern_or_exit(pattern)
-    _validate_addons_or_exit(addon, pattern_obj)
-
-    graph = pattern_obj.create_graph()
-    if addon:
-        graph = ADDON_REGISTRY.compose(graph, addon)
+    graph = _get_pattern_or_exit(pattern).create_graph()
 
     evidence_store = LLMEvidenceStore()
     llm_caller = auto_detect_llm(provider=provider, api_key=api_key, base_url=base_url, model=model)
@@ -310,34 +280,6 @@ def compile(
 
     typer.echo(f"Compilation successful. Output written to: {output}")
 
-    # Suggest closest catalog entry
-    from .core.catalog_match import find_best_catalog_match
-
-    match = find_best_catalog_match(graph.decisions(), pattern)
-    if match:
-        entry_name = match["entry_name"]
-        diff = match["diff"]
-        typer.echo("")
-        typer.echo(f"=== Catalog Match: {entry_name} ===")
-        if diff["same"]:
-            typer.echo(f"  Same ({len(diff['same'])}): {', '.join(diff['same'].keys())}")
-        if diff["different"]:
-            typer.echo(f"  Different ({len(diff['different'])}):")
-            for k, d in diff["different"].items():
-                typer.echo(f"    {k}: catalog={d['catalog']}, current={d['current']}")
-        if diff["missing_in_current"]:
-            typer.echo(f"  Missing in current ({len(diff['missing_in_current'])}):")
-            for k, v in diff["missing_in_current"].items():
-                typer.echo(f"    {k}: {v}")
-        if diff["extra_in_current"]:
-            typer.echo(f"  Extra in current ({len(diff['extra_in_current'])}):")
-            for k, v in diff["extra_in_current"].items():
-                typer.echo(f"    {k}: {v}")
-        typer.echo(
-            f"  Run 'intent-engine catalog diff --entry {entry_name} "
-            f"--input <decisions.json>' for full details."
-        )
-
     _emit_sample_matches(pattern, graph.typed_decisions())
     _write_evidence_output(evidence_output, evidence_store)
 
@@ -371,12 +313,6 @@ def discover(
         "--pattern",
         "-p",
         help=f"Pattern to use. Available: {_available_patterns()}",
-    ),
-    addon: list[str] = typer.Option(
-        [],
-        "--addon",
-        "-a",
-        help="Composable addon to layer (repeatable: --addon pci-compliance --addon hipaa)",
     ),
     provider: str = typer.Option(
         os.environ.get("INTENT_ENGINE_PROVIDER", "openai"),
@@ -432,15 +368,8 @@ def discover(
         engine = InterviewEngine.load_state(resume)
         graph = engine.graph
         pattern = engine.pattern
-        if addon:
-            typer.echo("Warning: --addon ignored when --resume is used", err=True)
     else:
-        pattern_obj = _get_pattern_or_exit(pattern)
-        _validate_addons_or_exit(addon, pattern_obj)
-
-        graph = pattern_obj.create_graph()
-        if addon:
-            graph = ADDON_REGISTRY.compose(graph, addon)
+        graph = _get_pattern_or_exit(pattern).create_graph()
         engine = InterviewEngine(graph)
 
     pattern_obj = _get_pattern_or_exit(pattern)
@@ -614,12 +543,6 @@ def interview(
         "-p",
         help=f"Pattern to use. Available: {_available_patterns()}",
     ),
-    addon: list[str] = typer.Option(
-        [],
-        "--addon",
-        "-a",
-        help="Composable addon to layer (repeatable: --addon pci-compliance --addon hipaa)",
-    ),
     save: Path = typer.Option(
         None,
         "--save",
@@ -642,14 +565,10 @@ def interview(
     if resume:
         engine = InterviewEngine.load_state(resume)
         actual_pattern = engine.pattern
-        if pattern != DEFAULT_PATTERN or addon:
-            typer.echo("Warning: --pattern and --addon ignored when --resume is used", err=True)
+        if pattern != DEFAULT_PATTERN:
+            typer.echo("Warning: --pattern ignored when --resume is used", err=True)
     else:
-        pattern_obj = _get_pattern_or_exit(pattern)
-        _validate_addons_or_exit(addon, pattern_obj)
-        graph = pattern_obj.create_graph()
-        if addon:
-            graph = ADDON_REGISTRY.compose(graph, addon)
+        graph = _get_pattern_or_exit(pattern).create_graph()
         engine = InterviewEngine(graph, pattern=pattern)
         actual_pattern = pattern
 
@@ -978,130 +897,12 @@ def review(
 
 
 @app.command()
-def catalog(
-    action: str = typer.Argument(
-        ...,
-        help="Action: list, show, diff, apply",
-    ),
-    entry: str = typer.Option(
-        None,
-        "--entry",
-        "-e",
-        help="Catalog entry name (for show, diff, apply)",
-    ),
-    input: Path = typer.Option(
-        None,
-        "--input",
-        "-i",
-        help="Current decision JSON file (for diff)",
-    ),
-    output: Path = typer.Option(
-        None,
-        "--output",
-        "-o",
-        help="Output path (for apply)",
-    ),
-) -> None:
-    """List, show, diff, or apply known-good catalog entries."""
-    cat = get_catalog()
-
-    if action == "list":
-        typer.echo("=== Config Catalog ===")
-        typer.echo("")
-        for name in cat.list():
-            e = cat.get(name)
-            typer.echo(f"  {name}")
-            typer.echo(f"    Pattern: {e.pattern}")
-            typer.echo(f"    Tags: {', '.join(e.tags)}")
-            typer.echo(f"    {e.description}")
-            typer.echo("")
-
-    elif action == "show":
-        if not entry:
-            typer.echo("Error: --entry required for show", err=True)
-            raise typer.Exit(1)
-        e = cat.get(entry)
-        typer.echo(f"=== {e.name} ===")
-        typer.echo(f"Description: {e.description}")
-        typer.echo(f"Pattern: {e.pattern}")
-        typer.echo(f"Tags: {', '.join(e.tags)}")
-        typer.echo("")
-        typer.echo("Decisions:")
-        for k, v in e.decisions.items():
-            typer.echo(f"  {k}: {v}")
-        if e.notes:
-            typer.echo("")
-            typer.echo("Notes:")
-            for role, note in e.notes.items():
-                typer.echo(f"  [{role}] {note}")
-
-    elif action == "diff":
-        if not entry:
-            typer.echo("Error: --entry required for diff", err=True)
-            raise typer.Exit(1)
-        if not input:
-            typer.echo("Error: --input (decision JSON file) required for diff", err=True)
-            raise typer.Exit(1)
-        with open(input) as f:
-            current = json.load(f)
-        result = cat.diff(entry, current)
-        typer.echo(f"=== Diff vs {entry} ===")
-        typer.echo("")
-        if result["same"]:
-            typer.echo(f"Same ({len(result['same'])}):")
-            for k, v in result["same"].items():
-                typer.echo(f"  {k}: {v}")
-        if result["different"]:
-            typer.echo(f"Different ({len(result['different'])}):")
-            for k, diff in result["different"].items():
-                typer.echo(f"  {k}: catalog={diff['catalog']}, current={diff['current']}")
-        if result["missing_in_current"]:
-            typer.echo(f"Missing in current ({len(result['missing_in_current'])}):")
-            for k, v in result["missing_in_current"].items():
-                typer.echo(f"  {k}: {v}")
-        if result["extra_in_current"]:
-            typer.echo(f"Extra in current ({len(result['extra_in_current'])}):")
-            for k, v in result["extra_in_current"].items():
-                typer.echo(f"  {k}: {v}")
-
-    elif action == "apply":
-        if not entry:
-            typer.echo("Error: --entry required for apply", err=True)
-            raise typer.Exit(1)
-        if not output:
-            typer.echo("Error: --output required for apply", err=True)
-            raise typer.Exit(1)
-        current_apply: dict[str, Any] = {}
-        if input:
-            with open(input) as f:
-                current_apply = json.load(f)
-        merged = cat.apply_as_defaults(entry, current_apply)
-        with open(output, "w") as f:
-            json.dump(merged, f, indent=2)
-        typer.echo(f"Merged decisions written to {output}")
-        from_catalog = len(merged) - len(current_apply)
-        typer.echo(
-            f"  {len(merged)} total ({len(current_apply)} current, {from_catalog} from catalog)"
-        )
-
-    else:
-        typer.echo(f"Unknown action: {action}. Use: list, show, diff, apply", err=True)
-        raise typer.Exit(1)
-
-
-@app.command()
 def template(
     pattern: str = typer.Option(
         DEFAULT_PATTERN,
         "--pattern",
         "-p",
         help=f"Pattern to use. Available: {_available_patterns()}",
-    ),
-    addon: list[str] = typer.Option(
-        [],
-        "--addon",
-        "-a",
-        help="Composable addon to layer (repeatable: --addon pci-compliance --addon hipaa)",
     ),
     output: Path = typer.Option(
         ...,
@@ -1111,15 +912,12 @@ def template(
     ),
 ) -> None:
     """Generate a Markdown design doc scaffold from a pattern."""
-    pattern_obj = _get_pattern_or_exit(pattern)
-    _validate_addons_or_exit(addon, pattern_obj)
+    _get_pattern_or_exit(pattern)
 
-    markdown = generate_template(pattern=pattern, addon_names=addon)
+    markdown = generate_template(pattern=pattern)
     output.write_text(markdown)
     typer.echo(f"Template written to: {output}")
     typer.echo(f"  Pattern: {pattern}")
-    if addon:
-        typer.echo(f"  Addons: {', '.join(addon)}")
 
 
 if __name__ == "__main__":

@@ -164,7 +164,7 @@ class TestKubernetesPattern:
         from intent_engine.patterns.kubernetes import K8sIntent
 
         output = tmp_path / "output"
-        generate_all(K8sIntent(), output, pattern="baseline")
+        generate_all(K8sIntent(), output, pattern="aws-lza")
 
         assert not (output / "cluster-config.yaml").exists()
         assert not (output / "namespace-config.yaml").exists()

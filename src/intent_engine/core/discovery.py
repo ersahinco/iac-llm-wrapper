@@ -99,9 +99,8 @@ class DiscoveryEngine:
     def sync_intent_to_graph(self, intent: Any) -> list[str]:
         """Feed extracted intent values into the requirement graph as decisions.
 
-        Derives field mappings from the graph's requirement nodes (target_field)
-        and the graph's optional addon field_map, making this data-driven rather
-        than hardcoded.
+        Derives field mappings from the graph's requirement nodes (target_field),
+        making this data-driven rather than hardcoded.
         """
         synced = []
         import warnings as _warnings
@@ -131,11 +130,7 @@ class DiscoveryEngine:
         default_map: dict[str, str | None] = {}
 
         for key, req in self.graph._requirements.items():
-            # Primary: requirement's own target_field
             intent_path = req.target_field
-            # Fallback: addon field_map override
-            if intent_path is None:
-                intent_path = self.graph._field_map.get(key)
             if intent_path is None:
                 continue
             try:

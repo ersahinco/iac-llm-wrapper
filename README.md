@@ -200,14 +200,13 @@ For BYOM module patterns such as `terraform-vpc`, `module-inputs.yaml` provides
 ready-to-use module references:
 ```yaml
 moduleInputs:
-  - moduleName: lza-network
+  - moduleName: terraform-aws-vpc
     variables:
+      name: orders-vpc
       cidr: 10.0.0.0/16
-      hub_cidr: 10.0.0.0/20
-  - moduleName: lza-security-baseline
-    variables:
-      audit_retention_days: 2555
-      block_public_access: true
+      azs:
+        - eu-central-1a
+        - eu-central-1b
 ```
 
 Engineers apply BYOM inputs to their Terraform/CDK/CloudFormation modules.
@@ -232,24 +231,9 @@ Patterns define questions, defaults, contracts, and output artifacts. Recommende
 | `kubernetes-cluster` | K8s cluster provisioning with node pools and network policies |
 | `terraform-vpc` | BYOM Terraform AWS VPC module input capture |
 
-Legacy LZA research patterns still exist for compatibility and extraction regression coverage:
-`baseline`, `minimal`, `workload`, `hybrid-enterprise`, `financial-services`, `healthcare`.
-New landing-zone work should prefer `aws-lza`.
-
-### Addons
-
-Addons layer additional requirements only onto patterns that explicitly opt in.
-Built-in addon support is currently limited to legacy/research LZA patterns:
-
-```bash
-iac-llm-wrapper compile -i design.md --pattern baseline --addon pci-compliance --addon hipaa
-```
-
-Built-in addons: `pci-compliance`, `hipaa`, `self-hosted-cicd`, `hashicorp-vault`, `paloalto-fw`, `hybrid-challenges`.
-
 ## Developer Experience
 
-- **CLI-first workflow**: Typer-based CLI with discover/compile/interview/validate/catalog/template/review commands for both architects and platform engineers.
+- **CLI-first workflow**: Typer-based CLI with discover/compile/interview/validate/sample/contract/template/review commands for both architects and platform engineers.
 - **uv for dependency management**: Fast, reproducible local setup and CI parity.
 - **Model-driven type safety**: Pydantic v2 models are the contract for extraction, normalization, validation, and generation.
 - **Fail-closed validation**: Graph-driven violation codes prevent incomplete or contradictory decisions from reaching implementation.
@@ -321,22 +305,6 @@ GLOBAL_REGISTRY.register(
         description="My custom pattern",
         graph_factory=my_graph_factory,
         intent_factory=MyIntentModel,
-    )
-)
-```
-
-### Create a new addon
-
-```python
-from intent_engine.core.patterns import ADDON_REGISTRY, Addon
-
-ADDON_REGISTRY.register(
-    Addon(
-        name="my-addon",
-        description="My custom addon",
-        requirements=[...],
-        field_map={...},
-        section_map={...},
     )
 )
 ```

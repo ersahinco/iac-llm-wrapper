@@ -1,9 +1,4 @@
-"""Pattern registry: pluggable requirement graphs for different scenarios.
-
-Patterns may opt into addons. Addons are composable modules that extend a base
-pattern's graph with additional requirements, field mappings, and template
-sections. New addons can be registered without modifying core code.
-"""
+"""Pattern registry: pluggable requirement graphs for different scenarios."""
 
 from __future__ import annotations
 
@@ -15,7 +10,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from .contracts import ContractValidator, TargetContract
-from .requirements import Requirement, RequirementGraph
+from .requirements import RequirementGraph
 
 
 @dataclass
@@ -27,8 +22,6 @@ class Pattern:
     graph_factory: Callable[[], RequirementGraph]
     # Intent model factory — the Pydantic model that this pattern produces
     intent_factory: Callable[[], BaseModel] = field(default_factory=lambda: lambda: BaseModel())
-    # reference to a ConfigCatalog entry
-    catalog_name: str | None = None
     # Domain context injected into LLM prompts
     prompt_context: str = ""
     # Section mapping for template generation: key -> (section, field_name)
@@ -49,8 +42,6 @@ class Pattern:
     extra_artifacts: list[str] = field(default_factory=list)
     # Target contracts that drive decisions, validation, and generated artifacts
     contracts: list[TargetContract] = field(default_factory=list)
-    # Explicit opt-in: prevents accidental cross-pattern addon composition.
-    allow_addons: bool = False
     # Pattern-specific discovery hooks
     extra_consistency_checks: list[Any] = field(default_factory=list)
     extra_signal_detectors: list[Any] = field(default_factory=list)
@@ -89,8 +80,8 @@ class PatternRegistry:
     def _validate_pattern(self, pattern: Pattern) -> None:
         """Validate that all requirements map to valid intent model fields.
 
-        Skips validation if the graph factory depends on symbols not yet
-        loaded (e.g. ADDON_REGISTRY during module import).
+        Skips validation if the graph factory depends on symbols not yet loaded
+        during module import.
         """
         from .model_introspection import validate_requirement_against_model
 
@@ -103,7 +94,7 @@ class PatternRegistry:
         try:
             graph = pattern.create_graph()
         except NameError:
-            # Graph factory depends on not-yet-loaded symbols (e.g. ADDON_REGISTRY)
+            # Graph factory depends on not-yet-loaded symbols during import.
             return
 
         errors: list[str] = []
@@ -129,107 +120,7 @@ class PatternRegistry:
         return sorted(self._patterns.keys())
 
 
-# Addon system ----------------------------------------------------------------
-#
-# Addons are composable modules that extend a base pattern's graph with
-# additional requirements, field mappings for extract sync, and section
-# mappings for template generation. Any number of addons can be composed
-# onto patterns that explicitly opt in via allow_addons.
-
-
-@dataclass
-class Addon:
-    """A composable module that adds requirements and mappings to a base pattern."""
-
-    name: str
-    description: str
-    requirements: list[Requirement] = field(default_factory=list)
-    depends_on: list[str] = field(default_factory=list)
-    # Field mapping for sync_intent_to_graph: key -> str | callable
-    field_map: dict[str, str | None] = field(default_factory=dict)
-    # Section mapping for template generator: key -> (section, field_name)
-    section_map: dict[str, tuple[str, str | None]] = field(default_factory=dict)
-
-
-class AddonRegistry:
-    """Registry of named composable addons."""
-
-    def __init__(self) -> None:
-        self._addons: dict[str, Addon] = {}
-
-    def register(self, addon: Addon) -> None:
-        self._addons[addon.name] = addon
-
-    def get(self, name: str) -> Addon:
-        if name not in self._addons:
-            available = ", ".join(sorted(self._addons.keys()))
-            raise KeyError(f"Unknown addon '{name}'. Available: {available}")
-        return self._addons[name]
-
-    def list(self) -> builtins.list[str]:
-        return sorted(self._addons.keys())
-
-    def resolve_order(self, addon_names: builtins.list[str]) -> builtins.list[str]:
-        """Topological sort of addon names respecting depends_on."""
-        graph: dict[str, set[str]] = {}
-        for name in addon_names:
-            addon = self.get(name)
-            graph.setdefault(name, set())
-            for dep in addon.depends_on:
-                if dep in addon_names:
-                    graph.setdefault(dep, set())
-                    graph[name].add(dep)
-        # Simple Kahn's algorithm
-        in_degree = {n: 0 for n in graph}
-        for n in graph:
-            for dep in graph[n]:
-                in_degree[dep] = in_degree.get(dep, 0) + 1
-        queue = [n for n in graph if in_degree.get(n, 0) == 0]
-        ordered = []
-        while queue:
-            node = queue.pop(0)
-            ordered.append(node)
-            for dep in graph[node]:
-                in_degree[dep] -= 1
-                if in_degree[dep] == 0:
-                    queue.append(dep)
-        remaining = [n for n in addon_names if n not in ordered]
-        return ordered + remaining
-
-    def compose(self, base: RequirementGraph, addon_names: builtins.list[str]) -> RequirementGraph:
-        """Apply addon requirements and field maps onto a base graph.
-
-        Returns a new graph with addon requirements added and field_map merged.
-        """
-        import copy
-
-        result = copy.deepcopy(base)
-        for addon_name in self.resolve_order(addon_names):
-            addon = self.get(addon_name)
-            for req in addon.requirements:
-                result.add(req)
-            # Merge addon field_map into graph so sync_intent_to_graph can use it
-            for key, field_path in addon.field_map.items():
-                result._field_map[key] = field_path
-        return result
-
-    def get_field_map(self, addon_names: builtins.list[str]) -> dict[str, str | None]:
-        """Merge field_map entries from multiple addons."""
-        merged: dict[str, str | None] = {}
-        for name in self.resolve_order(addon_names):
-            merged.update(self.get(name).field_map)
-        return merged
-
-    def get_section_map(self, addon_names: builtins.list[str]) -> dict[str, tuple[str, str | None]]:
-        """Merge section_map entries from multiple addons."""
-        merged: dict[str, tuple[str, str | None]] = {}
-        for name in self.resolve_order(addon_names):
-            merged.update(self.get(name).section_map)
-        return merged
-
-
 # Global registries (populated by domain-specific modules) --------------------
 
 
 GLOBAL_REGISTRY = PatternRegistry()
-ADDON_REGISTRY = AddonRegistry()

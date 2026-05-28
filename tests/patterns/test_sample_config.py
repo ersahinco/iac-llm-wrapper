@@ -101,7 +101,7 @@ class TestK8sSampleConfigRegistered:
     def test_k8s_cluster_v1_registered(self):
         cfg = GLOBAL_SAMPLE_REGISTRY.get("k8s-cluster-v1")
         assert cfg.pattern == "kubernetes-cluster"
-        assert cfg.fixture_name == "kubernetes-v1"
+        assert cfg.fixture_name == "k8s-cluster-v1"
         assert cfg.version == "1.0.0"
         assert cfg.decisions["cluster_name"] == "prod-k8s"
 
@@ -120,24 +120,24 @@ class TestK8sSampleConfigRegistered:
 
 class TestK8sSampleConfigFixtures:
     def test_fixture_dir_exists(self):
-        assert (FIXTURES / "kubernetes-v1").is_dir()
+        assert (FIXTURES / "k8s-cluster-v1").is_dir()
 
     def test_cluster_config_exists(self):
-        path = FIXTURES / "kubernetes-v1" / "cluster-config.yaml"
+        path = FIXTURES / "k8s-cluster-v1" / "cluster-config.yaml"
         assert path.exists()
         data = ruamel.yaml.YAML(typ="safe").load(path.read_text())
         assert data["cluster"]["name"] == "prod-k8s"
         assert data["cluster"]["version"] == "1.30"
 
     def test_namespace_config_exists(self):
-        path = FIXTURES / "kubernetes-v1" / "namespace-config.yaml"
+        path = FIXTURES / "k8s-cluster-v1" / "namespace-config.yaml"
         assert path.exists()
         data = ruamel.yaml.YAML(typ="safe").load(path.read_text())
         assert len(data["namespaces"]) >= 1
         assert data["namespaces"][0]["name"] == "production"
 
     def test_cluster_config_has_node_pools(self):
-        path = FIXTURES / "kubernetes-v1" / "cluster-config.yaml"
+        path = FIXTURES / "k8s-cluster-v1" / "cluster-config.yaml"
         data = ruamel.yaml.YAML(typ="safe").load(path.read_text())
         pools = data["cluster"]["nodePools"]
         assert len(pools) == 1

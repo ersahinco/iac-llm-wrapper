@@ -107,7 +107,7 @@ def compile_design(
     llm_caller: LLMCaller | None = None,
     evidence_store: LLMEvidenceStore | None = None,
     dry_run: bool = False,
-    pattern: str = "baseline",
+    pattern: str = "aws-lza",
 ) -> None:
     """Extract, normalize, validate, and generate from a design doc.
 
@@ -157,13 +157,10 @@ def compile_design(
     if llm_result.signal_decisions:
         graph.apply_decisions(llm_result.signal_decisions)
 
-    # 2c. Apply addon suggestions (future: auto-compose addons)
-    # Currently recorded in evidence but not auto-applied — architect decides
-
-    # 2d. Fill remaining gaps with defaults
+    # 2c. Fill remaining gaps with defaults
     graph.apply_defaults_for_remaining()
 
-    # 2e. Build intent from LLM decisions (handles complex nested objects)
+    # 2d. Build intent from LLM decisions (handles complex nested objects)
     # then overlay graph cascade decisions onto the same intent
     if llm_result.decisions or llm_result.signal_decisions:
         extractor = Extractor(graph=graph, pattern=pattern)
@@ -175,13 +172,13 @@ def compile_design(
     # Apply graph cascades (topology -> network.topology, etc.)
     graph.apply_to_intent(intent)
 
-    # 2f. Apply normalizer guardrails
+    # 2e. Apply normalizer guardrails
     if pattern_obj.normalizer is not None:
         intent = pattern_obj.normalizer(intent)
     else:
         intent = normalize(intent)
 
-    # 2g. Validate fail-closed (graph-driven when available)
+    # 2f. Validate fail-closed (graph-driven when available)
     violations = validate(intent, graph=graph, extra_validators=pattern_obj.validators)
     if violations:
         raise CompileError(violations)
@@ -189,7 +186,7 @@ def compile_design(
     if dry_run:
         return
 
-    # 2h. Generate artifacts
+    # 2g. Generate artifacts
     payload = _build_payload(intent, pattern, graph.typed_decisions(), llm_result.design_doc)
     generate_all(payload, output_dir, pattern=pattern)
 
@@ -198,7 +195,7 @@ def compile_from_interview(
     decisions: dict[str, str],
     output_dir: Path,
     accept_defaults: bool = True,
-    pattern: str = "baseline",
+    pattern: str = "aws-lza",
 ) -> None:
     pattern_obj = GLOBAL_REGISTRY.get(pattern)
     graph = pattern_obj.create_graph()
@@ -232,7 +229,7 @@ def compile_from_interview(
             yaml.dump({"auditTrail": audit}, f)
 
 
-def validate_generated_violations(input_dir: Path, pattern: str = "baseline") -> list[Violation]:
+def validate_generated_violations(input_dir: Path, pattern: str = "aws-lza") -> list[Violation]:
     violations: list[Violation] = []
     from .contracts import ContractValidator
     from .patterns import GLOBAL_REGISTRY
@@ -266,7 +263,7 @@ def validate_generated_violations(input_dir: Path, pattern: str = "baseline") ->
     return deduped
 
 
-def validate_generated(input_dir: Path, pattern: str = "baseline") -> list[str]:
+def validate_generated(input_dir: Path, pattern: str = "aws-lza") -> list[str]:
     return [violation.message for violation in validate_generated_violations(input_dir, pattern)]
 
 
@@ -332,22 +329,16 @@ def review_reports(before_path: Path, after_path: Path) -> dict:
     return result
 
 
-def _build_section_map(
-    pattern: str,
-    addon_names: list[str] | None,
-    graph,
-) -> dict[str, tuple[str, str | None]]:
-    """Build a section map from pattern metadata + addons + category fallback.
+def _build_section_map(pattern: str, graph) -> dict[str, tuple[str, str | None]]:
+    """Build a section map from pattern metadata + category fallback.
 
     New requirements automatically appear in templates under their category
     if no explicit mapping is provided.
     """
-    from .patterns import ADDON_REGISTRY, GLOBAL_REGISTRY
+    from .patterns import GLOBAL_REGISTRY
 
     pattern_obj = GLOBAL_REGISTRY.get(pattern)
     section_map: dict[str, tuple[str, str | None]] = dict(pattern_obj.section_map)
-    if addon_names:
-        section_map.update(ADDON_REGISTRY.get_section_map(addon_names))
 
     # Fallback: derive section from requirement category
     _CATEGORY_TO_SECTION: dict[str, str] = {
@@ -372,21 +363,14 @@ def _build_section_map(
     return section_map
 
 
-def generate_template(
-    pattern: str = "baseline",
-    addon_names: list[str] | None = None,
-) -> str:
-    """Generate a Markdown design doc scaffold from a pattern + optional addons."""
-    from .patterns import ADDON_REGISTRY, GLOBAL_REGISTRY
+def generate_template(pattern: str = "aws-lza") -> str:
+    """Generate a Markdown design doc scaffold from a pattern."""
+    from .patterns import GLOBAL_REGISTRY
 
     pattern_obj = GLOBAL_REGISTRY.get(pattern)
     graph = pattern_obj.create_graph()
-    if addon_names:
-        if not pattern_obj.allow_addons:
-            raise ValueError(f"Pattern '{pattern}' does not support addons")
-        graph = ADDON_REGISTRY.compose(graph, addon_names)
 
-    section_map = _build_section_map(pattern, addon_names, graph)
+    section_map = _build_section_map(pattern, graph)
 
     sections_content: dict[str, list[tuple[str, Any, str | None]]] = {}
     for key, req in graph._requirements.items():
@@ -397,8 +381,7 @@ def generate_template(
         sections_content.setdefault(section_name, []).append((key, req, field_name))
 
     lines: list[str] = []
-    addon_label = f" + {', '.join(addon_names)}" if addon_names else ""
-    lines.append(f"# Design Document — {pattern} pattern{addon_label}")
+    lines.append(f"# Design Document — {pattern} pattern")
     lines.append("#")
     lines.append("# Generated by intent-engine template. Fill in your decisions below.")
     lines.append("# Lines starting with # are comments. Uncomment and edit to set values.")

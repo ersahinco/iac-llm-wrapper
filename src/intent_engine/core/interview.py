@@ -41,7 +41,7 @@ class InterviewEngine:
     def __init__(
         self,
         graph: RequirementGraph | None = None,
-        pattern: str = "baseline",
+        pattern: str = "aws-lza",
     ) -> None:
         if graph is None:
             graph = GLOBAL_REGISTRY.get(pattern).create_graph()
@@ -325,9 +325,9 @@ class InterviewEngine:
         """
         state = json.loads(Path(path).read_text())
         if graph is None:
-            engine = cls(pattern=state.get("pattern", "baseline"))
+            engine = cls(pattern=state.get("pattern", "aws-lza"))
         else:
-            engine = cls(graph=graph, pattern=state.get("pattern", "baseline"))
+            engine = cls(graph=graph, pattern=state.get("pattern", "aws-lza"))
         # Replay decisions first (triggers _update_blocked), then skip
         # so that skip status sticks after blocked re-evaluation
         for key, value in state.get("decisions", {}).items():
