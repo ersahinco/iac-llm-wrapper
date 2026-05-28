@@ -196,6 +196,33 @@ def _compare_artifacts(output_dir: Path, expected_artifacts: Any) -> list[str]:
     return failures
 
 
+def _compare_failure(
+    case: EvalCase,
+    output_dir: Path,
+    proc: subprocess.CompletedProcess[str],
+) -> list[str]:
+    failures: list[str] = []
+    expected_violations = case.expected.get("violations", [])
+    if not isinstance(expected_violations, list):
+        failures.append("expect.violations must be a list")
+    else:
+        combined_output = f"{proc.stdout}\n{proc.stderr}"
+        for violation in expected_violations:
+            if not isinstance(violation, str):
+                failures.append("expect.violations entries must be strings")
+            elif violation not in combined_output:
+                failures.append(f"missing violation in output: {violation}")
+
+    failures.extend(_compare_artifacts(output_dir, case.expected.get("artifacts", [])))
+    report_path = output_dir / "decision-report.yaml"
+    if report_path.exists():
+        report = _yaml_load(report_path)
+        failures.extend(_compare_values(report, case.expected.get("values", {})))
+    elif case.expected.get("values"):
+        failures.append("missing artifact: decision-report.yaml")
+    return failures
+
+
 def _evaluate_case(
     case: EvalCase,
     use_llm: bool,
@@ -223,7 +250,14 @@ def _evaluate_case(
                 return EvalResult(
                     case.name, case.pattern, "FAIL", ["expected compile failure"], output_dir
                 )
-            return EvalResult(case.name, case.pattern, "PASS", [], output_dir)
+            failures = _compare_failure(case, output_dir, proc)
+            return EvalResult(
+                case.name,
+                case.pattern,
+                "PASS" if not failures else "FAIL",
+                failures,
+                output_dir,
+            )
 
         if proc.returncode != 0:
             detail = (proc.stderr or proc.stdout).strip().splitlines()

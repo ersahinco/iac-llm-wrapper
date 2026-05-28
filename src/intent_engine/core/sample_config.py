@@ -1,7 +1,7 @@
 """Versioned sample configurations for intent patterns.
 
 Each SampleConfig represents a known-good, version-pinned reference
-configuration that engineers can diff against or apply as defaults.
+configuration that engineers can compare against for handoff guidance.
 The version metadata lets consumers detect stale references and upgrade
 safely when module sources are updated.
 """

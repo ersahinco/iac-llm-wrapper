@@ -35,7 +35,7 @@ class Requirement:
     hint: str | None = None
     why_applies: str | None = None
     why_blocked: str | None = None
-    # Model-driven mapping: which RawIntent field this node maps to ----------
+    # Model-driven mapping: which intent model field this node maps to -------
     target_field: str | None = None  # dotted path: "security.cidr", "cicd.mode"
     target_type: str = "string"  # "string" | "int" | "bool" | enum name
     # Well-Architected mapping ------------------------------------------------

@@ -60,6 +60,8 @@ class IaCIntentPayload:
     intent: Any
     pattern: str = ""
     decisions: dict[str, Any] = field(default_factory=dict)
+    extraction_summary: dict[str, Any] = field(default_factory=dict)
+    deployment_readiness: dict[str, Any] = field(default_factory=dict)
 
     def __getattr__(self, name: str) -> Any:
         """Proxy attribute access to the underlying intent model.
@@ -67,7 +69,15 @@ class IaCIntentPayload:
         This allows existing generators to work unchanged when they receive
         an IaCIntentPayload instead of a raw intent object.
         """
-        if name in ("design_doc", "module_inputs", "intent", "pattern", "decisions"):
+        if name in (
+            "design_doc",
+            "module_inputs",
+            "intent",
+            "pattern",
+            "decisions",
+            "extraction_summary",
+            "deployment_readiness",
+        ):
             return object.__getattribute__(self, name)
         return getattr(self.intent, name)
 

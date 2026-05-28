@@ -166,8 +166,10 @@ MVP should produce a useful handoff without owning deployment:
 - LZA YAML emitter for the six mandatory configuration files
 - `lineage-manifest.yaml` mapping decisions to emitted files, required artifact paths,
   and YAML lineage paths
-- `decision-report.yaml` with audit trail and rationale
+- `decision-report.yaml` with extracted decisions and deployment readiness
 - `sample-recommendations.yaml` with persisted closest sample-config matches for handoff
+- `llm-trace-summary.yaml` with provider/model, calls, extracted decisions, gaps,
+  contradictions, and raw evidence path when extraction evidence exists
 - `deployment-runbook.md` with prerequisites and sequence
 - generated-artifact validation that fails closed when required paths, asserted values,
   or lineage paths disappear from emitted YAML

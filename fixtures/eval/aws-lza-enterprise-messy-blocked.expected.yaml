@@ -1,0 +1,18 @@
+version: 1
+name: aws-lza-enterprise-messy-blocked
+input: aws-lza-enterprise-messy-blocked.md
+pattern: aws-lza
+expect:
+  compile: fail
+  violations:
+    - AWS_LZA_NETWORK_ACCOUNT_REQUIRED
+    - AWS_LZA_INFRASTRUCTURE_OU_REQUIRED
+    - AWS_LZA_IDENTITY_CENTER_ADMIN_UNKNOWN
+    - AWS_LZA_HOME_REGION_NOT_ENABLED
+  values:
+    pattern: aws-lza
+    deploymentReadiness.deploymentAllowed: false
+    deploymentReadiness.status: blocked
+  artifacts:
+    - decision-report.yaml
+    - llm-trace-summary.yaml

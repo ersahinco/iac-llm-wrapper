@@ -21,20 +21,12 @@ uv run pip-audit --skip-editable
 uv run bandit -c bandit.yaml -r src -q -ll
 ```
 
-4. **Test with a local LLM** (mandatory for extraction changes):
+4. **Test extraction quality** (mandatory for extraction changes):
 
 This project is **LLM-first**. The deterministic fallback (graph defaults + keyword matching) is not sufficient for real design documents. Every change that affects extraction, patterns, or prompts must be validated with an LLM:
 
-```bash
-# Option A: Local Ollama (free, no API key)
-ollama pull qwen2.5:3b
-ollama serve
-./scripts/test-llm-extraction.sh qwen2.5:3b
-
-# Option B: Cloud provider (if you have an API key)
-export OPENAI_API_KEY=sk-...
-./scripts/test-llm-extraction.sh openai-gpt-4o-mini
-```
+Use `uv run python scripts/evaluate-extraction.py` for deterministic fixture drift and
+`uv run python scripts/evaluate-extraction.py --llm` when validating prompt/model behavior.
 
 The deterministic fallback (`INTENT_ENGINE_DISABLE_LLM=1`) exists for unit tests and CI bootstrapping only. It applies defaults and does keyword matching — it cannot parse free-form prose. Do not treat it as a production extraction path.
 
@@ -42,7 +34,7 @@ The deterministic fallback (`INTENT_ENGINE_DISABLE_LLM=1`) exists for unit tests
 
 ## Extension guide
 
-See [EXTENSION.md](EXTENSION.md) for the exact contract for adding new patterns, addons, and requirements.
+See [EXTENSION.md](EXTENSION.md) for the exact contract for adding new patterns and requirements.
 
 ## Code conventions
 

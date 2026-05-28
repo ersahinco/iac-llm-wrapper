@@ -52,6 +52,8 @@ Engineers:
 3. Reference `source` and `version` for module pinning when provided
 4. Use `decision-report.yaml` and `lineage-manifest.yaml` for audit and traceability
 5. Use `sample-recommendations.yaml` for persisted reference-bundle guidance
+6. Use `llm-trace-summary.yaml` to audit provider/model calls, extracted decisions,
+   gaps, contradictions, and raw evidence path when extraction evidence exists
 
 ## Sample Config Registry
 

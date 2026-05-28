@@ -54,6 +54,15 @@ def _normalized_artifact_text(file_name: str, text: str) -> str:
     )
 
 
+def _artifact_changed(file_name: str, generated_dir: Path, fixture_dir: Path) -> bool:
+    fixture_path = fixture_dir / file_name
+    if not fixture_path.exists():
+        return True
+    generated = _normalized_artifact_text(file_name, (generated_dir / file_name).read_text())
+    actual = _normalized_artifact_text(file_name, fixture_path.read_text())
+    return generated != actual
+
+
 def _drift_messages(sample: SampleConfig, generated_dir: Path, fixture_dir: Path) -> list[str]:
     expected = _generated_files(generated_dir)
     actual = {
@@ -91,7 +100,7 @@ def _sync_sample(sample: SampleConfig, check: bool) -> list[str]:
             if item.is_file() and item.name not in KEEP_FILES and item.name not in expected_names:
                 item.unlink()
         for item in generated_dir.iterdir():
-            if item.is_file():
+            if item.is_file() and _artifact_changed(item.name, generated_dir, fixture_dir):
                 shutil.copy2(item, fixture_dir / item.name)
         return drift
 

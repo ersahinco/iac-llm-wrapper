@@ -698,6 +698,7 @@ def gen_lza_lineage_manifest(intent: Any, output_dir: Path) -> None:
 
 
 def gen_lza_deployment_runbook(intent: Any, output_dir: Path) -> None:
+    readiness = getattr(intent, "deployment_readiness", {})
     intent = _aws_lza_intent(intent)
     if intent is None:
         return
@@ -727,28 +728,75 @@ def gen_lza_deployment_runbook(intent: Any, output_dir: Path) -> None:
         *_sample_recommendation_runbook_lines(intent),
         "## Sequence",
         "",
-        "1. Confirm AWS Organizations or Control Tower baseline matches `org_mode`.",
-        "2. Review generated LZA configuration files and compare with AWS sample baseline.",
-        "3. Replace placeholder account emails before deployment.",
         (
-            "4. Populate customer-specific Identity Center assignments, VPC route "
-            "tables/subnets, and optional security exports."
+            "1. Platform owner confirms AWS Organizations or Control Tower baseline "
+            "matches `org_mode`."
         ),
-        "5. Run AWS LZA deployment using its documented installer and pipeline.",
+        "2. Network owner reviews generated LZA network config against approved CIDR plan.",
         (
-            "6. Preserve `decision-report.yaml`, `decision-audit.yaml`, and "
+            "3. Security owner reviews logging, Security Hub, GuardDuty, and "
+            "delegated admin decisions."
+        ),
+        (
+            "4. Populate customer-specific Identity Center assignments and permission "
+            "sets; identity owner approves delegated admin."
+        ),
+        "5. Release owner replaces placeholder account emails before deployment.",
+        (
+            "6. Platform owner populates customer-specific VPC route tables/subnets, "
+            "TGW attachments, and optional security exports."
+        ),
+        "7. Manual gate: approve `decision-report.yaml`, `lineage-manifest.yaml`, and LZA diff.",
+        "8. Run AWS LZA deployment using its documented installer and pipeline.",
+        (
+            "9. Preserve `decision-report.yaml`, `decision-audit.yaml`, and "
             "`lineage-manifest.yaml` as handoff evidence."
         ),
+        (
+            "10. Rollback note: revert through AWS LZA pipeline history; do not "
+            "hand-edit generated artifacts."
+        ),
+        "",
+        "## Manual Gates",
+        "",
+        "- Architecture owner approves unresolved decisions are zero.",
+        "- Security owner approves logging/security services and IAM Identity Center scope.",
+        "- Network owner approves CIDRs, TGW attachments, and routing boundaries.",
+        "- Release owner confirms AWS LZA pipeline prereqs and rollback owner.",
+        "",
+        "## Dependencies",
+        "",
+        "- AWS Organizations or Control Tower baseline exists before LZA deploy.",
+        "- Account vending/email ownership complete before accounts config deploy.",
+        "- Identity Center delegated admin exists before IAM config deploy.",
+        "- Network CIDR/IPAM plan approved before network config deploy.",
+        "",
+        "## Rollback",
+        "",
+        "- Stop AWS LZA pipeline before re-running with corrected config.",
+        "- Revert to previous known-good LZA config commit.",
+        "- Keep generated reports as evidence; regenerate after decision changes.",
         "",
         "## Boundary",
         "",
         "This handoff does not generate a parallel Terraform or Terragrunt landing-zone stack.",
         "Use AWS LZA for landing-zone deployment unless a documented gap requires custom IaC.",
     ]
+    if readiness:
+        lines.extend(
+            [
+                "",
+                "## Deployment Readiness",
+                "",
+                f"- Status: `{readiness.get('status', 'unknown')}`",
+                f"- Deployment allowed: `{readiness.get('deploymentAllowed', False)}`",
+            ]
+        )
     (output_dir / "deployment-runbook.md").write_text("\n".join(lines) + "\n")
 
 
 def gen_lza_decision_report(intent: Any, output_dir: Path) -> None:
+    readiness = getattr(intent, "deployment_readiness", {})
     intent = _aws_lza_intent(intent)
     if intent is None:
         return
@@ -781,6 +829,8 @@ def gen_lza_decision_report(intent: Any, output_dir: Path) -> None:
             "complianceOverlay": str(intent.compliance_overlay),
         },
     }
+    if readiness:
+        data["deploymentReadiness"] = readiness
     _write_yaml(output_dir, "decision-report.yaml", data)
 
 

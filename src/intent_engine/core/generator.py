@@ -241,8 +241,17 @@ def gen_sample_recommendations(intent: Any, output_dir: Path) -> None:
     _write(output_dir, "sample-recommendations.yaml", data)
 
 
+def gen_llm_trace_summary(intent: Any, output_dir: Path) -> None:
+    """Write a lean summary of extraction evidence when compile captured it."""
+    summary = getattr(intent, "extraction_summary", None)
+    if not summary:
+        return
+    _write(output_dir, "llm-trace-summary.yaml", summary)
+
+
 register_generator("design-doc", gen_design_doc, priority=4, category="meta")
 register_generator("module-inputs", gen_module_inputs, priority=5, category="meta")
+register_generator("llm-trace-summary", gen_llm_trace_summary, priority=5, category="meta")
 register_generator(
     "sample-recommendations",
     gen_sample_recommendations,

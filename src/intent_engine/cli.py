@@ -254,13 +254,21 @@ def compile(
             graph=graph,
             llm_caller=llm_caller,
             evidence_store=evidence_store,
+            raw_evidence_path=evidence_output,
             dry_run=dry_run,
             pattern=pattern,
         )
     except CompileError as e:
-        typer.echo("Compilation failed with violations:", err=True)
+        typer.echo("Compilation failed: cannot deploy yet.", err=True)
+        typer.echo("Violations:", err=True)
         for v in e.violations:
             typer.echo(f"  [{v.code}] {v.message}", err=True)
+        if e.readiness and not dry_run:
+            typer.echo(
+                "Safe assessment artifacts written to output: "
+                "decision-report.yaml, llm-trace-summary.yaml",
+                err=True,
+            )
         typer.echo(
             "",
             err=True,

@@ -8,11 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Initial alpha release with intent-driven infrastructure decision framework.
-- Seven built-in patterns: baseline, minimal, workload, hybrid-enterprise, financial-services, healthcare, kubernetes-cluster.
-- Composable addon system (pci-compliance, hipaa, self-hosted-cicd, hashicorp-vault, paloalto-fw, hybrid-challenges).
-- ConfigCatalog with diff/apply for known-good decision sets.
+- Intent-driven infrastructure decision framework.
+- Built-in product paths: aws-lza, kubernetes-cluster, terraform-vpc.
+- Contract-backed sample recommendations for known-good handoff bundles.
 - Schema-driven LLM extraction with graph-traversal prompts.
 - Guided interview engine with topological question ordering.
-- Decision reports with Well-Architected pillar coverage and audit trails.
+- Decision reports, lineage manifests, deployment runbooks, and audit trails.
 - CI/CD: lint, format, type check, tests, coverage gate, dependency audit, and static security scan.

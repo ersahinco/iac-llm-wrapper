@@ -176,11 +176,13 @@ iac-llm-wrapper compile -i design.md -o out/ --pattern aws-lza
 ```
 
 For `aws-lza`, output includes:
-- `decision-report.yaml` — all decisions with WA pillar coverage and audit trail
+- `decision-report.yaml` — decisions, deployment readiness, blockers, and safe handoff path
 - `accounts-config.yaml`, `global-config.yaml`, `iam-config.yaml`, `network-config.yaml`, `organization-config.yaml`, `security-config.yaml` — AWS LZA handoff config files
 - `lineage-manifest.yaml` — decision-to-artifact path map
 - `deployment-runbook.md` — prerequisites and handoff sequence
 - `sample-recommendations.yaml` — closest pinned reference bundles for handoff
+- `llm-trace-summary.yaml` — provider/model, calls, extracted decisions, gaps,
+  contradictions, and raw evidence path when compile used extraction evidence
 
 ### 5. Engineer Handoff
 

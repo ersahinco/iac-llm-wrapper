@@ -33,12 +33,36 @@ Ranked recommendations are also persisted in `sample-recommendations.yaml`.
 
 ## Sequence
 
-1. Confirm AWS Organizations or Control Tower baseline matches `org_mode`.
-2. Review generated LZA configuration files and compare with AWS sample baseline.
-3. Replace placeholder account emails before deployment.
-4. Populate customer-specific Identity Center assignments, VPC route tables/subnets, and optional security exports.
-5. Run AWS LZA deployment using its documented installer and pipeline.
-6. Preserve `decision-report.yaml`, `decision-audit.yaml`, and `lineage-manifest.yaml` as handoff evidence.
+1. Platform owner confirms AWS Organizations or Control Tower baseline matches `org_mode`.
+2. Network owner reviews generated LZA network config against approved CIDR plan.
+3. Security owner reviews logging, Security Hub, GuardDuty, and delegated admin decisions.
+4. Populate customer-specific Identity Center assignments and permission sets; identity owner approves delegated admin.
+5. Release owner replaces placeholder account emails before deployment.
+6. Platform owner populates customer-specific VPC route tables/subnets, TGW attachments, and optional security exports.
+7. Manual gate: approve `decision-report.yaml`, `lineage-manifest.yaml`, and LZA diff.
+8. Run AWS LZA deployment using its documented installer and pipeline.
+9. Preserve `decision-report.yaml`, `decision-audit.yaml`, and `lineage-manifest.yaml` as handoff evidence.
+10. Rollback note: revert through AWS LZA pipeline history; do not hand-edit generated artifacts.
+
+## Manual Gates
+
+- Architecture owner approves unresolved decisions are zero.
+- Security owner approves logging/security services and IAM Identity Center scope.
+- Network owner approves CIDRs, TGW attachments, and routing boundaries.
+- Release owner confirms AWS LZA pipeline prereqs and rollback owner.
+
+## Dependencies
+
+- AWS Organizations or Control Tower baseline exists before LZA deploy.
+- Account vending/email ownership complete before accounts config deploy.
+- Identity Center delegated admin exists before IAM config deploy.
+- Network CIDR/IPAM plan approved before network config deploy.
+
+## Rollback
+
+- Stop AWS LZA pipeline before re-running with corrected config.
+- Revert to previous known-good LZA config commit.
+- Keep generated reports as evidence; regenerate after decision changes.
 
 ## Boundary
 

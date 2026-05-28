@@ -131,14 +131,55 @@ class TestEndToEndLLM:
         )
 
         output = tmp_path / "output"
-        compile_design(fixture, output, llm_caller=LLMCaller(MockLLMBackend(response)))
+        evidence_store = LLMEvidenceStore()
+        compile_design(
+            fixture,
+            output,
+            llm_caller=LLMCaller(MockLLMBackend(response)),
+            evidence_store=evidence_store,
+        )
 
         report = (output / "decision-report.yaml").read_text()
         assert "aws-lza" in report
         assert "AppProd" in report
         assert "Network" in report
+        assert "deploymentAllowed: true" in report
         assert (output / "lineage-manifest.yaml").exists()
+        assert (output / "llm-trace-summary.yaml").exists()
+        assert "MockLLMBackend" in (output / "llm-trace-summary.yaml").read_text()
         assert not (output / "terraform.tfvars").exists()
+
+    def test_llm_contradiction_blocks_compile_with_assessment(self, tmp_path: Path):
+        fixture = tmp_path / "design.md"
+        fixture.write_text(
+            """# AWS LZA Design
+
+## Accounts
+- network_account: Network
+"""
+        )
+        response = json.dumps(
+            {
+                "decisions": {"network_account": "Network", "topology": "hub-spoke"},
+                "signal_decisions": {},
+                "gaps": [],
+                "contradictions": [
+                    {
+                        "key": "enabled_regions",
+                        "reason": "region mismatch",
+                        "details": "home region not enabled",
+                    }
+                ],
+            }
+        )
+
+        output = tmp_path / "output"
+        with pytest.raises(Exception, match="LLM_CONTRADICTION_ENABLED_REGIONS"):
+            compile_design(fixture, output, llm_caller=LLMCaller(MockLLMBackend(response)))
+
+        report = (output / "decision-report.yaml").read_text()
+        assert "deploymentAllowed: false" in report
+        assert "home region not enabled" in report
 
 
 class TestMalformedLLMResponse:

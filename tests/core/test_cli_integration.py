@@ -79,6 +79,28 @@ class TestCLICompile:
         assert "Dry-run" in result.output
         assert not (output_dir / "decision-report.yaml").exists()
 
+    def test_compile_blocked_design_writes_safe_assessment(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setenv("INTENT_ENGINE_DISABLE_LLM", "1")
+        output_dir = tmp_path / "out"
+        result = runner.invoke(
+            app,
+            [
+                "compile",
+                "--input",
+                "fixtures/eval/aws-lza-enterprise-messy-blocked.md",
+                "--output",
+                str(output_dir),
+            ],
+        )
+        assert result.exit_code != 0
+        assert "cannot deploy yet" in result.output
+        assert "AWS_LZA_NETWORK_ACCOUNT_REQUIRED" in result.output
+        report = (output_dir / "decision-report.yaml").read_text()
+        assert "deploymentAllowed: false" in report
+        assert "Cannot deploy yet" in report
+        trace = (output_dir / "llm-trace-summary.yaml").read_text()
+        assert "callCount: 0" in trace
+
 
 class TestCLIVersion:
     def test_version_flag(self):
