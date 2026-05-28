@@ -35,6 +35,8 @@ Output ──────── Contract handoff artifacts, lineage, runbooks, m
 
 **Every decision is recorded** with timestamp, rationale, compliance context, and tradeoffs. Architects get living documentation. Compliance gets an audit trail. Engineers get a validated decision set to map to their IaC of choice.
 
+The goal is not to reinvent infrastructure tooling. Existing accelerators and modules stay the delivery layer. LLMs help read human intent, surface missing decisions, and draft structured inputs; Pydantic models, requirement graphs, target contracts, validators, lineage, and runbooks keep the path safe and repeatable.
+
 ## Quick Start (Ollama + uv)
 
 Run entirely locally with a 3B parameter model:

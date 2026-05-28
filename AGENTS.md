@@ -96,7 +96,7 @@ T16: Remove legacy LZA confusion, keep product path lean
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Removed legacy LZA path and stale extension surfaces; fixture drift, eval, usability, pre-commit all green
+- **Last session**: Folded product vision into README; full test/lint/type/eval/usability/pre-commit gate green
 
 ### Done
 
@@ -111,6 +111,7 @@ T16: Remove legacy LZA confusion, keep product path lean
 | Evaluation | Deterministic extraction gold corpus and role-based usability trials |
 | Fixtures | AWS LZA generated bundles, K8s generated bundle, usability docs, eval corpus |
 | Cleanup | Removed old LZA research path, old diff/apply surfaces, extension registry, old fixtures/tests/helpers |
+| Product docs | README states no wheel reinvention: LLM for intent capture, models/graphs/contracts/validators for guardrails, existing IaC for delivery |
 
 ### Next
 
