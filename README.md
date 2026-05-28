@@ -86,12 +86,14 @@ Run the checked-in eval corpus to test extraction quality against expected gener
 uv run python scripts/evaluate-extraction.py
 uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b
 uv run python scripts/evaluate-usability.py
+uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b
 ```
 
 The eval loop compiles docs in `fixtures/eval/`, compares `decision-report.yaml` values,
 entity counts/names, and required handoff files, then exits non-zero on misses.
 The usability loop checks role-based trials for architect gap discovery, engineer handoff,
-and bring-your-own Terraform module input generation.
+and bring-your-own Terraform module input generation. Deterministic mode is the CI plumbing
+gate; `--llm` is the product-quality check for local/provider models.
 
 Install from PyPI:
 

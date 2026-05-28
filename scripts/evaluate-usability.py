@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import os
 import subprocess
 import sys
@@ -17,18 +18,44 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 FIXTURES_DIR = REPO_ROOT / "fixtures" / "usability"
 
 
+@dataclass(frozen=True)
+class TrialConfig:
+    use_llm: bool
+    provider: str
+    model: str
+
+    @property
+    def mode(self) -> str:
+        return "llm" if self.use_llm else "deterministic"
+
+
 @dataclass
 class TrialResult:
     role: str
     name: str
+    mode: str
     status: str
     failures: list[str]
 
 
-def _run(args: list[str], output_dir: Path | None = None) -> subprocess.CompletedProcess[str]:
+def _run(args: list[str], config: TrialConfig) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
-    env["INTENT_ENGINE_DISABLE_LLM"] = "1"
-    cmd = [sys.executable, "-m", "intent_engine", *args]
+    cmd_args = list(args)
+    if config.use_llm:
+        llm_command = bool(args and args[0] in {"compile", "discover"})
+        if config.provider:
+            env["INTENT_ENGINE_PROVIDER"] = config.provider
+            if llm_command:
+                cmd_args.extend(["--provider", config.provider])
+        if config.model:
+            env["INTENT_ENGINE_MODEL"] = config.model
+            if llm_command:
+                cmd_args.extend(["--model", config.model])
+        env.pop("INTENT_ENGINE_DISABLE_LLM", None)
+    else:
+        env["INTENT_ENGINE_DISABLE_LLM"] = "1"
+
+    cmd = [sys.executable, "-m", "intent_engine", *cmd_args]
     return subprocess.run(
         cmd,
         cwd=REPO_ROOT,
@@ -55,17 +82,18 @@ def _module_inputs(output_dir: Path) -> list[dict[str, Any]]:
     return [item for item in items if isinstance(item, dict)]
 
 
-def _trial_architect_gap() -> TrialResult:
-    proc = _run(
-        [
-            "discover",
-            "--input",
-            str(FIXTURES_DIR / "architect-incomplete-lza.md"),
-            "--pattern",
-            "baseline",
-            "--no-llm",
-        ]
-    )
+def _trial_architect_gap(config: TrialConfig) -> TrialResult:
+    args = [
+        "discover",
+        "--input",
+        str(FIXTURES_DIR / "architect-incomplete-lza.md"),
+        "--pattern",
+        "baseline",
+    ]
+    if not config.use_llm:
+        args.append("--no-llm")
+
+    proc = _run(args, config)
     failures: list[str] = []
     output = proc.stdout + proc.stderr
     if proc.returncode != 0:
@@ -74,10 +102,16 @@ def _trial_architect_gap() -> TrialResult:
         failures.append("missing central_network_account gap")
     if "Clarifying questions" not in output:
         failures.append("missing architect clarifying question section")
-    return TrialResult("architect", "gap-discovery", "PASS" if not failures else "FAIL", failures)
+    return TrialResult(
+        "architect",
+        "gap-discovery",
+        config.mode,
+        "PASS" if not failures else "FAIL",
+        failures,
+    )
 
 
-def _trial_engineer_handoff() -> TrialResult:
+def _trial_engineer_handoff(config: TrialConfig) -> TrialResult:
     failures: list[str] = []
     with tempfile.TemporaryDirectory() as temp_dir:
         output_dir = Path(temp_dir)
@@ -90,13 +124,23 @@ def _trial_engineer_handoff() -> TrialResult:
                 str(output_dir),
                 "--pattern",
                 "baseline",
-            ]
+            ],
+            config,
         )
         if compile_proc.returncode != 0:
             failures.append("compile command failed")
-            return TrialResult("engineer", "handoff-artifacts", "FAIL", failures)
+            return TrialResult(
+                "engineer",
+                "handoff-artifacts",
+                config.mode,
+                "FAIL",
+                failures,
+            )
 
-        validate_proc = _run(["validate", "--input", str(output_dir), "--pattern", "baseline"])
+        validate_proc = _run(
+            ["validate", "--input", str(output_dir), "--pattern", "baseline"],
+            config,
+        )
         if validate_proc.returncode != 0:
             failures.append("validate command failed")
 
@@ -110,11 +154,15 @@ def _trial_engineer_handoff() -> TrialResult:
                 failures.append(f"missing artifact {expected_file}")
 
     return TrialResult(
-        "engineer", "handoff-artifacts", "PASS" if not failures else "FAIL", failures
+        "engineer",
+        "handoff-artifacts",
+        config.mode,
+        "PASS" if not failures else "FAIL",
+        failures,
     )
 
 
-def _trial_byom_terraform_vpc() -> TrialResult:
+def _trial_byom_terraform_vpc(config: TrialConfig) -> TrialResult:
     failures: list[str] = []
     with tempfile.TemporaryDirectory() as temp_dir:
         output_dir = Path(temp_dir)
@@ -127,14 +175,24 @@ def _trial_byom_terraform_vpc() -> TrialResult:
                 str(output_dir),
                 "--pattern",
                 "terraform-vpc",
-            ]
+            ],
+            config,
         )
         if compile_proc.returncode != 0:
             failures.append("compile command failed")
             failures.append((compile_proc.stderr or compile_proc.stdout).strip())
-            return TrialResult("byom", "terraform-vpc-module", "FAIL", failures)
+            return TrialResult(
+                "byom",
+                "terraform-vpc-module",
+                config.mode,
+                "FAIL",
+                failures,
+            )
 
-        validate_proc = _run(["validate", "--input", str(output_dir), "--pattern", "terraform-vpc"])
+        validate_proc = _run(
+            ["validate", "--input", str(output_dir), "--pattern", "terraform-vpc"],
+            config,
+        )
         if validate_proc.returncode != 0:
             failures.append("validate command failed")
 
@@ -165,22 +223,39 @@ def _trial_byom_terraform_vpc() -> TrialResult:
             if not (output_dir / expected_file).exists():
                 failures.append(f"missing artifact {expected_file}")
 
-    return TrialResult("byom", "terraform-vpc-module", "PASS" if not failures else "FAIL", failures)
+    return TrialResult(
+        "byom",
+        "terraform-vpc-module",
+        config.mode,
+        "PASS" if not failures else "FAIL",
+        failures,
+    )
 
 
 def main() -> int:
-    trials = [_trial_architect_gap, _trial_engineer_handoff, _trial_byom_terraform_vpc]
-    results = [trial() for trial in trials]
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--llm",
+        action="store_true",
+        help="Use configured LLM extraction instead of deterministic mode.",
+    )
+    parser.add_argument("--provider", default="ollama", help="LLM provider when --llm is set.")
+    parser.add_argument("--model", default="", help="LLM model when --llm is set.")
+    args = parser.parse_args()
 
-    print(f"{'Role':12s} {'Trial':24s} Status")
-    print("-" * 68)
+    config = TrialConfig(use_llm=args.llm, provider=args.provider, model=args.model)
+    trials = [_trial_architect_gap, _trial_engineer_handoff, _trial_byom_terraform_vpc]
+    results = [trial(config) for trial in trials]
+
+    print(f"{'Role':12s} {'Trial':24s} {'Mode':13s} Status")
+    print("-" * 84)
     failures = 0
     for result in results:
         suffix = "" if not result.failures else " - " + "; ".join(result.failures[:3])
-        print(f"{result.role:12s} {result.name:24s} {result.status}{suffix}")
+        print(f"{result.role:12s} {result.name:24s} {result.mode:13s} {result.status}{suffix}")
         if result.status != "PASS":
             failures += 1
-    print("-" * 68)
+    print("-" * 84)
     print(f"Results: {len(results) - failures} passed, {failures} failed")
     return 0 if failures == 0 else 1
 
