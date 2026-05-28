@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Intent-driven infrastructure decision engine.
+- Intent-to-IaC orchestration framework with a model-driven decision core.
 - Built-in product paths: aws-lza, kubernetes-cluster, terraform-vpc.
 - Contract-backed sample recommendations for known-good handoff bundles.
 - Schema-driven LLM extraction with graph-traversal prompts.

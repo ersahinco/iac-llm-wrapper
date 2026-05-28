@@ -2,9 +2,10 @@
 
 ## Overview
 
-`iac-llm-wrapper` is an LLM-assisted decision engine. Local models via Ollama
-are the primary development path. No API key or cloud service required. A 3B
-parameter model running locally is sufficient for many structured design docs.
+`iac-llm-wrapper` is an LLM-assisted intent-to-IaC orchestration framework. Local
+models via Ollama are the primary development path. No API key or cloud service
+required. A 3B parameter model running locally is sufficient for many structured
+design docs.
 
 **Important**: LLM testing is a local developer responsibility. CI does not run LLM tests (no API keys in GitHub Actions, no Ollama in CI). Every developer validates extraction quality with their own local models before submitting PRs.
 

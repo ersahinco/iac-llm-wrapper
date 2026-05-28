@@ -2,9 +2,11 @@
 
 ## What This Tool Actually Does
 
-`iac-llm-wrapper` is the package name. The shipped product is `intent-engine`:
-a pre-provisioning decision and handoff layer for infrastructure delivery. It is
-not a Terraform, CDK, CloudFormation, or accelerator wrapper.
+`iac-llm-wrapper` is an intent-to-IaC orchestration framework. The shipped core
+is `intent-engine`: today it wraps LLM extraction with deterministic decision
+validation and emits handoff artifacts. Future target adapters can wrap module
+generation or controlled IaC execution, but only after graph, contract, and gate
+checks pass.
 
 ### With LLM (Full Capability)
 
@@ -17,6 +19,7 @@ When an LLM backend is available (OpenAI, Anthropic, or local Ollama):
 5. **Normalizes** defaults only when applicable
 6. **Validates** against graph rules, model rules, and target contracts
 7. **Emits handoff artifacts** for existing accelerators, modules, or pipelines
+8. **Can later drive target adapters** for module generation or controlled execution
 
 ### Without LLM (Bootstrap Only)
 
@@ -108,7 +111,7 @@ When analyzing design documents, the tool detects architectural signals from tex
 
 1. **LLM extraction quality depends on the model**: GPT-4 class models work well; smaller local models handle standard fields reliably but can miss complex workload details in long documents.
 2. **Deterministic fallback is limited extraction**: Without LLM, graph defaults apply and structured Markdown sections can recover named accounts, OUs, and workloads. It still cannot interpret arbitrary free-form prose. This is a bootstrap path, not production.
-3. **Does not emit deployable IaC by default**: `aws-lza` emits accelerator handoff files; module patterns emit variables for existing IaC modules. Engineers still own Terraform, CDK, or CloudFormation deployment.
+3. **Current paths do not emit deployable IaC**: `aws-lza` emits accelerator handoff files; module patterns emit variables for existing IaC modules. Future target adapters may generate or execute IaC only behind graph, contract, and gate checks.
 4. **Module refs are references, not implementations**: Module refs point to public Terraform registry modules as examples. Organizations maintain their own module libraries.
 
 ## Next Capability Improvements

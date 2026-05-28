@@ -1,14 +1,18 @@
 # SPEC
 
 ## §G GOAL
-Model-driven infrastructure decision engine. Design doc → extracted decisions →
-normalized intent → validation → handoff artifacts. LZA is first target pattern.
+Model-driven intent-to-IaC orchestration framework. Design doc → extracted
+decisions → normalized intent → validation/gates → target handoff artifacts.
+Future target adapters may wrap module generation or controlled IaC execution
+after graph, contract, and gate checks pass. LZA is first target pattern.
 
 ## §C CONSTRAINTS
 - Python ≥3.11, Pydantic v2, Typer, ruff, pytest
 - Domain-agnostic core. Target logic → pattern files, not core
 - LLM extraction via Ollama/OpenAI/Anthropic. Deterministic fallback for CI
-- No AWS API calls, no deployment, no arbitrary root module generation
+- Current built-ins make no AWS API calls and do not deploy
+- No arbitrary root module generation from prose
+- Future generation/execution adapters require graph, contract, gate, evidence, and rollback checks
 - One SPEC.md at root. No split specs
 
 ## §I INTERFACES

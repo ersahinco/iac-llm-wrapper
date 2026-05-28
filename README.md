@@ -1,15 +1,16 @@
 # iac-llm-wrapper
 
-**Pre-provisioning infrastructure decision engine.**
+**Intent-to-IaC orchestration framework.**
 
 Architects write messy design docs. The tool extracts structured decisions,
 checks them against requirement graphs and target contracts, and emits traceable
 handoff artifacts for engineers.
 
-The repository and package are named `iac-llm-wrapper`. The product inside is
-**intent-engine**. Despite the package name, it is not a wrapper around
-Terraform, CDK, CloudFormation, or AWS LZA. It is a decision and handoff layer
-for infrastructure delivery.
+The repository and package are named `iac-llm-wrapper`. The core is
+**intent-engine**. Today it wraps LLM extraction with deterministic decision
+validation and emits handoff artifacts. Future target adapters can wrap module
+generation or controlled IaC execution, but only after graph, contract, and gate
+checks pass.
 
 LLMs help read intent. Human-owned models, requirement graphs, contracts,
 validators, lineage, runbooks, and evals decide what is acceptable. Existing
@@ -32,22 +33,23 @@ Extraction ──── LLM traverses a requirement graph and detects signals
 Interview ───── Guided questions fill remaining gaps (via CLI or API)
      │
      ▼
-Normalization ─ Defaults applied only when applicable. Duck-typed, pattern-aware.
+Normalization ─ Defaults applied only when applicable. Schema-aware, pattern-aware.
      │
      ▼
 Validation ──── Fail-closed checks against graph, model, and target contracts
      │
      ▼
-Output ──────── Contract handoff artifacts, lineage, runbooks, module inputs
+Output ──────── Target handoff today; gated generation/execution adapters later
 ```
 
 Every decision is recorded with provenance. Architects get a living decision
 record. Compliance gets traceability. Engineers get a validated handoff bundle
 for their IaC toolchain.
 
-Goal: reduce ambiguity before provisioning. LLMs read human intent and surface
-missing or conflicting decisions. Deterministic models, graphs, contracts,
-validators, lineage, runbooks, and evals keep the path safe and repeatable.
+Goal: reduce ambiguity before provisioning and create a controlled path toward
+IaC delivery. LLMs read human intent and surface missing or conflicting decisions.
+Deterministic models, graphs, contracts, validators, lineage, runbooks, and evals
+decide when handoff, generation, or execution is allowed.
 
 ## Quick Start (Ollama + uv)
 
@@ -281,7 +283,7 @@ uv run pre-commit run --all-files
 
 Security posture:
 
-- No cloud API calls and no direct infrastructure deployment from prose.
+- Current built-in paths make no cloud API calls and do not deploy infrastructure from prose.
 - Decision artifacts are auditable (timestamps, rationale, compliance context).
 - CI runs lint, format, and tests across supported Python versions.
 - Dependency and static security checks are part of the roadmap for hardening before broader GA.
@@ -339,7 +341,7 @@ See the [extension guide](EXTENSION.md) for the full contract.
 ```
 iac-llm-wrapper/
 └── src/
-    └── intent_engine/     # Core decision engine
+    └── intent_engine/     # Core intent engine
         ├── cli.py         # Typer CLI
         ├── core/          # Framework: models, graph, extraction, etc.
         └── patterns/      # Pluggable patterns (LZA, K8s, ...)
@@ -348,9 +350,11 @@ iac-llm-wrapper/
 ## Why Not Terraform, CDK, or CloudFormation?
 
 Those tools provision infrastructure. This tool captures and validates the
-decisions that must be made before provisioning. It emits handoff artifacts
-engineers use with existing accelerators, sample configurations, and IaC
-modules. It does not generate arbitrary deployable infrastructure from prose.
+decisions that must be made before provisioning. Today it emits handoff artifacts
+engineers use with existing accelerators, sample configurations, and IaC modules.
+Future target adapters can generate module inputs or run controlled IaC execution,
+but only after graph, contract, and gate checks pass. It does not generate
+arbitrary deployable infrastructure from prose.
 
 ## LLM Testing
 

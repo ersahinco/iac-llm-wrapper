@@ -2,15 +2,14 @@
 
 ## Goal
 
-Use `intent-engine` as a thin, model-driven decision layer for AWS Landing Zone
-Accelerator (LZA). `iac-llm-wrapper` is the package and CLI name; this path is
-not a Terraform, CDK, or accelerator wrapper. It gathers requirements, validates
-decisions, emits handoff artifacts, and reuses existing accelerators or modules
-where they solve the implementation problem.
+Use `intent-engine` as the decision core inside the `iac-llm-wrapper`
+intent-to-IaC orchestration framework. For AWS Landing Zone Accelerator (LZA),
+the current target path gathers requirements, validates decisions, emits handoff
+artifacts, and reuses LZA where it already solves the deployment problem.
 
-This is not an AWS IaC generator by default. It can emit custom IaC later when a
-selected target contract requires it, but LZA already provides the deployment
-engine for the landing-zone baseline.
+The current LZA path is handoff-only. It can add target adapters later when a
+selected contract requires module generation or controlled execution, but LZA
+already provides the deployment engine for the landing-zone baseline.
 
 ## Principles
 
@@ -20,6 +19,7 @@ engine for the landing-zone baseline.
 - Keep provider-specific orchestration explicit instead of pretending clouds are identical.
 - Prefer existing accelerators and modules over custom IaC.
 - Add custom IaC only when no existing accelerator or module covers the need.
+- Allow controlled execution adapters only behind graph, contract, manual gate, evidence, and rollback checks.
 - Keep the first AWS scope narrow: LZA before custom workloads.
 
 ## Data Model View
@@ -104,9 +104,9 @@ Target outputs vary:
 
 - AWS LZA: LZA YAML configuration, lineage manifest, decision report, deployment runbook
 - Terraform module: variables file, module input mapping, dependency notes
-- custom workload: custom IaC only when the contract requires it
+- future target adapter: module generation or controlled execution only when the contract requires it
 
-Provider-specific orchestration belongs in the target layer. Core remains generic.
+Provider-specific orchestration belongs in the target adapter layer. Core remains generic.
 
 ## Inspect Contracts
 
@@ -218,9 +218,11 @@ After LZA is complete, workload support can use the same contract model:
 - If a workload requires custom resources, enable a provider-specific generator for that
   target only.
 - If deployment orchestration is required, derive ordering from the same requirement and
-  dependency model used for validation.
+  dependency model used for validation, then require manual gates, evidence capture, and
+  rollback notes before execution.
 
-This keeps custom IaC as a target-specific feature, not the default architecture.
+This keeps custom IaC and controlled execution as target-specific features, not
+the default architecture.
 
 ## Acceptance Tests
 

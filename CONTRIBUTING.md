@@ -1,7 +1,8 @@
 # Contributing
 
-Thanks for considering contributing to `intent-engine`, the decision engine
-shipped in the `iac-llm-wrapper` package.
+Thanks for considering contributing to `iac-llm-wrapper`, the intent-to-IaC
+orchestration framework. `intent-engine` is the core that owns requirement
+graphs, target contracts, validation, and handoff artifacts.
 
 ## How to contribute
 
@@ -47,7 +48,7 @@ patterns and requirements.
 - **Type safety**: Pydantic v2 models for all data structures. No `dict` for domain objects.
 - **Pattern-driven**: New target path = new pattern, not modifications to core code.
 - **Data-driven**: New requirement = new `Requirement` node. The LLM prompt, interview questions, defaults, validation, and artifact emission all update automatically.
-- **No arbitrary IaC generation**: This tool emits validated handoff artifacts, not deployable infrastructure from prose.
+- **No arbitrary IaC generation**: Current paths emit validated handoff artifacts, not deployable infrastructure from prose. Future target adapters must run behind graph, contract, gate, evidence, and rollback checks.
 
 ## Getting started
 

@@ -2,9 +2,11 @@
 
 ## Project: intent-engine
 
-Pre-provisioning infrastructure decision engine. It captures architecture intent
-from prose, validates decisions through requirement graphs and target contracts,
-and emits traceable handoff artifacts that engineers use with their IaC toolchain.
+Core engine for `iac-llm-wrapper`, an intent-to-IaC orchestration framework. It
+captures architecture intent from prose, validates decisions through requirement
+graphs and target contracts, and emits traceable handoff artifacts that engineers
+use with their IaC toolchain. Future target adapters may wrap module generation
+or controlled IaC execution only after graph, contract, and gate checks pass.
 
 AWS Landing Zone Accelerator is the first product path, but the core must stay generic: patterns own domain models, contracts, validators, samples, and generators.
 
@@ -45,8 +47,9 @@ uv run python scripts/evaluate-usability.py
 
 - Core stays domain-agnostic. Use-case logic lives in pattern packages.
 - Graph owns decision order, branching, blocked paths, cascades, gaps, provenance, and deployment sequencing.
-- Existing accelerators/modules are contracts/data models, not custom stacks to generate.
-- No AWS API calls. No deployment. No arbitrary Terraform from prose.
+- Existing accelerators/modules are contracts/data models before they are generation or execution targets.
+- Current built-ins make no AWS API calls and do not deploy. No arbitrary Terraform from prose.
+- "Wrapper" means intent-to-IaC workflow orchestration, not bypassing IaC tools or gates.
 - Sample recommendations must persist as artifacts, not terminal-only hints.
 - `src/intent_engine/patterns/aws_lza` is the only AWS LZA path. Old research path was removed to avoid two-source confusion.
 
@@ -98,7 +101,7 @@ T16: Keep product path lean and current
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Cleaned product language: `iac-llm-wrapper` is package/CLI, `intent-engine` is pre-provisioning decision engine; full gate green
+- **Last session**: Aligned product language: `iac-llm-wrapper` is intent-to-IaC orchestration framework; current built-ins emit gated handoff artifacts; full gate green
 
 ### Done
 
@@ -113,7 +116,7 @@ T16: Keep product path lean and current
 | Evaluation | Deterministic extraction gold corpus with pass/fail/contract cases and role-based usability trials |
 | Fixtures | AWS LZA emitted bundles, K8s emitted bundle, usability docs, eval corpus |
 | Cleanup | Removed old LZA research path, old diff/apply surfaces, extension registry, old fixtures/tests/helpers |
-| Product docs | README defines repo/package name vs product role: `iac-llm-wrapper` ships `intent-engine`; not an IaC wrapper |
+| Product docs | README defines `iac-llm-wrapper` as intent-to-IaC orchestration: current validated handoff, future gated target adapters |
 | Observability | Lean `llm-trace-summary.yaml` for provider/model, calls, decisions, gaps, contradictions, and raw evidence path |
 | Language | Docs now use consistent terms: requirement graph, target contract, decision record, handoff artifact, provisioning toolchain |
 
@@ -123,10 +126,10 @@ T16: Keep product path lean and current
 2. Continue AWS LZA schema depth where real customer identity inputs exist, especially IAM Identity Center permission sets and assignments.
 3. Run local LLM usability/eval periodically with evidence output to validate actual architect/engineer experience beyond deterministic harness checks.
 4. Use local LLM trace quality findings to tune prompts only when deterministic harness cannot classify the issue.
-5. If public packaging changes, decide whether to keep `iac-llm-wrapper` as distribution name or rename to `intent-engine` before GA.
+5. If public packaging changes, keep naming aligned: `iac-llm-wrapper` is framework/distribution, `intent-engine` is core.
 
 ### Key Decisions This Session
 
-- Repo/package name can remain `iac-llm-wrapper`, but product language must say it is not an IaC wrapper.
-- Use "pre-provisioning decision engine" and "handoff artifacts" instead of vague wrapper/generator language.
+- Repo/package name can remain `iac-llm-wrapper`; "wrapper" means orchestration around intent, gates, and target handoff.
+- Current built-ins do not deploy; future target adapters may generate or execute IaC only after graph, contract, manual gate, evidence, and rollback checks.
 - Order of documented flow must match code: extraction/interview, normalization, validation, artifact emission.
