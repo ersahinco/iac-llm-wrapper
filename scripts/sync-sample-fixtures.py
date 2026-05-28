@@ -32,7 +32,7 @@ def _selected_samples(names: list[str]) -> list[SampleConfig]:
 
 
 def _fixture_dir(sample: SampleConfig) -> Path:
-    return FIXTURES_ROOT / sample.fixture_name
+    return FIXTURES_ROOT / str(sample.fixture_name)
 
 
 def _generated_files(path: Path) -> dict[str, str]:

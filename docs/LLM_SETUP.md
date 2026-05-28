@@ -88,9 +88,10 @@ This tests compilation of all fixture documents and reports success/failure for 
 - **This is the intended production path**
 
 ### Without LLM (Bootstrap / CI Only)
-- Uses graph defaults only
+- Uses graph defaults
 - Requires explicit `--decisions` JSON for custom values
 - Signal detection still works via keyword matching
+- Structured Markdown sections can recover named accounts, OUs, and workloads
 - **Not sufficient for real design documents**
 
 The deterministic fallback exists for:
@@ -98,7 +99,9 @@ The deterministic fallback exists for:
 - CI bootstrapping (when no API key is available)
 - Developer workflow without LLM setup
 
-It cannot parse free-form prose. If you feed a 20-page design document into the tool without an LLM, you get default values — not the architect's intent.
+It cannot interpret arbitrary free-form prose. If you feed a 20-page narrative design document
+into the tool without an LLM, you get defaults plus any explicitly structured entities — not the
+full architect intent.
 
 ### When to Use Each
 

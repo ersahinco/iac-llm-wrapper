@@ -70,7 +70,9 @@ iac-llm-wrapper compile -i design.md -o out/ --provider anthropic
 
 ### Without LLM (Bootstrap Only)
 
-The deterministic fallback applies graph defaults and does keyword matching. It cannot parse free-form prose. Use only for unit tests or when you have no LLM access:
+The deterministic fallback applies graph defaults, runs signal keyword matching, and can recover
+structured Markdown entity sections for accounts, OUs, and workloads. It still cannot interpret
+arbitrary free-form prose. Use only for unit tests or when you have no LLM access:
 
 ```bash
 INTENT_ENGINE_DISABLE_LLM=1 iac-llm-wrapper compile -i design.md -o out/
