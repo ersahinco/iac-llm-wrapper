@@ -33,7 +33,7 @@ Follow these steps. None of them require touching core framework files.
 
 ### 1. Define Pydantic Models
 
-Create a new module (e.g., `src/intent_engine/kubernetes_models.py`):
+Create a new pattern module (e.g., `src/intent_engine/patterns/my_pattern/models.py`):
 
 ```python
 from pydantic import BaseModel
@@ -78,7 +78,7 @@ Register output generators that write your artifacts:
 ```python
 from intent_engine.core.generator import register_generator
 from pathlib import Path
-from your_pattern.models import K8sIntent
+from intent_engine.patterns.my_pattern.models import K8sIntent
 
 def gen_cluster_config(intent, output_dir: Path) -> None:
     model = getattr(intent, "intent", intent)
@@ -105,7 +105,7 @@ Register a `Pattern` in `GLOBAL_REGISTRY`:
 ```python
 from intent_engine.core.contracts import ArtifactContract, TargetContract
 from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern
-from your_pattern.models import K8sIntent
+from intent_engine.patterns.my_pattern.models import K8sIntent
 
 contract = TargetContract(
     name="kubernetes-cluster-config",
@@ -166,7 +166,9 @@ The normalizer reads `defaults.yaml` and applies values duck-typed against your 
 
 ### 6. CLI Usage
 
-Your pattern is immediately available:
+Built-in patterns are available after `load_builtin_patterns()` imports them. If you add a
+new built-in pattern, add its package import there; external patterns can import/register
+their package before CLI use.
 
 ```bash
 intent-engine template --pattern kubernetes-cluster --output k8s-design.md
@@ -179,8 +181,8 @@ intent-engine validate --input ./k8s-out --pattern kubernetes-cluster
 Write a test that compiles end-to-end without touching core files:
 
 ```python
-import intent_engine.kubernetes_pattern  # triggers registration
-from intent_engine.compiler import compile_from_interview
+import intent_engine.patterns.kubernetes  # triggers registration
+from intent_engine.core.compiler import compile_from_interview
 
 def test_k8s_compiles(tmp_path):
     decisions = {"cluster_name": "prod-k8s", "cluster_version": "1.30"}

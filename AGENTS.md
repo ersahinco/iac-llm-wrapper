@@ -181,7 +181,7 @@ T15: Lean contract-driven handoff maturity
 - **Lint**: clean
 - **Format**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Simplified mypy gate to cover all source, fixed stale deterministic fallback wording, kept full gate green
+- **Last session**: Aligned CI/PR docs with current mypy gate, refreshed extension examples, kept full gate green
 
 ### Done
 | Area | Item |
@@ -260,6 +260,7 @@ T15: Lean contract-driven handoff maturity
 | **Pre-commit gate alignment** | Pre-commit now runs the same scoped `uv run --extra dev mypy` and sample fixture drift check as local/CI gates instead of a broader mirror-mypy invocation. |
 | **Whitespace-stable YAML generation** | Core and AWS LZA YAML dumpers strip trailing whitespace, so generated fixtures no longer fight whitespace hooks. |
 | **Source mypy coverage** | `uv run --extra dev mypy` now covers all `src/intent_engine` source plus fixture sync and extraction benchmark tooling. |
+| **CI mypy alignment** | CI, pre-commit, AGENTS commands, and PR checklist now all use `uv run --extra dev mypy`. |
 | **LLM-path deterministic backfill** | Compiler now merges deterministic Markdown accounts/OUs/workloads into LLM-produced intent, backfilling dropped or partial named entities from small models without duplicating explicit items. |
 | **Markdown extractor type coverage** | Deterministic Markdown extraction is now in mypy scope, protecting the small-model backfill path from silent type drift. |
 | **Extraction benchmark type coverage** | `scripts/benchmark-extraction.py` is now in mypy scope, protecting the local small-model quality benchmark from untyped JSON/YAML drift. |
@@ -271,6 +272,8 @@ T15: Lean contract-driven handoff maturity
 2. [ ] Decide whether small-model extraction still needs separate workload-only LLM pass after deterministic backfill results settle.
 
 ### Key Decisions This Session
+- **Quality gates need one spelling**: CI workflow and PR template now use `uv run --extra dev mypy`, matching AGENTS and pre-commit.
+- **Extension docs should model real package shape**: New pattern examples now use `src/intent_engine/patterns/...`, `intent_engine.patterns...`, and `intent_engine.core.compiler`.
 - **Mypy source scope should not be hand-maintained anymore**: Replaced long per-file mypy list with `src/intent_engine`, so new source modules enter the type gate by default.
 - **Deterministic fallback wording must stay precise**: Removed stale language that ignored structured Markdown entity recovery.
 - **Fallback wording must track implementation**: Docs and CLI text now describe deterministic mode as graph defaults plus structured Markdown entity recovery.
