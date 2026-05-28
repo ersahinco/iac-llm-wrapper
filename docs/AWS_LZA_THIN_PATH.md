@@ -2,23 +2,24 @@
 
 ## Goal
 
-Build `iac-llm-wrapper` as a thin, model-driven intent layer for AWS Landing Zone
-Accelerator (LZA). The tool should gather requirements, validate decisions, emit
-handoff artifacts, and reuse existing accelerators or modules wherever they already
-solve the implementation problem.
+Use `intent-engine` as a thin, model-driven decision layer for AWS Landing Zone
+Accelerator (LZA). `iac-llm-wrapper` is the package and CLI name; this path is
+not a Terraform, CDK, or accelerator wrapper. It gathers requirements, validates
+decisions, emits handoff artifacts, and reuses existing accelerators or modules
+where they solve the implementation problem.
 
-This is not an AWS IaC generator by default. It can support IaC generation later when
-the selected target needs it, but LZA already provides the deployment engine for the
-landing-zone baseline.
+This is not an AWS IaC generator by default. It can emit custom IaC later when a
+selected target contract requires it, but LZA already provides the deployment
+engine for the landing-zone baseline.
 
 ## Principles
 
-- Use ubiquitous language from architects, engineers, and the target accelerator.
-- Treat existing sample configurations and module schemas as data models.
-- Derive questions, validation, and outputs from models rather than hand-written flow.
+- Use domain language from architects, platform engineers, and the target accelerator.
+- Treat existing sample configurations and module schemas as contracts.
+- Derive questions, validation, and outputs from models instead of hand-written flow.
 - Keep provider-specific orchestration explicit instead of pretending clouds are identical.
-- Prefer existing accelerators and modules over custom generated IaC.
-- Add custom IaC generation only when no existing accelerator or module covers the need.
+- Prefer existing accelerators and modules over custom IaC.
+- Add custom IaC only when no existing accelerator or module covers the need.
 - Keep the first AWS scope narrow: LZA before custom workloads.
 
 ## Data Model View
@@ -28,7 +29,7 @@ An accelerator sample configuration is a contract:
 - required inputs
 - optional inputs
 - defaults
-- output files or resources
+- output files
 - deployment prerequisites
 - ordering constraints
 - cross-reference rules
@@ -45,10 +46,10 @@ AWS documents six mandatory configuration files:
 - `security-config.yaml`
 
 `customizations-config.yaml` and `replacements-config.yaml` are optional target-contract
-extensions. They should be emitted only when a selected use case needs custom
+extensions. They should be emitted only when a selected target pattern needs custom
 applications, third-party appliances, CloudFormation stacks, or replacement values.
 
-For other use cases, teams can bring their own module or accelerator contract:
+For other target patterns, teams can bring their own target contract:
 
 - LZA sample configuration
 - Terraform module schema
@@ -68,7 +69,7 @@ Use the source contract to derive:
 - fields
 - types
 - defaults
-- target artifacts
+- target files
 - schema-level required values
 
 Use the requirement graph to manage:
@@ -95,17 +96,17 @@ source contract
   -> extraction and interview
   -> normalized intent
   -> validators
-  -> target-specific artifacts
+  -> target-specific files
   -> handoff bundle
 ```
 
-Target-specific artifacts vary:
+Target outputs vary:
 
 - AWS LZA: LZA YAML configuration, lineage manifest, decision report, deployment runbook
 - Terraform module: variables file, module input mapping, dependency notes
-- custom workload: generated IaC only when the contract requires it
+- custom workload: custom IaC only when the contract requires it
 
-Provider-specific orchestration lives at the target layer. Core remains generic.
+Provider-specific orchestration belongs in the target layer. Core remains generic.
 
 ## Inspect Contracts
 
@@ -117,9 +118,9 @@ intent-engine contract list
 intent-engine contract show --pattern aws-lza
 ```
 
-This shows required artifacts, optional artifacts, required YAML paths, required
-decisions, source URL, value assertions, and decision-to-artifact lineage. The command
-reads registered contract metadata rather than hardcoding AWS LZA details.
+This shows required files, optional files, required YAML paths, required decisions,
+source URL, value assertions, and decision-to-artifact lineage. The command reads
+registered contract metadata instead of hardcoding AWS LZA details.
 
 ## Current Fixture Variants
 
@@ -129,10 +130,10 @@ Current AWS LZA review fixtures live under `fixtures/`:
 - `aws-lza-regulated-v1`: commercial baseline plus regulated overlay and extra Security Hub standard
 - `aws-lza-healthcare-v1`: healthcare baseline plus healthcare overlay and PHI-oriented account naming
 
-Each fixture directory includes generated handoff artifacts plus a short `README.md`
+Each fixture directory includes emitted handoff artifacts plus a short `README.md`
 describing source contract, upstream variant, and review expectations.
 Refresh all sample fixture bundles with `uv run python scripts/sync-sample-fixtures.py`.
-Use `--check` in CI or local review to catch stale generated files.
+Use `--check` in CI or local review to catch stale emitted files.
 
 ## Borrow From rxt-code-accelerator
 
@@ -142,20 +143,20 @@ Useful ideas:
 - graph validation before handoff
 - lineage manifest from input decision to emitted artifact path
 - preflight checks for tools, prerequisites, and required inputs
-- golden tests for generated artifacts
+- golden tests for emitted handoff artifacts
 - handoff packaging for engineers
 
 Avoid importing:
 
 - Azure Terragrunt generator shape
-- AVM wrapper parity as an AWS default
+- AVM parity as an AWS default
 - portal complexity before the CLI path is proven
 - broad cloud-neutral abstractions that hide provider-specific contracts
-- custom IaC generation where LZA or established modules already solve the problem
+- custom IaC where LZA or established modules already solve the problem
 
-## AWS LZA MVP
+## AWS LZA Current Scope
 
-MVP should produce a useful handoff without owning deployment:
+Current scope produces a useful handoff without owning deployment:
 
 - `aws-lza` pattern
 - `AwsLzaIntent` Pydantic model
@@ -173,7 +174,7 @@ MVP should produce a useful handoff without owning deployment:
 - `deployment-runbook.md` with prerequisites and sequence
 - blocked compile assessments validated by the generic
   `blocked-assessment-artifacts` contract
-- generated-artifact validation that fails closed when required paths, asserted values,
+- emitted-artifact validation that fails closed when required paths, asserted values,
   or lineage paths disappear from emitted YAML
 
 Current emitted YAML targets official LZA-style top-level sections such as:
@@ -186,7 +187,7 @@ Current emitted YAML targets official LZA-style top-level sections such as:
 - `security-config.yaml`: `accessAnalyzer`, `iamPasswordPolicy`, `awsConfig`, `cloudWatch`, `centralSecurityServices`
 
 Current emitted substructures stay close to upstream LZA shapes instead of hiding them behind
-custom wrapper fields:
+custom abstraction fields:
 
 - `iam-config.yaml`: `identityCenterPermissionSets`, `identityCenterAssignments`
 - `network-config.yaml`: VPC `enableDnsHostnames`, `enableDnsSupport`, `routeTables`, `subnets`,
@@ -219,17 +220,17 @@ After LZA is complete, workload support can use the same contract model:
 - If deployment orchestration is required, derive ordering from the same requirement and
   dependency model used for validation.
 
-This keeps custom generation as a feature, not the default architecture.
+This keeps custom IaC as a target-specific feature, not the default architecture.
 
 ## Acceptance Tests
 
 - Adding `aws-lza` does not require changes to core extraction, interview, validation,
-  normalization, or generation modules.
+  normalization, or emitter modules.
 - An AWS LZA sample fixture compiles to LZA YAML, decision report, lineage manifest, and
   runbook.
 - A regulated fixture selects the correct overlay decisions and fails closed when required
   accounts or controls are missing.
-- Generated LZA artifacts are covered by golden tests.
+- LZA handoff artifacts are covered by golden tests.
 - Validator catches cross-reference errors before handoff.
 
 ## Sources

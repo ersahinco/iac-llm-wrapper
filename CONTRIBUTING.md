@@ -1,6 +1,7 @@
 # Contributing
 
-Thanks for considering contributing to intent-engine.
+Thanks for considering contributing to `intent-engine`, the decision engine
+shipped in the `iac-llm-wrapper` package.
 
 ## How to contribute
 
@@ -23,7 +24,11 @@ uv run bandit -c bandit.yaml -r src -q -ll
 
 4. **Test extraction quality** (mandatory for extraction changes):
 
-This project is **LLM-first**. The deterministic fallback (graph defaults + keyword matching) is not sufficient for real design documents. Every change that affects extraction, patterns, or prompts must be validated with an LLM:
+This project is **LLM-assisted and deterministic-first for acceptance**. The LLM
+extracts candidate decisions from prose. The deterministic harness decides what
+is acceptable. The fallback path (graph defaults plus structured Markdown
+recovery) is not sufficient for real narrative design documents. Every change
+that affects extraction, patterns, or prompts must be validated with an LLM:
 
 Use `uv run python scripts/evaluate-extraction.py` for deterministic fixture drift and
 `uv run python scripts/evaluate-extraction.py --llm` when validating prompt/model behavior.
@@ -34,14 +39,15 @@ The deterministic fallback (`INTENT_ENGINE_DISABLE_LLM=1`) exists for unit tests
 
 ## Extension guide
 
-See [EXTENSION.md](EXTENSION.md) for the exact contract for adding new patterns and requirements.
+See [EXTENSION.md](EXTENSION.md) for the exact contract for adding new target
+patterns and requirements.
 
 ## Code conventions
 
 - **Type safety**: Pydantic v2 models for all data structures. No `dict` for domain objects.
-- **Pattern-driven**: New use cases = new pattern, not modifications to core code.
-- **Data-driven**: New requirement = new `Requirement` node. The LLM prompt, interview questions, defaults, validation, and generation all update automatically.
-- **No IaC generation**: This tool produces decision artifacts, not deployable infrastructure.
+- **Pattern-driven**: New target path = new pattern, not modifications to core code.
+- **Data-driven**: New requirement = new `Requirement` node. The LLM prompt, interview questions, defaults, validation, and artifact emission all update automatically.
+- **No arbitrary IaC generation**: This tool emits validated handoff artifacts, not deployable infrastructure from prose.
 
 ## Getting started
 

@@ -8,10 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Intent-driven infrastructure decision framework.
+- Intent-driven infrastructure decision engine.
 - Built-in product paths: aws-lza, kubernetes-cluster, terraform-vpc.
 - Contract-backed sample recommendations for known-good handoff bundles.
 - Schema-driven LLM extraction with graph-traversal prompts.
 - Guided interview engine with topological question ordering.
-- Decision reports, lineage manifests, deployment runbooks, and audit trails.
+- Handoff artifacts: decision reports, lineage manifests, deployment runbooks, and audit trails.
 - CI/CD: lint, format, type check, tests, coverage gate, dependency audit, and static security scan.

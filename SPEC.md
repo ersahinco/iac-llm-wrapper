@@ -1,20 +1,21 @@
 # SPEC
 
 ## §G GOAL
-Model-driven intent extraction framework. Design doc → structured decisions → validated artifacts. LZA pattern #1.
+Model-driven infrastructure decision engine. Design doc → extracted decisions →
+normalized intent → validation → handoff artifacts. LZA is first target pattern.
 
 ## §C CONSTRAINTS
 - Python ≥3.11, Pydantic v2, Typer, ruff, pytest
-- Domain-agnostic core. LZA logic → pattern files, not core
+- Domain-agnostic core. Target logic → pattern files, not core
 - LLM extraction via Ollama/OpenAI/Anthropic. Deterministic fallback for CI
-- No AWS API calls, no deployment, no root module generation
+- No AWS API calls, no deployment, no arbitrary root module generation
 - One SPEC.md at root. No split specs
 
 ## §I INTERFACES
 - cli: `intent-engine compile|interview|validate|discover|template|sample|contract|explain|review`
 - graph: `RequirementGraph` — add, decide, status, apply_decisions, cascade
 - models: pattern-specific Pydantic intent models
-- gen: `GeneratorRegistry` — `register(name, fn, priority, category, applies_to)`
+- emit: `GeneratorRegistry` — `register(name, fn, priority, category, applies_to)`
 - contracts: `TargetContract` — artifacts, required_paths, required_decisions, lineage
 - llm: `LLMCaller` — `call(prompt)` → `(response, LLMEvidence)`
 - patterns: `PatternRegistry` — register, get, list
@@ -26,7 +27,7 @@ Model-driven intent extraction framework. Design doc → structured decisions �
 V1: ∀ decision → recorded in audit trail with timestamp + rationale
 V2: ∄ compile without validate. Fail-closed on violations
 V3: Adding requirement node → auto-updates LLM prompt + interview + sample matching
-V4: Every new pattern → zero core changes (verify: no `patterns/` imports in `core/`)
+V4: Every new target pattern → zero core changes (verify: no `patterns/` imports in `core/`)
 V5: Pattern generators scoped by `applies_to`; internal guards only fallback safety
 V6: Test suite ! pass before push. Current full gate green, ruff clean
 

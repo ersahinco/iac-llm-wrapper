@@ -1,35 +1,38 @@
 # Extension Contract
 
-This framework is a **general-purpose intent-driven configuration system**. Landing zone accelerator (LZA) is simply the first use case — Pattern #1. You can add new use cases (e.g., `kubernetes-cluster`, `gcp-org`, `saas-tenant`) without modifying any core framework file.
+This framework is a **general-purpose intent-driven decision system**. AWS LZA
+is one target pattern, not a special core mode. You can add new target patterns
+(for example `kubernetes-cluster`, `gcp-org`, or `saas-tenant`) without modifying
+core framework files.
 
 ## What Is the Core Framework?
 
 These files are generic and must not contain use-case-specific logic:
 
 - `extractor.py` — Builds prompts from any `RequirementGraph`
-- `compiler.py` — Orchestrates extract → normalize → validate → generate
+- `compiler.py` — Orchestrates extract → normalize → validate → emit
 - `validator.py` — `validate_graph()` checks graph metadata; accepts extra validators
 - `normalizer.py` — Applies defaults from `defaults.yaml` using duck-typing
 - `interview.py` — Topological question ordering
-- `cli.py` — Generic CLI; `--pattern` selects the use case
+- `cli.py` — Generic CLI; `--pattern` selects the target pattern
 - `generator.py` — Pluggable output generators (registry pattern)
 - `patterns.py` — `PatternRegistry`
 - `requirements.py` — `RequirementGraph` with dependencies, gates, cascade
 
 ## What Is the Pattern Layer?
 
-Everything use-case specific lives here:
+Everything target-specific lives here:
 
-- **Pydantic models** — Define the intent shape for one use case
+- **Pydantic models** — Define the intent shape for one target pattern
 - **Pattern graph factories** — Define decisions as `Requirement` nodes
-- **Registered generators** — Define output artifacts
-- **`defaults.yaml`** — Define defaults and guardrails
+- **Registered generators** — Emit target handoff files
+- **`defaults.yaml`** — Define deterministic defaults
 - **Sample configs** — Define versioned, known-good decision sets
-- **CLI `--pattern` flag** — Selects which use case to run
+- **CLI `--pattern` flag** — Selects which target pattern to run
 
-## Adding a New Use Case
+## Adding a New Target Pattern
 
-Follow these steps. None of them require touching core framework files.
+Follow these steps. None should require touching core framework files.
 
 ### 1. Define Pydantic Models
 
@@ -73,7 +76,7 @@ Rules:
 
 ### 3. Register Generators
 
-Register output generators that write your artifacts:
+Register output generators that emit handoff files:
 
 ```python
 from intent_engine.core.generator import register_generator
@@ -126,7 +129,7 @@ contract = TargetContract(
 
 GLOBAL_REGISTRY.register(Pattern(
     name="kubernetes-cluster",
-    description="Kubernetes cluster provisioning",
+    description="Kubernetes cluster handoff",
     graph_factory=build_k8s_graph,
     intent_factory=K8sIntent,
     section_map={"cluster_name": ("Cluster", "name")},
@@ -137,7 +140,7 @@ GLOBAL_REGISTRY.register(Pattern(
 ```
 
 Pattern metadata fields:
-- `intent_factory` — The Pydantic model class for this use case
+- `intent_factory` — The Pydantic model class for this target pattern
 - `prompt_context` — Domain context injected into LLM prompts
 - `section_order` — Template section ordering
 - `section_map` — Maps requirement keys to template sections
@@ -153,7 +156,7 @@ Pattern metadata fields:
 
 ### 5. Add Defaults to `defaults.yaml`
 
-Add a section for your use case:
+Add a section for your target pattern:
 
 ```yaml
 k8s_defaults:
@@ -167,7 +170,7 @@ The normalizer reads `defaults.yaml` and applies values duck-typed against your 
 ### 6. CLI Usage
 
 Built-in patterns are available after `load_builtin_patterns()` imports them. If you add a
-new built-in pattern, add its package import there; external patterns can import/register
+new built-in pattern, add its package import there. External patterns can import/register
 their package before CLI use.
 
 ```bash
@@ -193,8 +196,9 @@ def test_k8s_compiles(tmp_path):
 
 ## Core Design Principles
 
-1. **The requirement graph is the product** — Adding one `Requirement` node automatically updates LLM prompts, interview questions, validation rules, and template sections.
-2. **Generators are defensive** — Use `hasattr` guards so multiple patterns coexist in the same registry.
-3. **Normalizers are duck-typed** — Only touch fields that exist on the intent model.
-4. **Validators are layered** — Graph-driven rules come from `Requirement` metadata; pattern-specific rules come from `Pattern.validators`.
-5. **No core code changes for new use cases** — If you find yourself editing `extractor.py`, `compiler.py`, `validator.py`, `normalizer.py`, `interview.py`, or `cli.py`, the framework is leaking domain assumptions. Move them to the pattern layer.
+1. **The requirement graph is the product brain** — Adding one `Requirement` node updates LLM prompts, interview questions, validation rules, and template sections.
+2. **Target contracts define handoff shape** — Required files, paths, value assertions, and lineage live in contracts.
+3. **Generators are scoped** — Use `applies_to` so multiple patterns coexist in the same registry.
+4. **Normalizers are duck-typed** — Only touch fields that exist on the intent model.
+5. **Validators are layered** — Graph-driven rules come from `Requirement` metadata; pattern-specific rules come from `Pattern.validators`.
+6. **No core code changes for new target patterns** — If you find yourself editing `extractor.py`, `compiler.py`, `validator.py`, `normalizer.py`, `interview.py`, or `cli.py`, the framework is leaking domain assumptions. Move them to the pattern layer.

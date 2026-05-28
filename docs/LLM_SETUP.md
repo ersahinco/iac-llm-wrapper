@@ -2,7 +2,9 @@
 
 ## Overview
 
-`iac-llm-wrapper` is **LLM-first**. Local models via Ollama are the primary development path. No API key or cloud service required. A 3B parameter model running locally is sufficient for most design documents.
+`iac-llm-wrapper` is an LLM-assisted decision engine. Local models via Ollama
+are the primary development path. No API key or cloud service required. A 3B
+parameter model running locally is sufficient for many structured design docs.
 
 **Important**: LLM testing is a local developer responsibility. CI does not run LLM tests (no API keys in GitHub Actions, no Ollama in CI). Every developer validates extraction quality with their own local models before submitting PRs.
 
@@ -78,17 +80,17 @@ uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwe
 uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b
 ```
 
-These compile checked-in role/eval fixtures, compare generated artifacts against expected
-outcomes, and verify LLM evidence when `--llm` is enabled.
+These compile checked-in role/eval fixtures, compare handoff artifacts against
+expected outcomes, and verify LLM evidence when `--llm` is enabled.
 
 ## LLM vs Deterministic Fallback
 
-### With LLM (Production Path)
+### With LLM (Model-Assisted Path)
 - Extracts free-form values from prose (accounts, workloads, CIDRs)
 - Detects signals from unstructured text
 - Fills gaps with guided interview
 - Handles implicit requirements
-- **This is the intended production path**
+- **This is the intended extraction path for narrative docs**
 
 ### Without LLM (Bootstrap / CI Only)
 - Uses graph defaults

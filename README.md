@@ -1,16 +1,24 @@
 # iac-llm-wrapper
 
-**LLM-powered infrastructure decision engine.**
+**Pre-provisioning infrastructure decision engine.**
 
-Architects describe infrastructure intent in prose. The tool extracts structured decisions, validates them against architectural knowledge graphs, and produces traceable artifacts engineers can act on.
+Architects write messy design docs. The tool extracts structured decisions,
+checks them against requirement graphs and target contracts, and emits traceable
+handoff artifacts for engineers.
 
-At its core is **intent-engine** — a knowledge-driven decision framework that powers extraction, validation, and generation. The `iac-llm-wrapper` package bundles this engine with off-the-shelf patterns for common infrastructure scenarios (landing zones, Kubernetes, compliance).
+The repository and package are named `iac-llm-wrapper`. The product inside is
+**intent-engine**. Despite the package name, it is not a wrapper around
+Terraform, CDK, CloudFormation, or AWS LZA. It is a decision and handoff layer
+for infrastructure delivery.
 
-Not a code generator. Not a Terraform/CDK wrapper. A **decision capture and validation** layer that sits between design documents and provisioning pipelines.
+LLMs help read intent. Human-owned models, requirement graphs, contracts,
+validators, lineage, runbooks, and evals decide what is acceptable. Existing
+accelerators, modules, and provisioning pipelines remain the delivery layer.
 
 ## The Core Idea
 
-Infrastructure design today means prose docs → misinterpretation → rework → compliance surprises.
+Infrastructure delivery often starts with prose, then loses decisions during
+handoff. That creates rework, compliance gaps, and unsafe defaults.
 
 This project replaces that with a **model-driven flow**:
 
@@ -24,18 +32,22 @@ Extraction ──── LLM traverses a requirement graph and detects signals
 Interview ───── Guided questions fill remaining gaps (via CLI or API)
      │
      ▼
-Validation ──── Fail-closed checks against the graph. Catches missing decisions early.
+Normalization ─ Defaults applied only when applicable. Duck-typed, pattern-aware.
      │
      ▼
-Normalization ─ Defaults applied only when applicable. Duck-typed, pattern-aware.
+Validation ──── Fail-closed checks against graph, model, and target contracts
      │
      ▼
 Output ──────── Contract handoff artifacts, lineage, runbooks, module inputs
 ```
 
-**Every decision is recorded** with timestamp, rationale, compliance context, and tradeoffs. Architects get living documentation. Compliance gets an audit trail. Engineers get a validated decision set to map to their IaC of choice.
+Every decision is recorded with provenance. Architects get a living decision
+record. Compliance gets traceability. Engineers get a validated handoff bundle
+for their IaC toolchain.
 
-The goal is not to reinvent infrastructure tooling. Existing accelerators and modules stay the delivery layer. LLMs help read human intent, surface missing decisions, and draft structured inputs; Pydantic models, requirement graphs, target contracts, validators, lineage, and runbooks keep the path safe and repeatable.
+Goal: reduce ambiguity before provisioning. LLMs read human intent and surface
+missing or conflicting decisions. Deterministic models, graphs, contracts,
+validators, lineage, runbooks, and evals keep the path safe and repeatable.
 
 ## Quick Start (Ollama + uv)
 
@@ -82,7 +94,8 @@ INTENT_ENGINE_DISABLE_LLM=1 iac-llm-wrapper compile -i design.md -o out/
 
 ### Evaluate Complex Docs
 
-Run the checked-in eval corpus to test extraction quality against expected generated artifacts:
+Run the checked-in eval corpus to test extraction quality against expected
+handoff artifacts:
 
 ```bash
 uv run python scripts/evaluate-extraction.py
@@ -92,13 +105,12 @@ uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen
 uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b --evidence-dir /tmp/iac-llm-evidence
 ```
 
-The eval loop compiles docs in `fixtures/eval/`, compares `decision-report.yaml` values,
-entity counts/names, and required handoff files, then exits non-zero on misses.
-The usability loop checks role-based trials for architect gap discovery, engineer handoff,
-and bring-your-own Terraform module input generation. Deterministic mode is the CI plumbing
-gate; `--llm` is the product-quality check for local/provider models. In `--llm` mode,
-the script verifies evidence files contain LLM calls; use `--evidence-dir` to keep the
-prompt/response YAML for inspection or observability import.
+The eval loop compiles docs in `fixtures/eval/`, compares decision values,
+entity names/counts, required files, and contract checks, then exits non-zero
+on misses. The usability loop checks role-based trials for architect gap
+discovery, engineer handoff, and bring-your-own Terraform module input capture.
+Deterministic mode is the CI harness gate; `--llm` is the model-quality gate.
+Use `--evidence-dir` to keep prompt/response YAML for inspection.
 
 Install from PyPI:
 
@@ -166,16 +178,16 @@ iac-llm-wrapper contract show --pattern aws-lza
 iac-llm-wrapper sample list --contract aws-lza-sample-configuration
 ```
 
-This keeps the path explicit: graph decisions must satisfy a target contract,
-then engineers receive generated handoff files plus matching sample bundles.
+This keeps the path explicit: graph decisions must satisfy a target contract
+before engineers receive handoff files and matching sample bundles.
 
-### 4. Compile to Decision Artifacts
+### 4. Compile to Handoff Artifacts
 
 ```bash
 iac-llm-wrapper compile -i design.md -o out/ --pattern aws-lza
 ```
 
-For `aws-lza`, output includes:
+For `aws-lza`, successful output includes:
 - `decision-report.yaml` — decisions, deployment readiness, blockers, and safe handoff path
 - `accounts-config.yaml`, `global-config.yaml`, `iam-config.yaml`, `network-config.yaml`, `organization-config.yaml`, `security-config.yaml` — AWS LZA handoff config files
 - `lineage-manifest.yaml` — decision-to-artifact path map
@@ -184,12 +196,13 @@ For `aws-lza`, output includes:
 - `llm-trace-summary.yaml` — provider/model, calls, extracted decisions, gaps,
   contradictions, and raw evidence path when compile used extraction evidence
 
-When compile is blocked, `decision-report.yaml` and `llm-trace-summary.yaml`
-must satisfy the built-in `blocked-assessment-artifacts` contract.
+When compile is blocked, only safe assessment artifacts are written:
+`decision-report.yaml` and `llm-trace-summary.yaml`. They must satisfy the
+built-in `blocked-assessment-artifacts` contract.
 
 ### 5. Engineer Handoff
 
-Engineers use the decision artifacts alongside sample configurations:
+Engineers use the handoff artifacts alongside sample configurations:
 
 ```bash
 # List available sample configs
@@ -216,8 +229,8 @@ moduleInputs:
         - eu-central-1b
 ```
 
-Engineers apply BYOM inputs to their Terraform/CDK/CloudFormation modules.
-For `aws-lza`, engineers review the generated LZA config files and runbook instead.
+Engineers apply BYOM inputs to their Terraform, CDK, or CloudFormation modules.
+For `aws-lza`, engineers review the emitted LZA config files and runbook instead.
 `sample-recommendations.yaml` preserves best matching reference bundles in output
 directory so engineers can recover proven starting points later without re-running
 interview session.
@@ -226,23 +239,24 @@ selected pattern to speed architect baseline selection and engineer handoff.
 Checked-in sample fixture bundles can be refreshed with
 `uv run python scripts/sync-sample-fixtures.py` and drift-checked with
 `uv run python scripts/sync-sample-fixtures.py --check`. CI runs the same check so
-generated fixture bundles cannot drift silently.
+emitted fixture bundles cannot drift silently.
 
 ## Patterns
 
-Patterns define questions, defaults, contracts, and output artifacts. Recommended product paths stay thin and contract-backed:
+Patterns define questions, defaults, contracts, validators, and output files.
+Recommended product paths stay thin and contract-backed:
 
 | Pattern | Description |
 |---------|-------------|
 | `aws-lza` | Thin AWS Landing Zone Accelerator handoff path using official-style LZA config artifacts |
-| `kubernetes-cluster` | K8s cluster provisioning with node pools and network policies |
+| `kubernetes-cluster` | K8s cluster handoff with node pools and network policies |
 | `terraform-vpc` | BYOM Terraform AWS VPC module input capture |
 
 ## Developer Experience
 
 - **CLI-first workflow**: Typer-based CLI with discover/compile/interview/validate/sample/contract/template/review commands for both architects and platform engineers.
 - **uv for dependency management**: Fast, reproducible local setup and CI parity.
-- **Model-driven type safety**: Pydantic v2 models are the contract for extraction, normalization, validation, and generation.
+- **Model-driven type safety**: Pydantic v2 models are the contract for extraction, normalization, validation, and artifact emission.
 - **Fail-closed validation**: Graph-driven violation codes prevent incomplete or contradictory decisions from reaching implementation.
 
 ## Quality and Security
@@ -294,7 +308,9 @@ g.add(
 )
 ```
 
-New requirements automatically appear in LLM prompts, interview questions, default application, validation, and generation — no core code changes needed.
+New requirements automatically appear in LLM prompts, interview questions,
+default application, validation, and artifact emission. No core code changes
+needed.
 
 ### Create a new pattern
 
@@ -329,9 +345,12 @@ iac-llm-wrapper/
         └── patterns/      # Pluggable patterns (LZA, K8s, ...)
 ```
 
-## Why Not Terraform/CDK/CloudFormation?
+## Why Not Terraform, CDK, or CloudFormation?
 
-Those tools execute infrastructure. This tool **designs infrastructure** — it captures the architectural decisions that should be made *before* provisioning. It produces decision artifacts that engineers use alongside sample configurations and IaC modules. It does not generate deployable infrastructure.
+Those tools provision infrastructure. This tool captures and validates the
+decisions that must be made before provisioning. It emits handoff artifacts
+engineers use with existing accelerators, sample configurations, and IaC
+modules. It does not generate arbitrary deployable infrastructure from prose.
 
 ## LLM Testing
 
@@ -366,7 +385,7 @@ See [docs/LLM_SETUP.md](docs/LLM_SETUP.md) for detailed model setup and troubles
 
 ## Project Status
 
-Alpha. 522+ tests. Core architecture is stable. Pattern library is growing. Contributions welcome.
+Alpha. Core architecture is stable. Pattern library is growing. Contributions welcome.
 
 ## License
 
