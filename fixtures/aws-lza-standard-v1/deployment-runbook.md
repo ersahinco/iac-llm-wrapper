@@ -23,6 +23,14 @@ Optional configuration files are emitted only when custom target contracts requi
 - `customizations-config.yaml`
 - `replacements-config.yaml`
 
+## Recommended Sample Configs
+
+Ranked recommendations are also persisted in `sample-recommendations.yaml`.
+
+- `aws-lza-standard-v1`: 12/12 decisions match, 0 differ, fixture `aws-lza-standard-v1/`
+- `aws-lza-regulated-v1`: 11/13 decisions match, 2 differ, fixture `aws-lza-regulated-v1/`
+- `aws-lza-healthcare-v1`: 10/13 decisions match, 3 differ, fixture `aws-lza-healthcare-v1/`
+
 ## Sequence
 
 1. Confirm AWS Organizations or Control Tower baseline matches `org_mode`.

@@ -188,6 +188,26 @@ def _security_hub_config(intent: AwsLzaIntent) -> dict[str, Any]:
     }
 
 
+def _sample_recommendation_runbook_lines(intent: AwsLzaIntent) -> list[str]:
+    decisions = SampleConfig.to_builtin(intent.model_dump())
+    matches = GLOBAL_SAMPLE_REGISTRY.find_best_matches(
+        decisions,
+        pattern="aws-lza",
+        limit=3,
+    )
+    if not matches:
+        return ["No registered sample recommendations found.", ""]
+
+    lines = ["Ranked recommendations are also persisted in `sample-recommendations.yaml`.", ""]
+    for match in matches:
+        lines.append(
+            f"- `{match.sample.name}`: {match.same_count}/"
+            f"{match.total_sample_decisions} decisions match, "
+            f"{match.different_count} differ, fixture `{match.sample.fixture_name}/`"
+        )
+    return lines + [""]
+
+
 def _core_vpc_config(intent: AwsLzaIntent) -> dict[str, Any]:
     return {
         "name": "Core",
@@ -710,6 +730,9 @@ def gen_lza_deployment_runbook(intent: Any, output_dir: Path) -> None:
         "",
         *[f"- `{name}`" for name in _LZA_CONTRACT.optional_artifacts],
         "",
+        "## Recommended Sample Configs",
+        "",
+        *_sample_recommendation_runbook_lines(intent),
         "## Sequence",
         "",
         "1. Confirm AWS Organizations or Control Tower baseline matches `org_mode`.",

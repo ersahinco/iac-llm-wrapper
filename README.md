@@ -180,7 +180,8 @@ After `compile` or `interview`, the CLI also prints closest sample matches for t
 selected pattern to speed architect baseline selection and engineer handoff.
 Checked-in sample fixture bundles can be refreshed with
 `uv run python scripts/sync-sample-fixtures.py` and drift-checked with
-`uv run python scripts/sync-sample-fixtures.py --check`.
+`uv run python scripts/sync-sample-fixtures.py --check`. CI runs the same check so
+generated fixture bundles cannot drift silently.
 
 ## Patterns
 

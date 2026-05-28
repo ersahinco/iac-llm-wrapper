@@ -220,6 +220,9 @@ class TestAwsLzaPattern:
         runbook = (output / "deployment-runbook.md").read_text()
         assert "AWS LZA Deployment Runbook" in runbook
         assert "Mandatory configuration files" in runbook
+        assert "Recommended Sample Configs" in runbook
+        assert "`aws-lza-standard-v1`" in runbook
+        assert "sample-recommendations.yaml" in runbook
         assert "Populate customer-specific Identity Center assignments" in runbook
         assert "parallel Terraform or Terragrunt" in runbook
 

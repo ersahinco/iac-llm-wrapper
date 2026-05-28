@@ -179,8 +179,8 @@ T15: Lean contract-driven handoff maturity
 - **Tests**: 515 passing, 1 skipped (LLM non-determinism)
 - **Lint**: clean
 - **Format**: clean
-- **Repo**: `github.com/ersahinco/intent-engine` (private)
-- **Last session**: Tightened AWS LZA global/network handoff shape, widened mypy to AWS LZA emitter, refreshed fixtures, kept full gate green
+- **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
+- **Last session**: Added explicit fixture drift check to CI, embedded sample recommendations in AWS LZA runbook, kept full gate green
 
 ### Done
 | Area | Item |
@@ -241,6 +241,7 @@ T15: Lean contract-driven handoff maturity
 | **Sample config CLI** | Added `intent-engine sample list/show` for registry-backed sample inspection by name or pattern, including metadata, decisions, and module references. |
 | **Sample matching** | Generic sample matching now ranks closest sample configs from typed graph decisions and prints recommendations after `compile`/`interview`. CLI list also filters by `--tag` and `--contract`. |
 | **Persisted sample handoff** | Patterns with registered sample configs now emit `sample-recommendations.yaml` as output artifact so engineers retain baseline guidance after terminal session ends. |
+| **Runbook sample guidance** | AWS LZA deployment runbook now embeds top sample recommendations from the generic sample registry so engineers see starting bundles without opening a second artifact first. |
 | **Contract CLI** | `intent-engine contract list/show` exposes registered target contracts, required/optional artifacts, required paths, required decisions, source URL, and decision lineage. |
 | **Contract schema checks** | `ArtifactContract.required_paths` lets target contracts validate generated YAML shape without pattern-specific artifact validators. |
 | **Contract value assertions** | `ArtifactContract.value_assertions` now validates stable downstream literal values such as org-trail toggles, DNS flags, and GuardDuty export settings. |
@@ -254,17 +255,18 @@ T15: Lean contract-driven handoff maturity
 | **Generator scoping tests** | Core tests now lock `applies_to` behavior so scoped generators do not run for other patterns. |
 | **Fixture sync helper** | `scripts/sync-sample-fixtures.py` regenerates sample fixture bundles from registered sample decisions, prunes stale generated files, and supports `--check` drift detection. |
 | **Fixture drift guard** | Sample fixture tests now compile each registered sample and compare checked-in bundles against fresh generated output, with timestamp normalization for `decision-audit.yaml`. |
+| **Fixture drift CI gate** | CI now runs `uv run python scripts/sync-sample-fixtures.py --check` explicitly so generated fixture drift fails fast and visibly. |
 | **Incremental mypy expansion** | `uv run --extra dev mypy` now covers core contracts, sample config registry, module payload mapping, AWS LZA emitter code, and AWS LZA contract metadata in addition to previous typed files. |
 | **LLM-path deterministic backfill** | Compiler now merges deterministic Markdown accounts/OUs/workloads into LLM-produced intent, backfilling dropped or partial named entities from small models without duplicating explicit items. |
 
 ### Next (prioritized)
 1. [ ] Continue narrowing remaining `aws-lza` field gaps against official LZA sample config schemas, especially IAM permission set/assignment detail when real customer identity inputs exist.
 2. [ ] Evaluate adding remaining source files to mypy scope when they change (ongoing incremental policy).
-3. [ ] Decide whether fixture drift `--check` belongs in CI for faster, more explicit failure mode.
-4. [ ] Decide whether sample recommendations should feed deployment runbooks or decision reports directly, not only standalone artifact.
-5. [ ] Decide whether small-model extraction still needs separate workload-only LLM pass after deterministic backfill results settle.
+3. [ ] Decide whether small-model extraction still needs separate workload-only LLM pass after deterministic backfill results settle.
 
 ### Key Decisions This Session
+- **Fixture drift belongs in CI now**: Tests already compare generated bundles, but explicit `sync-sample-fixtures.py --check` gives faster failure and clearer maintainer action.
+- **Runbook can summarize, artifact can detail**: `deployment-runbook.md` now names top sample bundles and match counts, while `sample-recommendations.yaml` remains the full machine-readable diff.
 - **Global/network LZA shape deepened without deploy ownership**: Added upstream-style CDK/logging/network placeholders and contract checks, but still emits handoff YAML only.
 - **Branch-specific contract pressure avoided**: Hub-spoke-only central network services and TGW details are emitted and tested, but not unconditional contract requirements, so `single-vpc` handoff still validates.
 - **Mypy follows touched stable code**: Added `patterns/aws_lza/__init__.py` to typed scope after tightening emitter behavior.
