@@ -68,10 +68,13 @@ class MarkdownExtractor:
                 continue
 
             # Validate against requirement options if available
-            req = self.graph._requirements.get(req_key)
-            if req and req.options:
+            matched_req = self.graph._requirements.get(req_key)
+            if matched_req and matched_req.options:
                 val_lower = raw_val.lower()
-                matched = next((opt for opt in req.options if opt.lower() == val_lower), None)
+                matched = next(
+                    (opt for opt in matched_req.options if opt.lower() == val_lower),
+                    None,
+                )
                 if matched:
                     raw_val = matched
                 else:

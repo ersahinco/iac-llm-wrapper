@@ -84,6 +84,7 @@ files = [
     "src/intent_engine/core/extractor.py",
     "src/intent_engine/core/compiler.py",
     "src/intent_engine/core/generator.py",
+    "src/intent_engine/core/markdown_extractor.py",
     "src/intent_engine/core/module_mapping.py",
     "src/intent_engine/core/sample_config.py",
     "src/intent_engine/core/validator.py",
