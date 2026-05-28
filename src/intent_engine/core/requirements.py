@@ -333,7 +333,7 @@ class RequirementGraph:
             except Exception:
                 pass
 
-        # Legacy string-based coercion
+        # Fallback for string-based target_type metadata.
         if target_type == "string":
             return value
         if target_type == "int":

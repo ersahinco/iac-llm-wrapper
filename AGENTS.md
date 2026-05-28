@@ -87,7 +87,7 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy.
 
 ### Current Goal
 
-T16: Remove legacy LZA confusion, keep product path lean
+T16: Keep product path lean and current
 
 ### Status
 
@@ -96,7 +96,7 @@ T16: Remove legacy LZA confusion, keep product path lean
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Folded product vision into README; full test/lint/type/eval/usability/pre-commit gate green
+- **Last session**: Ran lean/stale audit; removed confusing old wording and ignored generated junk; full gate green
 
 ### Done
 
@@ -122,6 +122,6 @@ T16: Remove legacy LZA confusion, keep product path lean
 ### Key Decisions This Session
 
 - One AWS LZA path beats two similar folders. Keep `patterns/aws_lza`; delete stale old path.
-- Samples and contracts replace legacy extension wiring for current product paths.
+- Samples and contracts replace old extension wiring for current product paths.
 - Fixture names should match sample names unless explicit override is needed.
 - Evaluation fixtures should exercise current product paths, not removed research paths.

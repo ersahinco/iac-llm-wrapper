@@ -52,7 +52,7 @@ For other use cases, teams can bring their own module or accelerator contract:
 
 - LZA sample configuration
 - Terraform module schema
-- organization module catalog
+- organization module inventory
 - Kubernetes chart values schema
 - custom Pydantic model
 

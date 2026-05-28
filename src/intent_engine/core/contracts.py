@@ -1,7 +1,7 @@
 """Target contracts and validation helpers.
 
 Contracts describe downstream targets such as AWS LZA sample configs,
-Terraform modules, org catalogs, or workload templates. They define shape;
+Terraform modules, org module inventories, or workload templates. They define shape;
 the requirement graph still owns branching and decision order.
 """
 

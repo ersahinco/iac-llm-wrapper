@@ -317,13 +317,13 @@ class Extractor:
     def parse_response(self, response: str) -> LLMGraphResult:
         """Parse LLM response into structured LLMGraphResult.
 
-        Supports both the new structured format (with decisions/signals/gaps)
-        and the legacy flat format for backward compatibility.
+        Supports graph-aware format (with decisions/signals/gaps) and flat
+        decision maps from simpler backends.
         """
         data: dict[str, Any] = _safe_json_parse(response) or {}
         result = LLMGraphResult(raw_response=response)
 
-        # New structured format
+        # Graph-aware format
         if "decisions" in data or "signal_decisions" in data:
             result.decisions = self._coerce_decisions(data.get("decisions", {}))
             result.design_doc = data.get("design_doc", {})
@@ -332,7 +332,7 @@ class Extractor:
             result.contradictions = data.get("contradictions", [])
             return result
 
-        # Legacy flat format: treat entire response as decisions
+        # Flat format: treat entire response as decisions.
         result.decisions = self._coerce_decisions(data)
         return result
 
@@ -399,11 +399,11 @@ class Extractor:
                     _, annotation = resolve_field_info(model, req.target_field)
                     parsed_val = coerce_value(raw_val, annotation)
                 except Exception:
-                    # Fallback to legacy target_type string match
+                    # Fall back to target_type string match.
                     pass
 
             if parsed_val is None:
-                # Legacy fallback for string-based target_type
+                # Fallback for string-based target_type metadata.
                 target_type = req.target_type
                 if target_type == "string":
                     parsed_val = _str(raw_val)
