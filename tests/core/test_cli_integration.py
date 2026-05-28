@@ -71,7 +71,7 @@ class TestCLICompile:
         result = runner.invoke(
             app, ["compile", "--input", "fixtures/valid-payments.md", "--output", str(output_dir)]
         )
-        # With defaults-only, compile succeeds with default values
+        # With deterministic fallback, compile succeeds from defaults and structured entities.
         assert result.exit_code == 0, result.output
         assert output_dir.exists()
         assert (output_dir / "decision-report.yaml").exists()

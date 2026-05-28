@@ -23,8 +23,9 @@ When no LLM is available (`INTENT_ENGINE_DISABLE_LLM=1`):
 2. **Validates** against graph rules
 3. **Generates** decision artifacts from defaults + any explicit `--decisions` JSON
 4. **Signal detection** still works on text via keyword matching
+5. **Structured Markdown entity sections** can recover named accounts, OUs, and workloads
 
-**Important**: This is not a production extraction path. A complex design document fed into the tool without an LLM produces default values, not the architect's intent. The deterministic fallback is for unit tests, CI bootstrapping, and quick validation only.
+**Important**: This is not a production extraction path. A complex narrative design document fed into the tool without an LLM produces defaults plus explicitly structured entities, not the full architect intent. The deterministic fallback is for unit tests, CI bootstrapping, and quick validation only.
 
 ## Decision Artifact → IaC Module Mapping
 

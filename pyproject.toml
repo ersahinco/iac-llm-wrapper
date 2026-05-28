@@ -96,7 +96,12 @@ files = [
     "src/intent_engine/patterns/aws_lza/contracts.py",
     "src/intent_engine/patterns/aws_lza/models.py",
     "src/intent_engine/patterns/kubernetes/__init__.py",
+    "src/intent_engine/patterns/kubernetes/models.py",
+    "src/intent_engine/patterns/lza/discovery.py",
     "src/intent_engine/patterns/lza/generators.py",
+    "src/intent_engine/patterns/lza/models.py",
+    "src/intent_engine/patterns/lza/normalizer.py",
+    "src/intent_engine/patterns/lza/validators.py",
 ]
 pretty = true
 show_error_codes = true

@@ -389,7 +389,7 @@ def discover(
     no_llm: bool = typer.Option(
         False,
         "--no-llm",
-        help="Disable LLM extraction (deterministic defaults only)",
+        help="Disable LLM extraction (defaults plus structured Markdown entities)",
     ),
     resume: Path = typer.Option(
         None,

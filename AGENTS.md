@@ -17,7 +17,7 @@ uv run python scripts/sync-sample-fixtures.py --check
 ## Architecture
 
 - **Models** (`models.py`): Pydantic v2 data model for intent concepts. Use-case specific; LZA models include `CICDRunnerConfig`, `SecretManagementConfig`, `NetworkApplianceConfig`. The model drives extraction, graph sync, validation, and generation — like environment variables for a runtime.
-- **Extract** (`extractor.py`): Single `Extractor` class driven by the requirement graph. Auto-generates LLM prompts from graph node `target_field`/`target_type`, parses JSON responses with type coercion. No regex, no rigid format — describe requirements in any structure. Falls back to graph defaults when no LLM available. Prompt is domain-agnostic; patterns optionally inject `prompt_context`.
+- **Extract** (`extractor.py`): Single `Extractor` class driven by the requirement graph. Auto-generates LLM prompts from graph node `target_field`/`target_type`, parses JSON responses with type coercion. No regex in the LLM extraction path, no rigid prose format. Without LLM, fallback applies graph defaults and can recover explicitly structured Markdown entity sections. Prompt is domain-agnostic; patterns optionally inject `prompt_context`.
 - **Patterns** (`patterns.py`): Pluggable pattern registry (`baseline`, `minimal`, `workload`, `hybrid-enterprise`, `financial-services`, `healthcare`, `kubernetes-cluster`). Patterns carry their own graph factories, intent models, default catalogs, validators, generators, and template metadata. New patterns register without core code changes. **Addon system**: `Addon`/`AddonRegistry` for composable modules that layer requirements, field maps, and section maps onto any base pattern. Built-in addons include `pci-compliance`, `hipaa`, `self-hosted-cicd`, `hashicorp-vault`, `paloalto-fw`. `--addon` CLI flag enables composition.
 - **Requirements** (`requirements.py`): Knowledge graph of decisions with `applies_if`, `blocked_if`, `depends_on`, and `cascade` rules. Each node carries architectural knowledge: WA pillars, compliance controls, migration signals, tradeoffs, alternatives, consequences, and confidence scores. Graphs are pattern-driven.
 - **Interview** (`interview.py`): Knowledge-driven interview engine. Presents questions in topological order with full context: WA pillars, compliance controls, tradeoffs, consequences, and detected signals. `path_log()` shows every decision and why each path was taken or skipped. Every decision is recorded in an audit trail with timestamp and rationale.
@@ -147,7 +147,7 @@ See `EXTENSION.md` for the exact contract for adding new use cases. The litmus t
 ## How It Works (Model-Driven Flow)
 
 1. **Architect writes Markdown** — prose with structured sections (Region, Topology, Network, Security, etc.)
-2. **Extraction** — LLM traverses the requirement graph guided by auto-generated prompts. Optional deterministic fallback uses graph defaults.
+2. **Extraction** — LLM traverses the requirement graph guided by auto-generated prompts. Optional deterministic fallback uses graph defaults plus explicitly structured Markdown entity sections.
 3. **Sync to Graph** — extracted values are fed into the requirement graph as decisions. The graph's `applies_if`/`blocked_if` rules propagate statuses automatically.
 4. **Discovery** — the system finds genuine gaps (not all unasked questions, only those that are applicable but unset). It also detects signals from the prose.
 5. **Interview** — if gaps exist, the architect is asked only the remaining questions. Each question includes WA pillar context, compliance controls, tradeoffs, consequences, and migration signals.
@@ -181,7 +181,7 @@ T15: Lean contract-driven handoff maturity
 - **Lint**: clean
 - **Format**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added catalog match helper to mypy scope, kept full gate green
+- **Last session**: Refreshed deterministic fallback docs/CLI text and added clean pattern support files to mypy scope, kept full gate green
 
 ### Done
 | Area | Item |
@@ -259,7 +259,7 @@ T15: Lean contract-driven handoff maturity
 | **Fixture drift CI gate** | CI now runs `uv run python scripts/sync-sample-fixtures.py --check` explicitly so generated fixture drift fails fast and visibly. |
 | **Pre-commit gate alignment** | Pre-commit now runs the same scoped `uv run --extra dev mypy` and sample fixture drift check as local/CI gates instead of a broader mirror-mypy invocation. |
 | **Whitespace-stable YAML generation** | Core and AWS LZA YAML dumpers strip trailing whitespace, so generated fixtures no longer fight whitespace hooks. |
-| **Incremental mypy expansion** | `uv run --extra dev mypy` now covers catalog matching, fixture sync tooling, extraction benchmark tooling, core contracts, sample config registry, Markdown extractor, module payload mapping, AWS LZA emitter/model code, and AWS LZA contract metadata in addition to previous typed files. |
+| **Incremental mypy expansion** | `uv run --extra dev mypy` now covers catalog matching, fixture sync tooling, extraction benchmark tooling, core contracts, sample config registry, Markdown extractor, module payload mapping, LZA support modules, AWS LZA emitter/model code, and AWS LZA contract metadata in addition to previous typed files. |
 | **LLM-path deterministic backfill** | Compiler now merges deterministic Markdown accounts/OUs/workloads into LLM-produced intent, backfilling dropped or partial named entities from small models without duplicating explicit items. |
 | **Markdown extractor type coverage** | Deterministic Markdown extraction is now in mypy scope, protecting the small-model backfill path from silent type drift. |
 | **Extraction benchmark type coverage** | `scripts/benchmark-extraction.py` is now in mypy scope, protecting the local small-model quality benchmark from untyped JSON/YAML drift. |
@@ -272,6 +272,8 @@ T15: Lean contract-driven handoff maturity
 3. [ ] Decide whether small-model extraction still needs separate workload-only LLM pass after deterministic backfill results settle.
 
 ### Key Decisions This Session
+- **Fallback wording must track implementation**: Docs and CLI text now describe deterministic mode as defaults plus structured Markdown entity recovery, not defaults-only.
+- **Pattern support files can enter typed scope gradually**: Added clean LZA normalizer/discovery/validators and pattern model files to mypy scope without forcing whole-repo typing churn.
 - **Catalog suggestions are user-facing enough for type coverage**: Added `core/catalog_match.py` to mypy scope because compile output depends on it for closest catalog guidance.
 - **Fixture sync is gate code**: Added `scripts/sync-sample-fixtures.py` to mypy scope because it now runs in CI and pre-commit.
 - **Fallback docs must match behavior**: README and LLM setup docs now say deterministic mode can recover structured account/OU/workload sections but still cannot interpret arbitrary prose.
