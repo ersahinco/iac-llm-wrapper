@@ -266,14 +266,29 @@ model: none
 callCount: 0
 markdownDecisions: {}
 markdownContradictions: []
+rawLlmDecisions: {}
+acceptedDecisions: {}
+appliedDecisions:
+  markdown: []
+  llm: []
+  signals: []
+  defaults: []
 extractedDecisions: {}
 signalDecisions: {}
-gaps: []
-contradictions: []
+gaps:
+  resolved: []
+  blocking: []
+contradictions:
+  blocking: []
 deploymentReadiness:
   deploymentAllowed: false
   status: blocked
   blockerCount: 1
+  blockingGapCount: 0
+  blockingContradictionCount: 0
+rawEvidence:
+  path: not-requested
+  status: not-requested
 """
         )
 

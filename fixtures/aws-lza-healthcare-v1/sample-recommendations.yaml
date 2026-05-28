@@ -16,6 +16,12 @@ currentDecisions:
   security_tooling_account: SecurityTooling
   network_account: Network
   identity_center_delegated_admin_account: SecurityTooling
+  identity_center_permission_sets:
+    - ClinicalReadOnly
+    - SecurityAudit
+  identity_center_assignments:
+    - ClinicalPlatform:ClinicalReadOnly:ClinicalProd
+    - SecurityAuditors:SecurityAudit:Audit
   topology: hub-spoke
   centralized_logging: true
   security_hub_enabled: true
@@ -40,10 +46,10 @@ recommendations:
       - healthcare
       - hipaa
       - phi
-    sameDecisionCount: 14
+    sameDecisionCount: 16
     differentDecisionCount: 0
     missingDecisionCount: 0
-    totalSampleDecisions: 14
+    totalSampleDecisions: 16
     sameDecisions:
       - baseline
       - centralized_logging
@@ -51,7 +57,9 @@ recommendations:
       - enabled_regions
       - guardduty_enabled
       - home_region
+      - identity_center_assignments
       - identity_center_delegated_admin_account
+      - identity_center_permission_sets
       - network_account
       - org_mode
       - organizational_units
@@ -81,9 +89,9 @@ recommendations:
       - control-tower
       - hub-spoke
     sameDecisionCount: 11
-    differentDecisionCount: 2
+    differentDecisionCount: 4
     missingDecisionCount: 0
-    totalSampleDecisions: 13
+    totalSampleDecisions: 15
     sameDecisions:
       - centralized_logging
       - enabled_regions
@@ -105,6 +113,19 @@ recommendations:
           - Prod
         current:
           - ClinicalProd
+      identity_center_permission_sets:
+        sample:
+          - ReadOnlyAccess
+          - PowerUserAccess
+        current:
+          - ClinicalReadOnly
+          - SecurityAudit
+      identity_center_assignments:
+        sample:
+          - PlatformAdmins:PowerUserAccess:Management
+        current:
+          - ClinicalPlatform:ClinicalReadOnly:ClinicalProd
+          - SecurityAuditors:SecurityAudit:Audit
     missingDecisions: {}
     extraCurrentDecisions:
       compliance_overlay: healthcare
@@ -127,9 +148,9 @@ recommendations:
       - security-hub
       - nist
     sameDecisionCount: 10
-    differentDecisionCount: 4
+    differentDecisionCount: 6
     missingDecisionCount: 0
-    totalSampleDecisions: 14
+    totalSampleDecisions: 16
     sameDecisions:
       - centralized_logging
       - guardduty_enabled
@@ -156,6 +177,20 @@ recommendations:
           - Prod
         current:
           - ClinicalProd
+      identity_center_permission_sets:
+        sample:
+          - ReadOnlyAccess
+          - AuditAccess
+        current:
+          - ClinicalReadOnly
+          - SecurityAudit
+      identity_center_assignments:
+        sample:
+          - SecurityAuditors:AuditAccess:Audit
+          - PlatformAdmins:ReadOnlyAccess:Management
+        current:
+          - ClinicalPlatform:ClinicalReadOnly:ClinicalProd
+          - SecurityAuditors:SecurityAudit:Audit
       compliance_overlay:
         sample: regulated
         current: healthcare

@@ -52,6 +52,9 @@ moduleInputs:
       enable_nat_gateway: true
 ```
 
+For `cloudformation-parameters`, the tool emits parameter handoff for an
+approved existing template, not a generated stack.
+
 Engineer workflow:
 1. Review `decision-report.yaml` for readiness, blockers, and decisions
 2. Use AWS LZA config files directly when pattern is `aws-lza`
@@ -59,9 +62,10 @@ Engineer workflow:
 4. Reference `source` and `version` for module pinning when provided
 5. Use `lineage-manifest.yaml` for traceability
 6. Use `sample-recommendations.yaml` for persisted reference-bundle guidance
-7. Use `llm-trace-summary.yaml` to audit provider/model calls, extracted decisions,
-   gaps, contradictions, and raw evidence path when extraction evidence exists
-8. Validate blocked compile output against `blocked-assessment-artifacts`
+7. Use `handoff-plan.yaml` for owners, ordering, manual gates, rollback, and boundary
+8. Use `llm-trace-summary.yaml` to audit provider/model calls, raw and accepted
+   decisions, gaps, contradictions, and raw evidence status
+9. Validate blocked compile output against `blocked-assessment-artifacts`
 
 ## Sample Config Registry
 

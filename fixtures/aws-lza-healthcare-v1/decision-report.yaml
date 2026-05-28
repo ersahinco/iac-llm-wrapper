@@ -20,6 +20,12 @@ accounts:
     - ClinicalProd
 identity:
   identityCenterDelegatedAdmin: SecurityTooling
+  identityCenterPermissionSets:
+    - ClinicalReadOnly
+    - SecurityAudit
+  identityCenterAssignments:
+    - ClinicalPlatform:ClinicalReadOnly:ClinicalProd
+    - SecurityAuditors:SecurityAudit:Audit
 network:
   topology: hub-spoke
   cidr: 10.0.0.0/16

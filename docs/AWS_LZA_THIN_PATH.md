@@ -104,6 +104,7 @@ Target outputs vary:
 
 - AWS LZA: LZA YAML configuration, lineage manifest, decision report, deployment runbook
 - Terraform module: variables file, module input mapping, dependency notes
+- CloudFormation template: parameter handoff for an existing approved template
 - future target adapter: module generation or controlled execution only when the contract requires it
 
 Provider-specific orchestration belongs in the target adapter layer. Core remains generic.
@@ -114,8 +115,8 @@ Contracts are first-class CLI objects. Architects and engineers can inspect the 
 before generating artifacts:
 
 ```bash
-intent-engine contract list
-intent-engine contract show --pattern aws-lza
+iac-llm-wrapper contract list
+iac-llm-wrapper contract show --pattern aws-lza
 ```
 
 This shows required files, optional files, required YAML paths, required decisions,
@@ -168,9 +169,11 @@ Current scope produces a useful handoff without owning deployment:
 - `lineage-manifest.yaml` mapping decisions to emitted files, required artifact paths,
   and YAML lineage paths
 - `decision-report.yaml` with extracted decisions and deployment readiness
+- `handoff-plan.yaml` with ordered owners, dependencies, gates, rollback, boundary,
+  and allowed next action
 - `sample-recommendations.yaml` with persisted closest sample-config matches for handoff
-- `llm-trace-summary.yaml` with provider/model, calls, extracted decisions, gaps,
-  contradictions, and raw evidence path when extraction evidence exists
+- `llm-trace-summary.yaml` with provider/model, rounded latency, raw and accepted
+  decisions, resolved/blocking gaps, blocking contradictions, and raw evidence status
 - `deployment-runbook.md` with prerequisites and sequence
 - blocked compile assessments validated by the generic
   `blocked-assessment-artifacts` contract
@@ -181,7 +184,7 @@ Current emitted YAML targets official LZA-style top-level sections such as:
 
 - `accounts-config.yaml`: `mandatoryAccounts`, `workloadAccounts`
 - `global-config.yaml`: `homeRegion`, `enabledRegions`, `controlTower`, `cdkOptions`, `logging`
-- `iam-config.yaml`: `homeRegion`, `identityCenter`
+- `iam-config.yaml`: `homeRegion`, `identityCenter`, permission sets, and assignments
 - `network-config.yaml`: `defaultVpc`, `centralNetworkServices`, `transitGateways`, `vpcs`
 - `organization-config.yaml`: `enable`, `organizationalUnits`, policy lists
 - `security-config.yaml`: `accessAnalyzer`, `iamPasswordPolicy`, `awsConfig`, `cloudWatch`, `centralSecurityServices`

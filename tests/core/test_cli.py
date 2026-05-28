@@ -52,7 +52,11 @@ class TestValidateCommand:
                 "--output",
                 str(output),
                 "--decisions",
-                '{"network_account": "Network"}',
+                (
+                    '{"network_account": "Network", '
+                    '"identity_center_permission_sets": "ReadOnlyAccess", '
+                    '"identity_center_assignments": "PlatformAdmins:ReadOnlyAccess:Management"}'
+                ),
             ],
         )
         assert result.exit_code == 0, result.output
@@ -149,7 +153,11 @@ class TestExplainCommand:
                 "--output",
                 str(output),
                 "--decisions",
-                '{"network_account": "Network"}',
+                (
+                    '{"network_account": "Network", '
+                    '"identity_center_permission_sets": "ReadOnlyAccess", '
+                    '"identity_center_assignments": "PlatformAdmins:ReadOnlyAccess:Management"}'
+                ),
             ],
         )
         result = runner.invoke(app, ["explain", "--report", str(output / "decision-report.yaml")])
@@ -165,7 +173,13 @@ class TestExplainCommand:
 class TestInterviewCommand:
     def test_interview_with_decisions_json(self, tmp_path: Path):
         output = tmp_path / "output"
-        decisions = json.dumps({"network_account": "Network"})
+        decisions = json.dumps(
+            {
+                "network_account": "Network",
+                "identity_center_permission_sets": "ReadOnlyAccess",
+                "identity_center_assignments": "PlatformAdmins:ReadOnlyAccess:Management",
+            }
+        )
         result = runner.invoke(
             app, ["interview", "--output", str(output), "--decisions", decisions]
         )
@@ -181,7 +195,13 @@ class TestInterviewCommand:
 
     def test_interview_prints_sample_match_for_aws_lza(self, tmp_path: Path):
         output = tmp_path / "output"
-        decisions = json.dumps({"network_account": "Network"})
+        decisions = json.dumps(
+            {
+                "network_account": "Network",
+                "identity_center_permission_sets": "ReadOnlyAccess",
+                "identity_center_assignments": "PlatformAdmins:ReadOnlyAccess:Management",
+            }
+        )
         result = runner.invoke(
             app, ["interview", "--output", str(output), "--decisions", decisions]
         )
@@ -189,4 +209,4 @@ class TestInterviewCommand:
         assert result.exit_code == 0
         assert "=== Sample Match ===" in result.stdout
         assert "aws-lza-standard-v1" in result.stdout
-        assert "intent-engine sample show --name aws-lza-standard-v1" in result.stdout
+        assert "iac-llm-wrapper sample show --name aws-lza-standard-v1" in result.stdout

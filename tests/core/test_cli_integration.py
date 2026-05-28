@@ -137,7 +137,7 @@ class TestCLIVersion:
     def test_version_flag(self):
         result = runner.invoke(app, ["--version"])
         assert result.exit_code == 0
-        assert "intent-engine" in result.output
+        assert "iac-llm-wrapper" in result.output
         assert "0.1.0" in result.output
 
 
@@ -151,7 +151,11 @@ class TestCLIInterview:
                 "--output",
                 str(output_dir),
                 "--decisions",
-                '{"network_account": "Network"}',
+                (
+                    '{"network_account": "Network", '
+                    '"identity_center_permission_sets": "ReadOnlyAccess", '
+                    '"identity_center_assignments": "PlatformAdmins:ReadOnlyAccess:Management"}'
+                ),
             ],
         )
         assert result.exit_code == 0, result.output
@@ -184,7 +188,11 @@ class TestCLIValidate:
                 "--output",
                 str(output_dir),
                 "--decisions",
-                '{"network_account": "Network"}',
+                (
+                    '{"network_account": "Network", '
+                    '"identity_center_permission_sets": "ReadOnlyAccess", '
+                    '"identity_center_assignments": "PlatformAdmins:ReadOnlyAccess:Management"}'
+                ),
             ],
         )
         assert result.exit_code == 0, result.output

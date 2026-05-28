@@ -16,7 +16,7 @@ after graph, contract, and gate checks pass. LZA is first target pattern.
 - One SPEC.md at root. No split specs
 
 ## §I INTERFACES
-- cli: `intent-engine compile|interview|validate|discover|template|sample|contract|explain|review`
+- cli: `iac-llm-wrapper compile|interview|validate|discover|template|sample|contract|explain|review`
 - graph: `RequirementGraph` — add, decide, status, apply_decisions, cascade
 - models: pattern-specific Pydantic intent models
 - emit: `GeneratorRegistry` — `register(name, fn, priority, category, applies_to)`

@@ -11,6 +11,8 @@ The repository and package are named `iac-llm-wrapper`. The core is
 validation and emits handoff artifacts. Future target adapters can wrap module
 generation or controlled IaC execution, but only after graph, contract, and gate
 checks pass.
+The primary CLI is `iac-llm-wrapper`; `intent-engine` is kept as an optional
+alias for the core engine.
 
 LLMs help read intent. Human-owned models, requirement graphs, contracts,
 validators, lineage, runbooks, and evals decide what is acceptable. Existing
@@ -111,6 +113,8 @@ The eval loop compiles docs in `fixtures/eval/`, compares decision values,
 entity names/counts, required files, and contract checks, then exits non-zero
 on misses. The usability loop checks role-based trials for architect gap
 discovery, engineer handoff, and bring-your-own Terraform module input capture.
+It also includes a CloudFormation parameter handoff trial to prove BYOM
+orchestration beyond Terraform without generating a stack.
 Deterministic mode is the CI harness gate; `--llm` is the model-quality gate.
 Use `--evidence-dir` to keep prompt/response YAML for inspection.
 
@@ -151,6 +155,8 @@ for a thin AWS LZA example):
 
 ## Identity
 - identity_center_delegated_admin_account: SecurityTooling
+- identity_center_permission_sets: ReadOnlyAccess, PowerUserAccess
+- identity_center_assignments: PlatformAdmins:PowerUserAccess:Management, AppTeam:ReadOnlyAccess:AppProd
 
 ## Network
 - topology: hub-spoke
@@ -193,6 +199,7 @@ For `aws-lza`, successful output includes:
 - `decision-report.yaml` — decisions, deployment readiness, blockers, and safe handoff path
 - `accounts-config.yaml`, `global-config.yaml`, `iam-config.yaml`, `network-config.yaml`, `organization-config.yaml`, `security-config.yaml` — AWS LZA handoff config files
 - `lineage-manifest.yaml` — decision-to-artifact path map
+- `handoff-plan.yaml` — ordered owners, dependencies, gates, rollback, boundary, and allowed next action
 - `deployment-runbook.md` — prerequisites and handoff sequence
 - `sample-recommendations.yaml` — closest pinned reference bundles for handoff
 - `llm-trace-summary.yaml` — provider/model, calls, extracted decisions, gaps,
@@ -219,7 +226,9 @@ iac-llm-wrapper sample show --name aws-lza-standard-v1
 ```
 
 For BYOM module patterns such as `terraform-vpc`, `module-inputs.yaml` provides
-ready-to-use module references:
+ready-to-use module references. For `cloudformation-parameters`,
+`cloudformation-parameters.yaml` captures parameters for an existing approved
+template without emitting a stack:
 ```yaml
 moduleInputs:
   - moduleName: terraform-aws-vpc
@@ -251,6 +260,7 @@ Recommended product paths stay thin and contract-backed:
 | Pattern | Description |
 |---------|-------------|
 | `aws-lza` | Thin AWS Landing Zone Accelerator handoff path using official-style LZA config artifacts |
+| `cloudformation-parameters` | BYOM CloudFormation parameter handoff for an existing template |
 | `kubernetes-cluster` | K8s cluster handoff with node pools and network policies |
 | `terraform-vpc` | BYOM Terraform AWS VPC module input capture |
 

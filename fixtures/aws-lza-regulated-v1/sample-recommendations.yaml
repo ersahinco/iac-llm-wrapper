@@ -17,6 +17,12 @@ currentDecisions:
   security_tooling_account: SecurityTooling
   network_account: Network
   identity_center_delegated_admin_account: SecurityTooling
+  identity_center_permission_sets:
+    - ReadOnlyAccess
+    - AuditAccess
+  identity_center_assignments:
+    - SecurityAuditors:AuditAccess:Audit
+    - PlatformAdmins:ReadOnlyAccess:Management
   topology: hub-spoke
   centralized_logging: true
   security_hub_enabled: true
@@ -41,10 +47,10 @@ recommendations:
       - regulated
       - security-hub
       - nist
-    sameDecisionCount: 14
+    sameDecisionCount: 16
     differentDecisionCount: 0
     missingDecisionCount: 0
-    totalSampleDecisions: 14
+    totalSampleDecisions: 16
     sameDecisions:
       - baseline
       - centralized_logging
@@ -52,7 +58,9 @@ recommendations:
       - enabled_regions
       - guardduty_enabled
       - home_region
+      - identity_center_assignments
       - identity_center_delegated_admin_account
+      - identity_center_permission_sets
       - network_account
       - org_mode
       - organizational_units
@@ -82,9 +90,9 @@ recommendations:
       - control-tower
       - hub-spoke
     sameDecisionCount: 12
-    differentDecisionCount: 1
+    differentDecisionCount: 3
     missingDecisionCount: 0
-    totalSampleDecisions: 13
+    totalSampleDecisions: 15
     sameDecisions:
       - baseline
       - centralized_logging
@@ -105,6 +113,19 @@ recommendations:
         current:
           - eu-central-1
           - eu-west-1
+      identity_center_permission_sets:
+        sample:
+          - ReadOnlyAccess
+          - PowerUserAccess
+        current:
+          - ReadOnlyAccess
+          - AuditAccess
+      identity_center_assignments:
+        sample:
+          - PlatformAdmins:PowerUserAccess:Management
+        current:
+          - SecurityAuditors:AuditAccess:Audit
+          - PlatformAdmins:ReadOnlyAccess:Management
     missingDecisions: {}
     extraCurrentDecisions:
       compliance_overlay: regulated
@@ -127,9 +148,9 @@ recommendations:
       - hipaa
       - phi
     sameDecisionCount: 10
-    differentDecisionCount: 4
+    differentDecisionCount: 6
     missingDecisionCount: 0
-    totalSampleDecisions: 14
+    totalSampleDecisions: 16
     sameDecisions:
       - centralized_logging
       - guardduty_enabled
@@ -156,6 +177,20 @@ recommendations:
           - ClinicalProd
         current:
           - Prod
+      identity_center_permission_sets:
+        sample:
+          - ClinicalReadOnly
+          - SecurityAudit
+        current:
+          - ReadOnlyAccess
+          - AuditAccess
+      identity_center_assignments:
+        sample:
+          - ClinicalPlatform:ClinicalReadOnly:ClinicalProd
+          - SecurityAuditors:SecurityAudit:Audit
+        current:
+          - SecurityAuditors:AuditAccess:Audit
+          - PlatformAdmins:ReadOnlyAccess:Management
       compliance_overlay:
         sample: healthcare
         current: regulated

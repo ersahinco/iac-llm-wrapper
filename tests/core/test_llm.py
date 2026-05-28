@@ -118,6 +118,11 @@ class TestEndToEndLLM:
                     "organizational_units": ["Security", "Infrastructure", "Workloads"],
                     "workload_accounts": ["AppProd"],
                     "network_account": "Network",
+                    "identity_center_permission_sets": ["ReadOnlyAccess", "PowerUserAccess"],
+                    "identity_center_assignments": [
+                        "PlatformAdmins:PowerUserAccess:Management",
+                        "AppTeam:ReadOnlyAccess:AppProd",
+                    ],
                     "topology": "hub-spoke",
                     "network_cidr": "10.50.0.0/16",
                     "centralized_logging": "true",
@@ -146,7 +151,7 @@ class TestEndToEndLLM:
         assert "deploymentAllowed: true" in report
         assert (output / "lineage-manifest.yaml").exists()
         assert (output / "llm-trace-summary.yaml").exists()
-        assert "MockLLMBackend" in (output / "llm-trace-summary.yaml").read_text()
+        assert "mockllm" in (output / "llm-trace-summary.yaml").read_text()
         assert not (output / "terraform.tfvars").exists()
 
     def test_llm_contradiction_blocks_compile_with_assessment(self, tmp_path: Path):

@@ -34,6 +34,7 @@ expect:
     - organization-config.yaml
     - security-config.yaml
     - decision-report.yaml
+    - handoff-plan.yaml
     - lineage-manifest.yaml
     - deployment-runbook.md
     - sample-recommendations.yaml

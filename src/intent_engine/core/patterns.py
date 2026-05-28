@@ -61,6 +61,8 @@ class Pattern:
             artifacts.extend(contract.required_artifacts)
         artifacts.extend(self.required_artifacts)
         artifacts.extend(self.extra_artifacts)
+        if self.contracts:
+            artifacts.append("handoff-plan.yaml")
         if GLOBAL_SAMPLE_REGISTRY.find_by_pattern(self.name):
             artifacts.append("sample-recommendations.yaml")
         return list(dict.fromkeys(artifacts))

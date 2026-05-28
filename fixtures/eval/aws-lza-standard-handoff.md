@@ -31,6 +31,8 @@ account. No Terraform root modules should be generated.
 ## Identity
 
 - identity_center_delegated_admin_account: SecurityTooling
+- identity_center_permission_sets: ReadOnlyAccess, PowerUserAccess
+- identity_center_assignments: PlatformAdmins:PowerUserAccess:Management, AppTeam:ReadOnlyAccess:AppProd
 
 ## Network
 

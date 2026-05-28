@@ -109,11 +109,13 @@ def _gap_is_resolved(graph, gap: Any) -> bool:
     return value is not None and str(value).strip() != ""
 
 
+def _blocking_gaps(graph, gaps: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [gap for gap in gaps if isinstance(gap, dict) and not _gap_is_resolved(graph, gap)]
+
+
 def _llm_result_violations(graph, llm_result: LLMGraphResult) -> list[Violation]:
     violations: list[Violation] = []
-    for gap in llm_result.gaps:
-        if _gap_is_resolved(graph, gap):
-            continue
+    for gap in _blocking_gaps(graph, llm_result.gaps):
         key = gap.get("key", "unknown") if isinstance(gap, dict) else "unknown"
         reason = gap.get("reason", "missing decision") if isinstance(gap, dict) else str(gap)
         violations.append(
@@ -205,9 +207,7 @@ def _build_deployment_readiness(
 ) -> dict[str, Any]:
     missing = _graph_missing_decisions(graph)
     conflicts = _violation_conflicts(violations)
-    llm_gaps = [
-        gap for gap in llm_result.gaps if isinstance(gap, dict) and not _gap_is_resolved(graph, gap)
-    ]
+    llm_gaps = _blocking_gaps(graph, llm_result.gaps)
     llm_contradictions = [
         contradiction
         for contradiction in llm_result.contradictions
@@ -244,19 +244,32 @@ def _build_extraction_summary(
     markdown_contradictions: list[dict[str, Any]],
     llm_result: LLMGraphResult,
     readiness: dict[str, Any],
+    applied_decisions: dict[str, list[str]],
+    accepted_decisions: dict[str, Any],
+    graph,
 ) -> dict[str, Any]:
     calls = []
     evidence_entries = evidence_store.entries if evidence_store is not None else []
     for entry in evidence_entries:
         calls.append(
             {
-                "provider": entry.get("backend", "unknown"),
+                "provider": _readable_provider(entry.get("backend", "unknown")),
                 "model": entry.get("model", "unknown"),
-                "latencyMs": entry.get("latency_ms", 0),
+                "latencyMs": round(float(entry.get("latency_ms", 0) or 0), 1),
                 "parseError": entry.get("parse_error"),
             }
         )
     first = calls[0] if calls else {}
+    blocking_gaps = _blocking_gaps(graph, llm_result.gaps)
+    resolved_gaps = [
+        gap for gap in llm_result.gaps if isinstance(gap, dict) and _gap_is_resolved(graph, gap)
+    ]
+    blocking_contradictions = [
+        contradiction
+        for contradiction in llm_result.contradictions
+        if isinstance(contradiction, dict)
+    ]
+    raw_evidence = _raw_evidence_status(raw_evidence_path, evidence_store)
     return {
         "pattern": pattern,
         "provider": first.get("provider", "none"),
@@ -265,17 +278,51 @@ def _build_extraction_summary(
         "calls": calls,
         "markdownDecisions": markdown_decisions,
         "markdownContradictions": markdown_contradictions,
-        "extractedDecisions": llm_result.decisions,
+        "rawLlmDecisions": llm_result.decisions,
+        "rawLlmSignalDecisions": llm_result.signal_decisions,
+        "acceptedDecisions": _to_builtin(accepted_decisions),
+        "appliedDecisions": applied_decisions,
+        "extractedDecisions": _to_builtin(accepted_decisions),
         "signalDecisions": llm_result.signal_decisions,
-        "gaps": llm_result.gaps,
-        "contradictions": llm_result.contradictions,
+        "gaps": {
+            "resolved": resolved_gaps,
+            "blocking": blocking_gaps,
+            "raw": llm_result.gaps,
+        },
+        "contradictions": {
+            "blocking": blocking_contradictions,
+            "raw": llm_result.contradictions,
+        },
         "deploymentReadiness": {
             "deploymentAllowed": readiness["deploymentAllowed"],
             "status": readiness["status"],
             "blockerCount": len(readiness["blockers"]),
+            "blockingGapCount": len(blocking_gaps),
+            "blockingContradictionCount": len(blocking_contradictions),
         },
-        "rawEvidencePath": str(raw_evidence_path) if raw_evidence_path else "",
+        "rawEvidence": raw_evidence,
+        "rawEvidencePath": raw_evidence["path"],
     }
+
+
+def _readable_provider(provider: Any) -> str:
+    value = str(provider or "unknown")
+    if value == "OpenAICompatibleBackend":
+        return "openai-compatible"
+    if value.endswith("Backend"):
+        value = value[: -len("Backend")]
+    return value.replace("_", "-").lower() or "unknown"
+
+
+def _raw_evidence_status(
+    raw_evidence_path: Path | None,
+    evidence_store: LLMEvidenceStore | None,
+) -> dict[str, str]:
+    if raw_evidence_path is None:
+        return {"path": "not-requested", "status": "not-requested"}
+    if evidence_store is None or not evidence_store.entries:
+        return {"path": str(raw_evidence_path), "status": "requested-empty"}
+    return {"path": str(raw_evidence_path), "status": "requested"}
 
 
 def _write_failed_compile_artifacts(
@@ -371,8 +418,14 @@ def compile_design(
     markdown_result = extract_from_markdown_with_diagnostics(text, graph)
     markdown_decisions = markdown_result.decisions
     markdown_entities = extract_entities_from_markdown(text)
+    applied_decisions: dict[str, list[str]] = {
+        "markdown": [],
+        "llm": [],
+        "signals": [],
+        "defaults": [],
+    }
     if markdown_decisions:
-        graph.apply_decisions(markdown_decisions)
+        applied_decisions["markdown"] = graph.apply_decisions(markdown_decisions)
 
     # ------------------------------------------------------------------
     # Layer 1: Non-deterministic intent understanding (LLM)
@@ -389,14 +442,17 @@ def compile_design(
     # ------------------------------------------------------------------
     # 2a. Apply LLM-extracted decisions to the graph (gates + cascade)
     if llm_result.decisions:
-        graph.apply_decisions(llm_result.decisions)
+        applied_decisions["llm"] = graph.apply_decisions(llm_result.decisions)
 
     # 2b. Apply signal-triggered decisions
     if llm_result.signal_decisions:
-        graph.apply_decisions(llm_result.signal_decisions)
+        applied_decisions["signals"] = graph.apply_decisions(llm_result.signal_decisions)
 
     # 2c. Fill remaining gaps with defaults
     graph.apply_defaults_for_remaining()
+    applied_decisions["defaults"] = [
+        str(entry["key"]) for entry in graph.audit_log() if entry.get("how") == "defaulted"
+    ]
 
     # 2d. Build intent from LLM decisions (handles complex nested objects)
     # then overlay graph cascade decisions onto the same intent
@@ -429,6 +485,9 @@ def compile_design(
         markdown_contradictions=markdown_result.contradictions,
         llm_result=llm_result,
         readiness=readiness,
+        applied_decisions=applied_decisions,
+        accepted_decisions=graph.typed_decisions(),
+        graph=graph,
     )
     if violations:
         if not dry_run:

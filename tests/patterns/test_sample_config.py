@@ -16,6 +16,7 @@ load_builtin_patterns()
 
 
 def _normalized_artifact_text(file_name: str, text: str) -> str:
+    text = re.sub(r"[ \t]+$", "", text, flags=re.MULTILINE)
     if file_name != "decision-audit.yaml":
         return text
     return re.sub(

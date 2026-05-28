@@ -118,6 +118,7 @@ class TestKubernetesPattern:
             "  instanceType: t3.large\n"
         )
         (output / "sample-recommendations.yaml").write_text("recommendations: []\n")
+        (output / "handoff-plan.yaml").write_text("pattern: kubernetes-cluster\n")
 
         result = runner.invoke(
             app, ["validate", "--input", str(output), "--pattern", "kubernetes-cluster"]

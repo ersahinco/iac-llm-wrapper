@@ -1,4 +1,4 @@
-"""Typer CLI for intent-engine."""
+"""Typer CLI for iac-llm-wrapper."""
 
 from __future__ import annotations
 
@@ -31,7 +31,13 @@ from .patterns import load_builtin_patterns
 
 load_builtin_patterns()
 
-app = typer.Typer(name="intent-engine", help="Knowledge-driven infrastructure decision system")
+APP_NAME = "iac-llm-wrapper"
+APP_VERSION = "0.1.0"
+
+app = typer.Typer(
+    name=APP_NAME,
+    help="Intent-to-IaC orchestration for validated handoff artifacts",
+)
 
 DEFAULT_PATTERN = "aws-lza"
 
@@ -153,12 +159,12 @@ def _emit_sample_matches(pattern: str, decisions: dict[str, Any]) -> None:
         if sample.tags:
             typer.echo(f"     Tags: {', '.join(sample.tags)}")
 
-    typer.echo(f"  Run 'intent-engine sample show --name {matches[0].sample.name}' for details.")
+    typer.echo(f"  Run '{APP_NAME} sample show --name {matches[0].sample.name}' for details.")
 
 
 def _version_callback(value: bool) -> None:
     if value:
-        typer.echo("intent-engine 0.1.0")
+        typer.echo(f"{APP_NAME} {APP_VERSION}")
         raise typer.Exit()
 
 
@@ -277,7 +283,7 @@ def compile(
         )
         typer.echo(
             "Fix violations in your Markdown and re-run. "
-            "Run 'intent-engine template --pattern <pattern>' to generate "
+            f"Run '{APP_NAME} template --pattern <pattern>' to generate "
             "a valid starting template.",
             err=True,
         )

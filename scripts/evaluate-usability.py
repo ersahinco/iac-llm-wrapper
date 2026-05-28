@@ -208,6 +208,7 @@ def _trial_engineer_handoff(config: TrialConfig) -> TrialResult:
         expected_files = (
             "accounts-config.yaml",
             "global-config.yaml",
+            "handoff-plan.yaml",
             "iam-config.yaml",
             "network-config.yaml",
             "organization-config.yaml",
@@ -292,6 +293,7 @@ def _trial_byom_terraform_vpc(config: TrialConfig) -> TrialResult:
 
         for expected_file in (
             "decision-report.yaml",
+            "handoff-plan.yaml",
             "module-inputs.yaml",
             "sample-recommendations.yaml",
             "terraform.tfvars",
@@ -303,6 +305,82 @@ def _trial_byom_terraform_vpc(config: TrialConfig) -> TrialResult:
     return TrialResult(
         "byom",
         "terraform-vpc-module",
+        config.mode,
+        "PASS" if not failures else "FAIL",
+        failures,
+        evidence_files,
+    )
+
+
+def _trial_byom_cloudformation_parameters(config: TrialConfig) -> TrialResult:
+    failures: list[str] = []
+    evidence_files: list[Path] = []
+    with tempfile.TemporaryDirectory() as temp_dir:
+        output_dir = Path(temp_dir)
+        evidence_path = _trial_evidence_path(
+            config,
+            "byom-cloudformation-parameters",
+            output_dir,
+        )
+        compile_proc = _run(
+            [
+                "compile",
+                "--input",
+                str(FIXTURES_DIR / "byom-cloudformation-parameters.md"),
+                "--output",
+                str(output_dir),
+                "--pattern",
+                "cloudformation-parameters",
+            ],
+            config,
+            evidence_path,
+        )
+        if evidence_path is not None:
+            evidence_files.append(evidence_path)
+        if compile_proc.returncode != 0:
+            failures.append("compile command failed")
+            failures.append((compile_proc.stderr or compile_proc.stdout).strip())
+            return TrialResult(
+                "byom",
+                "cloudformation-parameters",
+                config.mode,
+                "FAIL",
+                failures,
+                evidence_files,
+            )
+
+        validate_proc = _run(
+            ["validate", "--input", str(output_dir), "--pattern", "cloudformation-parameters"],
+            config,
+        )
+        if validate_proc.returncode != 0:
+            failures.append("validate command failed")
+
+        handoff = _yaml_load(output_dir / "cloudformation-parameters.yaml")
+        if handoff.get("stackName") != "orders-service-prod":
+            failures.append("wrong CloudFormation stack name")
+        if handoff.get("templateUrl") != "s3://approved-templates/orders-service.yaml":
+            failures.append("wrong CloudFormation template URL")
+        parameters = handoff.get("parameters", [])
+        if len(parameters) != 3:
+            failures.append("expected three CloudFormation parameters")
+
+        for unexpected_file in ("template.yaml", "stack.yaml", "main.tf", "terraform.tfvars"):
+            if (output_dir / unexpected_file).exists():
+                failures.append(f"unexpected generated deployable artifact {unexpected_file}")
+
+        for expected_file in (
+            "cloudformation-parameters.yaml",
+            "decision-report.yaml",
+            "handoff-plan.yaml",
+        ):
+            if not (output_dir / expected_file).exists():
+                failures.append(f"missing artifact {expected_file}")
+        failures.extend(_evidence_failures(config, evidence_path))
+
+    return TrialResult(
+        "byom",
+        "cloudformation-parameters",
         config.mode,
         "PASS" if not failures else "FAIL",
         failures,
@@ -332,7 +410,12 @@ def main() -> int:
         model=args.model,
         evidence_dir=args.evidence_dir,
     )
-    trials = [_trial_architect_gap, _trial_engineer_handoff, _trial_byom_terraform_vpc]
+    trials = [
+        _trial_architect_gap,
+        _trial_engineer_handoff,
+        _trial_byom_terraform_vpc,
+        _trial_byom_cloudformation_parameters,
+    ]
     results = [trial(config) for trial in trials]
 
     print(f"{'Role':12s} {'Trial':24s} {'Mode':13s} Status")

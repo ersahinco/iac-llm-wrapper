@@ -174,9 +174,9 @@ new built-in pattern, add its package import there. External patterns can import
 their package before CLI use.
 
 ```bash
-intent-engine template --pattern kubernetes-cluster --output k8s-design.md
-intent-engine interview --pattern kubernetes-cluster --output ./k8s-out
-intent-engine validate --input ./k8s-out --pattern kubernetes-cluster
+iac-llm-wrapper template --pattern kubernetes-cluster --output k8s-design.md
+iac-llm-wrapper interview --pattern kubernetes-cluster --output ./k8s-out
+iac-llm-wrapper validate --input ./k8s-out --pattern kubernetes-cluster
 ```
 
 ## Acceptance Test

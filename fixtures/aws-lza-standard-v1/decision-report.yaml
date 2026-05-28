@@ -20,6 +20,11 @@ accounts:
     - Prod
 identity:
   identityCenterDelegatedAdmin: SecurityTooling
+  identityCenterPermissionSets:
+    - ReadOnlyAccess
+    - PowerUserAccess
+  identityCenterAssignments:
+    - PlatformAdmins:PowerUserAccess:Management
 network:
   topology: hub-spoke
   cidr: 10.0.0.0/16

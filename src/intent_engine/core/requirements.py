@@ -122,8 +122,9 @@ class RequirementGraph:
             "key": key,
             "value": value,
             "how": how,
-            "reason": reason,
         }
+        if reason is not None:
+            entry["reason"] = reason
         self._audit_log.append(entry)
 
     def decide(self, key: str, value: str, reason: str | None = None) -> None:

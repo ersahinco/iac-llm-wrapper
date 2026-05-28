@@ -150,8 +150,33 @@ def _identity_center_config(intent: AwsLzaIntent) -> dict[str, Any]:
     return {
         "name": f"{intent.organization_name} Identity Center",
         "delegatedAdminAccount": intent.identity_center_delegated_admin_account,
-        "identityCenterPermissionSets": [],
-        "identityCenterAssignments": [],
+        "identityCenterPermissionSets": [
+            {
+                "name": name,
+                "description": f"{name} access boundary",
+                "sessionDuration": "PT8H",
+                "managedPolicies": [],
+            }
+            for name in intent.identity_center_permission_sets
+        ],
+        "identityCenterAssignments": [
+            _identity_center_assignment(assignment)
+            for assignment in intent.identity_center_assignments
+        ],
+    }
+
+
+def _identity_center_assignment(value: str) -> dict[str, Any]:
+    parts = [part.strip() for part in value.split(":") if part.strip()]
+    principal = parts[0] if parts else value
+    permission_set = parts[1] if len(parts) > 1 else ""
+    target = parts[2] if len(parts) > 2 else ""
+    return {
+        "name": value,
+        "principalType": "GROUP",
+        "principalId": principal,
+        "permissionSetName": permission_set,
+        "deploymentTargets": {"accounts": [target] if target else []},
     }
 
 
@@ -386,6 +411,36 @@ def _aws_lza_graph_factory() -> RequirementGraph:
     )
     graph.add(
         Requirement(
+            key="identity_center_permission_sets",
+            target_field="identity_center_permission_sets",
+            target_type="string_list",
+            label="Identity Center Permission Sets",
+            question=(
+                "Which IAM Identity Center permission sets are approved? Use comma-separated names."
+            ),
+            category="identity",
+            violation_code="AWS_LZA_IDENTITY_CENTER_PERMISSION_SETS_REQUIRED",
+            violation_message="IAM Identity Center handoff requires approved permission sets.",
+        )
+    )
+    graph.add(
+        Requirement(
+            key="identity_center_assignments",
+            target_field="identity_center_assignments",
+            target_type="string_list",
+            label="Identity Center Assignments",
+            question=(
+                "Which IAM Identity Center assignments are approved? "
+                "Use Principal:PermissionSet:Account entries separated by commas."
+            ),
+            depends_on=["identity_center_permission_sets"],
+            category="identity",
+            violation_code="AWS_LZA_IDENTITY_CENTER_ASSIGNMENTS_REQUIRED",
+            violation_message="IAM Identity Center handoff requires approved assignments.",
+        )
+    )
+    graph.add(
+        Requirement(
             key="topology",
             target_field="topology",
             target_type="LzaTopology",
@@ -518,6 +573,48 @@ def validate_aws_lza_intent(intent: AwsLzaIntent, graph=None) -> list[Violation]
                 message="Identity Center delegated administrator must reference a known account.",
             )
         )
+    if not intent.identity_center_permission_sets:
+        violations.append(
+            Violation(
+                code="AWS_LZA_IDENTITY_CENTER_PERMISSION_SETS_REQUIRED",
+                message="IAM Identity Center handoff requires at least one permission set.",
+            )
+        )
+    if not intent.identity_center_assignments:
+        violations.append(
+            Violation(
+                code="AWS_LZA_IDENTITY_CENTER_ASSIGNMENTS_REQUIRED",
+                message="IAM Identity Center handoff requires at least one assignment.",
+            )
+        )
+    permission_sets = set(intent.identity_center_permission_sets)
+    for assignment in intent.identity_center_assignments:
+        parts = [part.strip() for part in assignment.split(":") if part.strip()]
+        if len(parts) < 3:
+            violations.append(
+                Violation(
+                    code="AWS_LZA_IDENTITY_CENTER_ASSIGNMENT_FORMAT_INVALID",
+                    message=(
+                        "Identity Center assignments must use "
+                        "Principal:PermissionSet:Account format."
+                    ),
+                )
+            )
+            continue
+        if parts[1] not in permission_sets:
+            violations.append(
+                Violation(
+                    code="AWS_LZA_IDENTITY_CENTER_ASSIGNMENT_PERMISSION_SET_UNKNOWN",
+                    message="Identity Center assignments must reference approved permission sets.",
+                )
+            )
+        if parts[2] not in all_accounts and parts[2] != _MANAGEMENT_ACCOUNT:
+            violations.append(
+                Violation(
+                    code="AWS_LZA_IDENTITY_CENTER_ASSIGNMENT_ACCOUNT_UNKNOWN",
+                    message="Identity Center assignments must target known accounts.",
+                )
+            )
     if intent.home_region not in intent.enabled_regions:
         violations.append(
             Violation(
@@ -817,6 +914,8 @@ def gen_lza_decision_report(intent: Any, output_dir: Path) -> None:
         },
         "identity": {
             "identityCenterDelegatedAdmin": intent.identity_center_delegated_admin_account,
+            "identityCenterPermissionSets": intent.identity_center_permission_sets,
+            "identityCenterAssignments": intent.identity_center_assignments,
         },
         "network": {
             "topology": str(intent.topology),
@@ -850,6 +949,8 @@ _AWS_LZA_SECTION_MAP: dict[str, tuple[str, str | None]] = {
         "Identity",
         "identity_center_delegated_admin_account",
     ),
+    "identity_center_permission_sets": ("Identity", "identity_center_permission_sets"),
+    "identity_center_assignments": ("Identity", "identity_center_assignments"),
     "topology": ("Network", "topology"),
     "network_cidr": ("Network", "network_cidr"),
     "centralized_logging": ("Security", "centralized_logging"),
@@ -871,6 +972,10 @@ _AWS_LZA_SECTION_ORDER = [
 _AWS_LZA_FREE_FORM_EXAMPLES = {
     "Regions": ["enabled_regions: eu-central-1, eu-west-1"],
     "Accounts": ["workload_accounts: Dev, Test, Prod"],
+    "Identity": [
+        "identity_center_permission_sets: ReadOnlyAccess, PowerUserAccess",
+        "identity_center_assignments: PlatformAdmins:PowerUserAccess:Management",
+    ],
 }
 
 
@@ -995,6 +1100,8 @@ _register_aws_lza_sample(
         "security_tooling_account": "SecurityTooling",
         "network_account": "Network",
         "identity_center_delegated_admin_account": "SecurityTooling",
+        "identity_center_permission_sets": ["ReadOnlyAccess", "PowerUserAccess"],
+        "identity_center_assignments": ["PlatformAdmins:PowerUserAccess:Management"],
         "topology": "hub-spoke",
         "centralized_logging": "true",
         "security_hub_enabled": "true",
@@ -1017,6 +1124,11 @@ _register_aws_lza_sample(
         "security_tooling_account": "SecurityTooling",
         "network_account": "Network",
         "identity_center_delegated_admin_account": "SecurityTooling",
+        "identity_center_permission_sets": ["ReadOnlyAccess", "AuditAccess"],
+        "identity_center_assignments": [
+            "SecurityAuditors:AuditAccess:Audit",
+            "PlatformAdmins:ReadOnlyAccess:Management",
+        ],
         "topology": "hub-spoke",
         "centralized_logging": "true",
         "security_hub_enabled": "true",
@@ -1040,6 +1152,11 @@ _register_aws_lza_sample(
         "security_tooling_account": "SecurityTooling",
         "network_account": "Network",
         "identity_center_delegated_admin_account": "SecurityTooling",
+        "identity_center_permission_sets": ["ClinicalReadOnly", "SecurityAudit"],
+        "identity_center_assignments": [
+            "ClinicalPlatform:ClinicalReadOnly:ClinicalProd",
+            "SecurityAuditors:SecurityAudit:Audit",
+        ],
         "topology": "hub-spoke",
         "centralized_logging": "true",
         "security_hub_enabled": "true",

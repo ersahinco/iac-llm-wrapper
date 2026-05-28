@@ -17,7 +17,11 @@ from intent_engine.patterns.aws_lza.contracts import AWS_LZA_SAMPLE_CONFIG_CONTR
 from intent_engine.patterns.aws_lza.models import AwsLzaIntent
 
 FIXTURES = Path(__file__).parent.parent.parent / "fixtures"
-STANDARD_HUB_SPOKE_DECISIONS = {"network_account": "Network"}
+STANDARD_HUB_SPOKE_DECISIONS = {
+    "network_account": "Network",
+    "identity_center_permission_sets": "ReadOnlyAccess, PowerUserAccess",
+    "identity_center_assignments": "PlatformAdmins:PowerUserAccess:Management",
+}
 
 
 class TestAwsLzaPattern:
@@ -63,6 +67,10 @@ class TestAwsLzaPattern:
             "security_tooling_account": "SecurityTooling",
             "network_account": "Network",
             "identity_center_delegated_admin_account": "SecurityTooling",
+            "identity_center_permission_sets": "ReadOnlyAccess, PowerUserAccess",
+            "identity_center_assignments": (
+                "PlatformAdmins:PowerUserAccess:Management, DevTeam:ReadOnlyAccess:Dev"
+            ),
             "topology": "hub-spoke",
             "network_cidr": "10.0.0.0/16",
             "centralized_logging": "true",
@@ -98,8 +106,13 @@ class TestAwsLzaPattern:
         iam = yaml.load((output / "iam-config.yaml").read_text())
         assert iam["identityCenter"]["delegatedAdminAccount"] == "SecurityTooling"
         assert iam["homeRegion"] == "eu-central-1"
-        assert iam["identityCenter"]["identityCenterPermissionSets"] == []
-        assert iam["identityCenter"]["identityCenterAssignments"] == []
+        assert [item["name"] for item in iam["identityCenter"]["identityCenterPermissionSets"]] == [
+            "ReadOnlyAccess",
+            "PowerUserAccess",
+        ]
+        assert iam["identityCenter"]["identityCenterAssignments"][0]["permissionSetName"] == (
+            "PowerUserAccess"
+        )
 
         global_config = yaml.load((output / "global-config.yaml").read_text())
         assert global_config["terminationProtection"] is True
@@ -243,6 +256,7 @@ class TestAwsLzaPattern:
         for name in [
             "accounts-config.yaml",
             "global-config.yaml",
+            "handoff-plan.yaml",
             "iam-config.yaml",
             "network-config.yaml",
             "organization-config.yaml",
@@ -285,7 +299,12 @@ class TestAwsLzaPattern:
         from intent_engine.core.compiler import validate_generated
 
         output = tmp_path / "output"
-        compile_from_interview({"topology": "single-vpc"}, output, pattern="aws-lza")
+        decisions = {
+            "topology": "single-vpc",
+            "identity_center_permission_sets": "ReadOnlyAccess",
+            "identity_center_assignments": "PlatformAdmins:ReadOnlyAccess:Management",
+        }
+        compile_from_interview(decisions, output, pattern="aws-lza")
 
         yaml = ruamel.yaml.YAML(typ="safe")
         network = yaml.load((output / "network-config.yaml").read_text())

@@ -249,9 +249,118 @@ def gen_llm_trace_summary(intent: Any, output_dir: Path) -> None:
     _write(output_dir, "llm-trace-summary.yaml", summary)
 
 
+def _artifact_owner(artifact_name: str) -> str:
+    lowered = artifact_name.lower()
+    if "security" in lowered or "iam" in lowered:
+        return "security-owner"
+    if "network" in lowered or "vpc" in lowered or "cluster" in lowered:
+        return "network-owner"
+    if "account" in lowered or "organization" in lowered or "global" in lowered:
+        return "platform-owner"
+    return "target-owner"
+
+
+def gen_handoff_plan(intent: Any, output_dir: Path) -> None:
+    """Write a generic handoff plan from pattern contracts and readiness."""
+    pattern = getattr(intent, "pattern", "")
+    if not pattern:
+        return
+
+    from .patterns import GLOBAL_REGISTRY as PATTERN_REGISTRY
+
+    pattern_obj = PATTERN_REGISTRY.get(pattern)
+    readiness = getattr(intent, "deployment_readiness", {}) or {}
+    allowed = bool(readiness.get("deploymentAllowed", True))
+    contracts = pattern_obj.contracts
+    required_artifacts = list(
+        dict.fromkeys(
+            artifact for contract in contracts for artifact in contract.required_artifacts
+        )
+    )
+
+    review_steps = [
+        {
+            "id": f"review-{artifact_name.replace('.', '-').replace('_', '-')}",
+            "title": f"Review {artifact_name}",
+            "owner": _artifact_owner(artifact_name),
+            "dependsOn": ["validate-target-contracts"],
+            "manualGate": True,
+            "rollback": "Reject the handoff, correct the source intent, and re-run compile.",
+        }
+        for artifact_name in required_artifacts
+    ]
+    review_step_ids = [step["id"] for step in review_steps]
+    data = {
+        "pattern": pattern,
+        "boundary": (
+            "iac-llm-wrapper emits validated handoff artifacts only; downstream "
+            "generation, execution, dashboards, and cloud changes remain outside this artifact."
+        ),
+        "allowedNextAction": (
+            "Resolve blockers and re-run compile before any downstream handoff."
+            if not allowed
+            else "Pass the reviewed artifacts to the existing target toolchain after manual gates."
+        ),
+        "readiness": {
+            "status": readiness.get("status", "ready" if allowed else "blocked"),
+            "deploymentAllowed": allowed,
+            "blockers": readiness.get("blockers", []),
+        },
+        "targetContracts": [
+            {
+                "name": contract.name,
+                "kind": contract.kind,
+                "sourceUrl": contract.source_url,
+                "requiredArtifacts": contract.required_artifacts,
+            }
+            for contract in contracts
+        ],
+        "steps": [
+            {
+                "id": "resolve-decisions",
+                "title": "Confirm captured decisions and blockers",
+                "owner": "architecture-owner",
+                "dependsOn": [],
+                "manualGate": True,
+                "rollback": "Update the design document or interview answers and re-run compile.",
+            },
+            {
+                "id": "validate-target-contracts",
+                "title": "Validate required artifacts against target contracts",
+                "owner": "platform-owner",
+                "dependsOn": ["resolve-decisions"],
+                "manualGate": True,
+                "rollback": "Stop handoff until contract validation is clean.",
+            },
+            *review_steps,
+            {
+                "id": "approve-handoff",
+                "title": "Approve handoff to existing provisioning toolchain",
+                "owner": "release-owner",
+                "dependsOn": review_step_ids or ["validate-target-contracts"],
+                "manualGate": True,
+                "rollback": "Keep the previous approved artifact bundle as the active handoff.",
+            },
+        ],
+        "manualGates": [
+            "No blocking gaps or contradictions remain.",
+            "Target contract validation is clean.",
+            "Artifact owners approve files in their domain.",
+            "Rollback owner and previous known-good handoff are identified.",
+        ],
+        "rollback": [
+            "Do not mutate downstream systems from this plan.",
+            "Revert to the previous approved handoff bundle in the target toolchain.",
+            "Regenerate artifacts only from corrected intent.",
+        ],
+    }
+    _write(output_dir, "handoff-plan.yaml", data)
+
+
 register_generator("design-doc", gen_design_doc, priority=4, category="meta")
 register_generator("module-inputs", gen_module_inputs, priority=5, category="meta")
 register_generator("llm-trace-summary", gen_llm_trace_summary, priority=5, category="meta")
+register_generator("handoff-plan", gen_handoff_plan, priority=6, category="meta")
 register_generator(
     "sample-recommendations",
     gen_sample_recommendations,

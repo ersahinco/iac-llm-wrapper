@@ -76,8 +76,14 @@ artifacts:
       - homeRegion
       - identityCenter.name
       - identityCenter.delegatedAdminAccount
-      - identityCenter.identityCenterPermissionSets
-      - identityCenter.identityCenterAssignments
+      - identityCenter.identityCenterPermissionSets[]
+      - identityCenter.identityCenterPermissionSets[].name
+      - identityCenter.identityCenterPermissionSets[].sessionDuration
+      - identityCenter.identityCenterAssignments[]
+      - identityCenter.identityCenterAssignments[].principalType
+      - identityCenter.identityCenterAssignments[].principalId
+      - identityCenter.identityCenterAssignments[].permissionSetName
+      - identityCenter.identityCenterAssignments[].deploymentTargets
     valueAssertions: []
   - name: network-config.yaml
     required: true
@@ -247,6 +253,12 @@ lineage:
   - decision: identity_center_delegated_admin_account
     artifact: iam-config.yaml
     path: identityCenter.delegatedAdminAccount
+  - decision: identity_center_permission_sets
+    artifact: iam-config.yaml
+    path: identityCenter.identityCenterPermissionSets[]
+  - decision: identity_center_assignments
+    artifact: iam-config.yaml
+    path: identityCenter.identityCenterAssignments[]
   - decision: log_archive_account
     artifact: global-config.yaml
     path: logging.account

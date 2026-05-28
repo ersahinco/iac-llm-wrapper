@@ -35,6 +35,7 @@ documentation = "https://github.com/ersahinco/iac-llm-wrapper#readme"
 
 [project.scripts]
 iac-llm-wrapper = "intent_engine.cli:app"
+intent-engine = "intent_engine.cli:app"
 
 [project.optional-dependencies]
 dev = [

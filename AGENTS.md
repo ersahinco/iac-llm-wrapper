@@ -1,6 +1,6 @@
 # AGENTS.md
 
-## Project: intent-engine
+## Project: iac-llm-wrapper / intent-engine core
 
 Core engine for `iac-llm-wrapper`, an intent-to-IaC orchestration framework. It
 captures architecture intent from prose, validates decisions through requirement
@@ -26,12 +26,12 @@ uv run python scripts/evaluate-usability.py
 
 - **Models** (`models.py`): Pydantic v2 intent data models. Pattern-specific models drive extraction, graph sync, validation, and artifact emission.
 - **Extract** (`extractor.py`): Single graph-driven `Extractor`. Prompts come from requirement nodes, not regex or fixed document layout. Without LLM, deterministic fallback applies graph defaults and structured Markdown entity recovery.
-- **Patterns** (`patterns.py`): Lean registry for pluggable product paths. Current built-ins: `aws-lza`, `kubernetes-cluster`, `terraform-vpc`.
+- **Patterns** (`patterns.py`): Lean registry for pluggable product paths. Current built-ins: `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, `terraform-vpc`.
 - **Requirements** (`requirements.py`): Decision graph with `applies_if`, `blocked_if`, `depends_on`, cascade rules, tradeoffs, compliance controls, signals, and audit trail.
 - **Interview** (`interview.py`): Graph-ordered requirement capture. Shows context, asks only applicable gaps, supports save/resume, and records rationale.
 - **Normalize** (`normalizer.py`): Deterministic defaults from config/model data. No hidden provider calls.
 - **Validate** (`validator.py`): Fail-closed graph and pattern validation. Missing required applicable decisions become compile errors.
-- **Generate** (`generator.py`): Registry-driven emitter for decision report, contract handoff files, lineage, runbook, module inputs when pattern owns module mapping, and sample recommendations.
+- **Generate** (`generator.py`): Registry-driven emitter for decision report, generic handoff plan, contract handoff files, lineage, runbook, module inputs when pattern owns module mapping, and sample recommendations.
 - **Contracts** (`contracts.py`): Target artifact contracts define required files, paths, decisions, lineage, and stable value assertions.
 - **Samples** (`sample_config.py`): Registered reference bundles with pinned source metadata, module refs, tags, fixture dirs, and match recommendations.
 - **LLM** (`llm_caller.py`): Pluggable OpenAI-compatible, Ollama, or Anthropic backends with retry/backoff and evidence capture.
@@ -40,6 +40,7 @@ uv run python scripts/evaluate-usability.py
 ## Current Pattern Surface
 
 - `aws-lza`: Thin AWS LZA handoff path. Emits official-style LZA YAML artifacts, decision report, lineage manifest, deployment runbook, and sample recommendations. Does not emit deployable Terraform/Terragrunt landing-zone stacks.
+- `cloudformation-parameters`: BYOM CloudFormation parameter handoff for an approved existing template. Emits parameters and decision report, not a stack.
 - `kubernetes-cluster`: Contract-backed K8s handoff for cluster, namespace, module input, and sample fixture behavior.
 - `terraform-vpc`: BYOM Terraform AWS VPC module input capture. Emits module variables/tfvars handoff for an existing module, not root deployment scaffolding.
 
@@ -57,7 +58,7 @@ uv run python scripts/evaluate-usability.py
 
 - `fixtures/aws-lza-standard-v1/`, `fixtures/aws-lza-regulated-v1/`, `fixtures/aws-lza-healthcare-v1/`: emitted AWS LZA sample handoff bundles.
 - `fixtures/k8s-cluster-v1/`: emitted K8s sample handoff bundle.
-- `fixtures/usability/`: role trials for architect gap capture, engineer handoff, and BYOM module flow.
+- `fixtures/usability/`: role trials for architect gap capture, engineer handoff, BYOM Terraform, and BYOM CloudFormation parameter flow.
 - `fixtures/eval/`: extraction gold corpus with expected handoff artifact checks.
 - Version suffixes (`-v1`) are fixture contract versions. They protect emitted artifact shape from silent drift.
 
@@ -92,44 +93,44 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy.
 
 ### Current Goal
 
-T16: Keep product path lean and current
+T17: Harden lean intent-to-IaC orchestration surface
 
 ### Status
 
-- **Tests**: 263 passing, 1 skipped
+- **Tests**: 265 passing, 1 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Aligned product language: `iac-llm-wrapper` is intent-to-IaC orchestration framework; current built-ins emit gated handoff artifacts; full gate green
+- **Last session**: Aligned CLI/package naming on `iac-llm-wrapper`, improved trace summaries and blocked contract, added generic handoff plans, deepened AWS LZA Identity Center, added CloudFormation parameter handoff trial, full gate green
 
 ### Done
 
 | Area | Item |
 |------|------|
 | Core | models, extractor, requirements, patterns, interview, discovery, normalizer, validator, generator, contracts, samples, module mapping, CLI |
-| Patterns | `aws-lza`, `kubernetes-cluster`, `terraform-vpc` |
-| AWS LZA | Thin LZA handoff YAML, decision report/readiness, lineage manifest, deployment runbook, sample recommendations |
-| Contracts | Required artifacts, required paths, required decisions, lineage checks, value assertions, blocked assessment artifacts |
+| Patterns | `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, `terraform-vpc` |
+| AWS LZA | Thin LZA handoff YAML, IAM Identity Center permission sets/assignments, decision report/readiness, lineage manifest, deployment runbook, sample recommendations |
+| Contracts | Required artifacts, required paths, required decisions, lineage checks, value assertions, blocked assessment artifacts, generic handoff plan output |
 | Samples | Registry-backed `sample list/show`, match recommendations, fixture sync/drift guard |
 | LLM | Ollama/OpenAI-compatible/Anthropic backend factory, evidence store, local LLM integration tests |
-| Evaluation | Deterministic extraction gold corpus with pass/fail/contract cases and role-based usability trials |
+| Evaluation | Deterministic extraction gold corpus with pass/fail/contract cases and role-based usability trials including CloudFormation BYOM |
 | Fixtures | AWS LZA emitted bundles, K8s emitted bundle, usability docs, eval corpus |
 | Cleanup | Removed old LZA research path, old diff/apply surfaces, extension registry, old fixtures/tests/helpers |
 | Product docs | README defines `iac-llm-wrapper` as intent-to-IaC orchestration: current validated handoff, future gated target adapters |
-| Observability | Lean `llm-trace-summary.yaml` for provider/model, calls, decisions, gaps, contradictions, and raw evidence path |
+| Observability | Lean `llm-trace-summary.yaml` for provider/model, rounded latency, raw and accepted decisions, applied decisions, resolved/blocking gaps, blocking contradictions, and raw evidence status |
 | Language | Docs now use consistent terms: requirement graph, target contract, decision record, handoff artifact, provisioning toolchain |
 
 ### Next
 
-1. Add one non-Terraform BYOM trial (CDK or CloudFormation) if `terraform-vpc` trial stays clean.
-2. Continue AWS LZA schema depth where real customer identity inputs exist, especially IAM Identity Center permission sets and assignments.
-3. Run local LLM usability/eval periodically with evidence output to validate actual architect/engineer experience beyond deterministic harness checks.
-4. Use local LLM trace quality findings to tune prompts only when deterministic harness cannot classify the issue.
-5. If public packaging changes, keep naming aligned: `iac-llm-wrapper` is framework/distribution, `intent-engine` is core.
+1. Run local LLM usability/eval periodically with evidence output to validate actual architect/engineer experience beyond deterministic harness checks.
+2. Use local LLM trace quality findings to tune prompts only when deterministic harness cannot classify the issue.
+3. Continue AWS LZA schema depth only where real customer inputs justify it.
+4. If public packaging changes, keep naming aligned: `iac-llm-wrapper` is primary CLI/package, `intent-engine` is core/optional alias.
 
 ### Key Decisions This Session
 
-- Repo/package name can remain `iac-llm-wrapper`; "wrapper" means orchestration around intent, gates, and target handoff.
-- Current built-ins do not deploy; future target adapters may generate or execute IaC only after graph, contract, manual gate, evidence, and rollback checks.
-- Order of documented flow must match code: extraction/interview, normalization, validation, artifact emission.
+- Primary CLI/package name is `iac-llm-wrapper`; `intent-engine` remains the core engine and optional CLI alias.
+- Generic `handoff-plan.yaml` is emitted from existing graph/contract/readiness metadata; it records owners, order, gates, rollback, boundary, and allowed next action without deployment.
+- AWS LZA IAM Identity Center now requires approved permission sets and assignments before handoff.
+- CloudFormation BYOM is parameter handoff for an existing approved template, not stack generation.

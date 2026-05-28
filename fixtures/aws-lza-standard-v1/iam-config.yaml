@@ -4,5 +4,20 @@ homeRegion: eu-central-1
 identityCenter:
   name: ExampleCorp Identity Center
   delegatedAdminAccount: SecurityTooling
-  identityCenterPermissionSets: []
-  identityCenterAssignments: []
+  identityCenterPermissionSets:
+    - name: ReadOnlyAccess
+      description: ReadOnlyAccess access boundary
+      sessionDuration: PT8H
+      managedPolicies: []
+    - name: PowerUserAccess
+      description: PowerUserAccess access boundary
+      sessionDuration: PT8H
+      managedPolicies: []
+  identityCenterAssignments:
+    - name: PlatformAdmins:PowerUserAccess:Management
+      principalType: GROUP
+      principalId: PlatformAdmins
+      permissionSetName: PowerUserAccess
+      deploymentTargets:
+        accounts:
+          - Management

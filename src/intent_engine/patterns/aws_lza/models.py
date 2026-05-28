@@ -62,6 +62,8 @@ class AwsLzaIntent(BaseModel):
     security_tooling_account: str = "SecurityTooling"
     network_account: str = ""
     identity_center_delegated_admin_account: str = "SecurityTooling"
+    identity_center_permission_sets: list[str] = Field(default_factory=list)
+    identity_center_assignments: list[str] = Field(default_factory=list)
     topology: LzaTopology = LzaTopology.HUB_SPOKE
     network_cidr: str = "10.0.0.0/16"
     centralized_logging: bool = True
