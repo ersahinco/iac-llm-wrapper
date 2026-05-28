@@ -85,10 +85,13 @@ Run the checked-in eval corpus to test extraction quality against expected gener
 ```bash
 uv run python scripts/evaluate-extraction.py
 uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b
+uv run python scripts/evaluate-usability.py
 ```
 
 The eval loop compiles docs in `fixtures/eval/`, compares `decision-report.yaml` values,
 entity counts/names, and required handoff files, then exits non-zero on misses.
+The usability loop checks role-based trials for architect gap discovery, engineer handoff,
+and bring-your-own Terraform module input generation.
 
 Install from PyPI:
 
@@ -210,6 +213,7 @@ Patterns define which questions are asked, what defaults apply, and what knowled
 | `financial-services` | Baseline + PCI-DSS, SOX, data residency, payment segmentation |
 | `healthcare` | Baseline + HIPAA, PHI encryption, BAA coverage |
 | `kubernetes-cluster` | K8s cluster provisioning with node pools and network policies |
+| `terraform-vpc` | BYOM Terraform AWS VPC module input capture |
 
 ### Addons
 
@@ -236,6 +240,9 @@ Current quality gates:
 uv run ruff check .
 uv run ruff format --check .
 uv run pytest
+uv run --extra dev mypy
+uv run python scripts/evaluate-extraction.py
+uv run python scripts/evaluate-usability.py
 ```
 
 Recommended local hooks:

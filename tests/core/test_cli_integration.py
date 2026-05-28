@@ -42,6 +42,22 @@ class TestCLIDiscover:
         assert result.exit_code == 0
         assert "primary_region" in result.output
 
+    def test_discover_no_llm_uses_markdown_decisions(self):
+        result = runner.invoke(
+            app,
+            [
+                "discover",
+                "--input",
+                "fixtures/usability/architect-incomplete-lza.md",
+                "--pattern",
+                "baseline",
+                "--no-llm",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert "topology = hub-spoke" in result.output
+        assert "central_network_account" in result.output
+
     def test_discover_with_resume(self, tmp_path: Path):
         # Create a state file with one decision
         state_path = tmp_path / "state.json"

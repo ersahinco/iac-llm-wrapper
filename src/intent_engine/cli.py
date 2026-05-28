@@ -24,6 +24,7 @@ from .core.discovery import DiscoveryEngine, generate_clarifying_questions
 from .core.extractor import Extractor
 from .core.interview import InterviewEngine
 from .core.llm_caller import LLMEvidenceStore, auto_detect_llm
+from .core.markdown_extractor import extract_from_markdown
 from .core.patterns import ADDON_REGISTRY, GLOBAL_REGISTRY, Pattern
 from .core.sample_config import GLOBAL_SAMPLE_REGISTRY, SampleConfig
 from .core.suggestion import SuggestionEngine
@@ -434,6 +435,10 @@ def discover(
         text = "\n---\n".join(texts)
     else:
         text = input.read_text()
+
+    markdown_decisions = extract_from_markdown(text, graph)
+    if markdown_decisions:
+        graph.apply_decisions(markdown_decisions)
 
     use_llm = not no_llm and any(
         [

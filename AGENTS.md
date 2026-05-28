@@ -13,13 +13,14 @@ uv run ruff format --check .                       # format check
 uv run --extra dev mypy                            # type check
 uv run python scripts/sync-sample-fixtures.py --check
 uv run python scripts/evaluate-extraction.py       # eval complex docs
+uv run python scripts/evaluate-usability.py        # role-based trials
 ```
 
 ## Architecture
 
 - **Models** (`models.py`): Pydantic v2 data model for intent concepts. Use-case specific; LZA models include `CICDRunnerConfig`, `SecretManagementConfig`, `NetworkApplianceConfig`. The model drives extraction, graph sync, validation, and generation — like environment variables for a runtime.
 - **Extract** (`extractor.py`): Single `Extractor` class driven by the requirement graph. Auto-generates LLM prompts from graph node `target_field`/`target_type`, parses JSON responses with type coercion. No regex in the LLM extraction path, no rigid prose format. Without LLM, fallback applies graph defaults and can recover explicitly structured Markdown entity sections. Prompt is domain-agnostic; patterns optionally inject `prompt_context`.
-- **Patterns** (`patterns.py`): Pluggable pattern registry (`baseline`, `minimal`, `workload`, `hybrid-enterprise`, `financial-services`, `healthcare`, `kubernetes-cluster`). Patterns carry their own graph factories, intent models, default catalogs, validators, generators, and template metadata. New patterns register without core code changes. **Addon system**: `Addon`/`AddonRegistry` for composable modules that layer requirements, field maps, and section maps onto any base pattern. Built-in addons include `pci-compliance`, `hipaa`, `self-hosted-cicd`, `hashicorp-vault`, `paloalto-fw`. `--addon` CLI flag enables composition.
+- **Patterns** (`patterns.py`): Pluggable pattern registry (`baseline`, `minimal`, `workload`, `hybrid-enterprise`, `financial-services`, `healthcare`, `kubernetes-cluster`, `terraform-vpc`). Patterns carry their own graph factories, intent models, default catalogs, validators, generators, and template metadata. New patterns register without core code changes. **Addon system**: `Addon`/`AddonRegistry` for composable modules that layer requirements, field maps, and section maps onto any base pattern. Built-in addons include `pci-compliance`, `hipaa`, `self-hosted-cicd`, `hashicorp-vault`, `paloalto-fw`. `--addon` CLI flag enables composition.
 - **Requirements** (`requirements.py`): Knowledge graph of decisions with `applies_if`, `blocked_if`, `depends_on`, and `cascade` rules. Each node carries architectural knowledge: WA pillars, compliance controls, migration signals, tradeoffs, alternatives, consequences, and confidence scores. Graphs are pattern-driven.
 - **Interview** (`interview.py`): Knowledge-driven interview engine. Presents questions in topological order with full context: WA pillars, compliance controls, tradeoffs, consequences, and detected signals. `path_log()` shows every decision and why each path was taken or skipped. Every decision is recorded in an audit trail with timestamp and rationale.
 - **Normalize** (`normalizer.py`): Applies deterministic defaults from `defaults.yaml` using duck-typing. No hardcoded fallbacks — use-case specifics live in config.
@@ -50,6 +51,7 @@ uv run python scripts/evaluate-extraction.py       # eval complex docs
   - `financial-services`: baseline + PCI-DSS, SOX, data residency, payment segmentation (via `pci-compliance` addon)
   - `healthcare`: baseline + HIPAA, PHI encryption, BAA coverage (via `hipaa` addon)
   - `kubernetes-cluster`: K8s cluster provisioning with node pools and network policies (proof of generic framework)
+  - `terraform-vpc`: BYOM Terraform AWS VPC module input capture
 - **Addons**: The `AddonRegistry` supports composable modules that layer onto any base pattern. `--addon pci-compliance --addon hipaa` stacks multiple addons. Each addon carries requirements, field maps for extraction sync, and section maps for template generation. Built-in addons: `pci-compliance` (3 decisions), `hipaa` (3 decisions).
 - **ConfigCatalog**: Pre-built decision sets that represent proven, validated deployments.
   - `lza-minimal`: starter config for 1-2 accounts
@@ -178,17 +180,17 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff.
 T15: Lean contract-driven handoff maturity
 
 ### Status
-- **Tests**: 515 passing, 1 skipped (LLM non-determinism)
+- **Tests**: 520 passing, 1 skipped (LLM non-determinism)
 - **Lint**: clean
 - **Format**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added lean extraction eval loop with 3 complex docs, gold artifact checks, docs, kept full gate green
+- **Last session**: Added role-based usability trials and BYOM `terraform-vpc` pattern, fixed discover deterministic Markdown sync, kept full gate green
 
 ### Done
 | Area | Item |
 |------|------|
 | Core | Models, extractor, requirements, patterns, interview, discovery, normalizer, validator, generator, catalog, CLI, **sample_config** |
-| Patterns | baseline, minimal, workload, hybrid-enterprise, financial-services, healthcare, kubernetes-cluster |
+| Patterns | baseline, minimal, workload, hybrid-enterprise, financial-services, healthcare, kubernetes-cluster, terraform-vpc |
 | Catalog | 5 entries with diff/apply |
 | Reports | Decision report with WA pillar coverage + audit trail |
 | Signals | Detection from prose text (auto-generated from graph metadata) |
@@ -263,6 +265,9 @@ T15: Lean contract-driven handoff maturity
 | **Source mypy coverage** | `uv run --extra dev mypy` now covers all `src/intent_engine` source plus fixture sync and extraction benchmark tooling. |
 | **CI mypy alignment** | CI, pre-commit, AGENTS commands, and PR checklist now all use `uv run --extra dev mypy`. |
 | **Extraction eval loop** | `scripts/evaluate-extraction.py` compiles `fixtures/eval/*.md` and compares generated artifacts against `*.expected.yaml` gold files; CI runs the deterministic check. |
+| **Role usability loop** | `scripts/evaluate-usability.py` runs architect gap discovery, engineer handoff, and BYOM Terraform VPC module trials through the CLI; CI runs the deterministic check. |
+| **BYOM Terraform VPC pattern** | Added `terraform-vpc` pattern with Pydantic intent model, requirement graph, target contract, module mapper, sample config, and decision report generator. |
+| **Discover Markdown sync** | `discover --no-llm` now applies deterministic Markdown decisions before gap analysis, matching compile behavior. |
 | **LLM-path deterministic backfill** | Compiler now merges deterministic Markdown accounts/OUs/workloads into LLM-produced intent, backfilling dropped or partial named entities from small models without duplicating explicit items. |
 | **Markdown extractor type coverage** | Deterministic Markdown extraction is now in mypy scope, protecting the small-model backfill path from silent type drift. |
 | **Extraction benchmark type coverage** | `scripts/benchmark-extraction.py` is now in mypy scope, protecting the local small-model quality benchmark from untyped JSON/YAML drift. |
@@ -270,11 +275,15 @@ T15: Lean contract-driven handoff maturity
 | **Catalog match type coverage** | `core/catalog_match.py` is now in mypy scope, protecting CLI catalog recommendations from untyped drift. |
 
 ### Next (prioritized)
-1. [ ] Run `scripts/evaluate-extraction.py --llm` against local 3B/7B models and record misses before adding more extraction code.
-2. [ ] Continue narrowing remaining `aws-lza` field gaps against official LZA sample config schemas, especially IAM permission set/assignment detail when real customer identity inputs exist.
-3. [ ] Decide whether small-model extraction still needs separate workload-only LLM pass after deterministic backfill results settle.
+1. [ ] Run `scripts/evaluate-extraction.py --llm` and `scripts/evaluate-usability.py` against local 3B/7B models and record misses before adding more extraction code.
+2. [ ] Add one non-Terraform BYOM trial (CDK or CloudFormation) if Terraform VPC trial stays clean.
+3. [ ] Continue narrowing remaining `aws-lza` field gaps against official LZA sample config schemas, especially IAM permission set/assignment detail when real customer identity inputs exist.
+4. [ ] Decide whether small-model extraction still needs separate workload-only LLM pass after deterministic backfill results settle.
 
 ### Key Decisions This Session
+- **Role trials are product tests**: Added deterministic architect, engineer, and BYOM trials so ease-of-use regressions fail like normal quality gates.
+- **BYOM means module contract, not Terraform generation**: `terraform-vpc` emits typed module variables and tfvars handoff for an existing Terraform module; it does not create deployable root stacks.
+- **Discover must honor deterministic extraction**: Fixed `discover --no-llm` to apply Markdown key-value decisions before defaults, so architect gap review matches compile behavior.
 - **Eval first, product code second**: Added a gold-file eval loop before changing extraction behavior again, so future LLM tweaks are evidence-driven.
 - **Evaluate artifacts, not raw prompts**: Eval checks generated `decision-report.yaml` values, entity names/counts, and handoff files because that is what architects/engineers consume.
 - **No fake sample artifact requirement**: Eval corpus does not require `sample-recommendations.yaml` for legacy patterns that have no registered sample configs.

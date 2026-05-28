@@ -39,6 +39,9 @@ jobs:
       - name: Extraction eval check
         run: uv run python scripts/evaluate-extraction.py
 
+      - name: Usability trial check
+        run: uv run python scripts/evaluate-usability.py
+
   test:
     runs-on: ubuntu-latest
     strategy:

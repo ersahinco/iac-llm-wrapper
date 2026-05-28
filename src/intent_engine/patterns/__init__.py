@@ -18,6 +18,7 @@ def load_builtin_patterns() -> None:
     from . import aws_lza as _aws_lza  # noqa: F401
     from . import kubernetes as _kubernetes  # noqa: F401
     from . import lza as _lza  # noqa: F401
+    from . import terraform_vpc as _terraform_vpc  # noqa: F401
     from .lza import catalog as _lza_catalog  # noqa: F401
     from .lza import generators as _lza_generators  # noqa: F401
 
