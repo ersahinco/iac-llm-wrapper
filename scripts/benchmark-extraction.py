@@ -14,10 +14,11 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-FIXTURES = [
+FIXTURES: list[dict[str, Any]] = [
     {
         "name": "valid-payments.md",
         "path": "fixtures/valid-payments.md",
@@ -58,7 +59,7 @@ FIXTURES = [
 ]
 
 
-def parse_llm_json(raw_response: str) -> dict | None:
+def parse_llm_json(raw_response: str) -> dict[str, Any] | None:
     cleaned = raw_response.strip()
     if cleaned.startswith("```"):
         lines = cleaned.splitlines()
@@ -69,9 +70,10 @@ def parse_llm_json(raw_response: str) -> dict | None:
     if cleaned.startswith("```"):
         cleaned = cleaned.strip("`").strip()
     try:
-        return json.loads(cleaned)
+        data = json.loads(cleaned)
     except json.JSONDecodeError:
         return None
+    return data if isinstance(data, dict) else None
 
 
 def evidence_response_text(evidence_path: Path) -> str | None:
@@ -81,9 +83,13 @@ def evidence_response_text(evidence_path: Path) -> str | None:
         yaml = ruamel.yaml.YAML(typ="safe")
         with open(evidence_path) as f:
             data = yaml.load(f)
-        if not data or "calls" not in data or not data["calls"]:
+        if not isinstance(data, dict) or not data.get("calls"):
             return None
-        return data["calls"][0].get("response", "")
+        calls = data["calls"]
+        if not isinstance(calls, list) or not calls or not isinstance(calls[0], dict):
+            return None
+        response = calls[0].get("response", "")
+        return response if isinstance(response, str) else None
     except Exception:
         return None
 
@@ -98,11 +104,11 @@ def count_extracted(text: str, key: str) -> int:
     return -1
 
 
-def run_one(fixture: dict, model: str, provider: str) -> dict:
-    fixture_path = REPO_ROOT / fixture["path"]
-    result = {
-        "fixture": fixture["name"],
-        "pattern": fixture["pattern"],
+def run_one(fixture: dict[str, Any], model: str, provider: str) -> dict[str, Any]:
+    fixture_path = REPO_ROOT / str(fixture["path"])
+    result: dict[str, Any] = {
+        "fixture": str(fixture["name"]),
+        "pattern": str(fixture["pattern"]),
         "status": "OK",
         "compile": "ok",
         "violations": "",
@@ -126,7 +132,7 @@ def run_one(fixture: dict, model: str, provider: str) -> dict:
                 "--output",
                 tmpdir,
                 "--pattern",
-                fixture["pattern"],
+                str(fixture["pattern"]),
                 "--provider",
                 provider,
                 "--model",
@@ -183,13 +189,13 @@ def run_one(fixture: dict, model: str, provider: str) -> dict:
     return result
 
 
-def fmt(v):
+def fmt(v: object) -> str:
     if isinstance(v, int) and v < 0:
         return "N/A"
     return str(v)
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description="LLM extraction quality benchmark")
     parser.add_argument("--model", default="qwen2.5:7b")
     parser.add_argument("--provider", default="ollama")

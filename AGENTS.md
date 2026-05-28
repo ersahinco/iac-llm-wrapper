@@ -181,7 +181,7 @@ T15: Lean contract-driven handoff maturity
 - **Lint**: clean
 - **Format**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added deterministic Markdown extractor to mypy scope, fixed typed requirement lookup, kept full gate green
+- **Last session**: Added extraction benchmark script to mypy scope, tightened JSON/YAML typing, kept full gate green
 
 ### Done
 | Area | Item |
@@ -259,9 +259,10 @@ T15: Lean contract-driven handoff maturity
 | **Fixture drift CI gate** | CI now runs `uv run python scripts/sync-sample-fixtures.py --check` explicitly so generated fixture drift fails fast and visibly. |
 | **Pre-commit gate alignment** | Pre-commit now runs the same scoped `uv run --extra dev mypy` and sample fixture drift check as local/CI gates instead of a broader mirror-mypy invocation. |
 | **Whitespace-stable YAML generation** | Core and AWS LZA YAML dumpers strip trailing whitespace, so generated fixtures no longer fight whitespace hooks. |
-| **Incremental mypy expansion** | `uv run --extra dev mypy` now covers core contracts, sample config registry, Markdown extractor, module payload mapping, AWS LZA emitter/model code, and AWS LZA contract metadata in addition to previous typed files. |
+| **Incremental mypy expansion** | `uv run --extra dev mypy` now covers extraction benchmark tooling, core contracts, sample config registry, Markdown extractor, module payload mapping, AWS LZA emitter/model code, and AWS LZA contract metadata in addition to previous typed files. |
 | **LLM-path deterministic backfill** | Compiler now merges deterministic Markdown accounts/OUs/workloads into LLM-produced intent, backfilling dropped or partial named entities from small models without duplicating explicit items. |
 | **Markdown extractor type coverage** | Deterministic Markdown extraction is now in mypy scope, protecting the small-model backfill path from silent type drift. |
+| **Extraction benchmark type coverage** | `scripts/benchmark-extraction.py` is now in mypy scope, protecting the local small-model quality benchmark from untyped JSON/YAML drift. |
 
 ### Next (prioritized)
 1. [ ] Continue narrowing remaining `aws-lza` field gaps against official LZA sample config schemas, especially IAM permission set/assignment detail when real customer identity inputs exist.
@@ -269,6 +270,8 @@ T15: Lean contract-driven handoff maturity
 3. [ ] Decide whether small-model extraction still needs separate workload-only LLM pass after deterministic backfill results settle.
 
 ### Key Decisions This Session
+- **Small-model benchmark is part of quality system**: Added `scripts/benchmark-extraction.py` to mypy scope because it is the local evidence path for extraction quality decisions.
+- **Benchmark parsing now fails closed on shape**: JSON/YAML loads now verify mapping/list/string shapes before returning data, avoiding hidden `Any` propagation.
 - **Small-model support depends on deterministic parser health**: Added `core/markdown_extractor.py` to mypy scope because this code backs the small-model entity recovery path.
 - **Type fix kept behavior unchanged**: Renamed the optional requirement lookup variable before option normalization so mypy can prove the code is safe without changing extraction output.
 - **Fixture drift belongs in CI now**: Tests already compare generated bundles, but explicit `sync-sample-fixtures.py --check` gives faster failure and clearer maintainer action.

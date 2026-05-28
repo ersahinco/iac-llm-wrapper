@@ -71,6 +71,7 @@ testpaths = ["tests"]
 [tool.mypy]
 python_version = "3.11"
 files = [
+    "scripts/benchmark-extraction.py",
     "src/intent_engine/cli.py",
     "src/intent_engine/core/catalog.py",
     "src/intent_engine/core/patterns.py",
