@@ -76,11 +76,8 @@ iac-llm-wrapper sample list --contract aws-lza-sample-configuration
 # Show AWS LZA sample contract metadata and decisions
 iac-llm-wrapper sample show --name aws-lza-standard-v1
 
-# Diff current decisions against a proven config
-iac-llm-wrapper catalog diff --entry lza-financial --input decisions.json
-
-# Apply catalog defaults to current decisions
-iac-llm-wrapper catalog apply --entry lza-baseline --input current.json --output merged.json
+# Inspect required artifacts and lineage for a contract-backed pattern
+iac-llm-wrapper contract show --pattern aws-lza
 ```
 
 `compile` and `interview` also print closest sample matches for the chosen pattern so
@@ -98,9 +95,12 @@ When analyzing design documents, the tool detects architectural signals from tex
 | "SAP", "Oracle" | `network_segmentation`, `kms_key_spec` | Enterprise workload patterns |
 | "multi-cloud", "GCP" | `network_segmentation`, `data_residency` | Cross-cloud governance |
 
-## Catalog Entries
+Legacy catalog diff/apply still exists for older LZA research patterns. New
+contract-backed work should prefer `sample` and `contract`.
 
-| Catalog Entry | Pattern | Use Case | Contract / Module References |
+## Reference Entries
+
+| Reference Entry | Pattern | Use Case | Contract / Module References |
 |---------------|---------|----------|-------------------|
 | `aws-lza-standard-v1` | aws-lza | Standard Control Tower landing zone | AWS LZA sample configuration |
 | `aws-lza-regulated-v1` | aws-lza | Regulated Control Tower landing zone | AWS LZA sample configuration |

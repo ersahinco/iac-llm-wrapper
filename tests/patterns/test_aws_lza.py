@@ -268,6 +268,12 @@ class TestAwsLzaPattern:
         assert "baseline: standard" in markdown
         assert "enabled_regions: eu-central-1" in markdown
 
+    def test_template_rejects_legacy_addon(self):
+        from intent_engine.core.compiler import generate_template
+
+        with pytest.raises(ValueError, match="does not support addons"):
+            generate_template(pattern="aws-lza", addon_names=["pci-compliance"])
+
     def test_validate_command_passes_for_generated_artifacts(self, tmp_path: Path):
         from typer.testing import CliRunner
 

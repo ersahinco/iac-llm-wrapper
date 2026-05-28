@@ -18,7 +18,7 @@ This project replaces that with a **model-driven flow**:
 Prose / Markdown
      │
      ▼
-Extraction ──── LLM traverses a requirement graph, detects signals, suggests addons
+Extraction ──── LLM traverses a requirement graph and detects signals
      │
      ▼
 Interview ───── Guided questions fill remaining gaps (via CLI or API)
@@ -154,14 +154,18 @@ iac-llm-wrapper discover -i design.md --pattern aws-lza
 
 The tool extracts decisions, detects signals (PCI scope, regulated industry, hybrid connectivity), and reports any gaps.
 
-### 3. Diff Against Known-Good Catalog
+### 3. Inspect Contract and Samples
 
 ```bash
-# Generate a catalog entry comparison
-iac-llm-wrapper catalog diff --entry lza-financial --input decisions.json
+# See required AWS LZA handoff files, decisions, and lineage paths
+iac-llm-wrapper contract show --pattern aws-lza
+
+# See pinned reference bundles for engineer handoff
+iac-llm-wrapper sample list --contract aws-lza-sample-configuration
 ```
 
-Shows where your design deviates from proven configurations.
+This keeps the path explicit: graph decisions must satisfy a target contract,
+then engineers receive generated handoff files plus matching sample bundles.
 
 ### 4. Compile to Decision Artifacts
 
@@ -234,7 +238,8 @@ New landing-zone work should prefer `aws-lza`.
 
 ### Addons
 
-Addons layer additional requirements onto compatible legacy/research patterns:
+Addons layer additional requirements only onto patterns that explicitly opt in.
+Built-in addon support is currently limited to legacy/research LZA patterns:
 
 ```bash
 iac-llm-wrapper compile -i design.md --pattern baseline --addon pci-compliance --addon hipaa

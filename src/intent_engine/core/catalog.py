@@ -1,8 +1,7 @@
-"""ConfigCatalog: known-good reference decision sets.
+"""ConfigCatalog: legacy known-good reference decision sets.
 
-Provides pre-built decisions that represent proven, validated patterns.
-Architects can use these as starting points. Engineers can diff their
-current intent against a catalog entry to understand gaps.
+Provides pre-built decisions that represent proven, validated legacy patterns.
+New contract-backed patterns should prefer SampleConfigRegistry.
 
 Each catalog entry is a YAML file with:
   name: "baseline"
@@ -14,7 +13,7 @@ Each catalog entry is a YAML file with:
     ...
   notes:
     architect: "Suitable for enterprises with 5+ accounts"
-    engineer: "Produces 10 YAML files + workload skeletons"
+    engineer: "Produces validated handoff artifacts"
 """
 
 from __future__ import annotations

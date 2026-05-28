@@ -211,6 +211,7 @@ BUILTIN_PATTERNS: list[Pattern] = [
             "hybrid_ip_model, on_prem_cidrs"
         ),
         required_artifacts=list(_LZA_REQUIRED_ARTIFACTS),
+        allow_addons=True,
     ),
     Pattern(
         name="workload",
@@ -234,6 +235,7 @@ BUILTIN_PATTERNS: list[Pattern] = [
                 "api: target_account=Prod, network_mode=private, port=8080, cpu=256, memory=512",
             ],
         },
+        allow_addons=True,
     ),
     Pattern(
         name="minimal",
@@ -270,6 +272,7 @@ BUILTIN_PATTERNS: list[Pattern] = [
             ],
         },
         prompt_context="This pattern designs minimal AWS landing zone configurations.",
+        allow_addons=True,
     ),
     Pattern(
         name="hybrid-enterprise",
@@ -284,6 +287,7 @@ BUILTIN_PATTERNS: list[Pattern] = [
         free_form_examples=dict(_BASELINE_FREE_FORM_EXAMPLES),
         prompt_context="This pattern designs hybrid enterprise AWS landing zone configurations.",
         required_artifacts=list(_LZA_REQUIRED_ARTIFACTS),
+        allow_addons=True,
     ),
     Pattern(
         name="financial-services",
@@ -298,6 +302,7 @@ BUILTIN_PATTERNS: list[Pattern] = [
         free_form_examples=dict(_BASELINE_FREE_FORM_EXAMPLES),
         prompt_context="This pattern designs financial services AWS landing zone configurations.",
         required_artifacts=list(_LZA_REQUIRED_ARTIFACTS),
+        allow_addons=True,
     ),
     Pattern(
         name="healthcare",
@@ -312,6 +317,7 @@ BUILTIN_PATTERNS: list[Pattern] = [
         free_form_examples=dict(_BASELINE_FREE_FORM_EXAMPLES),
         prompt_context="This pattern designs healthcare AWS landing zone configurations.",
         required_artifacts=list(_LZA_REQUIRED_ARTIFACTS),
+        allow_addons=True,
     ),
 ]
 

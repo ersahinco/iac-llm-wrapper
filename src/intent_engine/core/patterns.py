@@ -1,8 +1,8 @@
 """Pattern registry: pluggable requirement graphs for different scenarios.
 
-Addons are composable modules that extend a base pattern's graph with
-additional requirements, field mappings, and template sections.
-New addons can be registered without modifying core code.
+Patterns may opt into addons. Addons are composable modules that extend a base
+pattern's graph with additional requirements, field mappings, and template
+sections. New addons can be registered without modifying core code.
 """
 
 from __future__ import annotations
@@ -49,6 +49,8 @@ class Pattern:
     extra_artifacts: list[str] = field(default_factory=list)
     # Target contracts that drive decisions, validation, and generated artifacts
     contracts: list[TargetContract] = field(default_factory=list)
+    # Explicit opt-in: prevents accidental cross-pattern addon composition.
+    allow_addons: bool = False
     # Pattern-specific discovery hooks
     extra_consistency_checks: list[Any] = field(default_factory=list)
     extra_signal_detectors: list[Any] = field(default_factory=list)
@@ -132,7 +134,7 @@ class PatternRegistry:
 # Addons are composable modules that extend a base pattern's graph with
 # additional requirements, field mappings for extract sync, and section
 # mappings for template generation. Any number of addons can be composed
-# onto any base pattern via CLI --addon flag.
+# onto patterns that explicitly opt in via allow_addons.
 
 
 @dataclass

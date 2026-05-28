@@ -64,11 +64,18 @@ def _get_pattern_or_exit(pattern: str) -> Pattern:
     return GLOBAL_REGISTRY.get(pattern)
 
 
-def _validate_addons_or_exit(addons: list[str]) -> None:
+def _validate_addons_or_exit(addons: list[str], pattern: Pattern | None = None) -> None:
     for addon_name in addons:
         if addon_name not in ADDON_REGISTRY.list():
             typer.echo(f"Unknown addon: {addon_name}. Available: {_available_addons()}", err=True)
             raise typer.Exit(1)
+    if addons and pattern is not None and not pattern.allow_addons:
+        typer.echo(
+            f"Pattern '{pattern.name}' does not support addons. "
+            "Use a pattern that explicitly declares addon support.",
+            err=True,
+        )
+        raise typer.Exit(1)
 
 
 def _parse_decisions_or_exit(raw_decisions: str | None) -> dict[str, Any] | None:
@@ -255,7 +262,7 @@ def compile(
         raise typer.Exit(1)
 
     pattern_obj = _get_pattern_or_exit(pattern)
-    _validate_addons_or_exit(addon)
+    _validate_addons_or_exit(addon, pattern_obj)
 
     graph = pattern_obj.create_graph()
     if addon:
@@ -428,9 +435,10 @@ def discover(
         if addon:
             typer.echo("Warning: --addon ignored when --resume is used", err=True)
     else:
-        _validate_addons_or_exit(addon)
+        pattern_obj = _get_pattern_or_exit(pattern)
+        _validate_addons_or_exit(addon, pattern_obj)
 
-        graph = _get_pattern_or_exit(pattern).create_graph()
+        graph = pattern_obj.create_graph()
         if addon:
             graph = ADDON_REGISTRY.compose(graph, addon)
         engine = InterviewEngine(graph)
@@ -638,7 +646,7 @@ def interview(
             typer.echo("Warning: --pattern and --addon ignored when --resume is used", err=True)
     else:
         pattern_obj = _get_pattern_or_exit(pattern)
-        _validate_addons_or_exit(addon)
+        _validate_addons_or_exit(addon, pattern_obj)
         graph = pattern_obj.create_graph()
         if addon:
             graph = ADDON_REGISTRY.compose(graph, addon)
@@ -1103,8 +1111,8 @@ def template(
     ),
 ) -> None:
     """Generate a Markdown design doc scaffold from a pattern."""
-    _get_pattern_or_exit(pattern)
-    _validate_addons_or_exit(addon)
+    pattern_obj = _get_pattern_or_exit(pattern)
+    _validate_addons_or_exit(addon, pattern_obj)
 
     markdown = generate_template(pattern=pattern, addon_names=addon)
     output.write_text(markdown)

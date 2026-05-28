@@ -382,6 +382,8 @@ def generate_template(
     pattern_obj = GLOBAL_REGISTRY.get(pattern)
     graph = pattern_obj.create_graph()
     if addon_names:
+        if not pattern_obj.allow_addons:
+            raise ValueError(f"Pattern '{pattern}' does not support addons")
         graph = ADDON_REGISTRY.compose(graph, addon_names)
 
     section_map = _build_section_map(pattern, addon_names, graph)

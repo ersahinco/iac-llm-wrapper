@@ -393,3 +393,29 @@ class TestCLITemplate:
         assert result.exit_code == 0
         content = output.read_text()
         assert "aws-lza pattern" in content
+
+    def test_addon_rejected_for_default_aws_lza(self, tmp_path: Path):
+        output = tmp_path / "design.md"
+        result = runner.invoke(
+            app,
+            ["template", "--addon", "pci-compliance", "--output", str(output)],
+        )
+        assert result.exit_code != 0
+        assert "does not support addons" in result.output
+
+    def test_addon_allowed_for_legacy_lza_pattern(self, tmp_path: Path):
+        output = tmp_path / "design.md"
+        result = runner.invoke(
+            app,
+            [
+                "template",
+                "--pattern",
+                "baseline",
+                "--addon",
+                "pci-compliance",
+                "--output",
+                str(output),
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert "data_residency" in output.read_text()

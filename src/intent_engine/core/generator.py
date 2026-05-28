@@ -1,7 +1,7 @@
 """Generate intent artifacts from normalized intent.
 
-Produces decision reports, deployment graphs, and workload skeletons
-that engineers use alongside sample configurations and IaC modules.
+Produces decision reports, contract handoff artifacts, lineage, runbooks, and
+module input files that engineers use alongside their IaC modules.
 
 The generator uses a registry pattern so new output modules can be added
 without modifying core generation logic. Each registered generator is a

@@ -20,40 +20,42 @@ uv run python scripts/evaluate-usability.py        # role-based trials
 
 - **Models** (`models.py`): Pydantic v2 data model for intent concepts. Use-case specific; LZA models include `CICDRunnerConfig`, `SecretManagementConfig`, `NetworkApplianceConfig`. The model drives extraction, graph sync, validation, and generation — like environment variables for a runtime.
 - **Extract** (`extractor.py`): Single `Extractor` class driven by the requirement graph. Auto-generates LLM prompts from graph node `target_field`/`target_type`, parses JSON responses with type coercion. No regex in the LLM extraction path, no rigid prose format. Without LLM, fallback applies graph defaults and can recover explicitly structured Markdown entity sections. Prompt is domain-agnostic; patterns optionally inject `prompt_context`.
-- **Patterns** (`patterns.py`): Pluggable pattern registry (`baseline`, `minimal`, `workload`, `hybrid-enterprise`, `financial-services`, `healthcare`, `kubernetes-cluster`, `terraform-vpc`). Patterns carry their own graph factories, intent models, default catalogs, validators, generators, and template metadata. New patterns register without core code changes. **Addon system**: `Addon`/`AddonRegistry` for composable modules that layer requirements, field maps, and section maps onto any base pattern. Built-in addons include `pci-compliance`, `hipaa`, `self-hosted-cicd`, `hashicorp-vault`, `paloalto-fw`. `--addon` CLI flag enables composition.
+- **Patterns** (`patterns.py`): Pluggable pattern registry. Recommended product paths are `aws-lza`, `kubernetes-cluster`, and `terraform-vpc`; legacy LZA research patterns remain explicit by `--pattern baseline|minimal|workload|hybrid-enterprise|financial-services|healthcare`. Patterns carry graph factories, intent models, validators, generators, contracts, and template metadata. Addons are opt-in via `Pattern.allow_addons`; current built-in addons support only legacy LZA research patterns.
 - **Requirements** (`requirements.py`): Knowledge graph of decisions with `applies_if`, `blocked_if`, `depends_on`, and `cascade` rules. Each node carries architectural knowledge: WA pillars, compliance controls, migration signals, tradeoffs, alternatives, consequences, and confidence scores. Graphs are pattern-driven.
 - **Interview** (`interview.py`): Knowledge-driven interview engine. Presents questions in topological order with full context: WA pillars, compliance controls, tradeoffs, consequences, and detected signals. `path_log()` shows every decision and why each path was taken or skipped. Every decision is recorded in an audit trail with timestamp and rationale.
 - **Normalize** (`normalizer.py`): Applies deterministic defaults from `defaults.yaml` using duck-typing. No hardcoded fallbacks — use-case specifics live in config.
 - **Validate** (`validator.py`): Fail-closed checks. `validate_graph()` derives violations from graph metadata. Accepts extra pattern-specific validators. Raises `CompileError` with violation codes on missing required decisions.
-- **Generate** (`generator.py`): Produces decision reports, deployment graphs, and workload skeletons from normalized intent. Uses a registry pattern so new output modules can be added without modifying core generation logic. Built-in generators have `hasattr` guards so multiple patterns coexist safely.
-- **Catalog** (`catalog.py`): Known-good reference configurations (`lza-minimal`, `lza-baseline`, `lza-hybrid-enterprise`, `lza-financial`, `lza-healthcare`). Architects can diff current decisions against proven configs. Engineers can apply catalog entries as starting points. CLI: `intent-engine catalog list/show/diff/apply`.
+- **Generate** (`generator.py`): Produces decision reports, contract handoff artifacts, lineage, runbooks, and module-input files from normalized intent. Uses a registry pattern so new output modules can be added without modifying core generation logic.
+- **Samples/Catalog** (`sample_config.py`, `catalog.py`): `SampleConfigRegistry` is the current contract-backed reference system for pinned handoff bundles. `ConfigCatalog` remains legacy LZA diff/apply support.
 - **LLM** (`llm_caller.py`): Pluggable `LLMBackend` (OpenAI-compatible REST) with retry + exponential backoff. `create_backend("openai"|"ollama"|"anthropic")` factory. Evidenced via `LLMEvidenceStore` with token usage tracking.
-- **CLI** (`cli.py`): Typer app with `compile`, `interview`, `validate`, `explain`, `catalog`, `discover`, `template`, `review` commands. Use `--pattern` to select scenario, `--addon` to layer addons, `--decisions` JSON for pre-fill, `--evidence-output` for LLM call audit.
+- **CLI** (`cli.py`): Typer app with `compile`, `interview`, `validate`, `explain`, `sample`, `contract`, `catalog`, `discover`, `template`, `review` commands. Default product path is `aws-lza`. Use `--pattern` to select scenario, `--addon` only where pattern opts in, `--decisions` JSON for pre-fill, `--evidence-output` for LLM call audit.
 
 ## Key Design Decisions
 
-- The framework is **domain-agnostic**. LZA-specific logic lives in the LZA pattern, models, and generators — not in core files.
+- The framework is **domain-agnostic**. Use-case logic lives in patterns, data models, contracts, and generators, not hardcoded CLI branches.
 - Topology is parsed into `intent.topology` then synced to `intent.network.topology` during normalization (LZA-specific normalizer behavior, duck-typed).
 - Workload Markdown format: `- name: key=value, key=value` (comma-separated KV after first colon).
 - Private CI/CD auto-adds 10 VPC endpoints: s3, sts, kms, logs, ecr.api, ecr.dkr, secretsmanager, ssm, ec2messages, ssmmessages.
 - Default region: eu-central-1. Default audit retention: 2555 days.
 - No AWS API calls. No deployment. No arbitrary Terraform from prose.
-- The tool produces decision reports, intent artifacts, and reference variable files (e.g., `terraform.tfvars` for module input handoff). Engineers use these alongside sample configurations and IaC modules. It does not generate deployable CDK/Terraform root modules or provider configs.
-- **Architecture debt**: Core files (`extractor.py`, `compiler.py`, `interview.py`) have LZA-specific conditionals despite generic naming. Fixing this requires moving prompt schemas to per-pattern `prompt_context` — a medium-refactor project. See `EXTENSION.md` for the extension contract.
+- The tool produces decision reports, contract handoff artifacts, and reference module-input files when the selected pattern owns module mapping. Engineers use these alongside sample configurations and IaC modules. It does not generate deployable CDK/Terraform root modules or provider configs.
+- **Legacy boundary**: `patterns/aws_lza` is the recommended thin AWS LZA path. `patterns/lza` remains legacy research/regression coverage until deliberate removal; do not add new LZA product behavior there.
 
 ## Pattern Registry and Catalog
 
-- **Patterns**: The `PatternRegistry` (`patterns.py`) decouples scenario definition from core logic. Each pattern has a name, description, graph factory, intent model factory, and optional catalog reference.
+- **Patterns**: The `PatternRegistry` (`patterns.py`) decouples scenario definition from core logic. Each pattern has a name, description, graph factory, intent model factory, optional contracts, and optional catalog/sample references.
+  - `aws-lza`: thin AWS Landing Zone Accelerator handoff with official-style LZA config artifacts
+  - `kubernetes-cluster`: K8s cluster provisioning with node pools and network policies
+  - `terraform-vpc`: BYOM Terraform AWS VPC module input capture
   - `baseline`: full LZA with hub-spoke, security, CI/CD, hybrid
   - `minimal`: bare minimum (4 decisions)
   - `workload`: workload account deployment only
   - `hybrid-enterprise`: baseline + hybrid connectivity + enhanced security
   - `financial-services`: baseline + PCI-DSS, SOX, data residency, payment segmentation (via `pci-compliance` addon)
   - `healthcare`: baseline + HIPAA, PHI encryption, BAA coverage (via `hipaa` addon)
-  - `kubernetes-cluster`: K8s cluster provisioning with node pools and network policies (proof of generic framework)
-  - `terraform-vpc`: BYOM Terraform AWS VPC module input capture
-- **Addons**: The `AddonRegistry` supports composable modules that layer onto any base pattern. `--addon pci-compliance --addon hipaa` stacks multiple addons. Each addon carries requirements, field maps for extraction sync, and section maps for template generation. Built-in addons: `pci-compliance` (3 decisions), `hipaa` (3 decisions).
-- **ConfigCatalog**: Pre-built decision sets that represent proven, validated deployments.
+- **Addons**: The `AddonRegistry` supports composable modules only for patterns that set `allow_addons=True`. This prevents legacy addon requirements from leaking into contract-backed product paths.
+- **SampleConfigRegistry**: Current contract-backed sample reference system (`sample list/show`) for pinned handoff bundles and match recommendations.
+- **ConfigCatalog**: Legacy pre-built decision sets that represent proven, validated legacy LZA deployments.
   - `lza-minimal`: starter config for 1-2 accounts
   - `lza-baseline`: standard enterprise (hub-spoke, no hybrid)
   - `lza-hybrid-enterprise`: with Direct Connect, egress inspection, hybrid DNS
@@ -181,11 +183,11 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff.
 T15: Lean contract-driven handoff maturity
 
 ### Status
-- **Tests**: 522 passing, 1 skipped (LLM non-determinism)
+- **Tests**: 525 passing, 1 skipped (LLM non-determinism)
 - **Lint**: clean
 - **Format**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Made CLI default `aws-lza`, removed stale legacy doc/scripts, kept full gate green
+- **Last session**: Made addon support explicit/opt-in, blocked legacy addons from thin product paths, cleaned stale catalog/addon docs, kept full gate green
 
 ### Done
 | Area | Item |
@@ -280,12 +282,13 @@ T15: Lean contract-driven handoff maturity
 | **Catalog match type coverage** | `core/catalog_match.py` is now in mypy scope, protecting CLI catalog recommendations from untyped drift. |
 | **Default pattern cleanup** | CLI defaults now use `aws-lza`; legacy LZA tests and examples opt into `baseline` explicitly where user-facing. |
 | **Dead script/doc removal** | Removed unreferenced legacy real-world doc plus stale `test-llm-extraction.sh` and `benchmark-extraction.py`; eval scripts are the quality path. |
+| **Addon boundary** | `Pattern.allow_addons` now gates `--addon`; legacy LZA research patterns opt in, while `aws-lza`, `kubernetes-cluster`, and BYOM patterns stay clean by default. |
+| **Docs lean-up** | README, capability docs, core docstrings, and AGENTS now put `contract`/`sample` first for product paths and label `catalog` as legacy LZA support. |
 
 ### Next (prioritized)
-1. [ ] Run `scripts/evaluate-extraction.py --llm` and `scripts/evaluate-usability.py --llm` against local 3B/7B models after CLI default cleanup and record misses before adding more extraction code.
-2. [ ] Add one non-Terraform BYOM trial (CDK or CloudFormation) if Terraform VPC trial stays clean.
-3. [ ] Continue narrowing remaining `aws-lza` field gaps against official LZA sample config schemas, especially IAM permission set/assignment detail when real customer identity inputs exist.
-4. [ ] Decide whether to retire or move legacy LZA research patterns after `aws-lza` covers required landing-zone trials.
+1. [ ] Add one non-Terraform BYOM trial (CDK or CloudFormation) if Terraform VPC trial stays clean.
+2. [ ] Continue narrowing remaining `aws-lza` field gaps against official LZA sample config schemas, especially IAM permission set/assignment detail when real customer identity inputs exist.
+3. [ ] Decide whether to retire or move legacy LZA research patterns after `aws-lza` covers required landing-zone trials.
 
 ### Key Decisions This Session
 - **Two LZA folders are not equal product paths**: `patterns/aws_lza` is the recommended thin AWS LZA handoff path; `patterns/lza` remains legacy research/regression coverage for richer workload/module extraction until deliberate removal.
@@ -296,6 +299,8 @@ T15: Lean contract-driven handoff maturity
 - **Docs must reduce pattern confusion**: README, capability docs, and LLM setup now steer new landing-zone users to `aws-lza`; legacy examples are labeled as regression/research material.
 - **Default path should be product path**: CLI defaults now use `aws-lza`; old `baseline` behavior remains available by explicit `--pattern baseline`, while core helper defaults stay backward-compatible until legacy LZA removal.
 - **One eval path beats stale scripts**: Removed shell/benchmark scripts that duplicated eval behavior and referenced missing fixtures. `evaluate-extraction.py` and `evaluate-usability.py` are the supported loops.
+- **Addon composition must be explicit**: `--addon` now fails for patterns that do not set `allow_addons=True`, preventing legacy compliance/CICD/FW requirements from leaking into contract-backed product paths.
+- **Samples/contracts are current guidance**: Product docs now show `contract` and `sample` commands before legacy `catalog`; catalog remains only for older LZA research patterns.
 - **Deterministic is plumbing, LLM is product value**: Usability runner now has `--llm` mode so local/provider models prove real architect and engineer experience.
 - **LLM use must be observable**: `evaluate-usability.py --llm` now requires LLM evidence files with calls, prompt, response, and expected model; `--evidence-dir` preserves them for inspection.
 - **CI stays deterministic**: Role trials still run deterministically in CI to avoid slow/flaky model dependency, while `--llm` remains the required local quality evidence path.
