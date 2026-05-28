@@ -43,6 +43,18 @@ def _available_addons() -> str:
     return ", ".join(ADDON_REGISTRY.list())
 
 
+def _write_evidence_output(evidence_output: Path | None, evidence_store: LLMEvidenceStore) -> None:
+    if not evidence_output or not evidence_store.entries:
+        return
+
+    import ruamel.yaml
+
+    yaml = ruamel.yaml.YAML(typ="safe")
+    with open(evidence_output, "w") as fh:
+        yaml.dump(evidence_store.to_dict(), fh)
+    typer.echo(f"LLM evidence written to: {evidence_output}")
+
+
 def _get_pattern_or_exit(pattern: str) -> Pattern:
     if pattern not in GLOBAL_REGISTRY.list():
         typer.echo(f"Unknown pattern: {pattern}. Available: {_available_patterns()}", err=True)
@@ -284,13 +296,7 @@ def compile(
 
     if dry_run:
         typer.echo("[Dry-run] Validation successful. No files written.")
-        if evidence_output and evidence_store.entries:
-            import ruamel.yaml
-
-            yaml = ruamel.yaml.YAML(typ="safe")
-            with open(evidence_output, "w") as fh:
-                yaml.dump(evidence_store.to_dict(), fh)
-            typer.echo(f"LLM evidence written to: {evidence_output}")
+        _write_evidence_output(evidence_output, evidence_store)
         return
 
     typer.echo(f"Compilation successful. Output written to: {output}")
@@ -324,6 +330,7 @@ def compile(
         )
 
     _emit_sample_matches(pattern, graph.typed_decisions())
+    _write_evidence_output(evidence_output, evidence_store)
 
 
 @app.command()
@@ -564,13 +571,7 @@ def discover(
             ctx = f" | {item['context']}" if item["context"] else ""
             typer.echo(f"  {status_icon} {item['key']} = {val}{ctx}")
 
-    if evidence_output and evidence_store.entries:
-        import ruamel.yaml
-
-        yaml = ruamel.yaml.YAML(typ="safe")
-        with open(evidence_output, "w") as fh:
-            yaml.dump(evidence_store.to_dict(), fh)
-        typer.echo(f"LLM evidence written to: {evidence_output}")
+    _write_evidence_output(evidence_output, evidence_store)
 
 
 @app.command()

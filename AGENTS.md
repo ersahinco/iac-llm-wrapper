@@ -266,7 +266,7 @@ T15: Lean contract-driven handoff maturity
 | **CI mypy alignment** | CI, pre-commit, AGENTS commands, and PR checklist now all use `uv run --extra dev mypy`. |
 | **Extraction eval loop** | `scripts/evaluate-extraction.py` compiles `fixtures/eval/*.md` and compares generated artifacts against `*.expected.yaml` gold files; CI runs the deterministic check. |
 | **Role usability loop** | `scripts/evaluate-usability.py` runs architect gap discovery, engineer handoff, and BYOM Terraform VPC module trials through the CLI; CI runs deterministic plumbing, `--llm` tests real usability. |
-| **LLM usability verification** | `scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b` passed architect, engineer, and BYOM trials locally. |
+| **LLM usability verification** | `scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b` passed architect, engineer, and BYOM trials locally, with evidence-file verification. |
 | **BYOM Terraform VPC pattern** | Added `terraform-vpc` pattern with Pydantic intent model, requirement graph, target contract, module mapper, sample config, and decision report generator. |
 | **Discover Markdown sync** | `discover --no-llm` now applies deterministic Markdown decisions before gap analysis, matching compile behavior. |
 | **LLM-path deterministic backfill** | Compiler now merges deterministic Markdown accounts/OUs/workloads into LLM-produced intent, backfilling dropped or partial named entities from small models without duplicating explicit items. |
@@ -283,6 +283,7 @@ T15: Lean contract-driven handoff maturity
 
 ### Key Decisions This Session
 - **Deterministic is plumbing, LLM is product value**: Usability runner now has `--llm` mode so local/provider models prove real architect and engineer experience.
+- **LLM use must be observable**: `evaluate-usability.py --llm` now requires LLM evidence files with calls, prompt, response, and expected model; `--evidence-dir` preserves them for inspection.
 - **CI stays deterministic**: Role trials still run deterministically in CI to avoid slow/flaky model dependency, while `--llm` remains the required local quality evidence path.
 - **Role trials are product tests**: Added deterministic architect, engineer, and BYOM trials so ease-of-use regressions fail like normal quality gates.
 - **BYOM means module contract, not Terraform generation**: `terraform-vpc` emits typed module variables and tfvars handoff for an existing Terraform module; it does not create deployable root stacks.
