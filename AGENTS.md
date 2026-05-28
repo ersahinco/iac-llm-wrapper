@@ -12,6 +12,7 @@ uv run ruff check .                                # lint
 uv run ruff format --check .                       # format check
 uv run --extra dev mypy                            # type check
 uv run python scripts/sync-sample-fixtures.py --check
+uv run python scripts/evaluate-extraction.py       # eval complex docs
 ```
 
 ## Architecture
@@ -181,7 +182,7 @@ T15: Lean contract-driven handoff maturity
 - **Lint**: clean
 - **Format**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Aligned CI/PR docs with current mypy gate, refreshed extension examples, kept full gate green
+- **Last session**: Added lean extraction eval loop with 3 complex docs, gold artifact checks, docs, kept full gate green
 
 ### Done
 | Area | Item |
@@ -261,6 +262,7 @@ T15: Lean contract-driven handoff maturity
 | **Whitespace-stable YAML generation** | Core and AWS LZA YAML dumpers strip trailing whitespace, so generated fixtures no longer fight whitespace hooks. |
 | **Source mypy coverage** | `uv run --extra dev mypy` now covers all `src/intent_engine` source plus fixture sync and extraction benchmark tooling. |
 | **CI mypy alignment** | CI, pre-commit, AGENTS commands, and PR checklist now all use `uv run --extra dev mypy`. |
+| **Extraction eval loop** | `scripts/evaluate-extraction.py` compiles `fixtures/eval/*.md` and compares generated artifacts against `*.expected.yaml` gold files; CI runs the deterministic check. |
 | **LLM-path deterministic backfill** | Compiler now merges deterministic Markdown accounts/OUs/workloads into LLM-produced intent, backfilling dropped or partial named entities from small models without duplicating explicit items. |
 | **Markdown extractor type coverage** | Deterministic Markdown extraction is now in mypy scope, protecting the small-model backfill path from silent type drift. |
 | **Extraction benchmark type coverage** | `scripts/benchmark-extraction.py` is now in mypy scope, protecting the local small-model quality benchmark from untyped JSON/YAML drift. |
@@ -268,10 +270,14 @@ T15: Lean contract-driven handoff maturity
 | **Catalog match type coverage** | `core/catalog_match.py` is now in mypy scope, protecting CLI catalog recommendations from untyped drift. |
 
 ### Next (prioritized)
-1. [ ] Continue narrowing remaining `aws-lza` field gaps against official LZA sample config schemas, especially IAM permission set/assignment detail when real customer identity inputs exist.
-2. [ ] Decide whether small-model extraction still needs separate workload-only LLM pass after deterministic backfill results settle.
+1. [ ] Run `scripts/evaluate-extraction.py --llm` against local 3B/7B models and record misses before adding more extraction code.
+2. [ ] Continue narrowing remaining `aws-lza` field gaps against official LZA sample config schemas, especially IAM permission set/assignment detail when real customer identity inputs exist.
+3. [ ] Decide whether small-model extraction still needs separate workload-only LLM pass after deterministic backfill results settle.
 
 ### Key Decisions This Session
+- **Eval first, product code second**: Added a gold-file eval loop before changing extraction behavior again, so future LLM tweaks are evidence-driven.
+- **Evaluate artifacts, not raw prompts**: Eval checks generated `decision-report.yaml` values, entity names/counts, and handoff files because that is what architects/engineers consume.
+- **No fake sample artifact requirement**: Eval corpus does not require `sample-recommendations.yaml` for legacy patterns that have no registered sample configs.
 - **Quality gates need one spelling**: CI workflow and PR template now use `uv run --extra dev mypy`, matching AGENTS and pre-commit.
 - **Extension docs should model real package shape**: New pattern examples now use `src/intent_engine/patterns/...`, `intent_engine.patterns...`, and `intent_engine.core.compiler`.
 - **Mypy source scope should not be hand-maintained anymore**: Replaced long per-file mypy list with `src/intent_engine`, so new source modules enter the type gate by default.

@@ -1,0 +1,45 @@
+version: 1
+name: lza-bank-platform
+input: lza-bank-platform.md
+pattern: financial-services
+expect:
+  compile: pass
+  values:
+    primaryRegion: eu-central-1
+    topology: hub-spoke
+    network.centralNetworkAccount: Network
+    network.cidr: 10.20.0.0/16
+    security.centralizedLogging: true
+    security.auditRetentionDays: 2555
+    cicd.mode: private
+    cicd.placement: SharedServices/BuildVPC
+  counts:
+    accounts: 9
+    ous: 5
+    workloads: 4
+  names:
+    accounts:
+      - Network
+      - SharedServices
+      - Audit
+      - SecurityOps
+      - CardProd
+      - CardNonProd
+      - FraudAnalytics
+      - MobileBanking
+      - Sandbox01
+    ous:
+      - Security
+      - Infrastructure
+      - Payments
+      - Digital
+      - Sandbox
+    workloads:
+      - card-api
+      - settlement-batch
+      - fraud-scoring
+      - mobile-edge
+  artifacts:
+    - decision-report.yaml
+    - module-inputs.yaml
+    - terraform.tfvars

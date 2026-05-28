@@ -72,6 +72,7 @@ testpaths = ["tests"]
 python_version = "3.11"
 files = [
     "scripts/benchmark-extraction.py",
+    "scripts/evaluate-extraction.py",
     "scripts/sync-sample-fixtures.py",
     "src/intent_engine",
 ]

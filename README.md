@@ -78,6 +78,18 @@ arbitrary free-form prose. Use only for unit tests or when you have no LLM acces
 INTENT_ENGINE_DISABLE_LLM=1 iac-llm-wrapper compile -i design.md -o out/
 ```
 
+### Evaluate Complex Docs
+
+Run the checked-in eval corpus to test extraction quality against expected generated artifacts:
+
+```bash
+uv run python scripts/evaluate-extraction.py
+uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b
+```
+
+The eval loop compiles docs in `fixtures/eval/`, compares `decision-report.yaml` values,
+entity counts/names, and required handoff files, then exits non-zero on misses.
+
 Install from PyPI:
 
 ```bash

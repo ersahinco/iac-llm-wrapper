@@ -1,0 +1,41 @@
+version: 1
+name: lza-messy-enterprise
+input: lza-messy-enterprise.md
+pattern: hybrid-enterprise
+expect:
+  compile: pass
+  values:
+    primaryRegion: eu-central-1
+    topology: hub-spoke
+    network.centralNetworkAccount: Network
+    network.cidr: 10.80.0.0/16
+    security.centralizedLogging: true
+    cicd.mode: private
+    cicd.placement: SharedServices/BuildVPC
+  counts:
+    accounts: 7
+    ous: 5
+    workloads: 3
+  names:
+    accounts:
+      - Network
+      - SharedServices
+      - Audit
+      - SecurityOps
+      - CorpProd
+      - FactoryProd
+      - DataLake
+    ous:
+      - Security
+      - Infrastructure
+      - CorpApps
+      - Manufacturing
+      - Data
+    workloads:
+      - erp-api
+      - factory-gateway
+      - lake-ingest
+  artifacts:
+    - decision-report.yaml
+    - module-inputs.yaml
+    - terraform.tfvars

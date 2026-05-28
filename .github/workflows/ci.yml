@@ -36,6 +36,9 @@ jobs:
       - name: Fixture drift check
         run: uv run python scripts/sync-sample-fixtures.py --check
 
+      - name: Extraction eval check
+        run: uv run python scripts/evaluate-extraction.py
+
   test:
     runs-on: ubuntu-latest
     strategy:
