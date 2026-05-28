@@ -3,7 +3,7 @@
 sourceContract:
   name: aws-lza-sample-configuration
   kind: aws-lza-sample-configuration
-  url: 
+  url:
     https://awslabs.github.io/landing-zone-accelerator-on-aws/latest/sample-configurations/
   baseline: healthcare
   mandatoryConfigFiles:
@@ -196,15 +196,15 @@ artifacts:
       - path: centralSecurityServices.guardduty.eksProtection.enable
         equals: true
         oneOf: []
-      - path: 
+      - path:
           centralSecurityServices.guardduty.exportConfiguration.overrideExisting
         equals: true
         oneOf: []
-      - path: 
+      - path:
           centralSecurityServices.guardduty.exportConfiguration.destinationType
         equals: S3
         oneOf: []
-      - path: 
+      - path:
           centralSecurityServices.guardduty.exportConfiguration.exportFrequency
         equals: FIFTEEN_MINUTES
         oneOf: []
@@ -222,7 +222,7 @@ artifacts:
         oneOf: []
   - name: customizations-config.yaml
     required: false
-    description: Optional custom applications, appliances, and CloudFormation 
+    description: Optional custom applications, appliances, and CloudFormation
       stacks.
     requiredPaths: []
     valueAssertions: []

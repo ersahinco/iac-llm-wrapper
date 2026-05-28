@@ -6,18 +6,6 @@ repos:
         args: [--fix]
       - id: ruff-format
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.15.0
-    hooks:
-      - id: mypy
-        args: []
-        additional_dependencies:
-          - types-PyYAML
-          - pydantic
-          - networkx
-          - typer
-          - ruamel.yaml
-
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
@@ -26,3 +14,16 @@ repos:
       - id: check-yaml
       - id: check-toml
       - id: check-added-large-files
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: uv run --extra dev mypy
+        language: system
+        pass_filenames: false
+      - id: sample-fixture-drift
+        name: sample fixture drift
+        entry: uv run python scripts/sync-sample-fixtures.py --check
+        language: system
+        pass_filenames: false

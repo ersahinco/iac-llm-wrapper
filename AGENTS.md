@@ -7,10 +7,11 @@
 ## Commands
 
 ```
-source .venv/bin/activate
-python -m pytest          # run all tests
-ruff check .              # lint
-ruff format --check .     # format check
+uv run pytest                                      # run all tests
+uv run ruff check .                                # lint
+uv run ruff format --check .                       # format check
+uv run --extra dev mypy                            # type check
+uv run python scripts/sync-sample-fixtures.py --check
 ```
 
 ## Architecture
@@ -180,7 +181,7 @@ T15: Lean contract-driven handoff maturity
 - **Lint**: clean
 - **Format**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added explicit fixture drift check to CI, embedded sample recommendations in AWS LZA runbook, kept full gate green
+- **Last session**: Aligned pre-commit with scoped mypy and fixture drift checks, fixed YAML trailing-space generation, kept full gate green
 
 ### Done
 | Area | Item |
@@ -256,7 +257,9 @@ T15: Lean contract-driven handoff maturity
 | **Fixture sync helper** | `scripts/sync-sample-fixtures.py` regenerates sample fixture bundles from registered sample decisions, prunes stale generated files, and supports `--check` drift detection. |
 | **Fixture drift guard** | Sample fixture tests now compile each registered sample and compare checked-in bundles against fresh generated output, with timestamp normalization for `decision-audit.yaml`. |
 | **Fixture drift CI gate** | CI now runs `uv run python scripts/sync-sample-fixtures.py --check` explicitly so generated fixture drift fails fast and visibly. |
-| **Incremental mypy expansion** | `uv run --extra dev mypy` now covers core contracts, sample config registry, module payload mapping, AWS LZA emitter code, and AWS LZA contract metadata in addition to previous typed files. |
+| **Pre-commit gate alignment** | Pre-commit now runs the same scoped `uv run --extra dev mypy` and sample fixture drift check as local/CI gates instead of a broader mirror-mypy invocation. |
+| **Whitespace-stable YAML generation** | Core and AWS LZA YAML dumpers strip trailing whitespace, so generated fixtures no longer fight whitespace hooks. |
+| **Incremental mypy expansion** | `uv run --extra dev mypy` now covers core contracts, sample config registry, module payload mapping, AWS LZA emitter/model code, and AWS LZA contract metadata in addition to previous typed files. |
 | **LLM-path deterministic backfill** | Compiler now merges deterministic Markdown accounts/OUs/workloads into LLM-produced intent, backfilling dropped or partial named entities from small models without duplicating explicit items. |
 
 ### Next (prioritized)
@@ -266,6 +269,8 @@ T15: Lean contract-driven handoff maturity
 
 ### Key Decisions This Session
 - **Fixture drift belongs in CI now**: Tests already compare generated bundles, but explicit `sync-sample-fixtures.py --check` gives faster failure and clearer maintainer action.
+- **Pre-commit must match project gates**: Replaced broad mirror-mypy hook with local `uv run --extra dev mypy` so local hooks enforce the same typed scope as CI/developer commands.
+- **Generated artifacts must be whitespace-stable**: YAML dumpers now trim trailing whitespace before writes, preventing generated fixtures and pre-commit whitespace hooks from oscillating.
 - **Runbook can summarize, artifact can detail**: `deployment-runbook.md` now names top sample bundles and match counts, while `sample-recommendations.yaml` remains the full machine-readable diff.
 - **Global/network LZA shape deepened without deploy ownership**: Added upstream-style CDK/logging/network placeholders and contract checks, but still emits handoff YAML only.
 - **Branch-specific contract pressure avoided**: Hub-spoke-only central network services and TGW details are emitted and tested, but not unconditional contract requirements, so `single-vpc` handoff still validates.

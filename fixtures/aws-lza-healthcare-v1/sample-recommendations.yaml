@@ -27,11 +27,11 @@ currentDecisions:
   network_cidr: 10.0.0.0/16
 recommendations:
   - name: aws-lza-healthcare-v1
-    description: Healthcare AWS LZA sample path with healthcare baseline and 
+    description: Healthcare AWS LZA sample path with healthcare baseline and
       PHI-focused overlay.
     version: 1.0.0
     releaseDate: '2026-05-27'
-    sourceUrl: 
+    sourceUrl:
       https://awslabs.github.io/landing-zone-accelerator-on-aws/latest/sample-configurations/
     sourceContract: aws-lza-sample-configuration
     upstreamVariant: healthcare
@@ -71,7 +71,7 @@ recommendations:
       central logging.
     version: 1.0.0
     releaseDate: '2026-05-27'
-    sourceUrl: 
+    sourceUrl:
       https://awslabs.github.io/landing-zone-accelerator-on-aws/latest/sample-configurations/
     sourceContract: aws-lza-sample-configuration
     upstreamVariant: standard
@@ -113,11 +113,11 @@ recommendations:
       network_account: Network
       network_cidr: 10.0.0.0/16
   - name: aws-lza-regulated-v1
-    description: Standard AWS LZA baseline plus regulated-industry security 
+    description: Standard AWS LZA baseline plus regulated-industry security
       overlay.
     version: 1.0.0
     releaseDate: '2026-05-27'
-    sourceUrl: 
+    sourceUrl:
       https://awslabs.github.io/landing-zone-accelerator-on-aws/latest/sample-configurations/
     sourceContract: aws-lza-sample-configuration
     upstreamVariant: standard

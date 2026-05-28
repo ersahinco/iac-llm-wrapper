@@ -465,7 +465,7 @@ def explain_report(report_path: Path) -> str:
         prefix = "  " * indent
         if isinstance(data, dict):
             for k, v in data.items():
-                if isinstance(v, (dict, list)):
+                if isinstance(v, dict | list):
                     lines.append(f"{prefix}{k}:")
                     _render(v, indent + 1)
                 else:

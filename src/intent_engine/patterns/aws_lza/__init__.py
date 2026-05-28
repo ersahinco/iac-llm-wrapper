@@ -38,7 +38,7 @@ def _yaml_dump(data: Any) -> str:
     yaml.indent(mapping=2, sequence=4, offset=2)
     buf = StringIO()
     yaml.dump(data, buf)
-    return buf.getvalue()
+    return "\n".join(line.rstrip() for line in buf.getvalue().splitlines()) + "\n"
 
 
 def _write_yaml(output_dir: Path, name: str, data: Any) -> None:

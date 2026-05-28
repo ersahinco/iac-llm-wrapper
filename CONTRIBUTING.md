@@ -16,6 +16,7 @@ uv run pytest --cov=src/intent_engine --cov-fail-under=80
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy
+uv run python scripts/sync-sample-fixtures.py --check
 uv run pip-audit --skip-editable
 uv run bandit -c bandit.yaml -r src -q -ll
 ```
@@ -75,7 +76,8 @@ uv run pre-commit install
 
 PRs should pass all CI jobs:
 
-- `quality` (lint, format, type check, tests, coverage threshold)
+- `lint` (ruff, format, type check, fixture drift check)
+- `test` (multi-version tests with coverage threshold)
 - `security` (`pip-audit`, `bandit`, SBOM generation)
 - `pre-commit` (optional but recommended — lower friction for reviewers)
 
@@ -83,7 +85,7 @@ Branch protection should enforce:
 
 - Required review from `CODEOWNERS` for core framework changes.
 - No direct pushes to `main` — all changes through PR.
-- Required status checks (`quality`, `security`) must pass before merge.
+- Required status checks (`lint`, `test`, `security`) must pass before merge.
 
 ## Code of conduct
 

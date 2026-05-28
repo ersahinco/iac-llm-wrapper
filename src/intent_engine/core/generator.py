@@ -81,7 +81,7 @@ def _yaml_dump(data: Any) -> str:
     yaml.indent(mapping=2, sequence=4, offset=2)
     buf = StringIO()
     yaml.dump(data, buf)
-    return buf.getvalue()
+    return "\n".join(line.rstrip() for line in buf.getvalue().splitlines()) + "\n"
 
 
 def _write(output_dir: Path, name: str, data: Any, schema_version: str | None = None) -> None:
@@ -161,7 +161,7 @@ def _hcl_value(value: Any) -> str:
     """Format a Python value as an HCL literal for .tfvars."""
     if isinstance(value, bool):
         return "true" if value else "false"
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return str(value)
     if isinstance(value, list):
         items = ", ".join(_hcl_value(v) for v in value)

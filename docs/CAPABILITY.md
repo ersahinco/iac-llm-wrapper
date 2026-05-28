@@ -105,15 +105,14 @@ When analyzing design documents, the tool detects architectural signals from tex
 
 ## Known Limitations (Honest Scope)
 
-1. **LLM extraction quality depends on the model**: GPT-4 class models work well; smaller local models (3B) handle standard fields reliably but may miss complex lists (accounts, OUs, workloads).
-2. **Deterministic fallback is not real extraction**: Without LLM, only graph defaults apply. It cannot parse free-form prose. This is a bootstrap path, not production.
+1. **LLM extraction quality depends on the model**: GPT-4 class models work well; smaller local models (3B) handle standard fields reliably but can still miss complex workload details in long documents.
+2. **Deterministic fallback is limited extraction**: Without LLM, graph defaults apply and structured Markdown sections can recover named accounts, OUs, and workloads. It still cannot interpret arbitrary free-form prose. This is a bootstrap path, not production.
 3. **Does not generate deployable IaC**: Output is decision artifacts + module variable mappings. Engineers still write Terraform/CDK/CloudFormation.
 4. **Catalog modules are references, not implementations**: Module refs point to public Terraform registry modules as examples. Organizations maintain their own module libraries.
 
 ## Next Capability Improvements
 
-- Better deterministic markdown extractor for accounts/OU/workload parsing (complement to LLM, not replacement)
+- Better small-model workload extraction on long design documents
 - More sample configs with real module variable schemas
 - Catalog diff visualization (not just JSON)
-- Decision report → Terraform variable file generator
 - Pattern-specific signal keyword expansion

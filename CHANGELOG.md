@@ -16,4 +16,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Guided interview engine with topological question ordering.
 - Decision reports with Well-Architected pillar coverage and audit trails.
 - CI/CD: lint, format, type check, tests, coverage gate, dependency audit, and static security scan.
-

@@ -44,9 +44,9 @@ for fixture_pattern in "${FIXTURES[@]}"; do
     IFS=':' read -r fixture pattern <<< "$fixture_pattern"
     fixture_path="$FIXTURES_DIR/$fixture"
     test_output="$OUTPUT_DIR/$fixture"
-    
+
     echo "Testing: $fixture (pattern: $pattern)"
-    
+
     if uv run iac-llm-wrapper compile \
         -i "$fixture_path" \
         -o "$test_output" \
@@ -55,12 +55,12 @@ for fixture_pattern in "${FIXTURES[@]}"; do
         --model "$MODEL" \
         > "$test_output.log" 2>&1; then
         echo "  ✓ Compilation successful"
-        
+
         # Check key outputs exist
         if [ -f "$test_output/decision-report.yaml" ]; then
             echo "  ✓ decision-report.yaml generated"
         fi
-        
+
         if [ -f "$test_output/module-inputs.yaml" ]; then
             echo "  ✓ module-inputs.yaml generated"
         fi
@@ -68,7 +68,7 @@ for fixture_pattern in "${FIXTURES[@]}"; do
         if [ -f "$test_output/sample-recommendations.yaml" ]; then
             echo "  ✓ sample-recommendations.yaml generated"
         fi
-        
+
         PASSED=$((PASSED + 1))
     else
         echo "  ✗ Compilation failed (see $test_output.log)"

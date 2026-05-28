@@ -23,7 +23,7 @@ recommendations:
     description: ''
     version: 1.0.0
     releaseDate: '2025-06-01'
-    sourceUrl: 
+    sourceUrl:
       https://github.com/aws/lza-universal-configuration/tree/main/modules/base/default
     sourceContract:
     upstreamVariant:
