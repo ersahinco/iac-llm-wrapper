@@ -7,6 +7,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from intent_engine.core.contracts import (
+    BLOCKED_ASSESSMENT_CONTRACT,
     ArtifactContract,
     ArtifactValueAssertion,
     ContractRegistry,
@@ -241,6 +242,42 @@ class TestContractValidator:
             "Lineage path missing for decision 'missing': config.yaml:metadata.owner"
         ]
         assert {violation.code for violation in violations} == {"CONTRACT_LINEAGE_PATH_MISSING"}
+
+    def test_blocked_assessment_contract_validates_safe_artifacts(self, tmp_path: Path):
+        (tmp_path / "decision-report.yaml").write_text(
+            """pattern: aws-lza
+deploymentReadiness:
+  deploymentAllowed: false
+  status: blocked
+  summary: Cannot deploy yet.
+  blockers:
+    - code: EXAMPLE
+      message: blocked
+  missingDecisions: []
+  conflictingDecisions: []
+  safeHandoffPath:
+    - Fix blockers.
+"""
+        )
+        (tmp_path / "llm-trace-summary.yaml").write_text(
+            """pattern: aws-lza
+provider: none
+model: none
+callCount: 0
+markdownDecisions: {}
+markdownContradictions: []
+extractedDecisions: {}
+signalDecisions: {}
+gaps: []
+contradictions: []
+deploymentReadiness:
+  deploymentAllowed: false
+  status: blocked
+  blockerCount: 1
+"""
+        )
+
+        assert ContractValidator(BLOCKED_ASSESSMENT_CONTRACT).validate_artifacts(tmp_path) == []
 
 
 class TestContractRegistry:

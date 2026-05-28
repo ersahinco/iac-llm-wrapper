@@ -101,6 +101,37 @@ class TestCLICompile:
         trace = (output_dir / "llm-trace-summary.yaml").read_text()
         assert "callCount: 0" in trace
 
+    def test_compile_duplicate_structured_decision_blocks(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setenv("INTENT_ENGINE_DISABLE_LLM", "1")
+        design = tmp_path / "design.md"
+        design.write_text(
+            """# AWS LZA Design
+
+## Accounts
+- network_account: Network
+
+## Network
+- topology: hub-spoke
+- network_cidr: 10.0.0.0/16
+- network_cidr: 10.1.0.0/16
+"""
+        )
+        output_dir = tmp_path / "out"
+        result = runner.invoke(
+            app,
+            [
+                "compile",
+                "--input",
+                str(design),
+                "--output",
+                str(output_dir),
+            ],
+        )
+        assert result.exit_code != 0
+        assert "MARKDOWN_CONTRADICTION_NETWORK_CIDR" in result.output
+        report = (output_dir / "decision-report.yaml").read_text()
+        assert "MARKDOWN_CONTRADICTION_NETWORK_CIDR" in report
+
 
 class TestCLIVersion:
     def test_version_flag(self):

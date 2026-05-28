@@ -184,6 +184,9 @@ For `aws-lza`, output includes:
 - `llm-trace-summary.yaml` — provider/model, calls, extracted decisions, gaps,
   contradictions, and raw evidence path when compile used extraction evidence
 
+When compile is blocked, `decision-report.yaml` and `llm-trace-summary.yaml`
+must satisfy the built-in `blocked-assessment-artifacts` contract.
+
 ### 5. Engineer Handoff
 
 Engineers use the decision artifacts alongside sample configurations:

@@ -422,3 +422,64 @@ class ContractRegistry:
 
 
 GLOBAL_CONTRACT_REGISTRY = ContractRegistry()
+
+
+BLOCKED_ASSESSMENT_CONTRACT = TargetContract(
+    name="blocked-assessment-artifacts",
+    kind="intent-engine-diagnostic",
+    source_url="intent-engine://contracts/blocked-assessment-artifacts/v1",
+    required_decisions=["deploymentReadiness"],
+    artifacts=[
+        ArtifactContract(
+            name="decision-report.yaml",
+            description="Safe blocked-compile assessment with no deployable target config.",
+            required_paths=[
+                "pattern",
+                "deploymentReadiness.deploymentAllowed",
+                "deploymentReadiness.status",
+                "deploymentReadiness.summary",
+                "deploymentReadiness.blockers[]",
+                "deploymentReadiness.blockers[].code",
+                "deploymentReadiness.blockers[].message",
+                "deploymentReadiness.missingDecisions",
+                "deploymentReadiness.conflictingDecisions",
+                "deploymentReadiness.safeHandoffPath[]",
+            ],
+            value_assertions=[
+                ArtifactValueAssertion(
+                    path="deploymentReadiness.deploymentAllowed",
+                    equals=False,
+                ),
+                ArtifactValueAssertion(path="deploymentReadiness.status", equals="blocked"),
+            ],
+        ),
+        ArtifactContract(
+            name="llm-trace-summary.yaml",
+            description="Lean extraction evidence summary for blocked compile diagnostics.",
+            required_paths=[
+                "pattern",
+                "provider",
+                "model",
+                "callCount",
+                "markdownDecisions",
+                "markdownContradictions",
+                "extractedDecisions",
+                "signalDecisions",
+                "gaps",
+                "contradictions",
+                "deploymentReadiness.deploymentAllowed",
+                "deploymentReadiness.status",
+                "deploymentReadiness.blockerCount",
+            ],
+            value_assertions=[
+                ArtifactValueAssertion(
+                    path="deploymentReadiness.deploymentAllowed",
+                    equals=False,
+                ),
+                ArtifactValueAssertion(path="deploymentReadiness.status", equals="blocked"),
+            ],
+        ),
+    ],
+)
+
+GLOBAL_CONTRACT_REGISTRY.register(BLOCKED_ASSESSMENT_CONTRACT)

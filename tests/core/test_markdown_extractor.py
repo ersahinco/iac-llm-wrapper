@@ -36,6 +36,35 @@ def test_extracts_multiple_fields():
     assert decisions["version"] == "1.30"
 
 
+def test_reports_conflicting_duplicate_keys():
+    g = RequirementGraph()
+    g.add(Requirement(key="home_region", target_field="home_region", label="Region", question="?"))
+    extractor = MarkdownExtractor(g)
+    result = extractor.extract_with_diagnostics(
+        "- home_region: us-east-1\n- home_region: eu-central-1\n"
+    )
+    assert result.decisions["home_region"] == "eu-central-1"
+    assert result.contradictions == [
+        {
+            "key": "home_region",
+            "reason": "conflicting structured Markdown values",
+            "details": "home_region was set to 'us-east-1' and later 'eu-central-1'",
+            "source": "markdown",
+        }
+    ]
+
+
+def test_duplicate_same_value_not_contradiction():
+    g = RequirementGraph()
+    g.add(Requirement(key="home_region", target_field="home_region", label="Region", question="?"))
+    extractor = MarkdownExtractor(g)
+    result = extractor.extract_with_diagnostics(
+        "- home_region: eu-central-1\n- home_region: eu-central-1\n"
+    )
+    assert result.decisions["home_region"] == "eu-central-1"
+    assert result.contradictions == []
+
+
 def test_skips_comments():
     g = RequirementGraph()
     g.add(Requirement(key="name", target_field="name", label="Name", question="Name?"))

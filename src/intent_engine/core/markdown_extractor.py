@@ -8,9 +8,16 @@ docs and reduces hallucination by pre-filling known values.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import Any
 
 from .requirements import RequirementGraph
+
+
+@dataclass
+class MarkdownExtractionResult:
+    decisions: dict[str, str]
+    contradictions: list[dict[str, Any]]
 
 
 class MarkdownExtractor:
@@ -28,7 +35,12 @@ class MarkdownExtractor:
 
         Returns a flat dict of requirement_key → string_value.
         """
+        return self.extract_with_diagnostics(text).decisions
+
+    def extract_with_diagnostics(self, text: str) -> MarkdownExtractionResult:
+        """Extract decisions and structured duplicate-key contradictions."""
         decisions: dict[str, str] = {}
+        contradictions: list[dict[str, Any]] = []
 
         # Build reverse lookup: field_name / target_field → requirement_key
         field_to_key: dict[str, str] = {}
@@ -82,15 +94,34 @@ class MarkdownExtractor:
                     # Keep raw so the LLM / validator can flag it
                     pass
 
+            previous = decisions.get(req_key)
+            if previous is not None and previous != raw_val:
+                contradictions.append(
+                    {
+                        "key": req_key,
+                        "reason": "conflicting structured Markdown values",
+                        "details": f"{req_key} was set to {previous!r} and later {raw_val!r}",
+                        "source": "markdown",
+                    }
+                )
             decisions[req_key] = raw_val
 
-        return decisions
+        return MarkdownExtractionResult(decisions=decisions, contradictions=contradictions)
 
 
 def extract_from_markdown(text: str, graph: RequirementGraph) -> dict[str, str]:
     """Convenience function: extract decisions from Markdown using a graph."""
     extractor = MarkdownExtractor(graph)
     return extractor.extract(text)
+
+
+def extract_from_markdown_with_diagnostics(
+    text: str,
+    graph: RequirementGraph,
+) -> MarkdownExtractionResult:
+    """Extract decisions and deterministic structured contradictions."""
+    extractor = MarkdownExtractor(graph)
+    return extractor.extract_with_diagnostics(text)
 
 
 # ---------------------------------------------------------------------------

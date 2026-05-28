@@ -91,12 +91,12 @@ T16: Keep product path lean and current
 
 ### Status
 
-- **Tests**: 259 passing, 1 skipped
+- **Tests**: 263 passing, 1 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added blocked enterprise AWS LZA eval, readiness report, trace summary, richer runbook sequencing; full gate green
+- **Last session**: Ran local Ollama messy-fixture eval; added deterministic Markdown contradiction detection and blocked assessment contract; full gate green
 
 ### Done
 
@@ -105,10 +105,10 @@ T16: Keep product path lean and current
 | Core | models, extractor, requirements, patterns, interview, discovery, normalizer, validator, generator, contracts, samples, module mapping, CLI |
 | Patterns | `aws-lza`, `kubernetes-cluster`, `terraform-vpc` |
 | AWS LZA | Thin LZA handoff YAML, decision report/readiness, lineage manifest, deployment runbook, sample recommendations |
-| Contracts | Required artifacts, required paths, required decisions, lineage checks, value assertions |
+| Contracts | Required artifacts, required paths, required decisions, lineage checks, value assertions, blocked assessment artifacts |
 | Samples | Registry-backed `sample list/show`, match recommendations, fixture sync/drift guard |
 | LLM | Ollama/OpenAI-compatible/Anthropic backend factory, evidence store, local LLM integration tests |
-| Evaluation | Deterministic extraction gold corpus with pass/fail cases and role-based usability trials |
+| Evaluation | Deterministic extraction gold corpus with pass/fail/contract cases and role-based usability trials |
 | Fixtures | AWS LZA generated bundles, K8s generated bundle, usability docs, eval corpus |
 | Cleanup | Removed old LZA research path, old diff/apply surfaces, extension registry, old fixtures/tests/helpers |
 | Product docs | README states no wheel reinvention: LLM for intent capture, models/graphs/contracts/validators for guardrails, existing IaC for delivery |
@@ -119,11 +119,11 @@ T16: Keep product path lean and current
 1. Add one non-Terraform BYOM trial (CDK or CloudFormation) if `terraform-vpc` trial stays clean.
 2. Continue AWS LZA schema depth where real customer identity inputs exist, especially IAM Identity Center permission sets and assignments.
 3. Run local LLM usability/eval periodically with evidence output to validate actual architect/engineer experience beyond deterministic plumbing.
-4. Consider deterministic conflict capture for repeated structured Markdown keys if real docs keep surfacing non-LLM contradictions.
+4. Use local LLM trace quality findings to tune prompts only when deterministic harness cannot classify the issue.
 
 ### Key Decisions This Session
 
-- LLM-reported gaps and contradictions should fail closed, not disappear after parsing.
-- Blocked compiles may emit only safe assessment artifacts, never deployable LZA config files.
-- Deployment sequencing belongs in handoff/runbook artifacts with owners, dependencies, gates, rollback, and boundaries.
-- Fixture sync must avoid timestamp churn in `decision-audit.yaml` when unrelated artifacts drift.
+- Resolved LLM gaps should remain visible in trace, but should not block when deterministic Markdown/graph already has the decision.
+- Duplicate structured Markdown keys with conflicting values are deterministic contradictions.
+- Blocked compile output has a generic `blocked-assessment-artifacts` contract.
+- Failed compile with `--evidence-output` must write raw evidence before exit.

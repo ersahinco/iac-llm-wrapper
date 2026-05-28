@@ -18,6 +18,8 @@ from typing import Any
 
 import ruamel.yaml
 
+from intent_engine.core.contracts import GLOBAL_CONTRACT_REGISTRY, ContractValidator
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_FIXTURES_DIR = REPO_ROOT / "fixtures" / "eval"
 
@@ -196,6 +198,26 @@ def _compare_artifacts(output_dir: Path, expected_artifacts: Any) -> list[str]:
     return failures
 
 
+def _compare_contracts(output_dir: Path, expected_contracts: Any) -> list[str]:
+    if not isinstance(expected_contracts, list):
+        return ["expect.contracts must be a list"]
+    failures: list[str] = []
+    for contract_name in expected_contracts:
+        if not isinstance(contract_name, str):
+            failures.append("expect.contracts entries must be strings")
+            continue
+        try:
+            contract = GLOBAL_CONTRACT_REGISTRY.get(contract_name)
+        except KeyError as exc:
+            failures.append(str(exc))
+            continue
+        failures.extend(
+            f"{contract_name}: {violation.message}"
+            for violation in ContractValidator(contract).validate_artifacts(output_dir)
+        )
+    return failures
+
+
 def _compare_failure(
     case: EvalCase,
     output_dir: Path,
@@ -214,6 +236,7 @@ def _compare_failure(
                 failures.append(f"missing violation in output: {violation}")
 
     failures.extend(_compare_artifacts(output_dir, case.expected.get("artifacts", [])))
+    failures.extend(_compare_contracts(output_dir, case.expected.get("contracts", [])))
     report_path = output_dir / "decision-report.yaml"
     if report_path.exists():
         report = _yaml_load(report_path)

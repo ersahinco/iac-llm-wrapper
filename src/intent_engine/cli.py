@@ -46,6 +46,7 @@ def _write_evidence_output(evidence_output: Path | None, evidence_store: LLMEvid
 
     import ruamel.yaml
 
+    evidence_output.parent.mkdir(parents=True, exist_ok=True)
     yaml = ruamel.yaml.YAML(typ="safe")
     with open(evidence_output, "w") as fh:
         yaml.dump(evidence_store.to_dict(), fh)
@@ -269,6 +270,7 @@ def compile(
                 "decision-report.yaml, llm-trace-summary.yaml",
                 err=True,
             )
+        _write_evidence_output(evidence_output, evidence_store)
         typer.echo(
             "",
             err=True,

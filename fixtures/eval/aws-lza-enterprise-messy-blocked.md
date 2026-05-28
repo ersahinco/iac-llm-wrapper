@@ -111,6 +111,9 @@ Network notes:
   Firewall, another says keep the existing appliance vendor until 2027.
 - CIDR 10.20.0.0/16 overlaps with a corporate lab in one spreadsheet, but the
   IPAM owner has not confirmed if that lab still exists.
+- network_cidr: 10.21.0.0/16
+- Late IPAM export used `10.21.0.0/16`; architecture board minutes still say
+  `10.20.0.0/16`.
 
 ## Security
 

@@ -54,6 +54,7 @@ Engineers:
 5. Use `sample-recommendations.yaml` for persisted reference-bundle guidance
 6. Use `llm-trace-summary.yaml` to audit provider/model calls, extracted decisions,
    gaps, contradictions, and raw evidence path when extraction evidence exists
+7. Validate blocked compile output against `blocked-assessment-artifacts`
 
 ## Sample Config Registry
 

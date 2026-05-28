@@ -171,6 +171,8 @@ MVP should produce a useful handoff without owning deployment:
 - `llm-trace-summary.yaml` with provider/model, calls, extracted decisions, gaps,
   contradictions, and raw evidence path when extraction evidence exists
 - `deployment-runbook.md` with prerequisites and sequence
+- blocked compile assessments validated by the generic
+  `blocked-assessment-artifacts` contract
 - generated-artifact validation that fails closed when required paths, asserted values,
   or lineage paths disappear from emitted YAML
 

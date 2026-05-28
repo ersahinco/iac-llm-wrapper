@@ -9,6 +9,7 @@ expect:
     - AWS_LZA_INFRASTRUCTURE_OU_REQUIRED
     - AWS_LZA_IDENTITY_CENTER_ADMIN_UNKNOWN
     - AWS_LZA_HOME_REGION_NOT_ENABLED
+    - MARKDOWN_CONTRADICTION_NETWORK_CIDR
   values:
     pattern: aws-lza
     deploymentReadiness.deploymentAllowed: false
@@ -16,3 +17,5 @@ expect:
   artifacts:
     - decision-report.yaml
     - llm-trace-summary.yaml
+  contracts:
+    - blocked-assessment-artifacts

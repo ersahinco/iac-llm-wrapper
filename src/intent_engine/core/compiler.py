@@ -11,7 +11,10 @@ from .extractor import Extractor, LLMGraphResult
 from .generator import generate_all
 from .interview import InterviewEngine
 from .llm_caller import LLMCaller, LLMEvidenceStore
-from .markdown_extractor import extract_entities_from_markdown, extract_from_markdown
+from .markdown_extractor import (
+    extract_entities_from_markdown,
+    extract_from_markdown_with_diagnostics,
+)
 from .model_introspection import append_to_list_field, merge_into_list_field
 from .normalizer import normalize
 from .patterns import GLOBAL_REGISTRY
@@ -96,9 +99,21 @@ def _to_builtin(value: Any) -> Any:
     return value
 
 
-def _llm_result_violations(llm_result: LLMGraphResult) -> list[Violation]:
+def _gap_is_resolved(graph, gap: Any) -> bool:
+    if not isinstance(gap, dict):
+        return False
+    key = gap.get("key")
+    if not isinstance(key, str) or not key:
+        return False
+    value = graph.get(key)
+    return value is not None and str(value).strip() != ""
+
+
+def _llm_result_violations(graph, llm_result: LLMGraphResult) -> list[Violation]:
     violations: list[Violation] = []
     for gap in llm_result.gaps:
+        if _gap_is_resolved(graph, gap):
+            continue
         key = gap.get("key", "unknown") if isinstance(gap, dict) else "unknown"
         reason = gap.get("reason", "missing decision") if isinstance(gap, dict) else str(gap)
         violations.append(
@@ -120,6 +135,24 @@ def _llm_result_violations(llm_result: LLMGraphResult) -> list[Violation]:
             Violation(
                 code=f"LLM_CONTRADICTION_{str(key).upper()}",
                 message=f"LLM reported conflicting decision '{key}': {reason}{suffix}",
+            )
+        )
+    return violations
+
+
+def _markdown_contradiction_violations(
+    contradictions: list[dict[str, Any]],
+) -> list[Violation]:
+    violations: list[Violation] = []
+    for contradiction in contradictions:
+        key = contradiction.get("key", "unknown")
+        reason = contradiction.get("reason", "conflicting structured Markdown values")
+        details = contradiction.get("details", "")
+        suffix = f" ({details})" if details else ""
+        violations.append(
+            Violation(
+                code=f"MARKDOWN_CONTRADICTION_{str(key).upper()}",
+                message=f"Markdown reported conflicting decision '{key}': {reason}{suffix}",
             )
         )
     return violations
@@ -159,6 +192,8 @@ def _violation_conflicts(violations: list[Violation]) -> list[dict[str, str]]:
             continue
         if violation.code.startswith("LLM_GAP_"):
             continue
+        if violation.code.startswith("LLM_CONTRADICTION_"):
+            continue
         conflicts.append({"code": violation.code, "reason": violation.message})
     return conflicts
 
@@ -170,7 +205,9 @@ def _build_deployment_readiness(
 ) -> dict[str, Any]:
     missing = _graph_missing_decisions(graph)
     conflicts = _violation_conflicts(violations)
-    llm_gaps = [gap for gap in llm_result.gaps if isinstance(gap, dict)]
+    llm_gaps = [
+        gap for gap in llm_result.gaps if isinstance(gap, dict) and not _gap_is_resolved(graph, gap)
+    ]
     llm_contradictions = [
         contradiction
         for contradiction in llm_result.contradictions
@@ -204,6 +241,7 @@ def _build_extraction_summary(
     evidence_store: LLMEvidenceStore | None,
     raw_evidence_path: Path | None,
     markdown_decisions: dict[str, Any],
+    markdown_contradictions: list[dict[str, Any]],
     llm_result: LLMGraphResult,
     readiness: dict[str, Any],
 ) -> dict[str, Any]:
@@ -222,10 +260,11 @@ def _build_extraction_summary(
     return {
         "pattern": pattern,
         "provider": first.get("provider", "none"),
-        "model": first.get("model", ""),
+        "model": first.get("model", "none") or "none",
         "callCount": len(calls),
         "calls": calls,
         "markdownDecisions": markdown_decisions,
+        "markdownContradictions": markdown_contradictions,
         "extractedDecisions": llm_result.decisions,
         "signalDecisions": llm_result.signal_decisions,
         "gaps": llm_result.gaps,
@@ -329,7 +368,8 @@ def compile_design(
     # ------------------------------------------------------------------
     # Layer 0: Deterministic Markdown pre-processing
     # ------------------------------------------------------------------
-    markdown_decisions = extract_from_markdown(text, graph)
+    markdown_result = extract_from_markdown_with_diagnostics(text, graph)
+    markdown_decisions = markdown_result.decisions
     markdown_entities = extract_entities_from_markdown(text)
     if markdown_decisions:
         graph.apply_decisions(markdown_decisions)
@@ -378,13 +418,15 @@ def compile_design(
 
     # 2f. Validate fail-closed (graph-driven when available)
     violations = validate(intent, graph=graph, extra_validators=pattern_obj.validators)
-    violations.extend(_llm_result_violations(llm_result))
+    violations.extend(_markdown_contradiction_violations(markdown_result.contradictions))
+    violations.extend(_llm_result_violations(graph, llm_result))
     readiness = _build_deployment_readiness(graph, violations, llm_result)
     extraction_summary = _build_extraction_summary(
         pattern=pattern,
         evidence_store=evidence_store,
         raw_evidence_path=raw_evidence_path,
         markdown_decisions=markdown_decisions,
+        markdown_contradictions=markdown_result.contradictions,
         llm_result=llm_result,
         readiness=readiness,
     )
