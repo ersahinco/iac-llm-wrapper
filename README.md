@@ -30,7 +30,7 @@ Validation ──── Fail-closed checks against the graph. Catches missing de
 Normalization ─ Defaults applied only when applicable. Duck-typed, pattern-aware.
      │
      ▼
-Output ──────── Decision reports, deployment graphs, workload skeletons
+Output ──────── Contract handoff artifacts, lineage, runbooks, module inputs
 ```
 
 **Every decision is recorded** with timestamp, rationale, compliance context, and tradeoffs. Architects get living documentation. Compliance gets an audit trail. Engineers get a validated decision set to map to their IaC of choice.
@@ -50,8 +50,8 @@ source .venv/bin/activate
 uv pip install -e ".[dev,llm]"
 
 # 3. Compile a design doc with local LLM
-iac-llm-wrapper compile -i fixtures/valid-payments.md -o out/ \
-  --pattern baseline --provider ollama --model qwen2.5:3b
+iac-llm-wrapper compile -i fixtures/usability/engineer-handoff-lza.md -o out/ \
+  --pattern aws-lza --provider ollama --model qwen2.5:3b
 ```
 
 No API key required. A 3B model (2GB RAM) extracts region, topology, CIDR, accounts, and security settings from Markdown in 8-15 seconds on modern laptops.
@@ -108,34 +108,48 @@ uv pip install iac-llm-wrapper
 
 ### 1. Start with a Design Document
 
-Write infrastructure intent in Markdown (see `fixtures/valid-payments.md` for a full example):
+Write infrastructure intent in Markdown (see `fixtures/usability/engineer-handoff-lza.md`
+for a thin AWS LZA example):
 
 ```markdown
 # Payments Landing Zone
 
-## Region
-- primary: eu-central-1
+## LZA Baseline
+- baseline: standard
 
-## Topology
-- topology: hub-spoke
+## Organization
+- org_mode: control-tower
+- organization_name: ExampleCorp
+- organizational_units: Security, Infrastructure, Workloads
+
+## Regions
+- home_region: eu-central-1
+- enabled_regions: eu-central-1
+
+## Accounts
+- workload_accounts: AppProd
+- audit_account: Audit
+- log_archive_account: LogArchive
+- security_tooling_account: SecurityTooling
+- network_account: Network
+
+## Identity
+- identity_center_delegated_admin_account: SecurityTooling
 
 ## Network
-- cidr: 10.0.0.0/16
-- central_network_account: Network
+- topology: hub-spoke
+- network_cidr: 10.50.0.0/16
 
 ## Security
-- audit_retention_days: 2555
 - centralized_logging: true
-
-## CI/CD
-- mode: private
-- placement: shared-vpc
+- security_hub_enabled: true
+- guardduty_enabled: true
 ```
 
 ### 2. Discover Signals and Gaps
 
 ```bash
-iac-llm-wrapper discover -i design.md --pattern baseline --addon pci-compliance
+iac-llm-wrapper discover -i design.md --pattern aws-lza
 ```
 
 The tool extracts decisions, detects signals (PCI scope, regulated industry, hybrid connectivity), and reports any gaps.
@@ -152,18 +166,15 @@ Shows where your design deviates from proven configurations.
 ### 4. Compile to Decision Artifacts
 
 ```bash
-iac-llm-wrapper compile -i design.md -o out/ --pattern baseline --addon pci-compliance
+iac-llm-wrapper compile -i design.md -o out/ --pattern aws-lza
 ```
 
-Output includes:
+For `aws-lza`, output includes:
 - `decision-report.yaml` — all decisions with WA pillar coverage and audit trail
-- `global-config.yaml` — region, logging, and global guardrail intent
-- `accounts-config.yaml` — account definitions
-- `network-config.yaml` — VPC, CIDR, and connectivity intent
-- `security-config.yaml` — audit, logging, encryption settings
-- `module-inputs.yaml` — mapped Terraform module variables with pinned versions
+- `accounts-config.yaml`, `global-config.yaml`, `iam-config.yaml`, `network-config.yaml`, `organization-config.yaml`, `security-config.yaml` — AWS LZA handoff config files
+- `lineage-manifest.yaml` — decision-to-artifact path map
+- `deployment-runbook.md` — prerequisites and handoff sequence
 - `sample-recommendations.yaml` — closest pinned reference bundles for handoff
-- `deployment-graph.yaml` — phased deployment order with dependencies
 
 ### 5. Engineer Handoff
 
@@ -177,11 +188,12 @@ iac-llm-wrapper sample list
 iac-llm-wrapper sample list --contract aws-lza-sample-configuration
 iac-llm-wrapper sample list --tag regulated
 
-# Show sample config with pinned module references and decisions
-iac-llm-wrapper sample show --name lza-baseline-v1
+# Show sample config with contract metadata and decisions
+iac-llm-wrapper sample show --name aws-lza-standard-v1
 ```
 
-The `module-inputs.yaml` provides ready-to-use module references:
+For BYOM module patterns such as `terraform-vpc`, `module-inputs.yaml` provides
+ready-to-use module references:
 ```yaml
 moduleInputs:
   - moduleName: lza-network
@@ -194,7 +206,8 @@ moduleInputs:
       block_public_access: true
 ```
 
-Engineers apply these inputs to their Terraform/CDK/CloudFormation modules.
+Engineers apply BYOM inputs to their Terraform/CDK/CloudFormation modules.
+For `aws-lza`, engineers review the generated LZA config files and runbook instead.
 `sample-recommendations.yaml` preserves best matching reference bundles in output
 directory so engineers can recover proven starting points later without re-running
 interview session.
@@ -207,22 +220,21 @@ generated fixture bundles cannot drift silently.
 
 ## Patterns
 
-Patterns define which questions are asked, what defaults apply, and what knowledge context is shown. The framework ships with built-in patterns — each a complete requirement graph:
+Patterns define questions, defaults, contracts, and output artifacts. Recommended product paths stay thin and contract-backed:
 
 | Pattern | Description |
 |---------|-------------|
-| `baseline` | Full feature set with hub-spoke networking, security, CI/CD, hybrid |
-| `minimal` | Bare minimum: region, topology, CIDR, audit retention |
-| `workload` | Workload account deployment only |
-| `hybrid-enterprise` | Baseline + Direct Connect, egress inspection, hybrid DNS |
-| `financial-services` | Baseline + PCI-DSS, SOX, data residency, payment segmentation |
-| `healthcare` | Baseline + HIPAA, PHI encryption, BAA coverage |
+| `aws-lza` | Thin AWS Landing Zone Accelerator handoff path using official-style LZA config artifacts |
 | `kubernetes-cluster` | K8s cluster provisioning with node pools and network policies |
 | `terraform-vpc` | BYOM Terraform AWS VPC module input capture |
 
+Legacy LZA research patterns still exist for compatibility and extraction regression coverage:
+`baseline`, `minimal`, `workload`, `hybrid-enterprise`, `financial-services`, `healthcare`.
+New landing-zone work should prefer `aws-lza`.
+
 ### Addons
 
-Addons layer additional requirements onto any base pattern:
+Addons layer additional requirements onto compatible legacy/research patterns:
 
 ```bash
 iac-llm-wrapper compile -i design.md --pattern baseline --addon pci-compliance --addon hipaa

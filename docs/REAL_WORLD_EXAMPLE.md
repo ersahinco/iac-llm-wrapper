@@ -1,6 +1,8 @@
 # Real-World Example: Payment Platform Landing Zone
 
 This example demonstrates the full intent-driven flow for a PCI-DSS scoped payment platform.
+It uses legacy LZA research patterns for rich workload/module extraction regression coverage.
+For new AWS landing-zone handoffs, prefer `--pattern aws-lza`.
 
 ## Design Document
 

@@ -1,51 +1,44 @@
 # Engineer Handoff Trial: Complete Landing Zone
 
-Architect selected a standard baseline hub-and-spoke landing zone. Engineer should be able to open
-the generated artifacts and find network, security, workload, and module handoff inputs.
+Architect selected a standard AWS LZA hub-and-spoke landing zone. Engineer should be able to open
+the generated handoff artifacts and find official LZA config files, lineage, runbook, and sample
+recommendations.
 
-## Region
+## LZA Baseline
 
-- primary_region: eu-central-1
+- baseline: standard
 
-## Topology
+## Organization
 
-- topology: hub-spoke
+- org_mode: control-tower
+- organization_name: ExampleCorp
+- organizational_units: Security, Infrastructure, Workloads
 
-## Organizational Units
+## Regions
 
-- Security: Audit and security operations
-- Infrastructure: Network and platform services
-- Workloads: Business applications
+- home_region: eu-central-1
+- enabled_regions: eu-central-1
 
 ## Accounts
 
-- Network: ou=Infrastructure, description=Transit and inspection
-- SharedServices: ou=Infrastructure, description=CI/CD and observability
-- Audit: ou=Security, description=Central audit archive
-- AppProd: ou=Workloads, description=Production application account
+- workload_accounts: AppProd
+- audit_account: Audit
+- log_archive_account: LogArchive
+- security_tooling_account: SecurityTooling
+- network_account: Network
+
+## Identity
+
+- identity_center_delegated_admin_account: SecurityTooling
 
 ## Network
 
+- topology: hub-spoke
 - network_cidr: 10.50.0.0/16
-- hub_cidr: 10.50.0.0/20
-- central_network_account: Network
 
 ## Security
 
-- audit_retention_days: 2555
 - centralized_logging: true
-- kms_rotation_required: true
-- s3_block_public_access: true
-- cloudtrail_org_trail: true
-- egress_inspection: required
-- inspection_pattern: centralized-nat
-- inspection_vendor: aws-network-firewall
-
-## CI/CD
-
-- cicd_mode: private
-- cicd_placement: SharedServices/BuildVPC
-
-## Workloads
-
-- orders-api: target_account=AppProd, network_mode=private, public_ingress=false, port=8080, cpu=512, memory=1024
+- security_hub_enabled: true
+- guardduty_enabled: true
+- compliance_overlay: none

@@ -1,90 +1,90 @@
 auditTrail:
-- timestamp: '2026-05-28T00:07:22.086631+00:00'
+- timestamp: '2026-05-28T13:35:28.787703+00:00'
   key: baseline
   value: standard
   how: decided
   reason:
-- timestamp: '2026-05-28T00:07:22.086657+00:00'
+- timestamp: '2026-05-28T13:35:28.787726+00:00'
   key: org_mode
   value: control-tower
   how: decided
   reason:
-- timestamp: '2026-05-28T00:07:22.086668+00:00'
+- timestamp: '2026-05-28T13:35:28.787735+00:00'
   key: home_region
   value: eu-central-1
   how: decided
   reason:
-- timestamp: '2026-05-28T00:07:22.086677+00:00'
+- timestamp: '2026-05-28T13:35:28.787744+00:00'
   key: enabled_regions
   value: eu-central-1,eu-west-1
   how: decided
   reason:
-- timestamp: '2026-05-28T00:07:22.086686+00:00'
+- timestamp: '2026-05-28T13:35:28.787752+00:00'
   key: organizational_units
   value: Security,Infrastructure,Workloads
   how: decided
   reason:
-- timestamp: '2026-05-28T00:07:22.086695+00:00'
+- timestamp: '2026-05-28T13:35:28.787760+00:00'
   key: workload_accounts
   value: Prod
   how: decided
   reason:
-- timestamp: '2026-05-28T00:07:22.086703+00:00'
+- timestamp: '2026-05-28T13:35:28.787767+00:00'
   key: security_tooling_account
   value: SecurityTooling
   how: decided
   reason:
-- timestamp: '2026-05-28T00:07:22.086710+00:00'
+- timestamp: '2026-05-28T13:35:28.787774+00:00'
+  key: network_account
+  value: Network
+  how: decided
+  reason:
+- timestamp: '2026-05-28T13:35:28.787781+00:00'
   key: identity_center_delegated_admin_account
   value: SecurityTooling
   how: decided
   reason:
-- timestamp: '2026-05-28T00:07:22.086717+00:00'
+- timestamp: '2026-05-28T13:35:28.787788+00:00'
   key: topology
   value: hub-spoke
   how: decided
   reason:
-- timestamp: '2026-05-28T00:07:22.086725+00:00'
+- timestamp: '2026-05-28T13:35:28.787794+00:00'
   key: centralized_logging
   value: 'true'
   how: decided
   reason:
-- timestamp: '2026-05-28T00:07:22.086732+00:00'
+- timestamp: '2026-05-28T13:35:28.787800+00:00'
   key: security_hub_enabled
   value: 'true'
   how: decided
   reason:
-- timestamp: '2026-05-28T00:07:22.086739+00:00'
+- timestamp: '2026-05-28T13:35:28.787806+00:00'
   key: guardduty_enabled
   value: 'true'
   how: decided
   reason:
-- timestamp: '2026-05-28T00:07:22.086745+00:00'
+- timestamp: '2026-05-28T13:35:28.787812+00:00'
   key: compliance_overlay
   value: regulated
   how: decided
   reason:
-- timestamp: '2026-05-28T00:07:22.086756+00:00'
+- timestamp: '2026-05-28T13:35:28.787824+00:00'
   key: organization_name
   value: ExampleCorp
   how: defaulted
   reason: default value
-- timestamp: '2026-05-28T00:07:22.086766+00:00'
+- timestamp: '2026-05-28T13:35:28.787834+00:00'
   key: audit_account
   value: Audit
   how: defaulted
   reason: default value
-- timestamp: '2026-05-28T00:07:22.086774+00:00'
+- timestamp: '2026-05-28T13:35:28.787841+00:00'
   key: log_archive_account
   value: LogArchive
   how: defaulted
   reason: default value
-- timestamp: '2026-05-28T00:07:22.086781+00:00'
-  key: network_account
-  value: Network
-  how: defaulted
-  reason: default value
-- timestamp: '2026-05-28T00:07:22.086788+00:00'
+- timestamp: '2026-05-28T13:35:28.787849+00:00'
   key: network_cidr
   value: 10.0.0.0/16
   how: defaulted

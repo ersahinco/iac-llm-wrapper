@@ -132,7 +132,7 @@ def _trial_architect_gap(config: TrialConfig) -> TrialResult:
         "--input",
         str(FIXTURES_DIR / "architect-incomplete-lza.md"),
         "--pattern",
-        "baseline",
+        "aws-lza",
     ]
     if not config.use_llm:
         args.append("--no-llm")
@@ -147,8 +147,8 @@ def _trial_architect_gap(config: TrialConfig) -> TrialResult:
         output = proc.stdout + proc.stderr
         if proc.returncode != 0:
             failures.append("discover command failed")
-        if "central_network_account" not in output:
-            failures.append("missing central_network_account gap")
+        if "network_account" not in output:
+            failures.append("missing network_account gap")
         if "Clarifying questions" not in output:
             failures.append("missing architect clarifying question section")
         failures.extend(_evidence_failures(config, evidence_path))
@@ -176,7 +176,7 @@ def _trial_engineer_handoff(config: TrialConfig) -> TrialResult:
                 "--output",
                 str(output_dir),
                 "--pattern",
-                "baseline",
+                "aws-lza",
             ],
             config,
             evidence_path,
@@ -195,18 +195,29 @@ def _trial_engineer_handoff(config: TrialConfig) -> TrialResult:
             )
 
         validate_proc = _run(
-            ["validate", "--input", str(output_dir), "--pattern", "baseline"],
+            ["validate", "--input", str(output_dir), "--pattern", "aws-lza"],
             config,
         )
         if validate_proc.returncode != 0:
             failures.append("validate command failed")
 
-        module_names = [str(item.get("moduleName", "")) for item in _module_inputs(output_dir)]
-        for expected in ("lza-network", "lza-security-baseline", "lza-workload"):
-            if expected not in module_names:
-                failures.append(f"missing module input {expected}")
+        for unexpected_file in ("module-inputs.yaml", "terraform.tfvars"):
+            if (output_dir / unexpected_file).exists():
+                failures.append(f"unexpected generated IaC handoff {unexpected_file}")
 
-        for expected_file in ("decision-report.yaml", "module-inputs.yaml", "terraform.tfvars"):
+        expected_files = (
+            "accounts-config.yaml",
+            "global-config.yaml",
+            "iam-config.yaml",
+            "network-config.yaml",
+            "organization-config.yaml",
+            "security-config.yaml",
+            "decision-report.yaml",
+            "lineage-manifest.yaml",
+            "deployment-runbook.md",
+            "sample-recommendations.yaml",
+        )
+        for expected_file in expected_files:
             if not (output_dir / expected_file).exists():
                 failures.append(f"missing artifact {expected_file}")
         failures.extend(_evidence_failures(config, evidence_path))

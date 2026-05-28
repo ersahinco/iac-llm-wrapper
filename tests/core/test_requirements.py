@@ -244,6 +244,30 @@ class TestRequirementGraph:
         assert g.get("regions") == "eu-central-1,eu-west-1"
         assert g.get("enabled") == "true"
 
+    def test_apply_decisions_respects_applies_if_order(self):
+        g = RequirementGraph()
+        g.add(
+            Requirement(
+                key="network_account",
+                label="Network Account",
+                question="Network account?",
+                applies_if={"topology": ["hub-spoke"]},
+            )
+        )
+        g.add(
+            Requirement(
+                key="topology",
+                label="Topology",
+                question="Topology?",
+                options=["hub-spoke", "single-vpc"],
+            )
+        )
+
+        applied = g.apply_decisions({"network_account": "Network", "topology": "hub-spoke"})
+
+        assert applied == ["topology", "network_account"]
+        assert g.get("network_account") == "Network"
+
     def test_typed_decisions_restores_structured_values(self):
         g = RequirementGraph()
         g.add(

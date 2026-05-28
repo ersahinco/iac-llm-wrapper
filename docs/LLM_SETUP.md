@@ -45,12 +45,12 @@ curl http://localhost:11434/api/tags
 
 ```bash
 # Compile with local LLM
-iac-llm-wrapper compile -i design.md -o out/ --pattern baseline --provider ollama --model qwen2.5:3b
+iac-llm-wrapper compile -i design.md -o out/ --pattern aws-lza --provider ollama --model qwen2.5:3b
 
 # Or set environment variable
 export INTENT_ENGINE_PROVIDER=ollama
 export INTENT_ENGINE_MODEL=qwen2.5:3b
-iac-llm-wrapper compile -i design.md -o out/ --pattern baseline
+iac-llm-wrapper compile -i design.md -o out/ --pattern aws-lza
 ```
 
 ## Model Recommendations

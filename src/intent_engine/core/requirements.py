@@ -76,9 +76,15 @@ class RequirementGraph:
             self._auto_derive_requirement(req)
         self._requirements[req.key] = req
         self._graph.add_node(req.key)
-        for dep in req.depends_on:
+        for dep in self._ordering_dependencies(req):
             self._graph.add_edge(dep, req.key)
         self._status[req.key] = RequirementStatus.PENDING
+
+    def _ordering_dependencies(self, req: Requirement) -> list[str]:
+        deps = list(req.depends_on)
+        deps.extend(req.applies_if)
+        deps.extend(req.blocked_if)
+        return list(dict.fromkeys(dep for dep in deps if dep != req.key))
 
     def _auto_derive_requirement(self, req: Requirement) -> None:
         """Auto-populate target_field and target_type from the intent model."""
@@ -162,7 +168,9 @@ class RequirementGraph:
             return False
         if self._status[key] != RequirementStatus.PENDING:
             return False
-        for dep in req.depends_on:
+        for dep in self._ordering_dependencies(req):
+            if dep not in self._requirements:
+                continue
             if self._status.get(dep) not in (
                 RequirementStatus.DECIDED,
                 RequirementStatus.DEFAULTED,
@@ -222,9 +230,11 @@ class RequirementGraph:
                 continue
             if self.is_blocked(key):
                 self._status[key] = RequirementStatus.BLOCKED
+            elif not self.is_ready(key):
+                continue
             elif not self.is_applicable(key):
                 self._status[key] = RequirementStatus.SKIPPED
-            elif self.is_ready(key):
+            else:
                 ready.append(key)
         return ready
 
@@ -285,7 +295,10 @@ class RequirementGraph:
         Returns the list of keys that were successfully applied.
         """
         applied: list[str] = []
-        for key, value in decisions.items():
+        ordered_keys = [key for key in nx.topological_sort(self._graph) if key in decisions]
+        ordered_keys.extend(key for key in decisions if key not in self._requirements)
+        for key in ordered_keys:
+            value = decisions[key]
             if key not in self._requirements:
                 continue
             # Skip if blocked or not applicable

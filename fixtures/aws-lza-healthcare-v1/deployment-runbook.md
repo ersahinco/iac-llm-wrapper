@@ -27,9 +27,9 @@ Optional configuration files are emitted only when custom target contracts requi
 
 Ranked recommendations are also persisted in `sample-recommendations.yaml`.
 
-- `aws-lza-healthcare-v1`: 13/13 decisions match, 0 differ, fixture `aws-lza-healthcare-v1/`
-- `aws-lza-standard-v1`: 10/12 decisions match, 2 differ, fixture `aws-lza-standard-v1/`
-- `aws-lza-regulated-v1`: 9/13 decisions match, 4 differ, fixture `aws-lza-regulated-v1/`
+- `aws-lza-healthcare-v1`: 14/14 decisions match, 0 differ, fixture `aws-lza-healthcare-v1/`
+- `aws-lza-standard-v1`: 11/13 decisions match, 2 differ, fixture `aws-lza-standard-v1/`
+- `aws-lza-regulated-v1`: 10/14 decisions match, 4 differ, fixture `aws-lza-regulated-v1/`
 
 ## Sequence
 

@@ -142,6 +142,9 @@ class Extractor:
 
     def _resolve_intent_model(self) -> type[BaseModel] | None:
         """Resolve the intent model for this pattern."""
+        graph_model = getattr(self.graph, "_intent_model", None)
+        if isinstance(graph_model, type) and issubclass(graph_model, BaseModel):
+            return graph_model
         try:
             from .patterns import GLOBAL_REGISTRY
 

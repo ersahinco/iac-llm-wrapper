@@ -367,7 +367,6 @@ def _aws_lza_graph_factory() -> RequirementGraph:
             target_type="string",
             label="Network Account",
             question="Which account owns shared networking?",
-            default="Network",
             category="network",
             applies_if={"topology": ["hub-spoke"]},
             violation_code="AWS_LZA_NETWORK_ACCOUNT_REQUIRED",
@@ -517,13 +516,6 @@ def validate_aws_lza_intent(intent: AwsLzaIntent, graph=None) -> list[Violation]
             Violation(
                 code="AWS_LZA_IDENTITY_CENTER_ADMIN_UNKNOWN",
                 message="Identity Center delegated administrator must reference a known account.",
-            )
-        )
-    if intent.topology == "hub-spoke" and not intent.network_account.strip():
-        violations.append(
-            Violation(
-                code="AWS_LZA_NETWORK_ACCOUNT_REQUIRED",
-                message="Hub-spoke topology requires a network account.",
             )
         )
     if intent.home_region not in intent.enabled_regions:
@@ -951,6 +943,7 @@ _register_aws_lza_sample(
         "organizational_units": ["Security", "Infrastructure", "Workloads"],
         "workload_accounts": ["Prod"],
         "security_tooling_account": "SecurityTooling",
+        "network_account": "Network",
         "identity_center_delegated_admin_account": "SecurityTooling",
         "topology": "hub-spoke",
         "centralized_logging": "true",
@@ -972,6 +965,7 @@ _register_aws_lza_sample(
         "organizational_units": ["Security", "Infrastructure", "Workloads"],
         "workload_accounts": ["Prod"],
         "security_tooling_account": "SecurityTooling",
+        "network_account": "Network",
         "identity_center_delegated_admin_account": "SecurityTooling",
         "topology": "hub-spoke",
         "centralized_logging": "true",
@@ -994,6 +988,7 @@ _register_aws_lza_sample(
         "organizational_units": ["Security", "Infrastructure", "Workloads"],
         "workload_accounts": ["ClinicalProd"],
         "security_tooling_account": "SecurityTooling",
+        "network_account": "Network",
         "identity_center_delegated_admin_account": "SecurityTooling",
         "topology": "hub-spoke",
         "centralized_logging": "true",

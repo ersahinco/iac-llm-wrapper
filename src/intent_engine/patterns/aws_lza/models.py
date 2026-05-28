@@ -60,7 +60,7 @@ class AwsLzaIntent(BaseModel):
     audit_account: str = "Audit"
     log_archive_account: str = "LogArchive"
     security_tooling_account: str = "SecurityTooling"
-    network_account: str = "Network"
+    network_account: str = ""
     identity_center_delegated_admin_account: str = "SecurityTooling"
     topology: LzaTopology = LzaTopology.HUB_SPOKE
     network_cidr: str = "10.0.0.0/16"

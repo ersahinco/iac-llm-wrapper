@@ -6,20 +6,36 @@ yet named the central network account in the notes.
 
 ## Region
 
-- primary_region: eu-central-1
+## LZA Baseline
 
-## Topology
+- baseline: standard
+
+## Organization
+
+- org_mode: control-tower
+- organization_name: ExampleCorp
+- organizational_units: Security, Infrastructure, Workloads
+
+## Regions
+
+- home_region: eu-central-1
+- enabled_regions: eu-central-1
+
+## Accounts
+
+- workload_accounts: Prod
+- audit_account: Audit
+- log_archive_account: LogArchive
+- security_tooling_account: SecurityTooling
+
+## Network
 
 - topology: hub-spoke
+- network_cidr: 10.50.0.0/16
 
 ## Security
 
 - audit_retention_days: 2555
 - centralized_logging: true
-- kms_rotation_required: true
-- s3_block_public_access: true
-
-## CI/CD
-
-- cicd_mode: private
-- cicd_placement: SharedServices/BuildVPC
+- security_hub_enabled: true
+- guardduty_enabled: true

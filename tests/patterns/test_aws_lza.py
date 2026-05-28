@@ -10,12 +10,14 @@ import ruamel.yaml
 import intent_engine.patterns.aws_lza  # noqa: F401 — triggers pattern registration
 from intent_engine.core.compiler import CompileError, compile_from_interview
 from intent_engine.core.contracts import GLOBAL_CONTRACT_REGISTRY, ContractValidator
+from intent_engine.core.extractor import Extractor
 from intent_engine.core.generator import generate_all
 from intent_engine.core.patterns import GLOBAL_REGISTRY
 from intent_engine.patterns.aws_lza.contracts import AWS_LZA_SAMPLE_CONFIG_CONTRACT
 from intent_engine.patterns.aws_lza.models import AwsLzaIntent
 
 FIXTURES = Path(__file__).parent.parent.parent / "fixtures"
+STANDARD_HUB_SPOKE_DECISIONS = {"network_account": "Network"}
 
 
 class TestAwsLzaPattern:
@@ -40,6 +42,12 @@ class TestAwsLzaPattern:
     def test_contract_is_registered(self):
         contract = GLOBAL_CONTRACT_REGISTRY.get("aws-lza-sample-configuration")
         assert contract is AWS_LZA_SAMPLE_CONFIG_CONTRACT
+
+    def test_extractor_with_graph_uses_pattern_intent_model(self):
+        graph = GLOBAL_REGISTRY.get("aws-lza").create_graph()
+        intent = Extractor(graph=graph).extract("")
+
+        assert isinstance(intent, AwsLzaIntent)
 
     def test_compile_from_interview_creates_handoff_artifacts(self, tmp_path: Path):
         decisions = {
@@ -228,7 +236,7 @@ class TestAwsLzaPattern:
 
     def test_standard_defaults_match_golden_fixture(self, tmp_path: Path):
         output = tmp_path / "output"
-        compile_from_interview({}, output, pattern="aws-lza")
+        compile_from_interview(STANDARD_HUB_SPOKE_DECISIONS, output, pattern="aws-lza")
 
         yaml = ruamel.yaml.YAML(typ="safe")
         fixture_dir = FIXTURES / "aws-lza-standard-v1"
@@ -266,7 +274,7 @@ class TestAwsLzaPattern:
         from intent_engine.cli import app
 
         output = tmp_path / "output"
-        compile_from_interview({}, output, pattern="aws-lza")
+        compile_from_interview(STANDARD_HUB_SPOKE_DECISIONS, output, pattern="aws-lza")
 
         runner = CliRunner()
         result = runner.invoke(app, ["validate", "--input", str(output), "--pattern", "aws-lza"])
@@ -290,7 +298,7 @@ class TestAwsLzaPattern:
         from intent_engine.core.compiler import validate_generated, validate_generated_violations
 
         output = tmp_path / "output"
-        compile_from_interview({}, output, pattern="aws-lza")
+        compile_from_interview(STANDARD_HUB_SPOKE_DECISIONS, output, pattern="aws-lza")
         (output / "iam-config.yaml").unlink()
 
         errors = validate_generated(output, pattern="aws-lza")
@@ -316,7 +324,7 @@ class TestAwsLzaPattern:
         from intent_engine.core.compiler import validate_generated
 
         output = tmp_path / "output"
-        compile_from_interview({}, output, pattern="aws-lza")
+        compile_from_interview(STANDARD_HUB_SPOKE_DECISIONS, output, pattern="aws-lza")
         (output / "network-config.yaml").write_text(
             "defaultVpc: {}\nendpointPolicies: []\ntransitGateways: []\nvpcs: []\n"
         )
@@ -330,7 +338,7 @@ class TestAwsLzaPattern:
         from intent_engine.core.compiler import validate_generated
 
         output = tmp_path / "output"
-        compile_from_interview({}, output, pattern="aws-lza")
+        compile_from_interview(STANDARD_HUB_SPOKE_DECISIONS, output, pattern="aws-lza")
         (output / "security-config.yaml").write_text(
             "homeRegion: eu-central-1\n"
             "accessAnalyzer:\n"

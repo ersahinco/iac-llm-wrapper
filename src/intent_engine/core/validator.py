@@ -37,7 +37,9 @@ def validate_graph(graph: RequirementGraph) -> list[Violation]:
             continue
         st = graph.status(key)
         if st in (RequirementStatus.DECIDED, RequirementStatus.DEFAULTED):
-            continue
+            value = graph.get(key)
+            if value is not None and str(value).strip():
+                continue
         # Not satisfied — emit violation using graph metadata
         code = req.violation_code or f"{key.upper()}_REQUIRED"
         message = req.violation_message or (

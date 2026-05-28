@@ -14,6 +14,7 @@ currentDecisions:
   workload_accounts:
     - Prod
   security_tooling_account: SecurityTooling
+  network_account: Network
   identity_center_delegated_admin_account: SecurityTooling
   topology: hub-spoke
   centralized_logging: true
@@ -22,7 +23,6 @@ currentDecisions:
   organization_name: ExampleCorp
   audit_account: Audit
   log_archive_account: LogArchive
-  network_account: Network
   network_cidr: 10.0.0.0/16
   compliance_overlay: none
 recommendations:
@@ -40,10 +40,10 @@ recommendations:
       - standard
       - control-tower
       - hub-spoke
-    sameDecisionCount: 12
+    sameDecisionCount: 13
     differentDecisionCount: 0
     missingDecisionCount: 0
-    totalSampleDecisions: 12
+    totalSampleDecisions: 13
     sameDecisions:
       - baseline
       - centralized_logging
@@ -51,6 +51,7 @@ recommendations:
       - guardduty_enabled
       - home_region
       - identity_center_delegated_admin_account
+      - network_account
       - org_mode
       - organizational_units
       - security_hub_enabled
@@ -63,7 +64,6 @@ recommendations:
       organization_name: ExampleCorp
       audit_account: Audit
       log_archive_account: LogArchive
-      network_account: Network
       network_cidr: 10.0.0.0/16
       compliance_overlay: none
   - name: aws-lza-regulated-v1
@@ -80,16 +80,17 @@ recommendations:
       - regulated
       - security-hub
       - nist
-    sameDecisionCount: 11
+    sameDecisionCount: 12
     differentDecisionCount: 2
     missingDecisionCount: 0
-    totalSampleDecisions: 13
+    totalSampleDecisions: 14
     sameDecisions:
       - baseline
       - centralized_logging
       - guardduty_enabled
       - home_region
       - identity_center_delegated_admin_account
+      - network_account
       - org_mode
       - organizational_units
       - security_hub_enabled
@@ -111,7 +112,6 @@ recommendations:
       organization_name: ExampleCorp
       audit_account: Audit
       log_archive_account: LogArchive
-      network_account: Network
       network_cidr: 10.0.0.0/16
   - name: aws-lza-healthcare-v1
     description: Healthcare AWS LZA sample path with healthcare baseline and
@@ -127,16 +127,17 @@ recommendations:
       - healthcare
       - hipaa
       - phi
-    sameDecisionCount: 10
+    sameDecisionCount: 11
     differentDecisionCount: 3
     missingDecisionCount: 0
-    totalSampleDecisions: 13
+    totalSampleDecisions: 14
     sameDecisions:
       - centralized_logging
       - enabled_regions
       - guardduty_enabled
       - home_region
       - identity_center_delegated_admin_account
+      - network_account
       - org_mode
       - organizational_units
       - security_hub_enabled
@@ -159,5 +160,4 @@ recommendations:
       organization_name: ExampleCorp
       audit_account: Audit
       log_archive_account: LogArchive
-      network_account: Network
       network_cidr: 10.0.0.0/16

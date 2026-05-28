@@ -159,8 +159,9 @@ class DiscoveryEngine:
                         # Value matches model default — apply as default in graph
                         req = self.graph._requirements[key]
                         if req.default is None:
-                            # Graph has no default but model has one — decide it
-                            self.graph.decide(key, val)
+                            # Graph has no default; model default is not evidence
+                            # that the design doc supplied this requirement.
+                            continue
                         else:
                             self.graph.apply_default(key)
                     synced.append(key)

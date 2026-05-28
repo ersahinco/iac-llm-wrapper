@@ -180,17 +180,17 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff.
 T15: Lean contract-driven handoff maturity
 
 ### Status
-- **Tests**: 520 passing, 1 skipped (LLM non-determinism)
+- **Tests**: 522 passing, 1 skipped (LLM non-determinism)
 - **Lint**: clean
 - **Format**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added `--llm` usability trials, verified local `qwen2.5:7b` role flow, kept full gate green
+- **Last session**: Clarified legacy LZA vs thin `aws-lza`, moved role usability trials to `aws-lza`, fixed graph gate ordering, kept full gate green
 
 ### Done
 | Area | Item |
 |------|------|
 | Core | Models, extractor, requirements, patterns, interview, discovery, normalizer, validator, generator, catalog, CLI, **sample_config** |
-| Patterns | baseline, minimal, workload, hybrid-enterprise, financial-services, healthcare, kubernetes-cluster, terraform-vpc |
+| Patterns | aws-lza, baseline, minimal, workload, hybrid-enterprise, financial-services, healthcare, kubernetes-cluster, terraform-vpc |
 | Catalog | 5 entries with diff/apply |
 | Reports | Decision report with WA pillar coverage + audit trail |
 | Signals | Detection from prose text (auto-generated from graph metadata) |
@@ -266,6 +266,10 @@ T15: Lean contract-driven handoff maturity
 | **CI mypy alignment** | CI, pre-commit, AGENTS commands, and PR checklist now all use `uv run --extra dev mypy`. |
 | **Extraction eval loop** | `scripts/evaluate-extraction.py` compiles `fixtures/eval/*.md` and compares generated artifacts against `*.expected.yaml` gold files; CI runs the deterministic check. |
 | **Role usability loop** | `scripts/evaluate-usability.py` runs architect gap discovery, engineer handoff, and BYOM Terraform VPC module trials through the CLI; CI runs deterministic plumbing, `--llm` tests real usability. |
+| **Role usability LZA alignment** | Architect/engineer usability trials now use thin `aws-lza` handoff artifacts, not legacy `baseline` module-output flow. |
+| **Graph gate ordering** | `RequirementGraph.apply_decisions()` now applies batched decisions in graph order, with `applies_if`/`blocked_if` condition keys treated as ordering dependencies. |
+| **No hidden required defaults** | `aws-lza.network_account` no longer defaults silently; hub-spoke designs must provide it, samples declare it explicitly, and empty required values fail validation. |
+| **Pattern surface clarity** | README/capability docs now point new AWS landing-zone work at `aws-lza` and label old LZA patterns as legacy extraction/regression coverage. |
 | **LLM usability verification** | `scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b` passed architect, engineer, and BYOM trials locally, with evidence-file verification. |
 | **BYOM Terraform VPC pattern** | Added `terraform-vpc` pattern with Pydantic intent model, requirement graph, target contract, module mapper, sample config, and decision report generator. |
 | **Discover Markdown sync** | `discover --no-llm` now applies deterministic Markdown decisions before gap analysis, matching compile behavior. |
@@ -276,12 +280,18 @@ T15: Lean contract-driven handoff maturity
 | **Catalog match type coverage** | `core/catalog_match.py` is now in mypy scope, protecting CLI catalog recommendations from untyped drift. |
 
 ### Next (prioritized)
-1. [ ] Run `scripts/evaluate-extraction.py --llm` and `scripts/evaluate-usability.py --llm` against local 3B/7B models and record misses before adding more extraction code.
+1. [ ] Run `scripts/evaluate-extraction.py --llm` and `scripts/evaluate-usability.py --llm` against local 3B/7B models after `aws-lza` usability realignment and record misses before adding more extraction code.
 2. [ ] Add one non-Terraform BYOM trial (CDK or CloudFormation) if Terraform VPC trial stays clean.
 3. [ ] Continue narrowing remaining `aws-lza` field gaps against official LZA sample config schemas, especially IAM permission set/assignment detail when real customer identity inputs exist.
-4. [ ] Decide whether small-model extraction still needs separate workload-only LLM pass after deterministic backfill results settle.
+4. [ ] Decide whether to retire or move legacy LZA research patterns after `aws-lza` covers required landing-zone trials.
 
 ### Key Decisions This Session
+- **Two LZA folders are not equal product paths**: `patterns/aws_lza` is the recommended thin AWS LZA handoff path; `patterns/lza` remains legacy research/regression coverage for richer workload/module extraction until deliberate removal.
+- **No hidden network account**: Hub-spoke AWS LZA now requires `network_account` from input/sample decisions instead of relying on a Pydantic default. Missing or empty values fail graph validation.
+- **Graph order beats Markdown order**: Batched decisions now apply in graph topological order, and `applies_if`/`blocked_if` keys participate in ordering, so gated decisions are not skipped because a document listed sections earlier.
+- **Model defaults are not extracted evidence**: Discovery no longer treats a model default as a user decision when the graph has no default for that requirement.
+- **Role trials should test product path**: LZA architect and engineer usability trials now validate `aws-lza` config files, lineage, runbook, and sample recommendations, and assert no Terraform/tfvars handoff is emitted for LZA.
+- **Docs must reduce pattern confusion**: README, capability docs, and LLM setup now steer new landing-zone users to `aws-lza`; legacy examples are labeled as regression/research material.
 - **Deterministic is plumbing, LLM is product value**: Usability runner now has `--llm` mode so local/provider models prove real architect and engineer experience.
 - **LLM use must be observable**: `evaluate-usability.py --llm` now requires LLM evidence files with calls, prompt, response, and expected model; `--evidence-dir` preserves them for inspection.
 - **CI stays deterministic**: Role trials still run deterministically in CI to avoid slow/flaky model dependency, while `--llm` remains the required local quality evidence path.

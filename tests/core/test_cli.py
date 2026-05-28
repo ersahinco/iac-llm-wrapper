@@ -237,9 +237,18 @@ class TestInterviewCommand:
 
     def test_interview_prints_sample_match_for_aws_lza(self, tmp_path: Path):
         output = tmp_path / "output"
+        decisions = json.dumps({"network_account": "Network"})
         result = runner.invoke(
             app,
-            ["interview", "--output", str(output), "--pattern", "aws-lza"],
+            [
+                "interview",
+                "--output",
+                str(output),
+                "--pattern",
+                "aws-lza",
+                "--decisions",
+                decisions,
+            ],
         )
 
         assert result.exit_code == 0
