@@ -97,23 +97,23 @@ T17: Harden lean intent-to-IaC orchestration surface
 
 ### Status
 
-- **Tests**: 270 passing, 1 skipped
+- **Tests**: 271 passing, 1 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Hardened LLM diagnostics so only requirement-graph gaps/contradictions block handoff; raw non-contract findings remain trace-visible; full gate green
+- **Last session**: Scoped LLM prompts/findings to graph contract keys and removed built-in pattern test-order dependency; full gate green
 
 ### Done
 
 | Area | Item |
 |------|------|
-| Core | models, extractor, requirements, patterns, interview, discovery, normalizer, validator, generator, contracts, samples, module mapping, CLI |
+| Core | models, extractor, requirements, lazy built-in pattern registry, patterns, interview, discovery, normalizer, validator, generator, contracts, samples, module mapping, CLI |
 | Patterns | `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, `terraform-vpc` |
 | AWS LZA | Thin LZA handoff YAML, IAM Identity Center permission sets/assignments, decision report/readiness, lineage manifest, deployment runbook, sample recommendations |
 | Contracts | Required artifacts, required paths, required decisions, lineage checks, value assertions, blocked assessment artifacts, contract-backed generic handoff plan |
 | Samples | Registry-backed `sample list/show`, match recommendations, fixture sync/drift guard |
-| LLM | Ollama/OpenAI-compatible/Anthropic backend factory, evidence store, local LLM integration tests, graph-scoped blocking findings |
+| LLM | Ollama/OpenAI-compatible/Anthropic backend factory, evidence store, local LLM integration tests, graph-scoped prompts and blocking findings |
 | Evaluation | Deterministic extraction gold corpus with AWS LZA and CloudFormation pass/fail/contract cases, trace quality assertions, optional LLM evidence capture, and role-based usability trials including CloudFormation BYOM |
 | Fixtures | AWS LZA emitted bundles, K8s emitted bundle, usability docs, eval corpus |
 | Cleanup | Removed old LZA research path, old diff/apply surfaces, extension registry, old fixtures/tests/helpers |
@@ -139,3 +139,5 @@ T17: Harden lean intent-to-IaC orchestration surface
 - Extraction eval trace expectations are mode-aware: deterministic expects no raw evidence request, LLM expects captured evidence.
 - Kubernetes cluster pattern is handoff-first; Terraform EKS module inputs are optional references, not root deployment scaffolding.
 - LLM-reported gaps and contradictions only block when they target known requirement graph nodes; model-invented non-contract findings stay raw trace evidence.
+- Extractor prompts now tell models to use only schema keys for decisions, signal decisions, gaps, and contradictions.
+- The global pattern registry lazily loads built-in patterns on first `get()`/`list()` so core API tests do not depend on CLI imports or suite order.

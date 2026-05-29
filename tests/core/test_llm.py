@@ -89,6 +89,13 @@ class TestCreateBackend:
 
 
 class TestEndToEndLLM:
+    def test_prompt_scopes_findings_to_schema_keys(self):
+        prompt = Extractor(pattern="aws-lza").build_prompt("Design doc text here")
+
+        assert "Use only SCHEMA keys for decisions" in prompt
+        assert "Do not report gaps for design_doc, accounts, OUs, or workloads metadata" in prompt
+        assert "If unsure about a SCHEMA key" in prompt
+
     def test_aws_lza_llm_round_trip(self, tmp_path: Path):
         fixture = tmp_path / "design.md"
         fixture.write_text(

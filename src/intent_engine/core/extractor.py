@@ -265,7 +265,10 @@ class Extractor:
             '"network_mode": "private" (or "public"), '
             '"runtime": "ecs-fargate" (or "ec2" or "eks"), '
             '"public_ingress": false, "port": 8080, "cpu": 256, "memory": 512}\n'
-            '11. OU format: {"name": "...", "description": "..."}\n\n'
+            '11. OU format: {"name": "...", "description": "..."}\n'
+            "12. Use only SCHEMA keys for decisions, signal_decisions, gaps, and "
+            "contradictions. Do not report gaps for design_doc, accounts, OUs, or "
+            "workloads metadata.\n\n"
             "=== EXAMPLE OUTPUT ===\n"
             "For a document with region=eu-central-1, topology=hub-spoke, "
             "an OU 'Infrastructure', and one account 'prod' under it:\n"
@@ -308,7 +311,8 @@ class Extractor:
             "  ]\n"
             "}\n\n"
             "If the document does not mention a field, omit it from 'decisions'.\n"
-            "Do NOT hallucinate values. If unsure, omit the key and list it in 'gaps'.\n\n"
+            "Do NOT hallucinate values. If unsure about a SCHEMA key, omit the decision "
+            "and list that SCHEMA key in 'gaps'.\n\n"
             f"=== SCHEMA (flat field map) ===\n{schema_block}\n\n"
             "=== DESIGN DOCUMENT ===\n"
             f"{text}"

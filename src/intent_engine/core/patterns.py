@@ -73,6 +73,19 @@ class PatternRegistry:
 
     def __init__(self) -> None:
         self._patterns: dict[str, Pattern] = {}
+        self._builtins_load_attempted = False
+
+    def _load_builtins_if_global(self) -> None:
+        if self._builtins_load_attempted:
+            return
+        if globals().get("GLOBAL_REGISTRY") is not self:
+            return
+        self._builtins_load_attempted = True
+        try:
+            from intent_engine.patterns import load_builtin_patterns
+        except ImportError:
+            return
+        load_builtin_patterns()
 
     def register(self, pattern: Pattern) -> None:
         # Schema alignment guard: validate requirements against intent model
@@ -113,12 +126,14 @@ class PatternRegistry:
             raise ValueError(msg)
 
     def get(self, name: str) -> Pattern:
+        self._load_builtins_if_global()
         if name not in self._patterns:
             available = ", ".join(sorted(self._patterns.keys()))
             raise KeyError(f"Unknown pattern '{name}'. Available: {available}")
         return self._patterns[name]
 
     def list(self) -> builtins.list[str]:
+        self._load_builtins_if_global()
         return sorted(self._patterns.keys())
 
 
