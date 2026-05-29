@@ -97,12 +97,12 @@ T17: Harden lean intent-to-IaC orchestration surface
 
 ### Status
 
-- **Tests**: 266 passing, 1 skipped
+- **Tests**: 267 passing, 1 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Removed overlapping capability doc, stale signal/normalization claims, AWS LZA future-adapter language, and unused category fallbacks; full gate green
+- **Last session**: Removed fake Anthropic provider surface, made discovery sync single-pass, fixed extension guide traps, removed stale AWS LZA thin-path/optional-artifact surface; full gate green
 
 ### Done
 
@@ -113,7 +113,7 @@ T17: Harden lean intent-to-IaC orchestration surface
 | AWS LZA | Thin LZA handoff YAML, IAM Identity Center permission sets/assignments, decision report/readiness, lineage manifest, deployment runbook, sample recommendations, focused pattern modules |
 | Contracts | Required artifacts, required paths, required decisions, lineage checks, value assertions, blocked assessment artifacts, contract-backed generic handoff plan |
 | Samples | Registry-backed `sample list/show`, match recommendations, fixture sync/drift guard |
-| LLM | Ollama/OpenAI-compatible/Anthropic backend factory, evidence store, local LLM integration tests, graph-scoped prompts and blocking findings |
+| LLM | Ollama/OpenAI-compatible backend factory, evidence store, local LLM integration tests, graph-scoped prompts and blocking findings |
 | Evaluation | Deterministic extraction gold corpus with AWS LZA and CloudFormation pass/fail/contract cases, trace quality assertions, optional LLM evidence capture, and role-based usability trials including CloudFormation BYOM |
 | Fixtures | AWS LZA emitted bundles, K8s emitted bundle, usability docs, eval corpus |
 | Cleanup | Removed old LZA research path, old diff/apply surfaces, extension registry, old fixtures/tests/helpers, global normalizer/defaults no-op surface, unused discovery hook fields, no-contract artifact fallback, overlapping capability doc |
@@ -146,7 +146,6 @@ T17: Harden lean intent-to-IaC orchestration surface
 - Release workflow uses `uv build`; `pyproject.toml` uses SPDX license metadata to avoid setuptools deprecation warnings.
 - Product scope lives in `README.md`/`docs/`; contributor workflow lives in `CONTRIBUTING.md`/`AGENTS.md`.
 - Defaults now live in Pydantic models and requirement graph nodes; there is no global `defaults.yaml` or no-op normalizer path.
-- `docs/AWS_LZA_THIN_PATH.md` is current product scope only; old borrowed-design rationale and speculative workload notes were removed.
 - AWS LZA pattern code is split by responsibility: registration, graph, validators, generators, samples, and helpers.
 - Discovery is graph-owned; unused pattern-specific consistency/signal hook fields were removed.
 - Artifact validation is contract-owned; pattern-level no-contract artifact fields were removed.

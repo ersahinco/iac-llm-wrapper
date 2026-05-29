@@ -18,11 +18,6 @@ Mandatory configuration files:
 - `organization-config.yaml`
 - `security-config.yaml`
 
-Optional configuration files are emitted only when custom target contracts require them:
-
-- `customizations-config.yaml`
-- `replacements-config.yaml`
-
 ## Recommended Sample Configs
 
 Ranked recommendations are also persisted in `sample-recommendations.yaml`.

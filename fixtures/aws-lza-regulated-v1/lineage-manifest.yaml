@@ -13,9 +13,6 @@ sourceContract:
     - network-config.yaml
     - organization-config.yaml
     - security-config.yaml
-  optionalConfigFiles:
-    - customizations-config.yaml
-    - replacements-config.yaml
 artifacts:
   - name: accounts-config.yaml
     required: true
@@ -226,17 +223,6 @@ artifacts:
       - path: centralSecurityServices.securityHub.notificationLevel
         equals: HIGH
         oneOf: []
-  - name: customizations-config.yaml
-    required: false
-    description: Optional custom applications, appliances, and CloudFormation
-      stacks.
-    requiredPaths: []
-    valueAssertions: []
-  - name: replacements-config.yaml
-    required: false
-    description: Optional replacement values across configuration files.
-    requiredPaths: []
-    valueAssertions: []
 lineage:
   - decision: org_mode
     artifact: global-config.yaml

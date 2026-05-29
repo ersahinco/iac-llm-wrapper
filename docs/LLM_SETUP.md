@@ -146,10 +146,6 @@ If local models are insufficient:
 # OpenAI
 export OPENAI_API_KEY=sk-...
 iac-llm-wrapper compile -i design.md -o out/ --provider openai --model gpt-4o-mini
-
-# Anthropic
-export ANTHROPIC_API_KEY=sk-ant-...
-iac-llm-wrapper compile -i design.md -o out/ --provider anthropic --model claude-3-haiku
 ```
 
 ## Performance Benchmarks

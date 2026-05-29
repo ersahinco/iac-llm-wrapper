@@ -199,7 +199,7 @@ def compile(
     provider: str = typer.Option(
         os.environ.get("INTENT_ENGINE_PROVIDER", "openai"),
         "--provider",
-        help="LLM provider: openai, ollama, anthropic",
+        help="LLM provider: openai, ollama",
     ),
     model: str = typer.Option(
         os.environ.get("INTENT_ENGINE_MODEL", ""),
@@ -333,7 +333,7 @@ def discover(
     provider: str = typer.Option(
         os.environ.get("INTENT_ENGINE_PROVIDER", "openai"),
         "--provider",
-        help="LLM provider: openai, ollama, anthropic",
+        help="LLM provider: openai, ollama",
     ),
     model: str = typer.Option(
         os.environ.get("INTENT_ENGINE_MODEL", ""),
@@ -445,7 +445,7 @@ def discover(
     typer.echo("=== Discovery Report ===")
     typer.echo("")
 
-    synced = discovery.sync_intent_to_graph(intent)
+    synced = result.synced
     if synced:
         typer.echo(f"[+] Synced {len(synced)} values from design doc:")
         for k in synced:

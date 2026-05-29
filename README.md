@@ -77,10 +77,6 @@ No API key required. A 3B model (2GB RAM) extracts region, topology, CIDR, accou
 # OpenAI
 export OPENAI_API_KEY=sk-...
 iac-llm-wrapper compile -i design.md -o out/ --provider openai
-
-# Anthropic
-export ANTHROPIC_API_KEY=sk-ant-...
-iac-llm-wrapper compile -i design.md -o out/ --provider anthropic
 ```
 
 ### Without LLM (Bootstrap Only)

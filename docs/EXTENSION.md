@@ -70,7 +70,8 @@ def build_k8s_graph() -> RequirementGraph:
 
 Rules:
 - `target_field` maps to your Pydantic model attribute (dotted paths supported)
-- `target_type` controls type coercion: `string`, `int`, `bool`, or any enum name
+- `target_type` controls type coercion: `string`, `int`, `bool`, `float`,
+  `string_list`, `cidr_list`, or any enum name
 - Use `applies_if`, `blocked_if`, `depends_on`, and `cascade` for logic gates
 
 ### 3. Register Generators
@@ -78,16 +79,27 @@ Rules:
 Register output generators that emit handoff files:
 
 ```python
-from intent_engine.core.generator import register_generator
+from io import StringIO
 from pathlib import Path
+
+import ruamel.yaml
+
+from intent_engine.core.generator import register_generator
 from intent_engine.patterns.my_pattern.models import K8sIntent
+
+def _write_yaml(path: Path, data: dict) -> None:
+    yaml = ruamel.yaml.YAML()
+    yaml.default_flow_style = False
+    buffer = StringIO()
+    yaml.dump(data, buffer)
+    path.write_text(buffer.getvalue())
 
 def gen_cluster_config(intent, output_dir: Path) -> None:
     model = getattr(intent, "intent", intent)
     if not isinstance(model, K8sIntent):
         return
     data = {"cluster": {"name": model.cluster_name}}
-    (output_dir / "cluster-config.yaml").write_text(yaml_dump(data))
+    _write_yaml(output_dir / "cluster-config.yaml", data)
 
 register_generator(
     "k8s-cluster",

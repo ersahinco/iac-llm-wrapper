@@ -231,16 +231,6 @@ AWS_LZA_SAMPLE_CONFIG_CONTRACT = TargetContract(
                 ),
             ],
         ),
-        ArtifactContract(
-            name="customizations-config.yaml",
-            required=False,
-            description="Optional custom applications, appliances, and CloudFormation stacks.",
-        ),
-        ArtifactContract(
-            name="replacements-config.yaml",
-            required=False,
-            description="Optional replacement values across configuration files.",
-        ),
     ],
     required_decisions=[
         "baseline",

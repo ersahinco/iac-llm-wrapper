@@ -50,6 +50,7 @@ class DiscoveryResult:
     ambiguous: list[Ambiguity] = field(default_factory=list)
     inconsistent: list[Inconsistency] = field(default_factory=list)
     signals: list[DetectedSignal] = field(default_factory=list)
+    synced: list[str] = field(default_factory=list)
 
     def is_complete(self) -> bool:
         return len(self.missing) == 0 and len(self.ambiguous) == 0 and len(self.inconsistent) == 0
@@ -174,7 +175,7 @@ class DiscoveryEngine:
         """Run all discovery checks against the current intent."""
         result = DiscoveryResult()
 
-        self.sync_intent_to_graph(intent)
+        result.synced = self.sync_intent_to_graph(intent)
         self._check_graph_gaps(result)
         self._check_cross_field_consistency(intent, result)
         self._detect_signals(intent, text, result)

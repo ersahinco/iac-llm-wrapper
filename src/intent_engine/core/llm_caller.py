@@ -202,7 +202,7 @@ def auto_detect_llm(
     """Auto-detect an LLM backend.
 
     Priority:
-    1. Paid provider (OpenAI/Anthropic) when an API key is available
+    1. OpenAI-compatible provider when an API key is available
     2. Local Ollama at http://localhost:11434
     3. None (caller falls back to graph defaults)
 
@@ -213,7 +213,7 @@ def auto_detect_llm(
     if os.environ.get("INTENT_ENGINE_DISABLE_LLM"):
         return None
 
-    if api_key or os.environ.get("OPENAI_API_KEY") or os.environ.get("ANTHROPIC_API_KEY"):
+    if api_key or os.environ.get("OPENAI_API_KEY"):
         backend_kwargs: dict[str, Any] = {}
         if api_key:
             backend_kwargs["api_key"] = api_key
@@ -260,8 +260,5 @@ def create_backend(
         return OpenAICompatibleBackend(**kwargs)
     if provider == "ollama":
         base_url = kwargs.pop("base_url", "http://localhost:11434/v1")
-        return OpenAICompatibleBackend(base_url=base_url, **kwargs)
-    if provider == "anthropic":
-        base_url = kwargs.pop("base_url", "https://api.anthropic.com/v1")
         return OpenAICompatibleBackend(base_url=base_url, **kwargs)
     raise ValueError(f"Unknown provider: {provider}")
