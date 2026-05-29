@@ -151,7 +151,12 @@ class TestEndToEndLLM:
         assert "deploymentAllowed: true" in report
         assert (output / "lineage-manifest.yaml").exists()
         assert (output / "llm-trace-summary.yaml").exists()
-        assert "mockllm" in (output / "llm-trace-summary.yaml").read_text()
+        trace = (output / "llm-trace-summary.yaml").read_text()
+        assert "mockllm" in trace
+        assert "rawLlmDecisions:" in trace
+        assert "acceptedDecisions:" in trace
+        assert "extractedDecisions:" not in trace
+        assert "rawEvidencePath:" not in trace
         assert not (output / "terraform.tfvars").exists()
 
     def test_llm_contradiction_blocks_compile_with_assessment(self, tmp_path: Path):

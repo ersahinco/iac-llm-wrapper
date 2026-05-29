@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from intent_engine.core.contracts import (
     BLOCKED_ASSESSMENT_CONTRACT,
+    HANDOFF_PLAN_CONTRACT,
     ArtifactContract,
     ArtifactValueAssertion,
     ContractRegistry,
@@ -273,7 +274,6 @@ appliedDecisions:
   llm: []
   signals: []
   defaults: []
-extractedDecisions: {}
 signalDecisions: {}
 gaps:
   resolved: []
@@ -293,6 +293,35 @@ rawEvidence:
         )
 
         assert ContractValidator(BLOCKED_ASSESSMENT_CONTRACT).validate_artifacts(tmp_path) == []
+
+    def test_handoff_plan_contract_validates_plan_shape(self, tmp_path: Path):
+        (tmp_path / "handoff-plan.yaml").write_text(
+            """pattern: cloudformation-parameters
+boundary: Handoff only.
+allowedNextAction: Pass reviewed artifacts to the existing toolchain.
+readiness:
+  status: ready
+  deploymentAllowed: true
+targetContracts:
+  - name: cloudformation-parameters-handoff
+    kind: cloudformation-parameters
+    requiredArtifacts:
+      - cloudformation-parameters.yaml
+steps:
+  - id: resolve-decisions
+    title: Confirm captured decisions
+    owner: architecture-owner
+    dependsOn: []
+    manualGate: true
+    rollback: Re-run compile.
+manualGates:
+  - No blockers remain.
+rollback:
+  - Use the previous approved handoff.
+"""
+        )
+
+        assert ContractValidator(HANDOFF_PLAN_CONTRACT).validate_artifacts(tmp_path) == []
 
 
 class TestContractRegistry:

@@ -202,8 +202,8 @@ For `aws-lza`, successful output includes:
 - `handoff-plan.yaml` — ordered owners, dependencies, gates, rollback, boundary, and allowed next action
 - `deployment-runbook.md` — prerequisites and handoff sequence
 - `sample-recommendations.yaml` — closest pinned reference bundles for handoff
-- `llm-trace-summary.yaml` — provider/model, calls, extracted decisions, gaps,
-  contradictions, and raw evidence path when compile used extraction evidence
+- `llm-trace-summary.yaml` — provider/model, calls, raw and accepted decisions,
+  resolved/blocking gaps, blocking contradictions, and raw evidence status
 
 When compile is blocked, only safe assessment artifacts are written:
 `decision-report.yaml` and `llm-trace-summary.yaml`. They must satisfy the

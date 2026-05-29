@@ -282,7 +282,6 @@ def _build_extraction_summary(
         "rawLlmSignalDecisions": llm_result.signal_decisions,
         "acceptedDecisions": _to_builtin(accepted_decisions),
         "appliedDecisions": applied_decisions,
-        "extractedDecisions": _to_builtin(accepted_decisions),
         "signalDecisions": llm_result.signal_decisions,
         "gaps": {
             "resolved": resolved_gaps,
@@ -301,7 +300,6 @@ def _build_extraction_summary(
             "blockingContradictionCount": len(blocking_contradictions),
         },
         "rawEvidence": raw_evidence,
-        "rawEvidencePath": raw_evidence["path"],
     }
 
 
@@ -555,7 +553,7 @@ def compile_from_interview(
 
 def validate_generated_violations(input_dir: Path, pattern: str = "aws-lza") -> list[Violation]:
     violations: list[Violation] = []
-    from .contracts import ContractValidator
+    from .contracts import HANDOFF_PLAN_CONTRACT, ContractValidator
     from .patterns import GLOBAL_REGISTRY
 
     pattern_obj = GLOBAL_REGISTRY.get(pattern)
@@ -571,6 +569,8 @@ def validate_generated_violations(input_dir: Path, pattern: str = "aws-lza") -> 
     # Run contract-driven artifact validators
     for contract in pattern_obj.contracts:
         violations.extend(ContractValidator(contract).validate_artifacts(input_dir))
+    if pattern_obj.contracts:
+        violations.extend(ContractValidator(HANDOFF_PLAN_CONTRACT).validate_artifacts(input_dir))
 
     # Run pattern-specific artifact validators
     for validator in pattern_obj.artifact_validators:

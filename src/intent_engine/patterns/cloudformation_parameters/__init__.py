@@ -170,7 +170,7 @@ def _validate_intent(intent: Any) -> list[Violation]:
     if model is None:
         return []
     violations: list[Violation] = []
-    if not _parameter_items(model.parameter_overrides):
+    if model.parameter_overrides and not _parameter_items(model.parameter_overrides):
         violations.append(
             Violation(
                 code="CLOUDFORMATION_PARAMETER_FORMAT_INVALID",

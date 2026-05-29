@@ -1,0 +1,18 @@
+version: 1
+name: cloudformation-parameters-missing-blocked
+input: cloudformation-parameters-missing-blocked.md
+pattern: cloudformation-parameters
+expect:
+  compile: fail
+  violations:
+    - CLOUDFORMATION_TEMPLATE_URL_REQUIRED
+    - CLOUDFORMATION_PARAMETERS_REQUIRED
+  values:
+    pattern: cloudformation-parameters
+    deploymentReadiness.deploymentAllowed: false
+    deploymentReadiness.status: blocked
+  artifacts:
+    - decision-report.yaml
+    - llm-trace-summary.yaml
+  contracts:
+    - blocked-assessment-artifacts

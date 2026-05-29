@@ -282,6 +282,14 @@ class TestAwsLzaPattern:
         assert "baseline: standard" in markdown
         assert "enabled_regions: eu-central-1" in markdown
 
+    def test_missing_identity_center_decisions_are_not_duplicated(self, tmp_path: Path):
+        with pytest.raises(CompileError) as exc_info:
+            compile_from_interview({"network_account": "Network"}, tmp_path, pattern="aws-lza")
+
+        codes = [violation.code for violation in exc_info.value.violations]
+        assert codes.count("AWS_LZA_IDENTITY_CENTER_PERMISSION_SETS_REQUIRED") == 1
+        assert codes.count("AWS_LZA_IDENTITY_CENTER_ASSIGNMENTS_REQUIRED") == 1
+
     def test_validate_command_passes_for_generated_artifacts(self, tmp_path: Path):
         from typer.testing import CliRunner
 

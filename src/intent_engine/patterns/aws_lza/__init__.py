@@ -13,7 +13,6 @@ from typing import Any
 
 import ruamel.yaml
 
-from intent_engine.core.contracts import ContractValidator
 from intent_engine.core.generator import register_generator
 from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern
 from intent_engine.core.requirements import Requirement, RequirementGraph
@@ -515,7 +514,7 @@ def _aws_lza_graph_factory() -> RequirementGraph:
 
 
 def validate_aws_lza_intent(intent: AwsLzaIntent, graph=None) -> list[Violation]:
-    violations: list[Violation] = ContractValidator(_LZA_CONTRACT).validate_intent(intent)
+    violations: list[Violation] = []
     ous = _normalized_ous(intent)
     if _SECURITY_OU.lower() not in ous:
         violations.append(
@@ -571,20 +570,6 @@ def validate_aws_lza_intent(intent: AwsLzaIntent, graph=None) -> list[Violation]
             Violation(
                 code="AWS_LZA_IDENTITY_CENTER_ADMIN_UNKNOWN",
                 message="Identity Center delegated administrator must reference a known account.",
-            )
-        )
-    if not intent.identity_center_permission_sets:
-        violations.append(
-            Violation(
-                code="AWS_LZA_IDENTITY_CENTER_PERMISSION_SETS_REQUIRED",
-                message="IAM Identity Center handoff requires at least one permission set.",
-            )
-        )
-    if not intent.identity_center_assignments:
-        violations.append(
-            Violation(
-                code="AWS_LZA_IDENTITY_CENTER_ASSIGNMENTS_REQUIRED",
-                message="IAM Identity Center handoff requires at least one assignment.",
             )
         )
     permission_sets = set(intent.identity_center_permission_sets)

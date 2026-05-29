@@ -466,7 +466,6 @@ BLOCKED_ASSESSMENT_CONTRACT = TargetContract(
                 "rawLlmDecisions",
                 "acceptedDecisions",
                 "appliedDecisions",
-                "extractedDecisions",
                 "signalDecisions",
                 "gaps.resolved",
                 "gaps.blocking",
@@ -490,4 +489,38 @@ BLOCKED_ASSESSMENT_CONTRACT = TargetContract(
     ],
 )
 
+HANDOFF_PLAN_CONTRACT = TargetContract(
+    name="generic-handoff-plan",
+    kind="intent-engine-handoff-plan",
+    source_url="intent-engine://contracts/generic-handoff-plan/v1",
+    required_decisions=["handoffPlan"],
+    artifacts=[
+        ArtifactContract(
+            name="handoff-plan.yaml",
+            description="Generic handoff plan with owners, ordering, gates, and rollback.",
+            required_paths=[
+                "pattern",
+                "boundary",
+                "allowedNextAction",
+                "readiness.status",
+                "readiness.deploymentAllowed",
+                "targetContracts[]",
+                "targetContracts[].name",
+                "targetContracts[].kind",
+                "targetContracts[].requiredArtifacts",
+                "steps[]",
+                "steps[].id",
+                "steps[].title",
+                "steps[].owner",
+                "steps[].dependsOn",
+                "steps[].manualGate",
+                "steps[].rollback",
+                "manualGates[]",
+                "rollback[]",
+            ],
+        )
+    ],
+)
+
 GLOBAL_CONTRACT_REGISTRY.register(BLOCKED_ASSESSMENT_CONTRACT)
+GLOBAL_CONTRACT_REGISTRY.register(HANDOFF_PLAN_CONTRACT)

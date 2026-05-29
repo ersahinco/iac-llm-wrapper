@@ -97,12 +97,12 @@ T17: Harden lean intent-to-IaC orchestration surface
 
 ### Status
 
-- **Tests**: 265 passing, 1 skipped
+- **Tests**: 267 passing, 1 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Aligned CLI/package naming on `iac-llm-wrapper`, improved trace summaries and blocked contract, added generic handoff plans, deepened AWS LZA Identity Center, added CloudFormation parameter handoff trial, full gate green
+- **Last session**: Removed trace compatibility aliases, deduped AWS LZA Identity Center validation noise, contract-backed generic handoff plans, added blocked CloudFormation eval, full gate green
 
 ### Done
 
@@ -111,14 +111,14 @@ T17: Harden lean intent-to-IaC orchestration surface
 | Core | models, extractor, requirements, patterns, interview, discovery, normalizer, validator, generator, contracts, samples, module mapping, CLI |
 | Patterns | `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, `terraform-vpc` |
 | AWS LZA | Thin LZA handoff YAML, IAM Identity Center permission sets/assignments, decision report/readiness, lineage manifest, deployment runbook, sample recommendations |
-| Contracts | Required artifacts, required paths, required decisions, lineage checks, value assertions, blocked assessment artifacts, generic handoff plan output |
+| Contracts | Required artifacts, required paths, required decisions, lineage checks, value assertions, blocked assessment artifacts, contract-backed generic handoff plan |
 | Samples | Registry-backed `sample list/show`, match recommendations, fixture sync/drift guard |
 | LLM | Ollama/OpenAI-compatible/Anthropic backend factory, evidence store, local LLM integration tests |
-| Evaluation | Deterministic extraction gold corpus with pass/fail/contract cases and role-based usability trials including CloudFormation BYOM |
+| Evaluation | Deterministic extraction gold corpus with AWS LZA and CloudFormation pass/fail/contract cases and role-based usability trials including CloudFormation BYOM |
 | Fixtures | AWS LZA emitted bundles, K8s emitted bundle, usability docs, eval corpus |
 | Cleanup | Removed old LZA research path, old diff/apply surfaces, extension registry, old fixtures/tests/helpers |
 | Product docs | README defines `iac-llm-wrapper` as intent-to-IaC orchestration: current validated handoff, future gated target adapters |
-| Observability | Lean `llm-trace-summary.yaml` for provider/model, rounded latency, raw and accepted decisions, applied decisions, resolved/blocking gaps, blocking contradictions, and raw evidence status |
+| Observability | Lean `llm-trace-summary.yaml` for provider/model, rounded latency, raw and accepted decisions, applied decisions, resolved/blocking gaps, blocking contradictions, and raw evidence status; old flat aliases removed |
 | Language | Docs now use consistent terms: requirement graph, target contract, decision record, handoff artifact, provisioning toolchain |
 
 ### Next
@@ -132,5 +132,7 @@ T17: Harden lean intent-to-IaC orchestration surface
 
 - Primary CLI/package name is `iac-llm-wrapper`; `intent-engine` remains the core engine and optional CLI alias.
 - Generic `handoff-plan.yaml` is emitted from existing graph/contract/readiness metadata; it records owners, order, gates, rollback, boundary, and allowed next action without deployment.
+- Generic `handoff-plan.yaml` is now shape-validated by the `generic-handoff-plan` contract for all contract-backed patterns.
 - AWS LZA IAM Identity Center now requires approved permission sets and assignments before handoff.
+- AWS LZA Identity Center missing-decision errors are graph-owned; pattern validators only keep cross-field/format checks.
 - CloudFormation BYOM is parameter handoff for an existing approved template, not stack generation.

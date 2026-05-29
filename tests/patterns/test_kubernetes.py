@@ -118,7 +118,31 @@ class TestKubernetesPattern:
             "  instanceType: t3.large\n"
         )
         (output / "sample-recommendations.yaml").write_text("recommendations: []\n")
-        (output / "handoff-plan.yaml").write_text("pattern: kubernetes-cluster\n")
+        (output / "handoff-plan.yaml").write_text(
+            """pattern: kubernetes-cluster
+boundary: Handoff only.
+allowedNextAction: Pass reviewed artifacts to the existing target toolchain.
+readiness:
+  status: ready
+  deploymentAllowed: true
+targetContracts:
+  - name: kubernetes-cluster-config
+    kind: kubernetes-cluster-config
+    requiredArtifacts:
+      - cluster-config.yaml
+steps:
+  - id: resolve-decisions
+    title: Confirm captured decisions
+    owner: architecture-owner
+    dependsOn: []
+    manualGate: true
+    rollback: Re-run compile.
+manualGates:
+  - No blockers remain.
+rollback:
+  - Use the previous approved handoff.
+"""
+        )
 
         result = runner.invoke(
             app, ["validate", "--input", str(output), "--pattern", "kubernetes-cluster"]

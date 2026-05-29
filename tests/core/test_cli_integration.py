@@ -100,6 +100,10 @@ class TestCLICompile:
         assert "Cannot deploy yet" in report
         trace = (output_dir / "llm-trace-summary.yaml").read_text()
         assert "callCount: 0" in trace
+        assert "acceptedDecisions:" in trace
+        assert "rawEvidence:" in trace
+        assert "extractedDecisions:" not in trace
+        assert "rawEvidencePath:" not in trace
 
     def test_compile_duplicate_structured_decision_blocks(self, tmp_path: Path, monkeypatch):
         monkeypatch.setenv("INTENT_ENGINE_DISABLE_LLM", "1")

@@ -82,6 +82,7 @@ class TestContractCommand:
 
         assert result.exit_code == 0
         assert "aws-lza-sample-configuration" in result.stdout
+        assert "generic-handoff-plan" in result.stdout
         assert "kubernetes-cluster-config" in result.stdout
         assert "terraform-aws-vpc" in result.stdout
 
