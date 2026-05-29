@@ -32,8 +32,6 @@ class Pattern:
     free_form_examples: dict[str, list[str]] = field(default_factory=dict)
     # Extra validators: list of functions(intent) -> list[Violation]
     validators: list[Callable[[Any], list[Any]]] = field(default_factory=list)
-    # Optional normalizer override: function(intent) -> intent
-    normalizer: Callable[[Any], Any] | None = None
     # Artifact validators for CLI validate command: list of functions(Path) -> list[str]
     artifact_validators: list[Callable[[Any], list[str]]] = field(default_factory=list)
     # Required artifact file names for CLI validate command

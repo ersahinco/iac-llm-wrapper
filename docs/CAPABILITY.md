@@ -16,10 +16,9 @@ When an LLM backend is available (OpenAI, Anthropic, or local Ollama):
 2. **Extracts structured decisions** using the requirement graph as schema
 3. **Detects signals** from text, such as regulated data or hybrid connectivity
 4. **Fills gaps** through guided interview
-5. **Normalizes** defaults only when applicable
-6. **Validates** against graph rules, model rules, and target contracts
-7. **Emits handoff artifacts** for existing accelerators, modules, or pipelines
-8. **Can later drive target adapters** for module generation or controlled execution
+5. **Validates** against graph rules, model rules, and target contracts
+6. **Emits handoff artifacts** for existing accelerators, modules, or pipelines
+7. **Can later drive target adapters** for module generation or controlled execution
 
 ### Without LLM (Bootstrap Only)
 
@@ -90,16 +89,12 @@ iac-llm-wrapper contract show --pattern aws-lza
 Architects can start from proven variants. Engineers can inspect source contract
 metadata without re-running discovery.
 
-## Signal Detection in Action
+## Signal Detection
 
-When analyzing design documents, the tool detects architectural signals from text:
-
-| Signal Keyword | Triggered Requirement | Context |
-|----------------|---------------------|---------|
-| "PCI-DSS", "payment card" | `cicd_mode`, `egress_inspection` | Regulated industry needs private CI/CD |
-| "on-prem", "Active Directory" | `hybrid_required`, `hybrid_dns_model` | Hybrid connectivity requirements |
-| "SAP", "Oracle" | `network_segmentation`, `kms_key_spec` | Enterprise workload patterns |
-| "multi-cloud", "GCP" | `network_segmentation`, `data_residency` | Cross-cloud governance |
+Signal detection is pattern-owned. Signals can make graph decisions more explicit
+or add review context, but only requirement keys that exist in the selected graph
+can block handoff. Model-invented findings remain trace evidence in
+`llm-trace-summary.yaml`.
 
 ## Reference Entries
 
@@ -121,4 +116,4 @@ When analyzing design documents, the tool detects architectural signals from tex
 ## Next Capability Improvements
 
 - More sample configs with real module variable schemas
-- Pattern-specific signal keyword expansion
+- Signal expansion only when it maps to current pattern graph requirements

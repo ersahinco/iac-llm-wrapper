@@ -2,7 +2,7 @@
 
 This test proves the framework is generic: we added a new use case
 without modifying extractor.py, compiler.py, validator.py,
-normalizer.py, interview.py, or cli.py.
+interview.py, or cli.py.
 """
 
 from __future__ import annotations

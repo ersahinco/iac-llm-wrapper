@@ -280,7 +280,7 @@ Recommended product paths stay thin and contract-backed:
 
 - **CLI-first workflow**: Typer-based CLI with discover/compile/interview/validate/sample/contract/template/review commands for both architects and platform engineers.
 - **uv for dependency management**: Fast, reproducible local setup and CI parity.
-- **Model-driven type safety**: Pydantic v2 models are the contract for extraction, normalization, validation, and artifact emission.
+- **Model-driven type safety**: Pydantic v2 models are the contract for extraction, validation, and artifact emission.
 - **Fail-closed validation**: Graph-driven violation codes prevent incomplete or contradictory decisions from reaching implementation.
 
 ## Quality and Security
@@ -307,8 +307,7 @@ Security posture:
 
 - Current built-in paths make no cloud API calls and do not deploy infrastructure from prose.
 - Decision artifacts are auditable (timestamps, rationale, compliance context).
-- CI runs lint, format, and tests across supported Python versions.
-- Dependency and static security checks are part of the roadmap for hardening before broader GA.
+- CI runs lint, format, tests, dependency audit, Bandit, and SBOM generation across supported Python versions.
 
 ## Extending
 

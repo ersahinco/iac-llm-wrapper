@@ -30,7 +30,6 @@ uv run pre-commit run --all-files
 - **Patterns** (`patterns.py`): Lean registry for pluggable product paths. Current built-ins: `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, `terraform-vpc`.
 - **Requirements** (`requirements.py`): Decision graph with `applies_if`, `blocked_if`, `depends_on`, cascade rules, tradeoffs, compliance controls, signals, and audit trail.
 - **Interview** (`interview.py`): Graph-ordered requirement capture. Shows context, asks only applicable gaps, supports save/resume, and records rationale.
-- **Normalize** (`normalizer.py`): Deterministic defaults from config/model data. No hidden provider calls.
 - **Validate** (`validator.py`): Fail-closed graph and pattern validation. Missing required applicable decisions become compile errors.
 - **Generate** (`generator.py`): Registry-driven emitter for decision report, generic handoff plan, contract handoff files, lineage, runbook, module inputs when pattern owns module mapping, and sample recommendations.
 - **Contracts** (`contracts.py`): Target artifact contracts define required files, paths, decisions, lineage, and stable value assertions.
@@ -70,7 +69,7 @@ uv run pre-commit run --all-files
 3. Graph applies decisions in dependency order and records provenance.
 4. Discovery reports applicable gaps and detected signals.
 5. Interview fills only missing applicable decisions.
-6. Normalize, validate, and emit handoff artifacts for engineers.
+6. Validate and emit handoff artifacts for engineers.
 
 ## Extension Contract
 
@@ -98,18 +97,18 @@ T17: Harden lean intent-to-IaC orchestration surface
 
 ### Status
 
-- **Tests**: 272 passing, 1 skipped
+- **Tests**: 266 passing, 1 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Removed remaining nonstandard root workflow docs and thinly delegated OpenCode/Copilot to `AGENTS.md`; full gate and package build green
+- **Last session**: Removed the dead global normalizer/defaults surface, stale capability signal examples, and old AWS LZA design-memo sections; full gate green
 
 ### Done
 
 | Area | Item |
 |------|------|
-| Core | models, extractor, requirements, lazy built-in pattern registry, patterns, interview, discovery, normalizer, validator, generator, contracts, samples, module mapping, CLI |
+| Core | models, extractor, requirements, lazy built-in pattern registry, patterns, interview, discovery, validator, generator, contracts, samples, module mapping, CLI |
 | Patterns | `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, `terraform-vpc` |
 | AWS LZA | Thin LZA handoff YAML, IAM Identity Center permission sets/assignments, decision report/readiness, lineage manifest, deployment runbook, sample recommendations |
 | Contracts | Required artifacts, required paths, required decisions, lineage checks, value assertions, blocked assessment artifacts, contract-backed generic handoff plan |
@@ -117,7 +116,7 @@ T17: Harden lean intent-to-IaC orchestration surface
 | LLM | Ollama/OpenAI-compatible/Anthropic backend factory, evidence store, local LLM integration tests, graph-scoped prompts and blocking findings |
 | Evaluation | Deterministic extraction gold corpus with AWS LZA and CloudFormation pass/fail/contract cases, trace quality assertions, optional LLM evidence capture, and role-based usability trials including CloudFormation BYOM |
 | Fixtures | AWS LZA emitted bundles, K8s emitted bundle, usability docs, eval corpus |
-| Cleanup | Removed old LZA research path, old diff/apply surfaces, extension registry, old fixtures/tests/helpers |
+| Cleanup | Removed old LZA research path, old diff/apply surfaces, extension registry, old fixtures/tests/helpers, global normalizer/defaults no-op surface |
 | Product docs | Standard root docs (`README`, `CONTRIBUTING`, `CHANGELOG`, `RELEASING`, `SECURITY`) define current lean DevOps workflow and product boundary |
 | Observability | Lean `llm-trace-summary.yaml` for provider/model, rounded latency, raw and accepted decisions, applied decisions, resolved/blocking gaps, blocking contradictions, and raw evidence status; old flat aliases removed |
 | Language | Docs now use consistent terms: requirement graph, target contract, decision record, handoff artifact, provisioning toolchain |
@@ -146,3 +145,6 @@ T17: Harden lean intent-to-IaC orchestration surface
 - OpenCode and GitHub Copilot guidance now point back to root `AGENTS.md`; custom parallel command files were removed to avoid competing workflows.
 - Release workflow uses `uv build`; `pyproject.toml` uses SPDX license metadata to avoid setuptools deprecation warnings.
 - Product scope lives in `README.md`/`docs/`; contributor workflow lives in `CONTRIBUTING.md`/`AGENTS.md`.
+- Defaults now live in Pydantic models and requirement graph nodes; there is no global `defaults.yaml` or no-op normalizer path.
+- `docs/CAPABILITY.md` describes signal handling generically so examples cannot drift away from graph requirement keys.
+- `docs/AWS_LZA_THIN_PATH.md` is current product scope only; old borrowed-design rationale and speculative workload notes were removed.

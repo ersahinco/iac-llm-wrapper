@@ -2,14 +2,13 @@
 
 This module demonstrates that a new use case can be added without
 modifying any core framework file (extractor, compiler, validator,
-normalizer, interview, cli, generator core).
+interview, cli, generator core).
 
 Steps taken:
 1. Define Pydantic models in kubernetes_models.py
 2. Define RequirementGraph factory below
 3. Register generators below
 4. Register Pattern in GLOBAL_REGISTRY below
-5. Add defaults to defaults.yaml
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""Orchestrator: drives the decision engine flow — extract, normalize, validate, generate."""
+"""Orchestrator: drives the decision engine flow — extract, validate, generate."""
 
 from __future__ import annotations
 
@@ -16,7 +16,6 @@ from .markdown_extractor import (
     extract_from_markdown_with_diagnostics,
 )
 from .model_introspection import append_to_list_field, merge_into_list_field
-from .normalizer import normalize
 from .patterns import GLOBAL_REGISTRY
 from .validator import Violation, validate
 
@@ -428,7 +427,7 @@ def compile_design(
     dry_run: bool = False,
     pattern: str = "aws-lza",
 ) -> None:
-    """Extract, normalize, validate, and generate from a design doc.
+    """Extract, validate, and generate from a design doc.
 
     Two-layer architecture:
       1. Non-deterministic: LLMContextProvider reads prose and traverses graph
@@ -508,13 +507,7 @@ def compile_design(
     # Apply graph cascades (topology -> network.topology, etc.)
     graph.apply_to_intent(intent)
 
-    # 2e. Apply normalizer guardrails
-    if pattern_obj.normalizer is not None:
-        intent = pattern_obj.normalizer(intent)
-    else:
-        intent = normalize(intent)
-
-    # 2f. Validate fail-closed (graph-driven when available)
+    # 2e. Validate fail-closed (graph-driven when available)
     violations = validate(intent, graph=graph, extra_validators=pattern_obj.validators)
     violations.extend(_markdown_contradiction_violations(markdown_result.contradictions))
     violations.extend(_llm_result_violations(graph, llm_result))
@@ -570,10 +563,6 @@ def compile_from_interview(
     if accept_defaults:
         engine.apply_defaults_for_remaining()
     intent = engine.to_intent()
-    if pattern_obj.normalizer is not None:
-        intent = pattern_obj.normalizer(intent)
-    else:
-        intent = normalize(intent)
     violations = validate(intent, graph=graph, extra_validators=pattern_obj.validators)
     if violations:
         raise CompileError(violations)

@@ -1,4 +1,4 @@
-"""Generate intent artifacts from normalized intent.
+"""Generate intent artifacts from validated intent.
 
 Produces decision reports, contract handoff artifacts, lineage, runbooks, and
 module input files that engineers use alongside their IaC modules.
@@ -6,9 +6,6 @@ module input files that engineers use alongside their IaC modules.
 The generator uses a registry pattern so new output modules can be added
 without modifying core generation logic. Each registered generator is a
 function(intent, output_dir) that writes its own files.
-
-Use-case-specific strings (e.g. organization name, role prefix) are read
-from defaults.yaml so the generator framework stays generic.
 """
 
 from __future__ import annotations

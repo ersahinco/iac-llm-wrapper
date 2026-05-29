@@ -1,3 +1,0 @@
-# Core framework defaults — kept minimal.
-# Use-case-specific defaults live in pattern modules.
-defaults: {}

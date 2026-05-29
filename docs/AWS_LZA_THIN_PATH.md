@@ -94,7 +94,7 @@ source contract
   -> data model
   -> requirement graph
   -> extraction and interview
-  -> normalized intent
+  -> validated intent
   -> validators
   -> target-specific files
   -> handoff bundle
@@ -135,25 +135,6 @@ Each fixture directory includes emitted handoff artifacts plus a short `README.m
 describing source contract, upstream variant, and review expectations.
 Refresh all sample fixture bundles with `uv run python scripts/sync-sample-fixtures.py`.
 Use `--check` in CI or local review to catch stale emitted files.
-
-## Borrow From rxt-code-accelerator
-
-Useful ideas:
-
-- Pydantic spec discipline
-- graph validation before handoff
-- lineage manifest from input decision to emitted artifact path
-- preflight checks for tools, prerequisites, and required inputs
-- golden tests for emitted handoff artifacts
-- handoff packaging for engineers
-
-Avoid importing:
-
-- Azure Terragrunt generator shape
-- AVM parity as an AWS default
-- portal complexity before the CLI path is proven
-- broad cloud-neutral abstractions that hide provider-specific contracts
-- custom IaC where LZA or established modules already solve the problem
 
 ## AWS LZA Current Scope
 
@@ -212,25 +193,10 @@ Terraform/Terragrunt landing-zone stack.
 The deployment sequence should reference AWS LZA and Control Tower prerequisites instead
 of generating a parallel Terragrunt deployment path.
 
-## Later Workloads
-
-After LZA is complete, workload support can use the same contract model:
-
-- If a workload maps to an existing Terraform module, emit module inputs and dependency
-  notes.
-- If a workload requires custom resources, enable a provider-specific generator for that
-  target only.
-- If deployment orchestration is required, derive ordering from the same requirement and
-  dependency model used for validation, then require manual gates, evidence capture, and
-  rollback notes before execution.
-
-This keeps custom IaC and controlled execution as target-specific features, not
-the default architecture.
-
 ## Acceptance Tests
 
 - Adding `aws-lza` does not require changes to core extraction, interview, validation,
-  normalization, or emitter modules.
+  or emitter modules.
 - An AWS LZA sample fixture compiles to LZA YAML, decision report, lineage manifest, and
   runbook.
 - A regulated fixture selects the correct overlay decisions and fails closed when required

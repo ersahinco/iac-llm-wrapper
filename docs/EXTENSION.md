@@ -10,9 +10,8 @@ core framework files.
 These files are generic and must not contain use-case-specific logic:
 
 - `extractor.py` — Builds prompts from any `RequirementGraph`
-- `compiler.py` — Orchestrates extract → normalize → validate → emit
+- `compiler.py` — Orchestrates extract, graph sync, validate, and emit
 - `validator.py` — `validate_graph()` checks graph metadata; accepts extra validators
-- `normalizer.py` — Applies defaults from `defaults.yaml` using duck-typing
 - `interview.py` — Topological question ordering
 - `cli.py` — Generic CLI; `--pattern` selects the target pattern
 - `generator.py` — Pluggable output generators (registry pattern)
@@ -26,7 +25,7 @@ Everything target-specific lives here:
 - **Pydantic models** — Define the intent shape for one target pattern
 - **Pattern graph factories** — Define decisions as `Requirement` nodes
 - **Registered generators** — Emit target handoff files
-- **`defaults.yaml`** — Define deterministic defaults
+- **Model and graph defaults** — Define deterministic defaults close to the fields they affect
 - **Sample configs** — Define versioned, known-good decision sets
 - **CLI `--pattern` flag** — Selects which target pattern to run
 
@@ -146,7 +145,6 @@ Pattern metadata fields:
 - `section_map` — Maps requirement keys to template sections
 - `free_form_examples` — Free-form Markdown examples for templates
 - `validators` — List of extra validator functions `intent -> list[Violation]`
-- `normalizer` — Optional normalizer override function
 - `contracts` — Target contracts for required files, required paths, value assertions,
   decisions, and lineage
 - `sample-recommendations.yaml` — Generic artifact emitted automatically when sample configs
@@ -154,18 +152,13 @@ Pattern metadata fields:
 - `required_artifacts` — Simple file checks when no target contract exists
 - `artifact_validators` — Custom cross-file validators only when contracts cannot express the rule
 
-### 5. Add Defaults to `defaults.yaml`
+### 5. Keep Defaults Close to the Pattern
 
-Add a section for your target pattern:
+Prefer these locations, in order:
 
-```yaml
-k8s_defaults:
-  cluster_name: k8s-cluster
-  cluster_version: "1.29"
-  network_policy_enabled: true
-```
-
-The normalizer reads `defaults.yaml` and applies values duck-typed against your intent model.
+- Pydantic model defaults for simple field defaults
+- `Requirement.default` for graph-visible defaults used by extraction, interview, and validation
+- Pattern validators or generators for target-specific behavior that is not a default
 
 ### 6. CLI Usage
 
@@ -199,6 +192,6 @@ def test_k8s_compiles(tmp_path):
 1. **The requirement graph is the product brain** — Adding one `Requirement` node updates LLM prompts, interview questions, validation rules, and template sections.
 2. **Target contracts define handoff shape** — Required files, paths, value assertions, and lineage live in contracts.
 3. **Generators are scoped** — Use `applies_to` so multiple patterns coexist in the same registry.
-4. **Normalizers are duck-typed** — Only touch fields that exist on the intent model.
+4. **Defaults are explicit** — Put defaults in the model or requirement graph so prompts, interviews, validation, and artifacts agree.
 5. **Validators are layered** — Graph-driven rules come from `Requirement` metadata; pattern-specific rules come from `Pattern.validators`.
-6. **No core code changes for new target patterns** — If you find yourself editing `extractor.py`, `compiler.py`, `validator.py`, `normalizer.py`, `interview.py`, or `cli.py`, the framework is leaking domain assumptions. Move them to the pattern layer.
+6. **No core code changes for new target patterns** — If you find yourself editing `extractor.py`, `compiler.py`, `validator.py`, `interview.py`, or `cli.py`, the framework is leaking domain assumptions. Move them to the pattern layer.
