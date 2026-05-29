@@ -32,10 +32,6 @@ class Pattern:
     free_form_examples: dict[str, list[str]] = field(default_factory=dict)
     # Extra validators: list of functions(intent) -> list[Violation]
     validators: list[Callable[[Any], list[Any]]] = field(default_factory=list)
-    # Artifact validators for CLI validate command: list of functions(Path) -> list[str]
-    artifact_validators: list[Callable[[Any], list[str]]] = field(default_factory=list)
-    # Required artifact file names for CLI validate command
-    required_artifacts: list[str] = field(default_factory=list)
     # Extra artifacts produced by pattern generators beyond target contract files
     extra_artifacts: list[str] = field(default_factory=list)
     # Target contracts that drive decisions, validation, and generated artifacts
@@ -54,7 +50,6 @@ class Pattern:
         artifacts: list[str] = []
         for contract in self.contracts:
             artifacts.extend(contract.required_artifacts)
-        artifacts.extend(self.required_artifacts)
         artifacts.extend(self.extra_artifacts)
         if self.contracts:
             artifacts.append("handoff-plan.yaml")

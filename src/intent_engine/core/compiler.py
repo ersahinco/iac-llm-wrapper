@@ -605,11 +605,6 @@ def validate_generated_violations(input_dir: Path, pattern: str = "aws-lza") -> 
     if pattern_obj.contracts:
         violations.extend(ContractValidator(HANDOFF_PLAN_CONTRACT).validate_artifacts(input_dir))
 
-    # Run pattern-specific artifact validators
-    for validator in pattern_obj.artifact_validators:
-        for message in validator(input_dir):
-            violations.append(Violation(code="ARTIFACT_VALIDATION_FAILED", message=message))
-
     deduped: list[Violation] = []
     seen_messages: set[str] = set()
     for violation in violations:

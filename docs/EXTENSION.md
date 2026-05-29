@@ -149,8 +149,6 @@ Pattern metadata fields:
   decisions, and lineage
 - `sample-recommendations.yaml` — Generic artifact emitted automatically when sample configs
   exist for the pattern
-- `required_artifacts` — Simple file checks when no target contract exists
-- `artifact_validators` — Custom cross-file validators only when contracts cannot express the rule
 
 ### 5. Keep Defaults Close to the Pattern
 

@@ -30,7 +30,6 @@ class TestAwsLzaPattern:
         pattern = GLOBAL_REGISTRY.get("aws-lza")
         assert pattern.description
         assert pattern.contracts == [AWS_LZA_SAMPLE_CONFIG_CONTRACT]
-        assert pattern.required_artifacts == []
         assert "lineage-manifest.yaml" in pattern.expected_artifacts()
         assert "sample-recommendations.yaml" in pattern.expected_artifacts()
         for artifact in AWS_LZA_SAMPLE_CONFIG_CONTRACT.required_artifacts:
