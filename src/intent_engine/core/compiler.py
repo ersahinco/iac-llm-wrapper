@@ -99,6 +99,13 @@ def _to_builtin(value: Any) -> Any:
     return value
 
 
+def _without_locked_decisions(
+    decisions: dict[str, Any],
+    locked_keys: set[str],
+) -> dict[str, Any]:
+    return {key: value for key, value in decisions.items() if key not in locked_keys}
+
+
 def _gap_is_resolved(graph, gap: Any) -> bool:
     key = _finding_key(gap)
     if key is None:
@@ -469,12 +476,19 @@ def compile_design(
     # Layer 2: Deterministic harness processing
     # ------------------------------------------------------------------
     # 2a. Apply LLM-extracted decisions to the graph (gates + cascade)
+    locked_decision_keys = set(applied_decisions["markdown"])
     if llm_result.decisions:
-        applied_decisions["llm"] = graph.apply_decisions(llm_result.decisions)
+        llm_decisions = _without_locked_decisions(llm_result.decisions, locked_decision_keys)
+        applied_decisions["llm"] = graph.apply_decisions(llm_decisions)
+        locked_decision_keys.update(applied_decisions["llm"])
 
     # 2b. Apply signal-triggered decisions
     if llm_result.signal_decisions:
-        applied_decisions["signals"] = graph.apply_decisions(llm_result.signal_decisions)
+        signal_decisions = _without_locked_decisions(
+            llm_result.signal_decisions,
+            locked_decision_keys,
+        )
+        applied_decisions["signals"] = graph.apply_decisions(signal_decisions)
 
     # 2c. Fill remaining gaps with defaults
     graph.apply_defaults_for_remaining()

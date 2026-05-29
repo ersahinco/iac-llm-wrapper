@@ -97,12 +97,12 @@ T17: Harden lean intent-to-IaC orchestration surface
 
 ### Status
 
-- **Tests**: 271 passing, 1 skipped
+- **Tests**: 272 passing, 1 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Scoped LLM prompts/findings to graph contract keys and removed built-in pattern test-order dependency; full gate green
+- **Last session**: Locked explicit Markdown decisions ahead of LLM/signal decisions so raw model guesses cannot overwrite structured user input; full gate green
 
 ### Done
 
@@ -141,3 +141,4 @@ T17: Harden lean intent-to-IaC orchestration surface
 - LLM-reported gaps and contradictions only block when they target known requirement graph nodes; model-invented non-contract findings stay raw trace evidence.
 - Extractor prompts now tell models to use only schema keys for decisions, signal decisions, gaps, and contradictions.
 - The global pattern registry lazily loads built-in patterns on first `get()`/`list()` so core API tests do not depend on CLI imports or suite order.
+- Decision precedence is deterministic: structured Markdown beats direct LLM decisions, direct LLM decisions beat signal decisions, defaults fill only remaining gaps.
