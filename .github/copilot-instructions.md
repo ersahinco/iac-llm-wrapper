@@ -1,15 +1,25 @@
-Respond terse like smart caveman. All technical substance stay. Only fluff die.
+# GitHub Copilot Instructions
 
-Rules:
-- Drop: articles (a/an/the), filler (just/really/basically), pleasantries, hedging
-- Fragments OK. Short synonyms. Technical terms exact. Code unchanged.
-- Pattern: [thing] [action] [reason]. [next step].
-- Not: "Sure! I'd be happy to help you with that."
-- Yes: "Bug in auth middleware. Fix:"
+Follow the root `AGENTS.md` for architecture, naming, quality gates, and current
+session state.
 
-Switch level: /caveman lite|full|ultra|wenyan
-Stop: "stop caveman" or "normal mode"
+Project rules:
 
-Auto-Clarity: drop caveman for security warnings, irreversible actions, user confused. Resume after.
+- Primary project and CLI name: `iac-llm-wrapper`.
+- Core engine name: `intent-engine`.
+- Keep core modules generic; target-specific behavior belongs in pattern packages.
+- Do not generate deployable IaC from prose. Emit validated handoff artifacts unless
+  a future target adapter has graph, contract, gate, evidence, and rollback checks.
+- Update tests and docs for user-facing behavior changes.
 
-Boundaries: code/commits/PRs written normal.
+Required local checks:
+
+```bash
+uv run pytest
+uv run ruff check .
+uv run ruff format --check .
+uv run --extra dev mypy
+uv run python scripts/sync-sample-fixtures.py --check
+uv run python scripts/evaluate-extraction.py
+uv run python scripts/evaluate-usability.py
+```

@@ -102,7 +102,7 @@ T17: Harden lean intent-to-IaC orchestration surface
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Locked explicit Markdown decisions ahead of LLM/signal decisions so raw model guesses cannot overwrite structured user input; full gate green
+- **Last session**: Aligned root DevOps docs and agent guidance; OpenCode/Copilot now share `AGENTS.md`; release build and packaging metadata verified; full gate green
 
 ### Done
 
@@ -117,7 +117,7 @@ T17: Harden lean intent-to-IaC orchestration surface
 | Evaluation | Deterministic extraction gold corpus with AWS LZA and CloudFormation pass/fail/contract cases, trace quality assertions, optional LLM evidence capture, and role-based usability trials including CloudFormation BYOM |
 | Fixtures | AWS LZA emitted bundles, K8s emitted bundle, usability docs, eval corpus |
 | Cleanup | Removed old LZA research path, old diff/apply surfaces, extension registry, old fixtures/tests/helpers |
-| Product docs | README defines `iac-llm-wrapper` as intent-to-IaC orchestration: current validated handoff, future gated target adapters |
+| Product docs | Standard root docs (`README`, `CONTRIBUTING`, `CHANGELOG`, `RELEASING`, `SECURITY`, `SPEC`, `FORMAT`) define current lean DevOps workflow and product boundary |
 | Observability | Lean `llm-trace-summary.yaml` for provider/model, rounded latency, raw and accepted decisions, applied decisions, resolved/blocking gaps, blocking contradictions, and raw evidence status; old flat aliases removed |
 | Language | Docs now use consistent terms: requirement graph, target contract, decision record, handoff artifact, provisioning toolchain |
 
@@ -142,3 +142,6 @@ T17: Harden lean intent-to-IaC orchestration surface
 - Extractor prompts now tell models to use only schema keys for decisions, signal decisions, gaps, and contradictions.
 - The global pattern registry lazily loads built-in patterns on first `get()`/`list()` so core API tests do not depend on CLI imports or suite order.
 - Decision precedence is deterministic: structured Markdown beats direct LLM decisions, direct LLM decisions beat signal decisions, defaults fill only remaining gaps.
+- OpenCode and GitHub Copilot guidance now point back to root `AGENTS.md`; bespoke cavekit/spec command files were removed to avoid competing workflows.
+- `SPEC.md` is now a current product spec, and `FORMAT.md` is standard formatting/quality guidance.
+- Release workflow uses `uv build`; `pyproject.toml` uses SPDX license metadata to avoid setuptools deprecation warnings.

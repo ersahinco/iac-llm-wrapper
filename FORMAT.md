@@ -1,119 +1,59 @@
-# SPEC.md FORMAT
+# Formatting and Quality
 
-Single file. Project root. Every cavekit command reads it.
+This project uses standard Python tooling. There is no custom formatter or
+project-specific style dialect.
 
-## SECTIONS
+## Python
 
-Fixed order. Fixed headers. Addressable.
+- Format with Ruff.
+- Lint with Ruff.
+- Keep line length at 100 characters.
+- Type check with mypy.
+- Prefer Pydantic v2 models for domain data.
+- Keep target-specific logic in `src/intent_engine/patterns/*`.
 
-```
-# SPEC
-
-## §G GOAL
-one line. what code must do.
-
-## §C CONSTRAINTS
-- bullet. non-negotiable boundary.
-- bullet. tech/lang/lib locked in.
-
-## §I INTERFACES
-external surface. what world sees.
-- cmd: `foo bar` → stdout JSON
-- api: POST /x → 200 {id}
-- file: `config.yaml` schema …
-- env: `FOO_KEY` required
-
-## §V INVARIANTS
-numbered. testable. each ! MUST hold.
-V1: ∀ req → auth check before handler
-V2: token expiry ≤ ⊥ allowed
-V3: DB write ! in transaction
-
-## §T TASKS
-pipe table. ids monotonic (never reused). status: `x` done / `~` wip / `.` todo.
-id|status|task|cites
-T1|.|scaffold repo|-
-T2|.|impl §I.api POST /x|V2
-T3|x|add §V.1 middleware|V1,I.api
-
-## §B BUGS
-pipe table. backprop log. each row = bug + invariant that catches recurrence.
-id|date|cause|fix
-B1|2026-04-20|token `<` not `≤`|V2
-B2|2026-04-21|race on write|V3
+```bash
+uv run ruff check .
+uv run ruff format --check .
+uv run --extra dev mypy
 ```
 
-**Table cell rules**: literal `|` → escape as `\|`. Backticks OK. Cells trimmed. Empty = `-`.
+## Markdown
 
-## ADDRESSING
+- Use clear headings and short sections.
+- Keep root docs conventional: `README.md`, `CONTRIBUTING.md`, `CHANGELOG.md`,
+  `RELEASING.md`, `SECURITY.md`, `SPEC.md`, `FORMAT.md`, `CODEOWNERS`.
+- Use `AGENTS.md` for agent workflow and session state.
+- Do not duplicate project rules across tool-specific agent files; point back to
+  `AGENTS.md`.
 
-`§<S>.<n>` = section.item. `§V.2` = invariants section, item 2.
-Commands, commits, PRs all reference by §. Zero ambiguity.
+## YAML
 
-## CAVEMAN ENCODING
+- Generated YAML artifacts include a schema comment and are checked through
+  contract tests.
+- Hand-authored workflow/config YAML must pass pre-commit `check-yaml`.
+- Refresh generated sample fixtures with:
 
-Default for every section. Rules:
-
-- Drop articles (a, an, the). Drop filler.
-- Drop aux verbs (is, are, was) where fragment works.
-- Short synonyms (fix > implement).
-- Fragments fine.
-
-**Preserve verbatim**: code, paths, identifiers, URLs, numbers, error strings, SQL, regex.
-
-**Symbols** (save tokens, machine-readable):
-
-```
-→   leads to / becomes / triggers
-∴   therefore / fix
-∀   for all / every
-∃   exists / some
-!   must
-?   may / optional
-⊥   never / impossible / forbidden
-≠   not equal / differs from
-∈   in / member of
-∉   not in
-≤   at most
-≥   at least
-&   and
-|   or
+```bash
+uv run python scripts/sync-sample-fixtures.py
 ```
 
-**Bad** (v1 prose):
+Check fixture drift with:
 
-> The authentication middleware must verify the token expiry on every request before allowing the handler to execute.
+```bash
+uv run python scripts/sync-sample-fixtures.py --check
+```
 
-**Good** (v2 caveman):
+## Pre-Commit
 
-> V1: ∀ req → auth check before handler
+Install hooks with:
 
-**Bad** (prose bug note):
+```bash
+uv run pre-commit install
+```
 
-> Fixed a bug where token expiry comparison used strict less-than instead of less-than-or-equal, causing tokens to be rejected exactly at their expiry timestamp.
+Run all hooks with:
 
-**Good** (v2 caveman):
-
-> B1: token `<` not `<=` ∴ tokens rejected @ expiry. §V.2 now ! `≤`.
-
-## WHY CAVEMAN FOR SPECS
-
-Spec loaded every invocation. 75% fewer tokens = 75% fewer dollars & faster reads.
-Human skims fast too. Symbols unambiguous.
-
-## ONE FILE RULE
-
-Big project → more sections, not more files. grep ceremony kills agent speed.
-If SPEC.md > 500 lines, compact §B (old bugs drop oldest) before splitting.
-
-## WRITES
-
-| command | writes | section |
-|---|---|---|
-| `/spec new` | creates | all |
-| `/spec amend` | edits | chosen |
-| `/spec bug` | appends | §B + §V |
-| `/build` | flips | §T status cell `.` → `~` → `x` |
-| `/check` | — | read only |
-
-That is whole format.
+```bash
+uv run pre-commit run --all-files
+```

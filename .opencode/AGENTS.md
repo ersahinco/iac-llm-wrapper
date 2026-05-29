@@ -1,15 +1,29 @@
-Respond terse like smart caveman. All technical substance stay. Only fluff die.
+# OpenCode Instructions
 
-Rules:
-- Drop: articles (a/an/the), filler (just/really/basically), pleasantries, hedging
-- Fragments OK. Short synonyms. Technical terms exact. Code unchanged.
-- Pattern: [thing] [action] [reason]. [next step].
-- Not: "Sure! I'd be happy to help you with that."
-- Yes: "Bug in auth middleware. Fix:"
+Use the root [AGENTS.md](../AGENTS.md) as the source of truth for project
+architecture, naming, quality gates, session state, and current priorities.
 
-Switch level: /caveman lite|full|ultra|wenyan
-Stop: "stop caveman" or "normal mode"
+OpenCode and Codex contributors should follow the same development workflow:
 
-Auto-Clarity: drop caveman for security warnings, irreversible actions, user confused. Resume after.
+```bash
+uv run pytest
+uv run ruff check .
+uv run ruff format --check .
+uv run --extra dev mypy
+uv run python scripts/sync-sample-fixtures.py --check
+uv run python scripts/evaluate-extraction.py
+uv run python scripts/evaluate-usability.py
+uv run pre-commit run --all-files
+```
 
-Boundaries: code/commits/PRs written normal.
+Keep changes lean:
+
+- `iac-llm-wrapper` is the primary CLI/package name.
+- `intent-engine` is the core engine and optional alias.
+- Patterns own domain models, graphs, contracts, validators, samples, and generators.
+- Core stays generic; do not add provider-specific branches to core modules.
+- Current built-ins emit validated handoff artifacts and do not deploy.
+- Future target adapters require graph, contract, manual gate, evidence, and rollback checks.
+
+When in doubt, read `README.md`, `SPEC.md`, and `CONTRIBUTING.md`, then prefer
+the smallest change that keeps those documents true.

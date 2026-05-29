@@ -1,56 +1,92 @@
-# SPEC
+# Specification
 
-## §G GOAL
-Model-driven intent-to-IaC orchestration framework. Design doc → extracted
-decisions → normalized intent → validation/gates → target handoff artifacts.
-Future target adapters may wrap module generation or controlled IaC execution
-after graph, contract, and gate checks pass. LZA is first target pattern.
+## Goal
 
-## §C CONSTRAINTS
-- Python ≥3.11, Pydantic v2, Typer, ruff, pytest
-- Domain-agnostic core. Target logic → pattern files, not core
-- LLM extraction via Ollama/OpenAI/Anthropic. Deterministic fallback for CI
-- Current built-ins make no AWS API calls and do not deploy
-- No arbitrary root module generation from prose
-- Future generation/execution adapters require graph, contract, gate, evidence, and rollback checks
-- One SPEC.md at root. No split specs
+`iac-llm-wrapper` is an intent-to-IaC orchestration framework. It turns design
+prose or structured Markdown into validated decision records and handoff
+artifacts for existing IaC accelerators, modules, and provisioning toolchains.
 
-## §I INTERFACES
-- cli: `iac-llm-wrapper compile|interview|validate|discover|template|sample|contract|explain|review`
-- graph: `RequirementGraph` — add, decide, status, apply_decisions, cascade
-- models: pattern-specific Pydantic intent models
-- emit: `GeneratorRegistry` — `register(name, fn, priority, category, applies_to)`
-- contracts: `TargetContract` — artifacts, required_paths, required_decisions, lineage
-- llm: `LLMCaller` — `call(prompt)` → `(response, LLMEvidence)`
-- patterns: `PatternRegistry` — register, get, list
-- env: `OPENAI_API_KEY`, `INTENT_ENGINE_PROVIDER`, `INTENT_ENGINE_MODEL`
-- file: `SPEC.md` — spec at repo root
-- file: `FORMAT.md` — spec schema at repo root
+The core engine is `intent-engine`. It owns extraction orchestration,
+requirement graphs, target contracts, validation, lineage, and artifact
+emission.
 
-## §V INVARIANTS
-V1: ∀ decision → recorded in audit trail with timestamp + rationale
-V2: ∄ compile without validate. Fail-closed on violations
-V3: Adding requirement node → auto-updates LLM prompt + interview + sample matching
-V4: Every new target pattern → zero core changes (verify: no `patterns/` imports in `core/`)
-V5: Pattern generators scoped by `applies_to`; internal guards only fallback safety
-V6: Test suite ! pass before push. Current full gate green, ruff clean
+## Scope
 
-## §T TASKS
-id|status|task|cites
-T1|x|Interview save/resume+transcript|V1
-T2|x|Discover --resume + LLM flags|V1
-T3|x|Sample match after compile|V1
-T4|x|LZA schema fixes (flat IAM, schemaVersion, cross-ref validators)|V1
-T5|x|Terraform tfvars generator|V1
-T6|x|Dead code removal (extract_json, describe, validate_template_output, suggest_for_given)|V3
-T7|x|LLM-unavailable warning + honest scope reframe|V3
-T8|x|Benchmark script for LLM extraction quality|V3
-T9|x|Deterministic fallback for accounts/OUs/workloads (keyword-based)|V4
-T10|.|Improve workloads extraction for small models (split extraction)|V3
-T11|.|More pattern-specific sample configs|V4
-T12|.|Decision-report → Terraform variables mapping|V5
-T13|~|Mypy expansion (remaining src files)|V4
-T14|~|AWS LZA thin path: model-driven contract, YAML emitter, lineage manifest|V4,V5
+- Extract architecture intent with an LLM when available.
+- Preserve explicit structured Markdown decisions ahead of LLM guesses.
+- Apply deterministic defaults only through graph/model rules.
+- Validate decisions fail-closed through requirement graphs, pattern validators,
+  and target contracts.
+- Emit traceable handoff artifacts for engineers.
+- Persist sample recommendations and LLM trace summaries as artifacts.
+- Support multiple target patterns without provider-specific core branches.
 
-## §B BUGS
-id|date|cause|fix
+## Non-Goals
+
+- No cloud API calls from current built-ins.
+- No direct deployment.
+- No arbitrary Terraform, CloudFormation, CDK, or Kubernetes generation from prose.
+- No provider-specific branches in core CLI, compiler, extractor, generator,
+  validator, or normalizer modules.
+- No dashboards or long-running orchestration service in the current CLI path.
+
+## Current Patterns
+
+| Pattern | Purpose | Boundary |
+|---|---|---|
+| `aws-lza` | AWS Landing Zone Accelerator handoff | Emits official-style LZA YAML, lineage, runbook, samples, and readiness artifacts. Does not emit a parallel landing-zone stack. |
+| `cloudformation-parameters` | BYOM CloudFormation parameter handoff | Emits parameter handoff for an approved existing template. Does not generate a stack. |
+| `kubernetes-cluster` | Kubernetes cluster handoff | Emits cluster/namespace handoff with optional Terraform EKS module input references. |
+| `terraform-vpc` | BYOM Terraform VPC module input capture | Emits module variables/tfvars handoff for an existing module. |
+
+## Interfaces
+
+- CLI: `iac-llm-wrapper compile|interview|validate|discover|template|sample|contract|explain|review`
+- Optional CLI alias: `intent-engine`
+- Pattern registry: `PatternRegistry.register/get/list`
+- Requirement graph: `RequirementGraph.add/decide/apply_decisions/apply_to_intent`
+- Contracts: `TargetContract` plus artifact, decision, lineage, and value assertions
+- LLM backend: `LLMCaller.call(prompt) -> (response, LLMEvidence)`
+- Fixtures: versioned sample bundles under `fixtures/*-v1`
+
+## Invariants
+
+- Every accepted decision is recorded in the graph audit trail.
+- Compile output is blocked when applicable required decisions are missing or contradictory.
+- LLM-reported gaps and contradictions only block when they target known applicable graph nodes.
+- Explicit structured Markdown decisions take precedence over direct LLM decisions.
+- Direct LLM decisions take precedence over signal decisions.
+- Defaults fill only remaining applicable gaps.
+- Contract-backed patterns emit `handoff-plan.yaml`.
+- Blocked compile output emits only safe assessment artifacts.
+- New target patterns register through pattern packages and must not require core provider branches.
+- Sample fixture drift is checked by `scripts/sync-sample-fixtures.py --check`.
+
+## Quality Gates
+
+```bash
+uv run pytest
+uv run ruff check .
+uv run ruff format --check .
+uv run --extra dev mypy
+uv run python scripts/sync-sample-fixtures.py --check
+uv run python scripts/evaluate-extraction.py
+uv run python scripts/evaluate-usability.py
+uv run pre-commit run --all-files
+```
+
+Run LLM-backed evals locally when changing extraction, prompts, graph wording, or
+pattern behavior:
+
+```bash
+uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b
+uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b
+```
+
+## High-Value Next Work
+
+1. Run local LLM usability with evidence output when Ollama is available.
+2. Tune prompts only from trace/eval findings that deterministic checks cannot classify.
+3. Add AWS LZA schema depth only for real customer identity/network/security inputs.
+4. Keep packaging names aligned if publishing changes: `iac-llm-wrapper` is the
+   distribution and CLI; `intent-engine` is the core and optional alias.

@@ -14,11 +14,20 @@ graphs, target contracts, validation, and handoff artifacts.
 uv venv
 source .venv/bin/activate
 uv pip install -e ".[dev,llm]"
-uv run pytest --cov=src/intent_engine --cov-fail-under=80
+uv run pytest
 uv run ruff check .
 uv run ruff format --check .
-uv run mypy
+uv run --extra dev mypy
 uv run python scripts/sync-sample-fixtures.py --check
+uv run python scripts/evaluate-extraction.py
+uv run python scripts/evaluate-usability.py
+uv run pre-commit run --all-files
+```
+
+CI also runs coverage, dependency audit, static security scan, and SBOM generation:
+
+```bash
+uv run pytest --cov=src/intent_engine --cov-fail-under=80
 uv run pip-audit --skip-editable
 uv run bandit -c bandit.yaml -r src -q -ll
 ```
@@ -31,8 +40,15 @@ is acceptable. The fallback path (graph defaults plus structured Markdown
 recovery) is not sufficient for real narrative design documents. Every change
 that affects extraction, patterns, or prompts must be validated with an LLM:
 
-Use `uv run python scripts/evaluate-extraction.py` for deterministic fixture drift and
-`uv run python scripts/evaluate-extraction.py --llm` when validating prompt/model behavior.
+Use deterministic evals for fixture drift and LLM-backed evals when validating
+prompt/model behavior:
+
+```bash
+uv run python scripts/evaluate-extraction.py
+uv run python scripts/evaluate-usability.py
+uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b
+uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b
+```
 
 The deterministic fallback (`INTENT_ENGINE_DISABLE_LLM=1`) exists for unit tests and CI bootstrapping only. It applies defaults and does keyword matching — it cannot parse free-form prose. Do not treat it as a production extraction path.
 
@@ -40,7 +56,7 @@ The deterministic fallback (`INTENT_ENGINE_DISABLE_LLM=1`) exists for unit tests
 
 ## Extension guide
 
-See [EXTENSION.md](EXTENSION.md) for the exact contract for adding new target
+See [docs/EXTENSION.md](docs/EXTENSION.md) for the exact contract for adding new target
 patterns and requirements.
 
 ## Code conventions

@@ -227,9 +227,8 @@ iac-llm-wrapper sample show --name aws-lza-standard-v1
 ```
 
 For BYOM module patterns such as `terraform-vpc`, `module-inputs.yaml` provides
-ready-to-use module references. For `cloudformation-parameters`,
-`cloudformation-parameters.yaml` captures parameters for an existing approved
-template without emitting a stack:
+ready-to-use module references:
+
 ```yaml
 moduleInputs:
   - moduleName: terraform-aws-vpc
@@ -239,6 +238,18 @@ moduleInputs:
       azs:
         - eu-central-1a
         - eu-central-1b
+```
+
+For `cloudformation-parameters`, `cloudformation-parameters.yaml` captures
+parameters for an existing approved template without emitting a stack:
+
+```yaml
+cloudFormationParameters:
+  stackName: orders-network
+  templateUrl: s3://approved-templates/network.yaml
+  parameters:
+    EnvironmentName: orders
+    VpcCidr: 10.60.0.0/16
 ```
 
 Engineers apply BYOM inputs to their Terraform, CDK, or CloudFormation modules.
@@ -345,7 +356,7 @@ GLOBAL_REGISTRY.register(
 )
 ```
 
-See the [extension guide](EXTENSION.md) for the full contract.
+See the [extension guide](docs/EXTENSION.md) for the full contract.
 
 ## Architecture
 
