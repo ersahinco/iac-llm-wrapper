@@ -1,4 +1,4 @@
-"""AWS LZA thin-path pattern tests."""
+"""AWS LZA handoff pattern tests."""
 
 from __future__ import annotations
 

@@ -34,12 +34,12 @@ uv run pre-commit run --all-files
 - **Generate** (`generator.py`): Registry-driven emitter for decision report, generic handoff plan, contract handoff files, lineage, runbook, module inputs when pattern owns module mapping, and sample recommendations.
 - **Contracts** (`contracts.py`): Target artifact contracts define required files, paths, decisions, lineage, and stable value assertions.
 - **Samples** (`sample_config.py`): Registered reference bundles with pinned source metadata, module refs, tags, fixture dirs, and match recommendations.
-- **LLM** (`llm_caller.py`): Pluggable OpenAI-compatible, Ollama, or Anthropic backends with retry/backoff and evidence capture.
+- **LLM** (`llm_caller.py`): Pluggable OpenAI-compatible and Ollama backends with retry/backoff and evidence capture.
 - **CLI** (`cli.py`): `compile`, `interview`, `validate`, `explain`, `sample`, `contract`, `discover`, `template`, `review`. Default pattern is `aws-lza`.
 
 ## Current Pattern Surface
 
-- `aws-lza`: Thin AWS LZA handoff path. Emits official-style LZA YAML artifacts, decision report, lineage manifest, deployment runbook, and sample recommendations. Does not emit deployable Terraform/Terragrunt landing-zone stacks.
+- `aws-lza`: Contract-backed AWS LZA handoff path. Emits official-style LZA YAML artifacts, decision report, lineage manifest, deployment runbook, and sample recommendations. Does not emit deployable Terraform/Terragrunt landing-zone stacks.
 - `cloudformation-parameters`: BYOM CloudFormation parameter handoff for an approved existing template. Emits parameters and decision report, not a stack.
 - `kubernetes-cluster`: Contract-backed K8s handoff for cluster/namespace config with optional Terraform EKS module input references.
 - `terraform-vpc`: BYOM Terraform AWS VPC module input capture. Emits module variables/tfvars handoff for an existing module, not root deployment scaffolding.
@@ -102,7 +102,7 @@ T17: Harden lean intent-to-IaC orchestration surface
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Removed fake Anthropic provider surface, made discovery sync single-pass, fixed extension guide traps, removed stale AWS LZA thin-path/optional-artifact surface; full gate green
+- **Last session**: Removed unused LLM dependency extra, aligned AWS LZA handoff wording, trimmed speculative contract docs, and kept the full gate green
 
 ### Done
 
@@ -110,7 +110,7 @@ T17: Harden lean intent-to-IaC orchestration surface
 |------|------|
 | Core | models, extractor, requirements, lazy built-in pattern registry, patterns, interview, discovery, validator, generator, contracts, samples, module mapping, CLI |
 | Patterns | `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, `terraform-vpc` |
-| AWS LZA | Thin LZA handoff YAML, IAM Identity Center permission sets/assignments, decision report/readiness, lineage manifest, deployment runbook, sample recommendations, focused pattern modules |
+| AWS LZA | Contract-backed LZA handoff YAML, IAM Identity Center permission sets/assignments, decision report/readiness, lineage manifest, deployment runbook, sample recommendations, focused pattern modules |
 | Contracts | Required artifacts, required paths, required decisions, lineage checks, value assertions, blocked assessment artifacts, contract-backed generic handoff plan |
 | Samples | Registry-backed `sample list/show`, match recommendations, fixture sync/drift guard |
 | LLM | Ollama/OpenAI-compatible backend factory, evidence store, local LLM integration tests, graph-scoped prompts and blocking findings |

@@ -11,7 +11,7 @@ with `uv run python scripts/sync-sample-fixtures.py`; CI checks drift with
 `--check`.
 
 - `aws-lza-standard-v1/`, `aws-lza-regulated-v1/`, `aws-lza-healthcare-v1/`:
-  current thin AWS LZA handoff bundles.
+  current AWS LZA handoff bundles.
 - `k8s-cluster-v1/`: Kubernetes sample bundle for the `kubernetes-cluster`
   pattern.
 - `terraform-vpc-basic-v1` is registry-only today; add a fixture bundle only

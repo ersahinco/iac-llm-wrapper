@@ -1,4 +1,4 @@
-"""AWS LZA thin-path intent models."""
+"""AWS LZA handoff intent models."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ class ComplianceOverlay(StrEnum):
 
 
 class AwsLzaIntent(BaseModel):
-    """Thin AWS LZA handoff intent.
+    """AWS LZA handoff intent.
 
     The model captures decisions needed to select and parameterize existing
     AWS LZA sample configurations. Deployment remains owned by AWS LZA.

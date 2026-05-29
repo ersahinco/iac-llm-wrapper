@@ -1,6 +1,6 @@
 # aws-lza-healthcare-v1
 
-Thin-path AWS LZA fixture for healthcare-oriented handoff with HIPAA-style review focus.
+AWS LZA fixture for healthcare-oriented handoff with HIPAA-style review focus.
 
 ## Metadata
 

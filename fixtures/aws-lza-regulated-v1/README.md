@@ -1,6 +1,6 @@
 # aws-lza-regulated-v1
 
-Thin-path AWS LZA fixture for regulated commercial path.
+AWS LZA fixture for regulated commercial path.
 
 ## Metadata
 

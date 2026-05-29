@@ -1,8 +1,8 @@
 """Target contracts and validation helpers.
 
-Contracts describe downstream targets such as AWS LZA sample configs,
-Terraform modules, org module inventories, or workload templates. They define shape;
-the requirement graph still owns branching and decision order.
+Contracts describe downstream handoff targets such as AWS LZA configs, module
+inputs, or parameter files. They define shape; the requirement graph still owns
+branching and decision order.
 """
 
 from __future__ import annotations

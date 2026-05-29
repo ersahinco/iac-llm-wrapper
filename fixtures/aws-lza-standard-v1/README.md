@@ -1,6 +1,6 @@
 # aws-lza-standard-v1
 
-Thin-path AWS LZA fixture for commercial baseline handoff.
+AWS LZA fixture for commercial baseline handoff.
 
 ## Metadata
 

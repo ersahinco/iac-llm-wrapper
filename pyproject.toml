@@ -48,9 +48,6 @@ dev = [
     "bandit>=1.7",
     "pre-commit>=3.0",
 ]
-llm = [
-    "openai>=1.0",
-]
 
 [build-system]
 requires = ["setuptools>=68"]

@@ -1,4 +1,4 @@
-"""AWS LZA thin-path pattern registration."""
+"""AWS LZA handoff pattern registration."""
 
 from __future__ import annotations
 
@@ -131,7 +131,7 @@ def _register_pattern() -> None:
     GLOBAL_REGISTRY.register(
         Pattern(
             name="aws-lza",
-            description="Thin AWS Landing Zone Accelerator handoff path",
+            description="Contract-backed AWS Landing Zone Accelerator handoff path",
             graph_factory=build_aws_lza_graph,
             intent_factory=AwsLzaIntent,
             validators=[validate_aws_lza_intent],

@@ -1,4 +1,4 @@
-"""Target contracts for AWS LZA thin-path generation."""
+"""Target contracts for AWS LZA handoff generation."""
 
 from __future__ import annotations
 

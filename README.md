@@ -62,7 +62,7 @@ ollama serve
 # 2. Set up the project
 uv venv
 source .venv/bin/activate
-uv pip install -e ".[dev,llm]"
+uv pip install -e ".[dev]"
 
 # 3. Compile a design doc with local LLM
 iac-llm-wrapper compile -i fixtures/usability/engineer-handoff-lza.md -o out/ \
@@ -266,7 +266,7 @@ Recommended product paths stay thin and contract-backed:
 
 | Pattern | Description |
 |---------|-------------|
-| `aws-lza` | Thin AWS Landing Zone Accelerator handoff path using official-style LZA config artifacts |
+| `aws-lza` | Contract-backed AWS Landing Zone Accelerator handoff using official-style LZA config artifacts |
 | `cloudformation-parameters` | BYOM CloudFormation parameter handoff for an existing template |
 | `kubernetes-cluster` | K8s cluster handoff with optional Terraform EKS module input references |
 | `terraform-vpc` | BYOM Terraform AWS VPC module input capture |
