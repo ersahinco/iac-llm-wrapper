@@ -40,9 +40,6 @@ class Pattern:
     extra_artifacts: list[str] = field(default_factory=list)
     # Target contracts that drive decisions, validation, and generated artifacts
     contracts: list[TargetContract] = field(default_factory=list)
-    # Pattern-specific discovery hooks
-    extra_consistency_checks: list[Any] = field(default_factory=list)
-    extra_signal_detectors: list[Any] = field(default_factory=list)
 
     def create_graph(self) -> RequirementGraph:
         graph = self.graph_factory()

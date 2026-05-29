@@ -91,10 +91,10 @@ metadata without re-running discovery.
 
 ## Signal Detection
 
-Signal detection is pattern-owned. Signals can make graph decisions more explicit
-or add review context, but only requirement keys that exist in the selected graph
-can block handoff. Model-invented findings remain trace evidence in
-`llm-trace-summary.yaml`.
+Signal detection is graph-owned. Requirement nodes can declare signals that make
+graph decisions more explicit or add review context. Only requirement keys that
+exist in the selected graph can block handoff. Model-invented findings remain
+trace evidence in `llm-trace-summary.yaml`.
 
 ## Reference Entries
 

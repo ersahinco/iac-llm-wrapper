@@ -102,7 +102,7 @@ T17: Harden lean intent-to-IaC orchestration surface
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Split the AWS LZA monolith into focused graph, validators, generators, samples, and helper modules after removing stale normalizer/defaults/doc surfaces; full gate green
+- **Last session**: Removed unused discovery hook fields after splitting AWS LZA modules and removing stale normalizer/defaults/doc surfaces; full gate green
 
 ### Done
 
@@ -116,7 +116,7 @@ T17: Harden lean intent-to-IaC orchestration surface
 | LLM | Ollama/OpenAI-compatible/Anthropic backend factory, evidence store, local LLM integration tests, graph-scoped prompts and blocking findings |
 | Evaluation | Deterministic extraction gold corpus with AWS LZA and CloudFormation pass/fail/contract cases, trace quality assertions, optional LLM evidence capture, and role-based usability trials including CloudFormation BYOM |
 | Fixtures | AWS LZA emitted bundles, K8s emitted bundle, usability docs, eval corpus |
-| Cleanup | Removed old LZA research path, old diff/apply surfaces, extension registry, old fixtures/tests/helpers, global normalizer/defaults no-op surface |
+| Cleanup | Removed old LZA research path, old diff/apply surfaces, extension registry, old fixtures/tests/helpers, global normalizer/defaults no-op surface, unused discovery hook fields |
 | Product docs | Standard root docs (`README`, `CONTRIBUTING`, `CHANGELOG`, `RELEASING`, `SECURITY`) define current lean DevOps workflow and product boundary |
 | Observability | Lean `llm-trace-summary.yaml` for provider/model, rounded latency, raw and accepted decisions, applied decisions, resolved/blocking gaps, blocking contradictions, and raw evidence status; old flat aliases removed |
 | Language | Docs now use consistent terms: requirement graph, target contract, decision record, handoff artifact, provisioning toolchain |
@@ -149,3 +149,4 @@ T17: Harden lean intent-to-IaC orchestration surface
 - `docs/CAPABILITY.md` describes signal handling generically so examples cannot drift away from graph requirement keys.
 - `docs/AWS_LZA_THIN_PATH.md` is current product scope only; old borrowed-design rationale and speculative workload notes were removed.
 - AWS LZA pattern code is split by responsibility: registration, graph, validators, generators, samples, and helpers.
+- Discovery is graph-owned; unused pattern-specific consistency/signal hook fields were removed.

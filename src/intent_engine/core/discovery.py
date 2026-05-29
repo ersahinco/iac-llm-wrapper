@@ -82,19 +82,11 @@ class DiscoveryEngine:
 
     All checks are data-driven from the graph metadata. No hardcoded field names.
 
-    Optional extra_consistency_checks and extra_signal_detectors allow patterns
-    to inject their own domain-specific handlers without modifying core code.
+    Requirement graph metadata drives gaps, consistency checks, and signals.
     """
 
-    def __init__(
-        self,
-        graph: RequirementGraph,
-        extra_consistency_checks: list[Any] | None = None,
-        extra_signal_detectors: list[Any] | None = None,
-    ) -> None:
+    def __init__(self, graph: RequirementGraph) -> None:
         self.graph = graph
-        self._extra_consistency_checks = extra_consistency_checks or []
-        self._extra_signal_detectors = extra_signal_detectors or []
 
     def sync_intent_to_graph(self, intent: Any) -> list[str]:
         """Feed extracted intent values into the requirement graph as decisions.
@@ -187,14 +179,6 @@ class DiscoveryEngine:
         self._check_cross_field_consistency(intent, result)
         self._detect_signals(intent, text, result)
 
-        # Pattern-specific consistency checks
-        for check in self._extra_consistency_checks:
-            check(intent, result)
-
-        # Pattern-specific signal detectors
-        for detector in self._extra_signal_detectors:
-            detector(intent, text.lower() if text else "", result)
-
         result.missing.sort(key=lambda x: x.priority)
         return result
 
@@ -227,8 +211,7 @@ class DiscoveryEngine:
     def _check_cross_field_consistency(self, intent: Any, result: DiscoveryResult) -> None:
         """Check for inconsistencies between intent fields.
 
-        Currently checks blocked_if relationships that are violated by intent values.
-        Future: derive more consistency rules from graph metadata.
+        Checks graph relationships that are violated by intent values.
         """
         # Check if any decision violates a blocked_if rule
         for key, req in self.graph._requirements.items():

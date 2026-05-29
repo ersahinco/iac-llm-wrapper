@@ -388,8 +388,6 @@ def discover(
         graph = _get_pattern_or_exit(pattern).create_graph()
         engine = InterviewEngine(graph)
 
-    pattern_obj = _get_pattern_or_exit(pattern)
-
     if input.is_dir():
         texts = []
         for f in sorted(input.glob("*.md")):
@@ -441,11 +439,7 @@ def discover(
     if decision_dict:
         engine.run_from_decisions(decision_dict)
 
-    discovery = DiscoveryEngine(
-        graph,
-        extra_consistency_checks=pattern_obj.extra_consistency_checks or [],
-        extra_signal_detectors=pattern_obj.extra_signal_detectors or [],
-    )
+    discovery = DiscoveryEngine(graph)
     result = discovery.discover(intent, text=text)
 
     typer.echo("=== Discovery Report ===")
