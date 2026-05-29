@@ -78,6 +78,7 @@ Run deterministic and LLM-backed eval loops:
 ```bash
 uv run python scripts/evaluate-extraction.py
 uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b
+uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b --evidence-dir /tmp/iac-llm-evidence
 uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b
 ```
 

@@ -39,6 +39,7 @@ class EvalResult:
     status: str
     failures: list[str]
     output_dir: Path | None = None
+    evidence_path: Path | None = None
 
 
 def _yaml_load(path: Path) -> dict[str, Any]:
@@ -78,7 +79,12 @@ def _expect_str(data: dict[str, Any], key: str, path: Path) -> str:
 
 
 def _compile_case(
-    case: EvalCase, output_dir: Path, use_llm: bool, provider: str, model: str
+    case: EvalCase,
+    output_dir: Path,
+    use_llm: bool,
+    provider: str,
+    model: str,
+    evidence_path: Path | None,
 ) -> subprocess.CompletedProcess[str]:
     cmd = [
         sys.executable,
@@ -96,6 +102,8 @@ def _compile_case(
         cmd.extend(["--provider", provider])
     if model:
         cmd.extend(["--model", model])
+    if use_llm and evidence_path is not None:
+        cmd.extend(["--evidence-output", str(evidence_path)])
 
     env = os.environ.copy()
     if not use_llm:
@@ -264,6 +272,33 @@ def _compare_trace(output_dir: Path, expected_trace: Any) -> list[str]:
     return failures
 
 
+def _compare_evidence(evidence_path: Path | None, model: str) -> list[str]:
+    if evidence_path is None:
+        return []
+    if not evidence_path.exists():
+        return [f"missing LLM evidence file: {evidence_path}"]
+
+    data = _yaml_load(evidence_path)
+    calls = data.get("calls")
+    if not isinstance(calls, list) or not calls:
+        return ["LLM evidence has no calls"]
+
+    failures: list[str] = []
+    for call in calls:
+        if not isinstance(call, dict):
+            failures.append("LLM evidence call is not a mapping")
+            continue
+        if call.get("parse_error"):
+            failures.append(f"LLM parse/call error: {call['parse_error']}")
+        if model and call.get("model") != model:
+            failures.append(f"LLM model mismatch: expected {model}, got {call.get('model')}")
+        if not call.get("prompt"):
+            failures.append("LLM evidence missing prompt")
+        if not call.get("response"):
+            failures.append("LLM evidence missing response")
+    return failures
+
+
 def _compare_failure(
     case: EvalCase,
     output_dir: Path,
@@ -299,48 +334,60 @@ def _evaluate_case(
     provider: str,
     model: str,
     keep_output_root: Path | None,
+    evidence_dir: Path | None,
 ) -> EvalResult:
     expected_compile = case.expected.get("compile", "pass")
     if expected_compile not in {"pass", "fail"}:
         return EvalResult(case.name, case.pattern, "FAIL", ["expect.compile must be pass or fail"])
 
+    evidence_path = evidence_dir / f"{case.name}.evidence.yaml" if evidence_dir else None
+
     if keep_output_root:
         output_dir = keep_output_root / case.name
         output_dir.mkdir(parents=True, exist_ok=True)
-        proc = _compile_case(case, output_dir, use_llm, provider, model)
+        proc = _compile_case(case, output_dir, use_llm, provider, model, evidence_path)
         cleanup = None
     else:
         cleanup = tempfile.TemporaryDirectory()
         output_dir = Path(cleanup.name)
-        proc = _compile_case(case, output_dir, use_llm, provider, model)
+        proc = _compile_case(case, output_dir, use_llm, provider, model, evidence_path)
 
     try:
         if expected_compile == "fail":
             if proc.returncode == 0:
                 return EvalResult(
-                    case.name, case.pattern, "FAIL", ["expected compile failure"], output_dir
+                    case.name,
+                    case.pattern,
+                    "FAIL",
+                    ["expected compile failure"],
+                    output_dir,
+                    evidence_path,
                 )
             failures = _compare_failure(case, output_dir, proc)
+            failures.extend(_compare_evidence(evidence_path, model))
             return EvalResult(
                 case.name,
                 case.pattern,
                 "PASS" if not failures else "FAIL",
                 failures,
                 output_dir,
+                evidence_path,
             )
 
         if proc.returncode != 0:
             detail = (proc.stderr or proc.stdout).strip().splitlines()
             failure = detail[-1] if detail else "compile failed"
-            return EvalResult(case.name, case.pattern, "FAIL", [failure], output_dir)
+            return EvalResult(case.name, case.pattern, "FAIL", [failure], output_dir, evidence_path)
 
         failures = _compare_report(case, output_dir)
+        failures.extend(_compare_evidence(evidence_path, model))
         return EvalResult(
             case.name,
             case.pattern,
             "PASS" if not failures else "FAIL",
             failures,
             output_dir,
+            evidence_path,
         )
     finally:
         if cleanup is not None:
@@ -359,22 +406,39 @@ def main() -> int:
     parser.add_argument(
         "--keep-output", type=Path, help="Keep generated outputs under this directory"
     )
+    parser.add_argument(
+        "--evidence-dir",
+        type=Path,
+        help="Directory to keep LLM evidence YAML files from --llm evals.",
+    )
     args = parser.parse_args()
 
     cases = _load_cases(args.fixtures_dir, args.fixture)
     keep_output = args.keep_output.resolve() if args.keep_output else None
     if keep_output:
         keep_output.mkdir(parents=True, exist_ok=True)
+    evidence_dir = args.evidence_dir.resolve() if args.evidence_dir else None
+    if evidence_dir:
+        evidence_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"{'Case':28s} {'Pattern':20s} {'Mode':13s} Status")
     print("-" * 78)
 
     failures = 0
     for case in cases:
-        result = _evaluate_case(case, args.llm, args.provider, args.model, keep_output)
+        result = _evaluate_case(
+            case,
+            args.llm,
+            args.provider,
+            args.model,
+            keep_output,
+            evidence_dir,
+        )
         mode = "llm" if args.llm else "deterministic"
         suffix = "" if not result.failures else " - " + "; ".join(result.failures[:3])
         print(f"{result.name:28s} {result.pattern:20s} {mode:13s} {result.status}{suffix}")
+        if result.evidence_path is not None:
+            print(f"{'':28s} {'evidence':20s} {'':13s} {result.evidence_path}")
         if result.status != "PASS":
             failures += 1
 

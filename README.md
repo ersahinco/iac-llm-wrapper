@@ -104,13 +104,14 @@ handoff artifacts:
 ```bash
 uv run python scripts/evaluate-extraction.py
 uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b
+uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b --evidence-dir /tmp/iac-llm-evidence
 uv run python scripts/evaluate-usability.py
 uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b
 uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b --evidence-dir /tmp/iac-llm-evidence
 ```
 
 The eval loop compiles docs in `fixtures/eval/`, compares decision values,
-entity names/counts, required files, and contract checks, then exits non-zero
+entity names/counts, required files, trace shape, and contract checks, then exits non-zero
 on misses. The usability loop checks role-based trials for architect gap
 discovery, engineer handoff, and bring-your-own Terraform module input capture.
 It also includes a CloudFormation parameter handoff trial to prove BYOM
@@ -392,6 +393,7 @@ Run deterministic and LLM-backed eval loops:
 ```bash
 uv run python scripts/evaluate-extraction.py
 uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b
+uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b --evidence-dir /tmp/iac-llm-evidence
 uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b
 ```
 
