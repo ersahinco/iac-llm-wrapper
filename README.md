@@ -262,7 +262,7 @@ Recommended product paths stay thin and contract-backed:
 |---------|-------------|
 | `aws-lza` | Thin AWS Landing Zone Accelerator handoff path using official-style LZA config artifacts |
 | `cloudformation-parameters` | BYOM CloudFormation parameter handoff for an existing template |
-| `kubernetes-cluster` | K8s cluster handoff with node pools and network policies |
+| `kubernetes-cluster` | K8s cluster handoff with optional Terraform EKS module input references |
 | `terraform-vpc` | BYOM Terraform AWS VPC module input capture |
 
 ## Developer Experience

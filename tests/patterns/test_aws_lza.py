@@ -290,6 +290,19 @@ class TestAwsLzaPattern:
         assert codes.count("AWS_LZA_IDENTITY_CENTER_PERMISSION_SETS_REQUIRED") == 1
         assert codes.count("AWS_LZA_IDENTITY_CENTER_ASSIGNMENTS_REQUIRED") == 1
 
+    def test_malformed_identity_center_assignment_blocks(self, tmp_path: Path):
+        decisions = {
+            "network_account": "Network",
+            "identity_center_permission_sets": "ReadOnlyAccess",
+            "identity_center_assignments": "PlatformAdmins:ReadOnlyAccess",
+        }
+
+        with pytest.raises(CompileError) as exc_info:
+            compile_from_interview(decisions, tmp_path, pattern="aws-lza")
+
+        codes = [violation.code for violation in exc_info.value.violations]
+        assert "AWS_LZA_IDENTITY_CENTER_ASSIGNMENT_FORMAT_INVALID" in codes
+
     def test_validate_command_passes_for_generated_artifacts(self, tmp_path: Path):
         from typer.testing import CliRunner
 

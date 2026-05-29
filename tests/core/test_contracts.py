@@ -323,6 +323,38 @@ rollback:
 
         assert ContractValidator(HANDOFF_PLAN_CONTRACT).validate_artifacts(tmp_path) == []
 
+    def test_handoff_plan_contract_catches_missing_owner(self, tmp_path: Path):
+        (tmp_path / "handoff-plan.yaml").write_text(
+            """pattern: cloudformation-parameters
+boundary: Handoff only.
+allowedNextAction: Pass reviewed artifacts to the existing toolchain.
+readiness:
+  status: ready
+  deploymentAllowed: true
+targetContracts:
+  - name: cloudformation-parameters-handoff
+    kind: cloudformation-parameters
+    requiredArtifacts:
+      - cloudformation-parameters.yaml
+steps:
+  - id: resolve-decisions
+    title: Confirm captured decisions
+    dependsOn: []
+    manualGate: true
+    rollback: Re-run compile.
+manualGates:
+  - No blockers remain.
+rollback:
+  - Use the previous approved handoff.
+"""
+        )
+
+        violations = ContractValidator(HANDOFF_PLAN_CONTRACT).validate_artifacts(tmp_path)
+
+        assert [violation.message for violation in violations] == [
+            "handoff-plan.yaml missing required path: steps[].owner"
+        ]
+
 
 class TestContractRegistry:
     def test_register_and_get_contract(self):

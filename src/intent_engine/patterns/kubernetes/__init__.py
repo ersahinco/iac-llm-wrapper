@@ -428,7 +428,9 @@ register_module_mapper("kubernetes-cluster", map_k8s_intent_to_modules)
 GLOBAL_REGISTRY.register(
     Pattern(
         name="kubernetes-cluster",
-        description="Kubernetes cluster provisioning with node pools and network policies",
+        description=(
+            "Kubernetes cluster handoff with optional Terraform EKS module input references"
+        ),
         graph_factory=_k8s_graph_factory,
         intent_factory=K8sIntent,
         section_map=dict(K8S_SECTION_MAP),

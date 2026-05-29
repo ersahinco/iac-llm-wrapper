@@ -41,7 +41,7 @@ uv run python scripts/evaluate-usability.py
 
 - `aws-lza`: Thin AWS LZA handoff path. Emits official-style LZA YAML artifacts, decision report, lineage manifest, deployment runbook, and sample recommendations. Does not emit deployable Terraform/Terragrunt landing-zone stacks.
 - `cloudformation-parameters`: BYOM CloudFormation parameter handoff for an approved existing template. Emits parameters and decision report, not a stack.
-- `kubernetes-cluster`: Contract-backed K8s handoff for cluster, namespace, module input, and sample fixture behavior.
+- `kubernetes-cluster`: Contract-backed K8s handoff for cluster/namespace config with optional Terraform EKS module input references.
 - `terraform-vpc`: BYOM Terraform AWS VPC module input capture. Emits module variables/tfvars handoff for an existing module, not root deployment scaffolding.
 
 ## Key Decisions
@@ -97,12 +97,12 @@ T17: Harden lean intent-to-IaC orchestration surface
 
 ### Status
 
-- **Tests**: 267 passing, 1 skipped
+- **Tests**: 269 passing, 1 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added mode-aware extraction trace assertions and LLM evidence capture; local Ollama `qwen2.5:7b` extraction eval passed with evidence; full gate green
+- **Last session**: Added CloudFormation clean eval, negative handoff-plan contract coverage, malformed Identity Center assignment coverage, clarified Kubernetes module-reference boundary; full gate green
 
 ### Done
 
@@ -137,3 +137,4 @@ T17: Harden lean intent-to-IaC orchestration surface
 - AWS LZA Identity Center missing-decision errors are graph-owned; pattern validators only keep cross-field/format checks.
 - CloudFormation BYOM is parameter handoff for an existing approved template, not stack generation.
 - Extraction eval trace expectations are mode-aware: deterministic expects no raw evidence request, LLM expects captured evidence.
+- Kubernetes cluster pattern is handoff-first; Terraform EKS module inputs are optional references, not root deployment scaffolding.
