@@ -102,7 +102,7 @@ T17: Harden lean intent-to-IaC orchestration surface
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Removed trace compatibility aliases, deduped AWS LZA Identity Center validation noise, contract-backed generic handoff plans, added blocked CloudFormation eval, full gate green
+- **Last session**: Added mode-aware extraction trace assertions and LLM evidence capture; local Ollama `qwen2.5:7b` extraction eval passed with evidence; full gate green
 
 ### Done
 
@@ -123,7 +123,7 @@ T17: Harden lean intent-to-IaC orchestration surface
 
 ### Next
 
-1. Run local LLM usability/eval periodically with evidence output to validate actual architect/engineer experience beyond deterministic harness checks.
+1. Run local LLM usability with evidence output periodically; extraction eval passed with `qwen2.5:7b`.
 2. Use local LLM trace quality findings to tune prompts only when deterministic harness cannot classify the issue.
 3. Continue AWS LZA schema depth only where real customer inputs justify it.
 4. If public packaging changes, keep naming aligned: `iac-llm-wrapper` is primary CLI/package, `intent-engine` is core/optional alias.
@@ -136,3 +136,4 @@ T17: Harden lean intent-to-IaC orchestration surface
 - AWS LZA IAM Identity Center now requires approved permission sets and assignments before handoff.
 - AWS LZA Identity Center missing-decision errors are graph-owned; pattern validators only keep cross-field/format checks.
 - CloudFormation BYOM is parameter handoff for an existing approved template, not stack generation.
+- Extraction eval trace expectations are mode-aware: deterministic expects no raw evidence request, LLM expects captured evidence.

@@ -149,7 +149,7 @@ def _names(items: Any) -> list[str]:
     return names
 
 
-def _compare_report(case: EvalCase, output_dir: Path) -> list[str]:
+def _compare_report(case: EvalCase, output_dir: Path, use_llm: bool) -> list[str]:
     failures: list[str] = []
     report_path = output_dir / "decision-report.yaml"
     if not report_path.exists():
@@ -160,7 +160,7 @@ def _compare_report(case: EvalCase, output_dir: Path) -> list[str]:
     failures.extend(_compare_counts(report, case.expected.get("counts", {})))
     failures.extend(_compare_names(report, case.expected.get("names", {})))
     failures.extend(_compare_artifacts(output_dir, case.expected.get("artifacts", [])))
-    failures.extend(_compare_trace(output_dir, case.expected.get("trace", {})))
+    failures.extend(_compare_trace(output_dir, case.expected.get("trace", {}), use_llm))
     return failures
 
 
@@ -236,7 +236,7 @@ def _compare_contracts(output_dir: Path, expected_contracts: Any) -> list[str]:
     return failures
 
 
-def _compare_trace(output_dir: Path, expected_trace: Any) -> list[str]:
+def _compare_trace(output_dir: Path, expected_trace: Any, use_llm: bool) -> list[str]:
     if not expected_trace:
         return []
     if not isinstance(expected_trace, dict):
@@ -269,6 +269,8 @@ def _compare_trace(output_dir: Path, expected_trace: Any) -> list[str]:
                 failures.append(f"trace path should be absent: {path}")
 
     failures.extend(_compare_values(trace, expected_trace.get("values", {})))
+    mode_key = "llmValues" if use_llm else "deterministicValues"
+    failures.extend(_compare_values(trace, expected_trace.get(mode_key, {})))
     return failures
 
 
@@ -303,6 +305,7 @@ def _compare_failure(
     case: EvalCase,
     output_dir: Path,
     proc: subprocess.CompletedProcess[str],
+    use_llm: bool,
 ) -> list[str]:
     failures: list[str] = []
     expected_violations = case.expected.get("violations", [])
@@ -318,7 +321,7 @@ def _compare_failure(
 
     failures.extend(_compare_artifacts(output_dir, case.expected.get("artifacts", [])))
     failures.extend(_compare_contracts(output_dir, case.expected.get("contracts", [])))
-    failures.extend(_compare_trace(output_dir, case.expected.get("trace", {})))
+    failures.extend(_compare_trace(output_dir, case.expected.get("trace", {}), use_llm))
     report_path = output_dir / "decision-report.yaml"
     if report_path.exists():
         report = _yaml_load(report_path)
@@ -363,7 +366,7 @@ def _evaluate_case(
                     output_dir,
                     evidence_path,
                 )
-            failures = _compare_failure(case, output_dir, proc)
+            failures = _compare_failure(case, output_dir, proc, use_llm)
             failures.extend(_compare_evidence(evidence_path, model))
             return EvalResult(
                 case.name,
@@ -379,7 +382,7 @@ def _evaluate_case(
             failure = detail[-1] if detail else "compile failed"
             return EvalResult(case.name, case.pattern, "FAIL", [failure], output_dir, evidence_path)
 
-        failures = _compare_report(case, output_dir)
+        failures = _compare_report(case, output_dir, use_llm)
         failures.extend(_compare_evidence(evidence_path, model))
         return EvalResult(
             case.name,

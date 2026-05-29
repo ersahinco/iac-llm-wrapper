@@ -52,6 +52,10 @@ expect:
       - rawEvidencePath
     values:
       pattern: aws-lza
-      callCount: 0
       deploymentReadiness.status: ready
+    deterministicValues:
+      callCount: 0
       rawEvidence.status: not-requested
+    llmValues:
+      callCount: 1
+      rawEvidence.status: requested
