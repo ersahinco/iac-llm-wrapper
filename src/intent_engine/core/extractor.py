@@ -1,8 +1,8 @@
 """LLM-based intent extractor driven by the requirement graph.
 
 The data model (RequirementGraph with target_field/target_type) generates the
-prompt. The LLM traverses the graph, detects signals, and extracts structured
-JSON; the model validates and coerces types.
+prompt. The LLM traverses the graph and extracts structured JSON; the model
+validates and coerces types.
 """
 
 from __future__ import annotations

@@ -36,7 +36,7 @@ class Requirement:
     why_applies: str | None = None
     why_blocked: str | None = None
     # Model-driven mapping: which intent model field this node maps to -------
-    target_field: str | None = None  # dotted path: "security.cidr", "cicd.mode"
+    target_field: str | None = None  # dotted path: "network.cidr", "security.enabled"
     target_type: str = "string"  # "string" | "int" | "bool" | enum name
     # Well-Architected mapping ------------------------------------------------
     wa_pillars: list[str] = field(default_factory=list)

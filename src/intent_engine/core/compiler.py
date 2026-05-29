@@ -682,7 +682,7 @@ def review_reports(before_path: Path, after_path: Path) -> dict:
 
 
 def _build_section_map(pattern: str, graph) -> dict[str, tuple[str, str | None]]:
-    """Build a section map from pattern metadata + category fallback.
+    """Build a section map from pattern metadata plus category fallback.
 
     New requirements automatically appear in templates under their category
     if no explicit mapping is provided.
@@ -692,17 +692,19 @@ def _build_section_map(pattern: str, graph) -> dict[str, tuple[str, str | None]]
     pattern_obj = GLOBAL_REGISTRY.get(pattern)
     section_map: dict[str, tuple[str, str | None]] = dict(pattern_obj.section_map)
 
-    # Fallback: derive section from requirement category
+    # Fallback: derive section from categories used by current built-in patterns.
     _CATEGORY_TO_SECTION: dict[str, str] = {
-        "organization": "Region",
+        "accelerator": "LZA Baseline",
+        "accounts": "Accounts",
+        "cloudformation": "CloudFormation",
+        "core": "Core",
+        "identity": "Identity",
+        "organization": "Organization",
         "network": "Network",
         "security": "Security",
-        "compliance": "Security",
-        "hybrid": "Hybrid Connectivity",
-        "cicd": "CI/CD",
-        "cost": "Network",
         "workload": "Workloads",
         "general": "General",
+        "meta": "Metadata",
     }
     for key, req in graph._requirements.items():
         if key in section_map:

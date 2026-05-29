@@ -29,13 +29,10 @@ This project replaces that with a **model-driven flow**:
 Prose / Markdown
      │
      ▼
-Extraction ──── LLM traverses a requirement graph and detects signals
+Extraction ──── LLM extracts graph decisions from prose
      │
      ▼
 Interview ───── Guided questions fill remaining gaps (via CLI or API)
-     │
-     ▼
-Normalization ─ Defaults applied only when applicable. Schema-aware, pattern-aware.
      │
      ▼
 Validation ──── Fail-closed checks against graph, model, and target contracts
@@ -88,9 +85,10 @@ iac-llm-wrapper compile -i design.md -o out/ --provider anthropic
 
 ### Without LLM (Bootstrap Only)
 
-The deterministic fallback applies graph defaults, runs signal keyword matching, and can recover
-structured Markdown entity sections for accounts, OUs, and workloads. It still cannot interpret
-arbitrary free-form prose. Use only for unit tests or when you have no LLM access:
+The deterministic fallback applies graph defaults and can recover structured
+Markdown entity sections for accounts, OUs, and workloads. It still cannot
+interpret arbitrary free-form prose. Use only for unit tests or when you have no
+LLM access:
 
 ```bash
 INTENT_ENGINE_DISABLE_LLM=1 iac-llm-wrapper compile -i design.md -o out/
@@ -175,7 +173,8 @@ for a thin AWS LZA example):
 iac-llm-wrapper discover -i design.md --pattern aws-lza
 ```
 
-The tool extracts decisions, detects signals (PCI scope, regulated industry, hybrid connectivity), and reports any gaps.
+The tool extracts graph decisions and reports applicable gaps for the selected
+pattern.
 
 ### 3. Inspect Contract and Samples
 
@@ -386,11 +385,10 @@ Tested with local Ollama models on real design documents:
 | qwen2.5:3b | 3B | ✓ | ✓ | ✓ |
 | llama3.2:3b | 3B | ✓ | — | — |
 
-**What a 3B model can extract:**
+**What a 3B model can extract in current fixtures:**
 - Region, topology, CIDR blocks
 - Security settings (audit retention, logging, encryption)
-- CI/CD mode and placement
-- Network appliance configuration
+- IAM Identity Center permission sets and assignments
 - Kubernetes cluster name, version, node pools
 
 **What it struggles with:**

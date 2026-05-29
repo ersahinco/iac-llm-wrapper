@@ -7,9 +7,8 @@ intent-to-IaC orchestration framework. For AWS Landing Zone Accelerator (LZA),
 the current target path gathers requirements, validates decisions, emits handoff
 artifacts, and reuses LZA where it already solves the deployment problem.
 
-The current LZA path is handoff-only. It can add target adapters later when a
-selected contract requires module generation or controlled execution, but LZA
-already provides the deployment engine for the landing-zone baseline.
+The current LZA path is handoff-only. LZA already provides the deployment engine
+for the landing-zone baseline.
 
 ## Principles
 
@@ -18,8 +17,6 @@ already provides the deployment engine for the landing-zone baseline.
 - Derive questions, validation, and outputs from models instead of hand-written flow.
 - Keep provider-specific orchestration explicit instead of pretending clouds are identical.
 - Prefer existing accelerators and modules over custom IaC.
-- Add custom IaC only when no existing accelerator or module covers the need.
-- Allow controlled execution adapters only behind graph, contract, manual gate, evidence, and rollback checks.
 - Keep the first AWS scope narrow: LZA before custom workloads.
 
 ## Data Model View
@@ -100,14 +97,9 @@ source contract
   -> handoff bundle
 ```
 
-Target outputs vary:
-
-- AWS LZA: LZA YAML configuration, lineage manifest, decision report, deployment runbook
-- Terraform module: variables file, module input mapping, dependency notes
-- CloudFormation template: parameter handoff for an existing approved template
-- future target adapter: module generation or controlled execution only when the contract requires it
-
-Provider-specific orchestration belongs in the target adapter layer. Core remains generic.
+The AWS LZA pattern emits LZA YAML configuration, lineage manifest, decision
+report, handoff plan, sample recommendations, and deployment runbook. Core
+remains generic; AWS-specific behavior stays in this pattern.
 
 ## Inspect Contracts
 
@@ -143,8 +135,8 @@ Current scope produces a useful handoff without owning deployment:
 - `aws-lza` pattern
 - `AwsLzaIntent` Pydantic model
 - LZA sample references
-- requirements for organization, accounts, OUs, regions, network, logging, security,
-  IAM, CI/CD, and compliance overlay
+- requirements for organization, accounts, OUs, regions, network, logging,
+  security services, IAM Identity Center, and compliance overlay
 - validators for cross-file references and missing required decisions
 - LZA YAML emitter for the six mandatory configuration files
 - `lineage-manifest.yaml` mapping decisions to emitted files, required artifact paths,

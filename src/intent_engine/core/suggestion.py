@@ -97,15 +97,17 @@ class SuggestionEngine:
         if status in (RequirementStatus.DECIDED, RequirementStatus.DEFAULTED):
             return 99
 
-        cat = req.category
-        if cat == "organization":
-            return 1
-        if cat == "network":
-            return 3
-        if cat == "security":
-            return 4
-        if cat == "cicd":
-            return 5
-        if cat == "hybrid":
-            return 6
-        return 10
+        priority_by_category = {
+            "accelerator": 1,
+            "organization": 2,
+            "accounts": 3,
+            "identity": 4,
+            "network": 5,
+            "security": 6,
+            "cloudformation": 7,
+            "core": 8,
+            "workload": 9,
+            "general": 10,
+            "meta": 11,
+        }
+        return priority_by_category.get(req.category, 10)
