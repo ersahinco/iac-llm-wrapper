@@ -5,8 +5,9 @@
 Core engine for `iac-llm-wrapper`, an intent-to-IaC orchestration framework. It
 captures architecture intent from prose, validates decisions through requirement
 graphs and target contracts, and emits traceable handoff artifacts that engineers
-use with their IaC toolchain. Future target adapters may wrap module generation
-or controlled IaC execution only after graph, contract, and gate checks pass.
+use with their IaC toolchain. Generation or controlled IaC execution stays
+downstream unless a registered target adapter owns it and passes graph, contract,
+and gate checks.
 
 AWS Landing Zone Accelerator is the first product path, but the core must stay generic: patterns own domain models, contracts, validators, samples, and generators.
 
@@ -102,7 +103,7 @@ T17: Harden lean intent-to-IaC orchestration surface
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Removed unused LLM dependency extra, aligned AWS LZA handoff wording, trimmed speculative contract docs, and kept the full gate green
+- **Last session**: Fixed evidence/help drift, removed remaining future-adapter wording, added a complex enterprise AWS LZA handoff eval, and kept the full gate green
 
 ### Done
 
@@ -114,7 +115,7 @@ T17: Harden lean intent-to-IaC orchestration surface
 | Contracts | Required artifacts, required paths, required decisions, lineage checks, value assertions, blocked assessment artifacts, contract-backed generic handoff plan |
 | Samples | Registry-backed `sample list/show`, match recommendations, fixture sync/drift guard |
 | LLM | Ollama/OpenAI-compatible backend factory, evidence store, local LLM integration tests, graph-scoped prompts and blocking findings |
-| Evaluation | Deterministic extraction gold corpus with AWS LZA and CloudFormation pass/fail/contract cases, trace quality assertions, optional LLM evidence capture, and role-based usability trials including CloudFormation BYOM |
+| Evaluation | Deterministic extraction gold corpus with AWS LZA standard/complex/blocked cases and CloudFormation pass/fail cases, trace quality assertions, optional LLM evidence capture, and role-based usability trials including CloudFormation BYOM |
 | Fixtures | AWS LZA emitted bundles, K8s emitted bundle, usability docs, eval corpus |
 | Cleanup | Removed old LZA research path, old diff/apply surfaces, extension registry, old fixtures/tests/helpers, global normalizer/defaults no-op surface, unused discovery hook fields, no-contract artifact fallback, overlapping capability doc |
 | Product docs | Standard root docs (`README`, `CONTRIBUTING`, `CHANGELOG`, `RELEASING`, `SECURITY`) define current lean DevOps workflow and product boundary |

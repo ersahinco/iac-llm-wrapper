@@ -219,7 +219,7 @@ def compile(
     evidence_output: Path = typer.Option(
         None,
         "--evidence-output",
-        help="Path to write LLM call evidence JSON",
+        help="Path to write LLM call evidence YAML",
     ),
     dry_run: bool = typer.Option(
         False,
@@ -353,7 +353,7 @@ def discover(
     evidence_output: Path = typer.Option(
         None,
         "--evidence-output",
-        help="Path to write LLM call evidence JSON",
+        help="Path to write LLM call evidence YAML",
     ),
     no_llm: bool = typer.Option(
         False,

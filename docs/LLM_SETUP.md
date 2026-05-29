@@ -124,14 +124,13 @@ full architect intent.
 
 ### Model Times Out
 - 3B models should respond in 10-30 seconds
-- Increase timeout: `INTENT_ENGINE_TIMEOUT=60`
 - Try a faster model (qwen2.5:3b is generally fastest)
 
 ### Extraction Quality is Poor
 - Ensure the document follows the expected structure (see `fixtures/`)
 - Try a larger model (7B+)
 - Use `--decisions` JSON for critical values
-- Check the LLM evidence output: `--evidence-output evidence.json`
+- Check the LLM evidence output: `--evidence-output evidence.yaml`
 
 ### Ollama Not Detected
 - Verify Ollama is running: `curl http://localhost:11434/api/tags`
