@@ -120,6 +120,15 @@ def _get_path(data: Any, dotted_path: str) -> Any:
     return current
 
 
+def _path_exists(data: Any, dotted_path: str) -> bool:
+    current = data
+    for part in dotted_path.split("."):
+        if not isinstance(current, dict) or part not in current:
+            return False
+        current = current[part]
+    return True
+
+
 def _names(items: Any) -> list[str]:
     if not isinstance(items, list):
         return []
@@ -143,6 +152,7 @@ def _compare_report(case: EvalCase, output_dir: Path) -> list[str]:
     failures.extend(_compare_counts(report, case.expected.get("counts", {})))
     failures.extend(_compare_names(report, case.expected.get("names", {})))
     failures.extend(_compare_artifacts(output_dir, case.expected.get("artifacts", [])))
+    failures.extend(_compare_trace(output_dir, case.expected.get("trace", {})))
     return failures
 
 
@@ -218,6 +228,42 @@ def _compare_contracts(output_dir: Path, expected_contracts: Any) -> list[str]:
     return failures
 
 
+def _compare_trace(output_dir: Path, expected_trace: Any) -> list[str]:
+    if not expected_trace:
+        return []
+    if not isinstance(expected_trace, dict):
+        return ["expect.trace must be a mapping"]
+
+    trace_path = output_dir / "llm-trace-summary.yaml"
+    if not trace_path.exists():
+        return ["missing artifact: llm-trace-summary.yaml"]
+
+    trace = _yaml_load(trace_path)
+    failures: list[str] = []
+    required = expected_trace.get("required", [])
+    if not isinstance(required, list):
+        failures.append("expect.trace.required must be a list")
+    else:
+        for path in required:
+            if not isinstance(path, str):
+                failures.append("expect.trace.required entries must be strings")
+            elif not _path_exists(trace, path):
+                failures.append(f"trace missing required path: {path}")
+
+    absent = expected_trace.get("absent", [])
+    if not isinstance(absent, list):
+        failures.append("expect.trace.absent must be a list")
+    else:
+        for path in absent:
+            if not isinstance(path, str):
+                failures.append("expect.trace.absent entries must be strings")
+            elif _path_exists(trace, path):
+                failures.append(f"trace path should be absent: {path}")
+
+    failures.extend(_compare_values(trace, expected_trace.get("values", {})))
+    return failures
+
+
 def _compare_failure(
     case: EvalCase,
     output_dir: Path,
@@ -237,6 +283,7 @@ def _compare_failure(
 
     failures.extend(_compare_artifacts(output_dir, case.expected.get("artifacts", [])))
     failures.extend(_compare_contracts(output_dir, case.expected.get("contracts", [])))
+    failures.extend(_compare_trace(output_dir, case.expected.get("trace", {})))
     report_path = output_dir / "decision-report.yaml"
     if report_path.exists():
         report = _yaml_load(report_path)

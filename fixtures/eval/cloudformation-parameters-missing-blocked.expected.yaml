@@ -16,3 +16,19 @@ expect:
     - llm-trace-summary.yaml
   contracts:
     - blocked-assessment-artifacts
+  trace:
+    required:
+      - rawLlmDecisions
+      - acceptedDecisions
+      - appliedDecisions.markdown
+      - gaps.blocking
+      - contradictions.blocking
+      - rawEvidence.status
+    absent:
+      - extractedDecisions
+      - rawEvidencePath
+    values:
+      pattern: cloudformation-parameters
+      callCount: 0
+      deploymentReadiness.status: blocked
+      rawEvidence.status: not-requested

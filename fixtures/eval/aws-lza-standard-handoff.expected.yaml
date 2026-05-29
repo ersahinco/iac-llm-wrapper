@@ -39,3 +39,19 @@ expect:
     - lineage-manifest.yaml
     - deployment-runbook.md
     - sample-recommendations.yaml
+  trace:
+    required:
+      - rawLlmDecisions
+      - acceptedDecisions
+      - appliedDecisions.markdown
+      - gaps.resolved
+      - gaps.blocking
+      - rawEvidence.status
+    absent:
+      - extractedDecisions
+      - rawEvidencePath
+    values:
+      pattern: aws-lza
+      callCount: 0
+      deploymentReadiness.status: ready
+      rawEvidence.status: not-requested
