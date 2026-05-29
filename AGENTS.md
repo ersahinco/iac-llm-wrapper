@@ -102,7 +102,7 @@ T17: Harden lean intent-to-IaC orchestration surface
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Removed the dead global normalizer/defaults surface, stale capability signal examples, and old AWS LZA design-memo sections; full gate green
+- **Last session**: Split the AWS LZA monolith into focused graph, validators, generators, samples, and helper modules after removing stale normalizer/defaults/doc surfaces; full gate green
 
 ### Done
 
@@ -110,7 +110,7 @@ T17: Harden lean intent-to-IaC orchestration surface
 |------|------|
 | Core | models, extractor, requirements, lazy built-in pattern registry, patterns, interview, discovery, validator, generator, contracts, samples, module mapping, CLI |
 | Patterns | `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, `terraform-vpc` |
-| AWS LZA | Thin LZA handoff YAML, IAM Identity Center permission sets/assignments, decision report/readiness, lineage manifest, deployment runbook, sample recommendations |
+| AWS LZA | Thin LZA handoff YAML, IAM Identity Center permission sets/assignments, decision report/readiness, lineage manifest, deployment runbook, sample recommendations, focused pattern modules |
 | Contracts | Required artifacts, required paths, required decisions, lineage checks, value assertions, blocked assessment artifacts, contract-backed generic handoff plan |
 | Samples | Registry-backed `sample list/show`, match recommendations, fixture sync/drift guard |
 | LLM | Ollama/OpenAI-compatible/Anthropic backend factory, evidence store, local LLM integration tests, graph-scoped prompts and blocking findings |
@@ -148,3 +148,4 @@ T17: Harden lean intent-to-IaC orchestration surface
 - Defaults now live in Pydantic models and requirement graph nodes; there is no global `defaults.yaml` or no-op normalizer path.
 - `docs/CAPABILITY.md` describes signal handling generically so examples cannot drift away from graph requirement keys.
 - `docs/AWS_LZA_THIN_PATH.md` is current product scope only; old borrowed-design rationale and speculative workload notes were removed.
+- AWS LZA pattern code is split by responsibility: registration, graph, validators, generators, samples, and helpers.
