@@ -185,6 +185,7 @@ def _trial_engineer_handoff(config: TrialConfig) -> TrialResult:
             evidence_files.append(evidence_path)
         if compile_proc.returncode != 0:
             failures.append("compile command failed")
+            failures.append((compile_proc.stderr or compile_proc.stdout).strip())
             return TrialResult(
                 "engineer",
                 "handoff-artifacts",

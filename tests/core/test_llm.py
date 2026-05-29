@@ -191,6 +191,78 @@ class TestEndToEndLLM:
         assert "deploymentAllowed: false" in report
         assert "home region not enabled" in report
 
+    def test_llm_non_contract_findings_do_not_block_handoff(self, tmp_path: Path):
+        fixture = tmp_path / "design.md"
+        fixture.write_text(
+            """# AWS LZA Design
+
+## LZA Baseline
+- baseline: standard
+
+## Organization
+- org_mode: control-tower
+- organization_name: ExampleCorp
+- organizational_units: Security, Infrastructure, Workloads
+
+## Regions
+- home_region: eu-central-1
+- enabled_regions: eu-central-1
+
+## Accounts
+- workload_accounts: AppProd
+- audit_account: Audit
+- log_archive_account: LogArchive
+- security_tooling_account: SecurityTooling
+- network_account: Network
+
+## Identity
+- identity_center_delegated_admin_account: SecurityTooling
+- identity_center_permission_sets: ReadOnlyAccess, PowerUserAccess
+- identity_center_assignments: PlatformAdmins:PowerUserAccess:Management,
+  AppTeam:ReadOnlyAccess:AppProd
+
+## Network
+- topology: hub-spoke
+- network_cidr: 10.50.0.0/16
+
+## Security
+- centralized_logging: true
+- security_hub_enabled: true
+- guardduty_enabled: true
+- compliance_overlay: none
+"""
+        )
+        response = json.dumps(
+            {
+                "decisions": {},
+                "signal_decisions": {},
+                "gaps": [
+                    {
+                        "key": "project_name",
+                        "reason": "Not mentioned.",
+                        "suggestion": "Ask for a project name.",
+                    }
+                ],
+                "contradictions": [
+                    {
+                        "key": "compliance_tags",
+                        "reason": "Not mentioned consistently.",
+                    }
+                ],
+            }
+        )
+
+        output = tmp_path / "output"
+        compile_design(fixture, output, llm_caller=LLMCaller(MockLLMBackend(response)))
+
+        report = (output / "decision-report.yaml").read_text()
+        trace = (output / "llm-trace-summary.yaml").read_text()
+        assert "deploymentAllowed: true" in report
+        assert "project_name" in trace
+        assert "compliance_tags" in trace
+        assert "blocking: []" in trace
+        assert "LLM_GAP_PROJECT_NAME" not in report
+
 
 class TestMalformedLLMResponse:
     def test_markdown_fence_recovery(self):

@@ -158,6 +158,9 @@ class RequirementGraph:
     def get(self, key: str) -> str | None:
         return self._decisions.get(key)
 
+    def has_requirement(self, key: str) -> bool:
+        return key in self._requirements
+
     def status(self, key: str) -> RequirementStatus:
         return self._status.get(key, RequirementStatus.PENDING)
 

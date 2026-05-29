@@ -100,17 +100,59 @@ def _to_builtin(value: Any) -> Any:
 
 
 def _gap_is_resolved(graph, gap: Any) -> bool:
-    if not isinstance(gap, dict):
-        return False
-    key = gap.get("key")
-    if not isinstance(key, str) or not key:
+    key = _finding_key(gap)
+    if key is None:
         return False
     value = graph.get(key)
     return value is not None and str(value).strip() != ""
 
 
 def _blocking_gaps(graph, gaps: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [gap for gap in gaps if isinstance(gap, dict) and not _gap_is_resolved(graph, gap)]
+    return [
+        gap
+        for gap in gaps
+        if isinstance(gap, dict)
+        and _finding_targets_requirement(graph, gap)
+        and not _gap_is_resolved(graph, gap)
+    ]
+
+
+def _finding_key(finding: Any) -> str | None:
+    if not isinstance(finding, dict):
+        return None
+    key = finding.get("key")
+    if not isinstance(key, str) or not key:
+        return None
+    return key
+
+
+def _finding_targets_requirement(graph, finding: Any) -> bool:
+    key = _finding_key(finding)
+    if key is None or not _graph_has_requirement(graph, key):
+        return False
+    is_applicable = getattr(graph, "is_applicable", None)
+    if callable(is_applicable) and not is_applicable(key):
+        return False
+    is_blocked = getattr(graph, "is_blocked", None)
+    if callable(is_blocked) and is_blocked(key):
+        return False
+    return True
+
+
+def _graph_has_requirement(graph, key: str) -> bool:
+    has_requirement = getattr(graph, "has_requirement", None)
+    if callable(has_requirement):
+        return bool(has_requirement(key))
+    requirements = getattr(graph, "_requirements", {})
+    return key in requirements
+
+
+def _blocking_contradictions(graph, contradictions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        contradiction
+        for contradiction in contradictions
+        if isinstance(contradiction, dict) and _finding_targets_requirement(graph, contradiction)
+    ]
 
 
 def _llm_result_violations(graph, llm_result: LLMGraphResult) -> list[Violation]:
@@ -124,14 +166,10 @@ def _llm_result_violations(graph, llm_result: LLMGraphResult) -> list[Violation]
                 message=f"LLM reported missing decision '{key}': {reason}",
             )
         )
-    for contradiction in llm_result.contradictions:
-        key = contradiction.get("key", "unknown") if isinstance(contradiction, dict) else "unknown"
-        reason = (
-            contradiction.get("reason", "contradiction")
-            if isinstance(contradiction, dict)
-            else str(contradiction)
-        )
-        details = contradiction.get("details", "") if isinstance(contradiction, dict) else ""
+    for contradiction in _blocking_contradictions(graph, llm_result.contradictions):
+        key = contradiction.get("key", "unknown")
+        reason = contradiction.get("reason", "contradiction")
+        details = contradiction.get("details", "")
         suffix = f" ({details})" if details else ""
         violations.append(
             Violation(
@@ -208,11 +246,7 @@ def _build_deployment_readiness(
     missing = _graph_missing_decisions(graph)
     conflicts = _violation_conflicts(violations)
     llm_gaps = _blocking_gaps(graph, llm_result.gaps)
-    llm_contradictions = [
-        contradiction
-        for contradiction in llm_result.contradictions
-        if isinstance(contradiction, dict)
-    ]
+    llm_contradictions = _blocking_contradictions(graph, llm_result.contradictions)
     blockers = [{"code": v.code, "message": v.message} for v in violations]
     deployment_allowed = not blockers
     return {
@@ -264,11 +298,7 @@ def _build_extraction_summary(
     resolved_gaps = [
         gap for gap in llm_result.gaps if isinstance(gap, dict) and _gap_is_resolved(graph, gap)
     ]
-    blocking_contradictions = [
-        contradiction
-        for contradiction in llm_result.contradictions
-        if isinstance(contradiction, dict)
-    ]
+    blocking_contradictions = _blocking_contradictions(graph, llm_result.contradictions)
     raw_evidence = _raw_evidence_status(raw_evidence_path, evidence_store)
     return {
         "pattern": pattern,
