@@ -102,6 +102,35 @@ class TestContractCommand:
         assert "--name or --pattern required" in result.output
 
 
+class TestGraphCommand:
+    def test_graph_export_json(self):
+        result = runner.invoke(app, ["graph", "export", "--pattern", "aws-lza", "--format", "json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.stdout)
+        assert data["pattern"] == "aws-lza"
+        assert data["nodeCount"] >= 1
+        assert any(node["key"] == "network_account" for node in data["nodes"])
+        assert any(edge["kind"] == "applies_if" for edge in data["edges"])
+
+    def test_graph_export_mermaid(self):
+        result = runner.invoke(
+            app,
+            ["graph", "export", "--pattern", "aws-lza", "--format", "mermaid"],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "flowchart TD" in result.stdout
+        assert "Network Account" in result.stdout
+        assert "applies_if" in result.stdout
+
+    def test_graph_export_unknown_format_fails(self):
+        result = runner.invoke(app, ["graph", "export", "--format", "dot"])
+
+        assert result.exit_code == 1
+        assert "Unknown graph export format" in result.output
+
+
 class TestSampleCommand:
     def test_sample_list_shows_registered_samples(self):
         result = runner.invoke(app, ["sample", "list", "--pattern", "aws-lza"])

@@ -9,6 +9,7 @@ from typing import Any
 
 import typer
 
+from .core.artifact_review import write_review_html
 from .core.compiler import (
     CompileError,
     compile_design,
@@ -21,6 +22,7 @@ from .core.compiler import (
 from .core.contracts import GLOBAL_CONTRACT_REGISTRY, TargetContract
 from .core.discovery import DiscoveryEngine, generate_clarifying_questions
 from .core.extractor import Extractor
+from .core.graph_export import graph_to_json, graph_to_mermaid
 from .core.interview import InterviewEngine
 from .core.llm_caller import LLMEvidenceStore, auto_detect_llm
 from .core.markdown_extractor import extract_from_markdown
@@ -38,6 +40,8 @@ app = typer.Typer(
     name=APP_NAME,
     help="Intent-to-IaC orchestration for validated handoff artifacts",
 )
+graph_app = typer.Typer(help="Inspect and export requirement graphs")
+app.add_typer(graph_app, name="graph")
 
 DEFAULT_PATTERN = "aws-lza"
 
@@ -180,6 +184,46 @@ def main(
     ),
 ) -> None:
     pass
+
+
+@graph_app.command("export")
+def graph_export(
+    pattern: str = typer.Option(
+        DEFAULT_PATTERN,
+        "--pattern",
+        "-p",
+        help=f"Pattern to use. Available: {_available_patterns()}",
+    ),
+    format: str = typer.Option(
+        "json",
+        "--format",
+        "-f",
+        help="Export format: json, mermaid",
+    ),
+    output: Path = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Optional file path. Defaults to stdout.",
+    ),
+) -> None:
+    """Export a pattern requirement graph as JSON or Mermaid."""
+    graph = _get_pattern_or_exit(pattern).create_graph()
+    normalized_format = format.lower()
+    if normalized_format == "json":
+        rendered = graph_to_json(graph, pattern)
+    elif normalized_format == "mermaid":
+        rendered = graph_to_mermaid(graph, pattern)
+    else:
+        typer.echo("Unknown graph export format. Use: json, mermaid", err=True)
+        raise typer.Exit(1)
+
+    if output:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(rendered)
+        typer.echo(f"Graph exported to: {output}")
+        return
+    typer.echo(rendered, nl=False)
 
 
 @app.command()
@@ -827,20 +871,53 @@ def explain(
 
 @app.command()
 def review(
+    action: str = typer.Argument(
+        "diff",
+        help="Action: diff, html",
+    ),
     before: Path = typer.Option(
-        ...,
+        None,
         "--before",
         "-b",
         help="Before decision report (decision-report.yaml)",
     ),
     after: Path = typer.Option(
-        ...,
+        None,
         "--after",
         "-a",
         help="After decision report (decision-report.yaml)",
     ),
+    input: Path = typer.Option(
+        None,
+        "--input",
+        "-i",
+        help="Generated artifact directory for html review",
+    ),
+    output: Path = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Output path for html review",
+    ),
 ) -> None:
-    """Diff two decision reports to show what changed between revisions."""
+    """Review generated artifacts: diff reports or write static HTML."""
+    if action == "html":
+        if input is None or output is None:
+            typer.echo("Error: review html requires --input and --output", err=True)
+            raise typer.Exit(1)
+        if not input.is_dir():
+            typer.echo(f"Error: input path is not a directory: {input}", err=True)
+            raise typer.Exit(1)
+        write_review_html(input, output)
+        typer.echo(f"Review HTML written to: {output}")
+        return
+
+    if action != "diff":
+        typer.echo("Unknown review action. Use: diff, html", err=True)
+        raise typer.Exit(1)
+    if before is None or after is None:
+        typer.echo("Error: review diff requires --before and --after", err=True)
+        raise typer.Exit(1)
     if not before.exists():
         typer.echo(f"Error: before file does not exist: {before}", err=True)
         raise typer.Exit(1)

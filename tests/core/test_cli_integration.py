@@ -231,6 +231,43 @@ class TestCLIReview:
         assert "eu-central-1" in result.output
         assert "eu-west-1" in result.output
 
+    def test_review_html_from_complex_lza_handoff(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setenv("INTENT_ENGINE_DISABLE_LLM", "1")
+        output_dir = tmp_path / "out"
+        compile_result = runner.invoke(
+            app,
+            [
+                "compile",
+                "--input",
+                "fixtures/eval/aws-lza-complex-enterprise-handoff.md",
+                "--output",
+                str(output_dir),
+            ],
+        )
+        assert compile_result.exit_code == 0, compile_result.output
+
+        review_path = output_dir / "handoff-review.html"
+        result = runner.invoke(
+            app,
+            ["review", "html", "--input", str(output_dir), "--output", str(review_path)],
+        )
+
+        assert result.exit_code == 0, result.output
+        html = review_path.read_text()
+        assert "aws-lza handoff review" in html
+        assert "ContosoEnterprise" in html
+        assert "Readiness" in html
+        assert "Accepted Decisions" in html
+        assert "Graph Decisions" in html
+        assert "Target Artifacts" in html
+        assert "Trace Summary" in html
+
+    def test_review_html_requires_input_and_output(self):
+        result = runner.invoke(app, ["review", "html"])
+
+        assert result.exit_code == 1
+        assert "requires --input and --output" in result.output
+
 
 class TestCLITemplate:
     def test_template_default_pattern_is_aws_lza(self, tmp_path: Path):

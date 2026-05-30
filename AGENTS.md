@@ -32,11 +32,11 @@ uv run pre-commit run --all-files
 - **Requirements** (`requirements.py`): Decision graph with `applies_if`, `blocked_if`, `depends_on`, cascade rules, tradeoffs, compliance controls, signals, and audit trail.
 - **Interview** (`interview.py`): Graph-ordered requirement capture. Shows context, asks only applicable gaps, supports save/resume, and records rationale.
 - **Validate** (`validator.py`): Fail-closed graph and pattern validation. Missing required applicable decisions become compile errors.
-- **Generate** (`generator.py`): Registry-driven emitter for decision report, generic handoff plan, contract handoff files, lineage, runbook, module inputs when pattern owns module mapping, and sample recommendations.
+- **Generate** (`generator.py`): Registry-driven emitter for decision report, generic handoff plan, contract handoff files, lineage, runbook, module inputs when pattern owns module mapping, sample recommendations, and static review artifacts.
 - **Contracts** (`contracts.py`): Target artifact contracts define required files, paths, decisions, lineage, and stable value assertions.
 - **Samples** (`sample_config.py`): Registered reference bundles with pinned source metadata, module refs, tags, fixture dirs, and match recommendations.
 - **LLM** (`llm_caller.py`): Pluggable OpenAI-compatible and Ollama backends with retry/backoff and evidence capture.
-- **CLI** (`cli.py`): `compile`, `interview`, `validate`, `explain`, `sample`, `contract`, `discover`, `template`, `review`. Default pattern is `aws-lza`.
+- **CLI** (`cli.py`): `compile`, `interview`, `validate`, `explain`, `sample`, `contract`, `graph`, `discover`, `template`, `review`. Default pattern is `aws-lza`.
 
 ## Current Pattern Surface
 
@@ -98,18 +98,18 @@ T17: Harden lean intent-to-IaC orchestration surface
 
 ### Status
 
-- **Tests**: 267 passing, 1 skipped
+- **Tests**: 272 passing, 1 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Fixed evidence/help drift, removed remaining future-adapter wording, added a complex enterprise AWS LZA handoff eval, and kept the full gate green
+- **Last session**: Added graph JSON/Mermaid export, static handoff review HTML, and battle-tested both against a complex enterprise AWS LZA handoff; full gate green
 
 ### Done
 
 | Area | Item |
 |------|------|
-| Core | models, extractor, requirements, lazy built-in pattern registry, patterns, interview, discovery, validator, generator, contracts, samples, module mapping, CLI |
+| Core | models, extractor, requirements, lazy built-in pattern registry, patterns, interview, discovery, validator, generator, graph export, static review, contracts, samples, module mapping, CLI |
 | Patterns | `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, `terraform-vpc` |
 | AWS LZA | Contract-backed LZA handoff YAML, IAM Identity Center permission sets/assignments, decision report/readiness, lineage manifest, deployment runbook, sample recommendations, focused pattern modules |
 | Contracts | Required artifacts, required paths, required decisions, lineage checks, value assertions, blocked assessment artifacts, contract-backed generic handoff plan |
@@ -119,7 +119,7 @@ T17: Harden lean intent-to-IaC orchestration surface
 | Fixtures | AWS LZA emitted bundles, K8s emitted bundle, usability docs, eval corpus |
 | Cleanup | Removed old LZA research path, old diff/apply surfaces, extension registry, old fixtures/tests/helpers, global normalizer/defaults no-op surface, unused discovery hook fields, no-contract artifact fallback, overlapping capability doc |
 | Product docs | Standard root docs (`README`, `CONTRIBUTING`, `CHANGELOG`, `RELEASING`, `SECURITY`) define current lean DevOps workflow and product boundary |
-| Observability | Lean `llm-trace-summary.yaml` for provider/model, rounded latency, raw and accepted decisions, applied decisions, resolved/blocking gaps, blocking contradictions, and raw evidence status; old flat aliases removed |
+| Observability | Lean `llm-trace-summary.yaml` and static review page for provider/model, rounded latency, raw and accepted decisions, applied decisions, resolved/blocking gaps, blocking contradictions, and raw evidence status; old flat aliases removed |
 | Language | Docs now use consistent terms: requirement graph, target contract, decision record, handoff artifact, provisioning toolchain |
 
 ### Next

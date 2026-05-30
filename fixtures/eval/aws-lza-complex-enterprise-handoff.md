@@ -174,4 +174,3 @@ Security requirements:
   execution.
 - Release owner confirms placeholder account emails are replaced outside the
   generated artifact bundle.
-

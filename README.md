@@ -175,6 +175,10 @@ pattern.
 ### 3. Inspect Contract and Samples
 
 ```bash
+# Export the requirement graph for review or UI consumption
+iac-llm-wrapper graph export --pattern aws-lza --format mermaid
+iac-llm-wrapper graph export --pattern aws-lza --format json
+
 # See required AWS LZA handoff files, decisions, and lineage paths
 iac-llm-wrapper contract show --pattern aws-lza
 
@@ -204,6 +208,15 @@ For `aws-lza`, successful output includes:
 When compile is blocked, only safe assessment artifacts are written:
 `decision-report.yaml` and `llm-trace-summary.yaml`. They must satisfy the
 built-in `blocked-assessment-artifacts` contract.
+
+Generate a portable static review page when humans need one file to inspect:
+
+```bash
+iac-llm-wrapper review html --input out/ --output out/handoff-review.html
+```
+
+The page summarizes readiness, allowed next action, blockers, decisions,
+artifacts, handoff-plan steps, and LLM trace summary without running a server.
 
 ### 5. Engineer Handoff
 
@@ -273,7 +286,7 @@ Recommended product paths stay thin and contract-backed:
 
 ## Developer Experience
 
-- **CLI-first workflow**: Typer-based CLI with discover/compile/interview/validate/sample/contract/template/review commands for both architects and platform engineers.
+- **CLI-first workflow**: Typer-based CLI with discover/compile/interview/validate/sample/contract/graph/template/review commands for both architects and platform engineers.
 - **uv for dependency management**: Fast, reproducible local setup and CI parity.
 - **Model-driven type safety**: Pydantic v2 models are the contract for extraction, validation, and artifact emission.
 - **Fail-closed validation**: Graph-driven violation codes prevent incomplete or contradictory decisions from reaching implementation.
