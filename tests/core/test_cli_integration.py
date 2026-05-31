@@ -268,6 +268,7 @@ class TestCLIReview:
         assert "requirement-graph.mmd" in html
         assert (output_dir / "requirement-graph.json").exists()
         assert (output_dir / "requirement-graph.mmd").exists()
+        assert (output_dir / "contract-validation.yaml").exists()
         assert "Contract Validation" in html
         assert "aws-lza-sample-configuration" in html
         assert "generic-handoff-plan" in html

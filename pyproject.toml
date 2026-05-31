@@ -69,6 +69,8 @@ testpaths = ["tests"]
 [tool.mypy]
 python_version = "3.11"
 files = [
+    "scripts/battle-test.py",
+    "scripts/compare-model-benchmarks.py",
     "scripts/evaluate-extraction.py",
     "scripts/evaluate-usability.py",
     "scripts/sync-sample-fixtures.py",

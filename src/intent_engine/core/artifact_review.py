@@ -1,30 +1,31 @@
-"""Static handoff review page generation."""
+"""Static handoff review page orchestration."""
 
 from __future__ import annotations
 
 import os
-from html import escape
 from pathlib import Path
 from typing import Any
 
 import ruamel.yaml
 
-from .contracts import BLOCKED_ASSESSMENT_CONTRACT, HANDOFF_PLAN_CONTRACT, ContractValidator
+from .contract_validation import build_contract_validation, write_contract_validation
 from .graph_export import graph_to_json, graph_to_mermaid
 from .patterns import GLOBAL_REGISTRY
+from .review_renderer import render_review_html as render_review_html_context
 
 
 def write_review_html(input_dir: Path, output: Path) -> None:
     """Write a portable static HTML review page for a generated handoff bundle."""
     output.parent.mkdir(parents=True, exist_ok=True)
     graph_exports = _write_graph_exports(input_dir)
-    output.write_text(
-        render_review_html(
-            input_dir,
-            graph_exports=_relative_graph_exports(input_dir, output.parent, graph_exports),
-            link_base_dir=output.parent,
-        )
+    contract_validation_path = write_contract_validation(input_dir)
+    context = build_review_context(
+        input_dir,
+        link_base_dir=output.parent,
+        graph_exports=_relative_graph_exports(input_dir, output.parent, graph_exports),
+        contract_validation_path=contract_validation_path,
     )
+    output.write_text(render_review_html_context(context))
 
 
 def render_review_html(
@@ -33,121 +34,60 @@ def render_review_html(
     link_base_dir: Path | None = None,
 ) -> str:
     """Render a static HTML review page from generated handoff artifacts."""
+    context = build_review_context(
+        input_dir,
+        link_base_dir=link_base_dir or input_dir,
+        graph_exports=graph_exports or _existing_graph_exports(input_dir),
+        contract_validation_path=None,
+    )
+    return render_review_html_context(context)
+
+
+def build_review_context(
+    input_dir: Path,
+    *,
+    link_base_dir: Path,
+    graph_exports: dict[str, str],
+    contract_validation_path: Path | None,
+) -> dict[str, Any]:
+    """Read generated artifacts and return renderer-ready review context."""
     report = _read_yaml(input_dir / "decision-report.yaml")
     trace = _read_yaml(input_dir / "llm-trace-summary.yaml")
     benchmark = _read_yaml(input_dir / "model-benchmark.yaml")
     handoff = _read_yaml(input_dir / "handoff-plan.yaml")
     lineage = _read_yaml(input_dir / "lineage-manifest.yaml")
     readiness = _readiness(report, handoff)
-    artifacts = _artifact_names(input_dir, handoff, lineage)
-    contract_results = _contract_validation(input_dir, report, handoff, readiness)
-    graph_exports = graph_exports or _existing_graph_exports(input_dir)
-    link_base_dir = link_base_dir or input_dir
-
-    return "\n".join(
-        [
-            "<!doctype html>",
-            '<html lang="en">',
-            "<head>",
-            '<meta charset="utf-8">',
-            '<meta name="viewport" content="width=device-width, initial-scale=1">',
-            f"<title>{escape(str(report.get('pattern', 'handoff')))} handoff review</title>",
-            "<style>",
-            _CSS,
-            "</style>",
-            "</head>",
-            "<body>",
-            "<main>",
-            "<header>",
-            "<p>iac-llm-wrapper static review</p>",
-            f"<h1>{escape(str(report.get('pattern', 'handoff')))} handoff review</h1>",
-            f'<div class="status {escape(readiness["status"])}">'
-            f"{escape(readiness['status'])}</div>",
-            "</header>",
-            _section(
-                "Readiness",
-                [
-                    _kv("Deployment allowed", str(readiness["deploymentAllowed"])),
-                    _kv("Allowed next action", readiness["allowedNextAction"]),
-                    _list_block("Blockers", readiness["blockers"]),
-                ],
-            ),
-            _section(
-                "Requirement Graph",
-                [
-                    _link_list(
-                        [
-                            ("JSON export", graph_exports.get("json", "")),
-                            ("Mermaid export", graph_exports.get("mermaid", "")),
-                        ]
-                    ),
-                ],
-            ),
-            _section("Accepted Decisions", [_mapping_table(_accepted_decisions(trace))]),
-            _section("Graph Decisions", [_mapping_table(_graph_decisions(report))]),
-            _section(
-                "Gaps And Contradictions",
-                [
-                    _list_block("Blocking gaps", _trace_list(trace, "gaps", "blocking")),
-                    _list_block("Resolved gaps", _trace_list(trace, "gaps", "resolved")),
-                    _list_block(
-                        "Blocking contradictions",
-                        _trace_list(trace, "contradictions", "blocking"),
-                    ),
-                ],
-            ),
-            _section(
-                "Contract Validation",
-                [
-                    _contract_table(contract_results),
-                    _details("Raw contract validation", _yaml_dump(contract_results)),
-                ],
-            ),
-            _section("Target Artifacts", [_artifact_table(input_dir, artifacts)]),
-            _section("Handoff Plan", [_handoff_steps(handoff)]),
-            _section(
-                "Trace Summary",
-                [
-                    _kv("Provider", str(trace.get("provider", "unknown"))),
-                    _kv("Model", str(trace.get("model", "unknown"))),
-                    _kv("Call count", str(trace.get("callCount", "0"))),
-                    _kv("Raw evidence", _raw_evidence(trace)),
-                    _artifact_link_row(
-                        input_dir,
-                        link_base_dir,
-                        "LLM trace summary",
-                        "llm-trace-summary.yaml",
-                    ),
-                    _raw_evidence_link(input_dir, link_base_dir, trace),
-                    _details("Raw trace summary", _yaml_dump(trace)),
-                ],
-            ),
-            _section(
-                "Model Benchmark",
-                [
-                    _kv("Mode", _benchmark_path(benchmark, "run", "mode")),
-                    _kv("Latency total", f"{_benchmark_path(benchmark, 'latency', 'totalMs')} ms"),
-                    _kv("Tokens", _token_summary(benchmark)),
-                    _kv("Cost", _benchmark_path(benchmark, "cost", "status")),
-                    _kv(
-                        "Accepted decisions",
-                        _benchmark_path(benchmark, "quality", "acceptedDecisionCount"),
-                    ),
-                    _artifact_link_row(
-                        input_dir,
-                        link_base_dir,
-                        "Model benchmark",
-                        "model-benchmark.yaml",
-                    ),
-                    _details("Raw model benchmark", _yaml_dump(benchmark)),
-                ],
-            ),
-            "</main>",
-            "</body>",
-            "</html>",
-            "",
-        ]
+    contract_validation = (
+        _read_yaml(contract_validation_path)
+        if contract_validation_path is not None
+        else build_contract_validation(input_dir)
     )
+
+    return {
+        "pattern": str(report.get("pattern", handoff.get("pattern", "handoff"))),
+        "readiness": readiness,
+        "graphExports": graph_exports,
+        "acceptedDecisions": _dict(trace.get("acceptedDecisions")),
+        "graphDecisions": _graph_decisions(report),
+        "blockingGaps": _trace_list(trace, "gaps", "blocking"),
+        "resolvedGaps": _trace_list(trace, "gaps", "resolved"),
+        "blockingContradictions": _trace_list(trace, "contradictions", "blocking"),
+        "contractValidation": _coerce_list(contract_validation.get("contracts")),
+        "contractValidationArtifact": contract_validation,
+        "artifacts": _artifact_rows(input_dir, _artifact_names(input_dir, handoff, lineage)),
+        "handoff": handoff,
+        "trace": trace,
+        "benchmark": benchmark,
+        "rawEvidence": _raw_evidence(trace),
+        "links": {
+            "llmTrace": _artifact_href(input_dir, link_base_dir, "llm-trace-summary.yaml"),
+            "rawEvidence": _raw_evidence_href(link_base_dir, trace),
+            "modelBenchmark": _artifact_href(input_dir, link_base_dir, "model-benchmark.yaml"),
+            "contractValidation": _href(link_base_dir, contract_validation_path)
+            if contract_validation_path is not None
+            else None,
+        },
+    }
 
 
 def _write_graph_exports(input_dir: Path) -> dict[str, str]:
@@ -182,37 +122,27 @@ def _relative_graph_exports(
     graph_exports: dict[str, str],
 ) -> dict[str, str]:
     return {
-        key: _href(link_base_dir, input_dir / value)
+        key: _href_required(link_base_dir, input_dir / value)
         for key, value in graph_exports.items()
         if value
     }
 
 
-def _read_yaml(path: Path) -> dict[str, Any]:
-    if not path.exists():
+def _read_yaml(path: Path | None) -> dict[str, Any]:
+    if path is None or not path.exists():
         return {}
     yaml = ruamel.yaml.YAML(typ="safe")
     data = yaml.load(path.read_text())
     return data if isinstance(data, dict) else {}
 
 
-def _yaml_dump(data: Any) -> str:
-    from io import StringIO
-
-    yaml = ruamel.yaml.YAML()
-    yaml.default_flow_style = False
-    buf = StringIO()
-    yaml.dump(data, buf)
-    return buf.getvalue()
+def _dict(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
 
 
 def _readiness(report: dict[str, Any], handoff: dict[str, Any]) -> dict[str, Any]:
-    report_readiness = report.get("deploymentReadiness")
-    if not isinstance(report_readiness, dict):
-        report_readiness = {}
-    handoff_readiness = handoff.get("readiness")
-    if not isinstance(handoff_readiness, dict):
-        handoff_readiness = {}
+    report_readiness = _dict(report.get("deploymentReadiness"))
+    handoff_readiness = _dict(handoff.get("readiness"))
     allowed = bool(
         report_readiness.get(
             "deploymentAllowed",
@@ -234,11 +164,6 @@ def _readiness(report: dict[str, Any], handoff: dict[str, Any]) -> dict[str, Any
             report_readiness.get("blockers", handoff_readiness.get("blockers", []))
         ),
     }
-
-
-def _accepted_decisions(trace: dict[str, Any]) -> dict[str, Any]:
-    accepted = trace.get("acceptedDecisions")
-    return accepted if isinstance(accepted, dict) else {}
 
 
 def _graph_decisions(report: dict[str, Any]) -> dict[str, Any]:
@@ -271,6 +196,16 @@ def _artifact_names(input_dir: Path, handoff: dict[str, Any], lineage: dict[str,
     return sorted(dict.fromkeys(name for name in names if name))
 
 
+def _artifact_rows(input_dir: Path, artifacts: list[str]) -> list[dict[str, str]]:
+    return [
+        {
+            "name": artifact,
+            "status": "present" if (input_dir / artifact).exists() else "missing",
+        }
+        for artifact in artifacts
+    ]
+
+
 def _raw_evidence(trace: dict[str, Any]) -> str:
     raw = trace.get("rawEvidence")
     if not isinstance(raw, dict):
@@ -280,308 +215,33 @@ def _raw_evidence(trace: dict[str, Any]) -> str:
     return f"{status} ({path})" if path else str(status)
 
 
-def _contract_validation(
-    input_dir: Path,
-    report: dict[str, Any],
-    handoff: dict[str, Any],
-    readiness: dict[str, Any],
-) -> list[dict[str, Any]]:
-    contracts = []
-    if readiness["deploymentAllowed"]:
-        pattern = str(report.get("pattern", handoff.get("pattern", "")) or "")
-        try:
-            pattern_obj = GLOBAL_REGISTRY.get(pattern)
-        except KeyError:
-            pattern_obj = None
-        if pattern_obj is not None:
-            contracts.extend(pattern_obj.contracts)
-            if pattern_obj.contracts:
-                contracts.append(HANDOFF_PLAN_CONTRACT)
-    else:
-        contracts.append(BLOCKED_ASSESSMENT_CONTRACT)
-
-    results = []
-    for contract in contracts:
-        violations = ContractValidator(contract).validate_artifacts(input_dir)
-        results.append(
-            {
-                "name": contract.name,
-                "kind": contract.kind,
-                "status": "pass" if not violations else "fail",
-                "violationCount": len(violations),
-                "violations": [
-                    {"code": violation.code, "message": violation.message}
-                    for violation in violations
-                ],
-            }
-        )
-    return results
-
-
-def _contract_table(results: list[dict[str, Any]]) -> str:
-    if not results:
-        return '<p class="muted">No contract validation available.</p>'
-    rows = []
-    for result in results:
-        status = str(result.get("status", "unknown"))
-        count = str(result.get("violationCount", "0"))
-        rows.append(
-            "<tr>"
-            f"<th>{escape(str(result.get('name', 'unknown')))}</th>"
-            f'<td class="{escape(status)}">{escape(status)}</td>'
-            f"<td>{escape(count)} violation(s)</td>"
-            "</tr>"
-        )
-    return "<table>" + "".join(rows) + "</table>"
-
-
-def _link_list(links: list[tuple[str, str]]) -> str:
-    active = [(label, href) for label, href in links if href]
-    if not active:
-        return '<p class="muted">No graph export files found.</p>'
-    items = "".join(
-        f'<li><a href="{escape(href)}">{escape(label)}</a></li>' for label, href in active
-    )
-    return f"<ul>{items}</ul>"
-
-
-def _artifact_link_row(
-    input_dir: Path,
-    link_base_dir: Path,
-    label: str,
-    artifact_name: str,
-) -> str:
+def _artifact_href(input_dir: Path, link_base_dir: Path, artifact_name: str) -> str | None:
     path = input_dir / artifact_name
     if not path.exists():
-        return _kv(label, "missing")
-    href = _href(link_base_dir, path)
-    return (
-        f'<div class="kv"><span>{escape(label)}</span>'
-        f'<strong><a href="{escape(href)}">{escape(artifact_name)}</a></strong></div>'
-    )
+        return None
+    return _href(link_base_dir, path)
 
 
-def _raw_evidence_link(input_dir: Path, link_base_dir: Path, trace: dict[str, Any]) -> str:
+def _raw_evidence_href(link_base_dir: Path, trace: dict[str, Any]) -> str | None:
     raw = trace.get("rawEvidence")
     if not isinstance(raw, dict):
-        return _kv("Raw evidence file", "unknown")
+        return None
     path = str(raw.get("path", ""))
     if not path or path == "not-requested":
-        return _kv("Raw evidence file", "not-requested")
+        return None
     evidence_path = Path(path)
-    href = _href(link_base_dir, evidence_path) if evidence_path.exists() else path
-    label = evidence_path.name if evidence_path.exists() else path
-    return (
-        f'<div class="kv"><span>Raw evidence file</span>'
-        f'<strong><a href="{escape(href)}">{escape(label)}</a></strong></div>'
-    )
+    return _href(link_base_dir, evidence_path) if evidence_path.exists() else path
 
 
-def _href(link_base_dir: Path, target: Path) -> str:
+def _href(link_base_dir: Path, target: Path | None) -> str | None:
+    if target is None:
+        return None
+    return _href_required(link_base_dir, target)
+
+
+def _href_required(link_base_dir: Path, target: Path) -> str:
     return Path(os.path.relpath(target, link_base_dir)).as_posix()
-
-
-def _benchmark_path(benchmark: dict[str, Any], section: str, key: str) -> str:
-    value = benchmark.get(section)
-    if not isinstance(value, dict):
-        return "unknown"
-    return str(value.get(key, "unknown"))
-
-
-def _token_summary(benchmark: dict[str, Any]) -> str:
-    tokens = benchmark.get("tokens")
-    if not isinstance(tokens, dict):
-        return "unknown"
-    status = tokens.get("status", "unknown")
-    total = tokens.get("totalTokens", 0)
-    return f"{status}, total={total}"
-
-
-def _section(title: str, body: list[str]) -> str:
-    return "\n".join(
-        [
-            "<section>",
-            f"<h2>{escape(title)}</h2>",
-            *body,
-            "</section>",
-        ]
-    )
-
-
-def _kv(label: str, value: str) -> str:
-    return f'<div class="kv"><span>{escape(label)}</span><strong>{escape(value)}</strong></div>'
-
-
-def _list_block(title: str, items: list[Any]) -> str:
-    if not items:
-        return f'<h3>{escape(title)}</h3><p class="muted">None</p>'
-    rendered = "".join(f"<li>{escape(_summarize(item))}</li>" for item in items)
-    return f"<h3>{escape(title)}</h3><ul>{rendered}</ul>"
-
-
-def _mapping_table(data: dict[str, Any]) -> str:
-    if not data:
-        return '<p class="muted">None</p>'
-    rows = []
-    for key, value in sorted(data.items()):
-        rows.append(
-            f"<tr><th>{escape(str(key))}</th><td><pre>{escape(_summarize(value))}</pre></td></tr>"
-        )
-    return "<table>" + "".join(rows) + "</table>"
-
-
-def _artifact_table(input_dir: Path, artifacts: list[str]) -> str:
-    if not artifacts:
-        return '<p class="muted">No artifacts found.</p>'
-    rows = []
-    for name in artifacts:
-        path = input_dir / name
-        status = "present" if path.exists() else "missing"
-        rows.append(f'<tr><th>{escape(name)}</th><td class="{status}">{status}</td></tr>')
-    return "<table>" + "".join(rows) + "</table>"
-
-
-def _handoff_steps(handoff: dict[str, Any]) -> str:
-    steps = handoff.get("steps")
-    if not isinstance(steps, list) or not steps:
-        return '<p class="muted">No handoff plan found.</p>'
-    items = []
-    for step in steps:
-        if not isinstance(step, dict):
-            continue
-        title = str(step.get("title", step.get("id", "step")))
-        owner = str(step.get("owner", "unknown"))
-        depends = ", ".join(str(item) for item in _coerce_list(step.get("dependsOn", [])))
-        gate = "manual gate" if step.get("manualGate") else "automated"
-        items.append(
-            "<li>"
-            f"<strong>{escape(title)}</strong>"
-            f"<span>Owner: {escape(owner)} | {escape(gate)}</span>"
-            f"<span>Depends on: {escape(depends or 'none')}</span>"
-            "</li>"
-        )
-    return '<ol class="steps">' + "".join(items) + "</ol>"
-
-
-def _details(title: str, content: str) -> str:
-    return f"<details><summary>{escape(title)}</summary><pre>{escape(content)}</pre></details>"
 
 
 def _coerce_list(value: Any) -> list[Any]:
     return value if isinstance(value, list) else []
-
-
-def _summarize(value: Any) -> str:
-    if isinstance(value, dict | list):
-        return _yaml_dump(value).strip()
-    return str(value)
-
-
-_CSS = """
-:root {
-  color-scheme: light;
-  --bg: #f7f7f4;
-  --panel: #ffffff;
-  --text: #1f2933;
-  --muted: #667085;
-  --line: #d9d9d0;
-  --ok: #0f766e;
-  --warn: #a16207;
-  --bad: #b42318;
-}
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font: 14px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-main {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: 32px 20px 48px;
-}
-header {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 24px;
-}
-header p {
-  color: var(--muted);
-  margin: 0;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  font-size: 12px;
-}
-h1, h2, h3 { margin: 0; }
-h1 { font-size: 32px; }
-h2 { font-size: 20px; margin-bottom: 14px; }
-h3 { font-size: 15px; margin: 16px 0 8px; }
-section {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 18px;
-  margin: 14px 0;
-}
-.status {
-  justify-self: start;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: #e7f8f5;
-  color: var(--ok);
-  font-weight: 700;
-}
-.status.blocked { background: #fff4ed; color: var(--bad); }
-.kv {
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  gap: 16px;
-  border-top: 1px solid var(--line);
-  padding: 10px 0;
-}
-.kv span, .muted { color: var(--muted); }
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-th, td {
-  border-top: 1px solid var(--line);
-  padding: 9px 8px;
-  text-align: left;
-  vertical-align: top;
-}
-th { width: 280px; font-weight: 650; }
-pre {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
-ul, ol { margin: 0; padding-left: 22px; }
-.steps li {
-  margin: 10px 0;
-}
-.steps span {
-  display: block;
-  color: var(--muted);
-}
-.present { color: var(--ok); font-weight: 700; }
-.pass { color: var(--ok); font-weight: 700; }
-.missing { color: var(--bad); font-weight: 700; }
-.fail { color: var(--bad); font-weight: 700; }
-a { color: #155eef; }
-details {
-  border-top: 1px solid var(--line);
-  padding-top: 12px;
-}
-summary {
-  cursor: pointer;
-  font-weight: 700;
-  margin-bottom: 10px;
-}
-@media (max-width: 720px) {
-  .kv { grid-template-columns: 1fr; gap: 4px; }
-  th { width: auto; display: block; border-top: 1px solid var(--line); }
-  td { display: block; border-top: 0; }
-}
-"""

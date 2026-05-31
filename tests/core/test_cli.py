@@ -131,6 +131,17 @@ class TestGraphCommand:
         assert "Unknown graph export format" in result.output
 
 
+class TestPatternCommand:
+    def test_pattern_check_default(self):
+        result = runner.invoke(app, ["pattern", "check", "--pattern", "aws-lza"])
+
+        assert result.exit_code == 0, result.output
+        assert "Pattern check passed: aws-lza" in result.stdout
+        assert "Requirements:" in result.stdout
+        assert "Contracts:" in result.stdout
+        assert "Samples:" in result.stdout
+
+
 class TestSampleCommand:
     def test_sample_list_shows_registered_samples(self):
         result = runner.invoke(app, ["sample", "list", "--pattern", "aws-lza"])

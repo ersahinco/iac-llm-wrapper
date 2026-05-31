@@ -80,6 +80,7 @@ uv run python scripts/evaluate-extraction.py
 uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b
 uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b --evidence-dir /tmp/iac-llm-evidence
 uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b
+uv run python scripts/battle-test.py --fixture aws-lza-complex-enterprise-handoff --llm --provider ollama --model qwen2.5:7b
 ```
 
 These compile checked-in role/eval fixtures, compare handoff artifacts against
@@ -88,6 +89,12 @@ expected outcomes, and verify LLM evidence when `--llm` is enabled.
 Every compile writes `model-benchmark.yaml` next to the handoff artifacts. Use it
 to compare provider/model behavior, latency, token reporting, readiness, and
 decision/gap counts without adding a UI or observability service to this repo.
+`battle-test.py` keeps full local review bundles under ignored `tests/results/`.
+Compare multiple runs with:
+
+```bash
+uv run python scripts/compare-model-benchmarks.py tests/results/*/model-benchmark.yaml
+```
 
 ## LLM vs Deterministic Fallback
 

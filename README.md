@@ -102,6 +102,8 @@ uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwe
 uv run python scripts/evaluate-usability.py
 uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b
 uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b --evidence-dir /tmp/iac-llm-evidence
+uv run python scripts/battle-test.py --fixture aws-lza-complex-enterprise-handoff --llm --provider ollama --model qwen2.5:7b
+uv run python scripts/compare-model-benchmarks.py tests/results/*/model-benchmark.yaml
 ```
 
 The eval loop compiles docs in `fixtures/eval/`, compares decision values,
@@ -112,6 +114,8 @@ It also includes a CloudFormation parameter handoff trial to prove BYOM
 orchestration beyond Terraform without generating a stack.
 Deterministic mode is the CI harness gate; `--llm` is the model-quality gate.
 Use `--evidence-dir` to keep prompt/response YAML for inspection.
+Use `battle-test.py` for repeatable local artifact bundles under ignored
+`tests/results/`.
 
 Install from PyPI:
 
@@ -182,6 +186,9 @@ iac-llm-wrapper graph export --pattern aws-lza --format json
 # See required AWS LZA handoff files, decisions, and lineage paths
 iac-llm-wrapper contract show --pattern aws-lza
 
+# Check a pattern's graph, contracts, samples, and expected artifact surface
+iac-llm-wrapper pattern check --pattern aws-lza
+
 # See pinned reference bundles for engineer handoff
 iac-llm-wrapper sample list --contract aws-lza-sample-configuration
 ```
@@ -221,7 +228,8 @@ The page summarizes readiness, allowed next action, blockers, decisions,
 requirement graph exports, contract validation, artifacts, handoff-plan steps,
 raw evidence links, LLM trace summary, and model benchmark without running a
 server. It writes `requirement-graph.json` and `requirement-graph.mmd` beside
-the handoff artifacts for external viewers.
+the handoff artifacts for external viewers, and writes `contract-validation.yaml`
+for tools that should not scrape HTML.
 
 ### 5. Engineer Handoff
 
@@ -417,11 +425,14 @@ uv run python scripts/evaluate-extraction.py
 uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b
 uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b --evidence-dir /tmp/iac-llm-evidence
 uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b
+uv run python scripts/battle-test.py --fixture aws-lza-complex-enterprise-handoff --llm --provider ollama --model qwen2.5:7b
+uv run python scripts/compare-model-benchmarks.py tests/results/*/model-benchmark.yaml
 ```
 
 Each compile also emits `model-benchmark.yaml`. It is intentionally artifact
 only: provider/model, latency, token availability, readiness, decision/gap
 counts, and cost-estimation status are captured for external analysis tools.
+Battle-test outputs are local, ignored, and written under `tests/results/`.
 
 See [docs/LLM_SETUP.md](docs/LLM_SETUP.md) for detailed model setup and troubleshooting.
 
