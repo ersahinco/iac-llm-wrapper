@@ -263,9 +263,29 @@ class TestCLIReview:
         assert "Readiness" in html
         assert "Accepted Decisions" in html
         assert "Graph Decisions" in html
+        assert "Requirement Graph" in html
+        assert "requirement-graph.json" in html
+        assert "requirement-graph.mmd" in html
+        assert (output_dir / "requirement-graph.json").exists()
+        assert (output_dir / "requirement-graph.mmd").exists()
+        assert "Contract Validation" in html
+        assert "aws-lza-sample-configuration" in html
+        assert "generic-handoff-plan" in html
         assert "Target Artifacts" in html
         assert "Trace Summary" in html
+        assert "llm-trace-summary.yaml" in html
         assert "Model Benchmark" in html
+        assert "model-benchmark.yaml" in html
+
+        outside_review = tmp_path / "handoff-review.html"
+        outside_result = runner.invoke(
+            app,
+            ["review", "html", "--input", str(output_dir), "--output", str(outside_review)],
+        )
+        assert outside_result.exit_code == 0, outside_result.output
+        outside_html = outside_review.read_text()
+        assert f"{output_dir.name}/requirement-graph.json" in outside_html
+        assert f"{output_dir.name}/llm-trace-summary.yaml" in outside_html
 
     def test_review_html_requires_input_and_output(self):
         result = runner.invoke(app, ["review", "html"])

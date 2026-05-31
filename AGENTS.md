@@ -119,7 +119,7 @@ T17: Harden lean intent-to-IaC orchestration surface
 | Fixtures | AWS LZA emitted bundles, K8s emitted bundle, usability docs, eval corpus |
 | Cleanup | Removed old LZA research path, old diff/apply surfaces, extension registry, old fixtures/tests/helpers, global normalizer/defaults no-op surface, unused discovery hook fields, no-contract artifact fallback, overlapping capability doc |
 | Product docs | Standard root docs (`README`, `CONTRIBUTING`, `CHANGELOG`, `RELEASING`, `SECURITY`) define current lean DevOps workflow and product boundary |
-| Observability | Lean `llm-trace-summary.yaml`, `model-benchmark.yaml`, and static review page for provider/model, rounded latency, token availability, cost-estimation status, raw and accepted decisions, applied decisions, resolved/blocking gaps, blocking contradictions, and raw evidence status; old flat aliases removed |
+| Observability | Lean `llm-trace-summary.yaml`, `model-benchmark.yaml`, static review page, graph export links, raw evidence links, and contract validation details for provider/model, rounded latency, token availability, cost-estimation status, raw and accepted decisions, applied decisions, resolved/blocking gaps, blocking contradictions, and raw evidence status; old flat aliases removed |
 | Language | Docs now use consistent terms: requirement graph, target contract, decision record, handoff artifact, provisioning toolchain |
 
 ### Next
@@ -154,3 +154,4 @@ T17: Harden lean intent-to-IaC orchestration surface
 - Template/suggestion category fallbacks now match current built-in pattern categories.
 - `model-benchmark.yaml` is derived from existing trace data; it records run mode, provider/model, latency, token availability, readiness, decision/gap/contradiction counts, parse errors, cost-estimation status, and the boundary that external tools may visualize it but readiness stays graph/contract-owned.
 - OpenAI-compatible backends preserve provider token usage when the API reports it; local models that do not report usage remain explicit `not-reported` instead of guessed.
+- Static review HTML now writes and links `requirement-graph.json` plus `requirement-graph.mmd`, links trace/benchmark/raw-evidence artifacts, and renders contract validation pass/fail details without adding a server or JS app.

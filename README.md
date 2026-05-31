@@ -218,8 +218,10 @@ iac-llm-wrapper review html --input out/ --output out/handoff-review.html
 ```
 
 The page summarizes readiness, allowed next action, blockers, decisions,
-artifacts, handoff-plan steps, LLM trace summary, and model benchmark without
-running a server.
+requirement graph exports, contract validation, artifacts, handoff-plan steps,
+raw evidence links, LLM trace summary, and model benchmark without running a
+server. It writes `requirement-graph.json` and `requirement-graph.mmd` beside
+the handoff artifacts for external viewers.
 
 ### 5. Engineer Handoff
 
