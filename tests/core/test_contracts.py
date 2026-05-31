@@ -291,6 +291,47 @@ rawEvidence:
   status: not-requested
 """
         )
+        (tmp_path / "model-benchmark.yaml").write_text(
+            """schemaVersion: intent-engine/model-benchmark/v1
+pattern: aws-lza
+run:
+  mode: deterministic
+  provider: none
+  model: none
+  callCount: 0
+readiness:
+  status: blocked
+  deploymentAllowed: false
+  blockerCount: 1
+latency:
+  totalMs: 0.0
+  averageMs: 0.0
+  maxMs: 0.0
+tokens:
+  status: not-reported
+  promptTokens: 0
+  completionTokens: 0
+  totalTokens: 0
+quality:
+  acceptedDecisionCount: 0
+  rawLlmDecisionCount: 0
+  rawLlmSignalDecisionCount: 0
+  appliedDecisionCounts: {}
+  resolvedGapCount: 0
+  blockingGapCount: 0
+  rawGapCount: 0
+  blockingContradictionCount: 0
+  rawContradictionCount: 0
+  parseErrorCount: 0
+cost:
+  status: not-estimated
+rawEvidence:
+  path: not-requested
+  status: not-requested
+boundary: Trace artifact only.
+calls: []
+"""
+        )
 
         assert ContractValidator(BLOCKED_ASSESSMENT_CONTRACT).validate_artifacts(tmp_path) == []
 

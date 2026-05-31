@@ -104,6 +104,10 @@ class TestCLICompile:
         assert "rawEvidence:" in trace
         assert "extractedDecisions:" not in trace
         assert "rawEvidencePath:" not in trace
+        benchmark = (output_dir / "model-benchmark.yaml").read_text()
+        assert "mode: deterministic" in benchmark
+        assert "deploymentAllowed: false" in benchmark
+        assert "blockingGapCount:" in benchmark
 
     def test_compile_duplicate_structured_decision_blocks(self, tmp_path: Path, monkeypatch):
         monkeypatch.setenv("INTENT_ENGINE_DISABLE_LLM", "1")
@@ -261,6 +265,7 @@ class TestCLIReview:
         assert "Graph Decisions" in html
         assert "Target Artifacts" in html
         assert "Trace Summary" in html
+        assert "Model Benchmark" in html
 
     def test_review_html_requires_input_and_output(self):
         result = runner.invoke(app, ["review", "html"])

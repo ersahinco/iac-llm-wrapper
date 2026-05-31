@@ -19,6 +19,7 @@ def render_review_html(input_dir: Path) -> str:
     """Render a static HTML review page from generated handoff artifacts."""
     report = _read_yaml(input_dir / "decision-report.yaml")
     trace = _read_yaml(input_dir / "llm-trace-summary.yaml")
+    benchmark = _read_yaml(input_dir / "model-benchmark.yaml")
     handoff = _read_yaml(input_dir / "handoff-plan.yaml")
     lineage = _read_yaml(input_dir / "lineage-manifest.yaml")
     readiness = _readiness(report, handoff)
@@ -75,6 +76,20 @@ def render_review_html(input_dir: Path) -> str:
                     _kv("Call count", str(trace.get("callCount", "0"))),
                     _kv("Raw evidence", _raw_evidence(trace)),
                     _details("Raw trace summary", _yaml_dump(trace)),
+                ],
+            ),
+            _section(
+                "Model Benchmark",
+                [
+                    _kv("Mode", _benchmark_path(benchmark, "run", "mode")),
+                    _kv("Latency total", f"{_benchmark_path(benchmark, 'latency', 'totalMs')} ms"),
+                    _kv("Tokens", _token_summary(benchmark)),
+                    _kv("Cost", _benchmark_path(benchmark, "cost", "status")),
+                    _kv(
+                        "Accepted decisions",
+                        _benchmark_path(benchmark, "quality", "acceptedDecisionCount"),
+                    ),
+                    _details("Raw model benchmark", _yaml_dump(benchmark)),
                 ],
             ),
             "</main>",
@@ -177,6 +192,22 @@ def _raw_evidence(trace: dict[str, Any]) -> str:
     return f"{status} ({path})" if path else str(status)
 
 
+def _benchmark_path(benchmark: dict[str, Any], section: str, key: str) -> str:
+    value = benchmark.get(section)
+    if not isinstance(value, dict):
+        return "unknown"
+    return str(value.get(key, "unknown"))
+
+
+def _token_summary(benchmark: dict[str, Any]) -> str:
+    tokens = benchmark.get("tokens")
+    if not isinstance(tokens, dict):
+        return "unknown"
+    status = tokens.get("status", "unknown")
+    total = tokens.get("totalTokens", 0)
+    return f"{status}, total={total}"
+
+
 def _section(title: str, body: list[str]) -> str:
     return "\n".join(
         [
@@ -252,7 +283,7 @@ def _coerce_list(value: Any) -> list[Any]:
 
 
 def _summarize(value: Any) -> str:
-    if isinstance(value, (dict, list)):
+    if isinstance(value, dict | list):
         return _yaml_dump(value).strip()
     return str(value)
 

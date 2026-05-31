@@ -17,6 +17,7 @@ from intent_engine.core.llm_caller import (
     LLMEvidenceStore,
     create_backend,
 )
+from intent_engine.core.observability import build_model_benchmark
 
 
 class MockLLMBackend(LLMBackend):
@@ -80,6 +81,21 @@ class TestLLMCaller:
         assert evidence.response == "hello world"
         assert evidence.prompt == "say hello"
 
+    def test_call_captures_backend_token_usage(self):
+        backend = MockLLMBackend("hello world")
+        backend.last_token_usage = {
+            "prompt_tokens": 11,
+            "completion_tokens": 4,
+            "total_tokens": 15,
+        }
+        _, evidence = LLMCaller(backend).call("say hello")
+
+        assert evidence.token_usage == {
+            "prompt_tokens": 11,
+            "completion_tokens": 4,
+            "total_tokens": 15,
+        }
+
 
 class TestLLMEvidence:
     def test_to_dict(self):
@@ -105,6 +121,59 @@ class TestLLMEvidenceStore:
         store.record(ev)
         assert store.to_dict()["calls"][0]["prompt"] == "p"
         assert store.to_dict()["calls"][0]["response"] == "r"
+
+
+class TestModelBenchmark:
+    def test_build_model_benchmark_rolls_up_trace_fields(self):
+        benchmark = build_model_benchmark(
+            {
+                "pattern": "aws-lza",
+                "provider": "ollama",
+                "model": "qwen2.5:7b",
+                "calls": [
+                    {
+                        "provider": "ollama",
+                        "model": "qwen2.5:7b",
+                        "latencyMs": 10.04,
+                        "tokenUsage": {
+                            "prompt_tokens": 7,
+                            "completion_tokens": 5,
+                            "total_tokens": 12,
+                        },
+                    },
+                    {
+                        "provider": "ollama",
+                        "model": "qwen2.5:7b",
+                        "latencyMs": 20.02,
+                        "tokenUsage": {
+                            "prompt_tokens": 3,
+                            "completion_tokens": 2,
+                            "total_tokens": 5,
+                        },
+                        "parseError": "bad json",
+                    },
+                ],
+                "acceptedDecisions": {"home_region": "eu-central-1"},
+                "rawLlmDecisions": {"home_region": "eu-central-1"},
+                "rawLlmSignalDecisions": {},
+                "appliedDecisions": {"llm": ["home_region"]},
+                "gaps": {"resolved": [{}], "blocking": [], "raw": [{}]},
+                "contradictions": {"blocking": [], "raw": []},
+                "deploymentReadiness": {
+                    "status": "ready",
+                    "deploymentAllowed": True,
+                    "blockerCount": 0,
+                },
+            }
+        )
+
+        assert benchmark["run"]["mode"] == "llm"
+        assert benchmark["latency"]["totalMs"] == 30.1
+        assert benchmark["tokens"]["status"] == "captured"
+        assert benchmark["tokens"]["totalTokens"] == 17
+        assert benchmark["quality"]["acceptedDecisionCount"] == 1
+        assert benchmark["quality"]["parseErrorCount"] == 1
+        assert benchmark["cost"]["status"] == "not-estimated"
 
 
 class TestCreateBackend:
@@ -198,12 +267,18 @@ class TestEndToEndLLM:
         assert "deploymentAllowed: true" in report
         assert (output / "lineage-manifest.yaml").exists()
         assert (output / "llm-trace-summary.yaml").exists()
+        assert (output / "model-benchmark.yaml").exists()
         trace = (output / "llm-trace-summary.yaml").read_text()
         assert "mockllm" in trace
         assert "rawLlmDecisions:" in trace
         assert "acceptedDecisions:" in trace
         assert "extractedDecisions:" not in trace
         assert "rawEvidencePath:" not in trace
+        benchmark = (output / "model-benchmark.yaml").read_text()
+        assert "schemaVersion: intent-engine/model-benchmark/v1" in benchmark
+        assert "mode: llm" in benchmark
+        assert "acceptedDecisionCount:" in benchmark
+        assert "status: not-estimated" in benchmark
         assert not (output / "terraform.tfvars").exists()
 
     def test_llm_contradiction_blocks_compile_with_assessment(self, tmp_path: Path):

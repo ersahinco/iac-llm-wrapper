@@ -85,6 +85,10 @@ uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen
 These compile checked-in role/eval fixtures, compare handoff artifacts against
 expected outcomes, and verify LLM evidence when `--llm` is enabled.
 
+Every compile writes `model-benchmark.yaml` next to the handoff artifacts. Use it
+to compare provider/model behavior, latency, token reporting, readiness, and
+decision/gap counts without adding a UI or observability service to this repo.
+
 ## LLM vs Deterministic Fallback
 
 ### With LLM (Model-Assisted Path)
@@ -131,6 +135,7 @@ full architect intent.
 - Try a larger model (7B+)
 - Use `--decisions` JSON for critical values
 - Check the LLM evidence output: `--evidence-output evidence.yaml`
+- Check `model-benchmark.yaml` for latency, parse errors, and decision/gap counts
 
 ### Ollama Not Detected
 - Verify Ollama is running: `curl http://localhost:11434/api/tags`

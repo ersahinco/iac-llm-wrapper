@@ -19,6 +19,7 @@ expect:
   artifacts:
     - decision-report.yaml
     - llm-trace-summary.yaml
+    - model-benchmark.yaml
   contracts:
     - blocked-assessment-artifacts
   trace:

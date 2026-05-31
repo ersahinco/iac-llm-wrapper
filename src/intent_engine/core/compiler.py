@@ -16,6 +16,7 @@ from .markdown_extractor import (
     extract_from_markdown_with_diagnostics,
 )
 from .model_introspection import append_to_list_field, merge_into_list_field
+from .observability import build_model_benchmark
 from .patterns import GLOBAL_REGISTRY
 from .validator import Violation, validate
 
@@ -296,6 +297,7 @@ def _build_extraction_summary(
                 "provider": _readable_provider(entry.get("backend", "unknown")),
                 "model": entry.get("model", "unknown"),
                 "latencyMs": round(float(entry.get("latency_ms", 0) or 0), 1),
+                "tokenUsage": entry.get("token_usage", {}),
                 "parseError": entry.get("parse_error"),
             }
         )
@@ -376,6 +378,11 @@ def _write_failed_compile_artifacts(
         },
     )
     _write_yaml_artifact(output_dir, "llm-trace-summary.yaml", extraction_summary)
+    _write_yaml_artifact(
+        output_dir,
+        "model-benchmark.yaml",
+        build_model_benchmark(extraction_summary),
+    )
 
 
 class LLMContextProvider:

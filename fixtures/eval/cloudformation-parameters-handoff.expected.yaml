@@ -14,6 +14,7 @@ expect:
     - decision-report.yaml
     - handoff-plan.yaml
     - llm-trace-summary.yaml
+    - model-benchmark.yaml
   trace:
     required:
       - rawLlmDecisions

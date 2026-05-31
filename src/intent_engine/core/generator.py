@@ -246,6 +246,16 @@ def gen_llm_trace_summary(intent: Any, output_dir: Path) -> None:
     _write(output_dir, "llm-trace-summary.yaml", summary)
 
 
+def gen_model_benchmark(intent: Any, output_dir: Path) -> None:
+    """Write model behavior rollups from the extraction trace."""
+    summary = getattr(intent, "extraction_summary", None)
+    if not summary:
+        return
+    from .observability import build_model_benchmark
+
+    _write(output_dir, "model-benchmark.yaml", build_model_benchmark(summary))
+
+
 def _artifact_owner(artifact_name: str) -> str:
     lowered = artifact_name.lower()
     if "security" in lowered or "iam" in lowered:
@@ -357,6 +367,7 @@ def gen_handoff_plan(intent: Any, output_dir: Path) -> None:
 register_generator("design-doc", gen_design_doc, priority=4, category="meta")
 register_generator("module-inputs", gen_module_inputs, priority=5, category="meta")
 register_generator("llm-trace-summary", gen_llm_trace_summary, priority=5, category="meta")
+register_generator("model-benchmark", gen_model_benchmark, priority=5, category="meta")
 register_generator("handoff-plan", gen_handoff_plan, priority=6, category="meta")
 register_generator(
     "sample-recommendations",

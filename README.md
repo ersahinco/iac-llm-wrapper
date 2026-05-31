@@ -204,10 +204,12 @@ For `aws-lza`, successful output includes:
 - `sample-recommendations.yaml` — closest pinned reference bundles for handoff
 - `llm-trace-summary.yaml` — provider/model, calls, raw and accepted decisions,
   resolved/blocking gaps, blocking contradictions, and raw evidence status
+- `model-benchmark.yaml` — latency, token, quality, readiness, and cost-status
+  rollups for LLM evaluation without embedding an observability platform
 
 When compile is blocked, only safe assessment artifacts are written:
-`decision-report.yaml` and `llm-trace-summary.yaml`. They must satisfy the
-built-in `blocked-assessment-artifacts` contract.
+`decision-report.yaml`, `llm-trace-summary.yaml`, and `model-benchmark.yaml`.
+They must satisfy the built-in `blocked-assessment-artifacts` contract.
 
 Generate a portable static review page when humans need one file to inspect:
 
@@ -216,7 +218,8 @@ iac-llm-wrapper review html --input out/ --output out/handoff-review.html
 ```
 
 The page summarizes readiness, allowed next action, blockers, decisions,
-artifacts, handoff-plan steps, and LLM trace summary without running a server.
+artifacts, handoff-plan steps, LLM trace summary, and model benchmark without
+running a server.
 
 ### 5. Engineer Handoff
 
@@ -413,6 +416,10 @@ uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwe
 uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b --evidence-dir /tmp/iac-llm-evidence
 uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b
 ```
+
+Each compile also emits `model-benchmark.yaml`. It is intentionally artifact
+only: provider/model, latency, token availability, readiness, decision/gap
+counts, and cost-estimation status are captured for external analysis tools.
 
 See [docs/LLM_SETUP.md](docs/LLM_SETUP.md) for detailed model setup and troubleshooting.
 

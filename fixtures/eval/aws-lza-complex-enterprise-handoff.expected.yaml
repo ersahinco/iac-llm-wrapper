@@ -78,6 +78,7 @@ expect:
     - decision-report.yaml
     - handoff-plan.yaml
     - llm-trace-summary.yaml
+    - model-benchmark.yaml
     - lineage-manifest.yaml
     - deployment-runbook.md
     - sample-recommendations.yaml

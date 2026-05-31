@@ -98,12 +98,12 @@ T17: Harden lean intent-to-IaC orchestration surface
 
 ### Status
 
-- **Tests**: 272 passing, 1 skipped
+- **Tests**: 274 passing, 1 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added graph JSON/Mermaid export, static handoff review HTML, and battle-tested both against a complex enterprise AWS LZA handoff; full gate green
+- **Last session**: Added artifact-first `model-benchmark.yaml`, preserved provider token usage when reported, included benchmark data in static review, and battle-tested with local Ollama on complex enterprise AWS LZA; full gate green
 
 ### Done
 
@@ -114,18 +114,18 @@ T17: Harden lean intent-to-IaC orchestration surface
 | AWS LZA | Contract-backed LZA handoff YAML, IAM Identity Center permission sets/assignments, decision report/readiness, lineage manifest, deployment runbook, sample recommendations, focused pattern modules |
 | Contracts | Required artifacts, required paths, required decisions, lineage checks, value assertions, blocked assessment artifacts, contract-backed generic handoff plan |
 | Samples | Registry-backed `sample list/show`, match recommendations, fixture sync/drift guard |
-| LLM | Ollama/OpenAI-compatible backend factory, evidence store, local LLM integration tests, graph-scoped prompts and blocking findings |
+| LLM | Ollama/OpenAI-compatible backend factory, evidence store, provider token usage capture, local LLM integration tests, graph-scoped prompts and blocking findings |
 | Evaluation | Deterministic extraction gold corpus with AWS LZA standard/complex/blocked cases and CloudFormation pass/fail cases, trace quality assertions, optional LLM evidence capture, and role-based usability trials including CloudFormation BYOM |
 | Fixtures | AWS LZA emitted bundles, K8s emitted bundle, usability docs, eval corpus |
 | Cleanup | Removed old LZA research path, old diff/apply surfaces, extension registry, old fixtures/tests/helpers, global normalizer/defaults no-op surface, unused discovery hook fields, no-contract artifact fallback, overlapping capability doc |
 | Product docs | Standard root docs (`README`, `CONTRIBUTING`, `CHANGELOG`, `RELEASING`, `SECURITY`) define current lean DevOps workflow and product boundary |
-| Observability | Lean `llm-trace-summary.yaml` and static review page for provider/model, rounded latency, raw and accepted decisions, applied decisions, resolved/blocking gaps, blocking contradictions, and raw evidence status; old flat aliases removed |
+| Observability | Lean `llm-trace-summary.yaml`, `model-benchmark.yaml`, and static review page for provider/model, rounded latency, token availability, cost-estimation status, raw and accepted decisions, applied decisions, resolved/blocking gaps, blocking contradictions, and raw evidence status; old flat aliases removed |
 | Language | Docs now use consistent terms: requirement graph, target contract, decision record, handoff artifact, provisioning toolchain |
 
 ### Next
 
-1. Run local LLM usability with evidence output when Ollama is available; deterministic usability remains green.
-2. Use local LLM trace quality findings to tune prompts only when deterministic harness cannot classify the issue.
+1. Run local LLM usability with evidence output when new models are available; deterministic usability remains green.
+2. Use `model-benchmark.yaml` and local LLM trace quality findings to tune prompts only when deterministic harness cannot classify the issue.
 3. Continue AWS LZA schema depth only where real customer inputs justify it.
 4. Keep repo-internal docs lean: product scope in `README.md`/`docs/`, workflow in `CONTRIBUTING.md`/`AGENTS.md`.
 
@@ -152,3 +152,5 @@ T17: Harden lean intent-to-IaC orchestration surface
 - Artifact validation is contract-owned; pattern-level no-contract artifact fields were removed.
 - README and AWS LZA docs now describe only current graph-backed behavior; stale CI/CD, hybrid, network appliance, and normalization claims were removed.
 - Template/suggestion category fallbacks now match current built-in pattern categories.
+- `model-benchmark.yaml` is derived from existing trace data; it records run mode, provider/model, latency, token availability, readiness, decision/gap/contradiction counts, parse errors, cost-estimation status, and the boundary that external tools may visualize it but readiness stays graph/contract-owned.
+- OpenAI-compatible backends preserve provider token usage when the API reports it; local models that do not report usage remain explicit `not-reported` instead of guessed.

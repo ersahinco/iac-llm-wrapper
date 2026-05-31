@@ -34,6 +34,7 @@ class OpenAICompatibleBackend(LLMBackend):
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
         self.model = model
         self.timeout = timeout
+        self.last_token_usage: dict[str, int] = {}
 
     def complete(self, prompt: str, **kwargs: Any) -> str:
         headers: dict[str, str] = {
@@ -71,6 +72,16 @@ class OpenAICompatibleBackend(LLMBackend):
                     continue
                 response.raise_for_status()
                 data = response.json()
+                usage = data.get("usage")
+                self.last_token_usage = (
+                    {
+                        "prompt_tokens": int(usage.get("prompt_tokens", 0) or 0),
+                        "completion_tokens": int(usage.get("completion_tokens", 0) or 0),
+                        "total_tokens": int(usage.get("total_tokens", 0) or 0),
+                    }
+                    if isinstance(usage, dict)
+                    else {}
+                )
                 return str(data["choices"][0]["message"]["content"])
             except requests.exceptions.Timeout as exc:
                 last_exc = exc
@@ -170,9 +181,16 @@ class LLMCaller:
         latency_ms = (time.perf_counter() - start) * 1000
 
         token_usage = {}
+        backend_usage = getattr(self.backend, "last_token_usage", {})
+        if isinstance(backend_usage, dict):
+            token_usage = {
+                str(key): int(value or 0)
+                for key, value in backend_usage.items()
+                if key in {"prompt_tokens", "completion_tokens", "total_tokens"}
+            }
         try:
             data = json.loads(response)
-            if "usage" in data:
+            if "usage" in data and not token_usage:
                 token_usage = {
                     "prompt_tokens": data["usage"].get("prompt_tokens", 0),
                     "completion_tokens": data["usage"].get("completion_tokens", 0),

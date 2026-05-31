@@ -317,7 +317,7 @@ def compile(
         if e.readiness and not dry_run:
             typer.echo(
                 "Safe assessment artifacts written to output: "
-                "decision-report.yaml, llm-trace-summary.yaml",
+                "decision-report.yaml, llm-trace-summary.yaml, model-benchmark.yaml",
                 err=True,
             )
         _write_evidence_output(evidence_output, evidence_store)
