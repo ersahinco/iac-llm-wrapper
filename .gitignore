@@ -30,4 +30,6 @@ htmlcov/
 
 # Generated
 output/
+tests/results/*
+!tests/results/.gitkeep
 *.generated.yaml
