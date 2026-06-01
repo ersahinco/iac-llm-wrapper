@@ -50,6 +50,10 @@ IaC delivery. LLMs read human intent and surface missing or conflicting decision
 Deterministic models, graphs, contracts, validators, lineage, runbooks, and evals
 decide when handoff, generation, or execution is allowed.
 
+Use [docs/GLOSSARY.md](docs/GLOSSARY.md) for the shared project language:
+intent, decision, requirement graph, target contract, handoff artifact,
+readiness, allowed next action, pattern, battle test, and evidence.
+
 ## Quick Start (Ollama + uv)
 
 Run entirely locally with a 3B parameter model:
@@ -378,6 +382,8 @@ GLOBAL_REGISTRY.register(
 ```
 
 See the [extension guide](docs/EXTENSION.md) for the full contract.
+Use [docs/PATTERN_AUTHORING.md](docs/PATTERN_AUTHORING.md) as the checklist for
+adding or changing a pattern.
 
 ## Architecture
 

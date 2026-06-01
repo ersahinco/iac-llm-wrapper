@@ -1,0 +1,61 @@
+# Glossary
+
+Shared language for `iac-llm-wrapper`.
+
+## Intent
+
+Architect or engineer input, usually Markdown prose. Intent is source material,
+not trusted truth. The tool extracts candidate decisions from it.
+
+## Decision
+
+A structured value accepted by the requirement graph. Decisions are the values
+that validation, contracts, and handoff artifacts may rely on.
+
+## Raw LLM Decision
+
+A model-proposed value before graph acceptance. Raw LLM decisions are preserved
+for audit and debugging, but they do not become authoritative unless they map to
+known graph requirements.
+
+## Requirement Graph
+
+The source of truth for decision keys, ordering, applicability, dependencies,
+defaults, blocking gaps, cascades, and contradiction handling.
+
+## Target Contract
+
+The contract for a target handoff shape: required artifacts, required paths,
+required decisions, value assertions, and lineage checks.
+
+## Handoff Artifact
+
+A file emitted for humans or downstream IaC toolchains. Current handoff artifacts
+are not deployments and do not make cloud changes.
+
+## Readiness
+
+The status that says whether a handoff is ready, blocked, or missing required
+input. Readiness is graph- and contract-owned, not model-owned.
+
+## Allowed Next Action
+
+The next safe action recorded in `handoff-plan.yaml`. It should tell an engineer
+what can happen next without implying deployment when the bundle is blocked.
+
+## Pattern
+
+A product path plugin. A pattern owns its Pydantic model, requirement graph,
+contracts, validators, sample configs, and artifact generators.
+
+## Battle Test
+
+A repeatable local confidence run that writes an ignored bundle under
+`tests/results/`. It emits `battle-summary.yaml` with verdict, confidence
+categories, findings, and improvement items.
+
+## Evidence
+
+Prompt, response, trace, benchmark, and validation data that explains how the
+bundle was produced. Evidence is for audit and improvement; it is not a separate
+source of authority.

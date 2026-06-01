@@ -98,36 +98,36 @@ T17: Harden lean intent-to-IaC orchestration surface
 
 ### Status
 
-- **Tests**: 275 passing, 1 skipped
+- **Tests**: 282 passing, 1 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added explicit `battle-summary.yaml` verdicts to battle-test bundles, covering extraction, handoff, safety, model value, and regression confidence; battle-tested deterministic ready, deterministic blocked, and local Ollama complex AWS LZA; full gate green
+- **Last session**: Extracted battle-summary verdict logic into a tested core module, added lean glossary and pattern authoring docs, and kept the battle-test script as a thin runner; full gate green
 
 ### Done
 
 | Area | Item |
 |------|------|
-| Core | models, extractor, requirements, lazy built-in pattern registry, patterns, interview, discovery, validator, generator, graph export, static review, review renderer, contracts, contract validation, samples, module mapping, CLI |
+| Core | models, extractor, requirements, lazy built-in pattern registry, patterns, interview, discovery, validator, generator, graph export, static review, review renderer, contracts, contract validation, battle summary, samples, module mapping, CLI |
 | Patterns | `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, `terraform-vpc` |
 | AWS LZA | Contract-backed LZA handoff YAML, IAM Identity Center permission sets/assignments, decision report/readiness, lineage manifest, deployment runbook, sample recommendations, focused pattern modules |
 | Contracts | Required artifacts, required paths, required decisions, lineage checks, value assertions, blocked assessment artifacts, contract-backed generic handoff plan |
 | Samples | Registry-backed `sample list/show`, match recommendations, fixture sync/drift guard |
 | LLM | Ollama/OpenAI-compatible backend factory, evidence store, provider token usage capture, local LLM integration tests, graph-scoped prompts and blocking findings |
-| Evaluation | Deterministic extraction gold corpus with AWS LZA standard/complex/blocked cases and CloudFormation pass/fail cases, trace quality assertions, optional LLM evidence capture, and role-based usability trials including CloudFormation BYOM |
+| Evaluation | Deterministic extraction gold corpus with AWS LZA standard/complex/blocked cases and CloudFormation pass/fail cases, trace quality assertions, battle-summary verdict unit tests, optional LLM evidence capture, and role-based usability trials including CloudFormation BYOM |
 | Fixtures | AWS LZA emitted bundles, K8s emitted bundle, usability docs, eval corpus |
 | Cleanup | Removed old LZA research path, old diff/apply surfaces, extension registry, old fixtures/tests/helpers, global normalizer/defaults no-op surface, unused discovery hook fields, no-contract artifact fallback, overlapping capability doc |
-| Product docs | Standard root docs (`README`, `CONTRIBUTING`, `CHANGELOG`, `RELEASING`, `SECURITY`) define current lean DevOps workflow and product boundary |
+| Product docs | Standard root docs (`README`, `CONTRIBUTING`, `CHANGELOG`, `RELEASING`, `SECURITY`) plus lean glossary and pattern authoring docs define current DevOps workflow, product boundary, and shared language |
 | Observability | Lean `llm-trace-summary.yaml`, `model-benchmark.yaml`, `contract-validation.yaml`, `battle-summary.yaml`, static review page, graph export links, raw evidence links, benchmark comparison, and contract validation details for provider/model, rounded latency, token availability, cost-estimation status, raw and accepted decisions, applied decisions, resolved/blocking gaps, blocking contradictions, raw evidence status, and battle verdicts; old flat aliases removed |
-| Language | Docs now use consistent terms: requirement graph, target contract, decision record, handoff artifact, provisioning toolchain |
+| Language | Docs now use consistent terms: intent, decision, raw LLM decision, requirement graph, target contract, handoff artifact, readiness, allowed next action, pattern, battle test, evidence, provisioning toolchain |
 
 ### Next
 
 1. Run local LLM usability with evidence output when new models are available; deterministic usability remains green.
 2. Use `scripts/battle-test.py`, `battle-summary.yaml`, `model-benchmark.yaml`, and `scripts/compare-model-benchmarks.py` to tune prompts only when deterministic harness cannot classify the issue.
 3. Continue AWS LZA schema depth only where real customer inputs justify it.
-4. Keep repo-internal docs lean: product scope in `README.md`/`docs/`, workflow in `CONTRIBUTING.md`/`AGENTS.md`.
+4. Keep repo-internal docs lean: product scope in `README.md`/`docs/`, workflow in `CONTRIBUTING.md`/`AGENTS.md`; avoid new docs unless they reduce repeated explanation.
 
 ### Key Decisions This Session
 
@@ -156,7 +156,9 @@ T17: Harden lean intent-to-IaC orchestration surface
 - OpenAI-compatible backends preserve provider token usage when the API reports it; local models that do not report usage remain explicit `not-reported` instead of guessed.
 - Static review HTML now writes and links `requirement-graph.json` plus `requirement-graph.mmd`, links trace/benchmark/raw-evidence artifacts, and renders contract validation pass/fail details without adding a server or JS app.
 - `scripts/battle-test.py` writes repeatable local bundles under ignored `tests/results/` and emits `battle-summary.yaml` with a verdict, confidence categories, findings, and improvement items.
+- Battle-summary scoring lives in `src/intent_engine/core/battle_summary.py`; `scripts/battle-test.py` stays a thin local harness runner.
 - Battle summaries treat expected blocked cases as pass when they remain blocked for clear graph/contract reasons and still emit review/validation artifacts.
 - LLM battles can pass with `expected-weakness` findings when deterministic Markdown carried the value and the model added no accepted decisions; that limitation becomes an explicit improvement item instead of hidden optimism.
 - The latest AWS LZA complex deterministic run was ready with 20 accepted decisions, and the local `llama3.2:3b` run was ready with 4437 tokens, 81410.2 ms latency, 20 accepted decisions, zero parse errors, contract validation pass, and model confidence marked as expected weakness.
 - `iac-llm-wrapper pattern check --pattern aws-lza` validates graph shape, contract graph alignment, expected artifact names, and sample fixture presence.
+- `docs/GLOSSARY.md` owns ubiquitous language; `docs/PATTERN_AUTHORING.md` owns the contributor checklist, while `docs/EXTENSION.md` remains the detailed API contract.

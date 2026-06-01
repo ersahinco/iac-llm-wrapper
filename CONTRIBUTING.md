@@ -56,8 +56,10 @@ The deterministic fallback (`INTENT_ENGINE_DISABLE_LLM=1`) exists for unit tests
 
 ## Extension guide
 
-See [docs/EXTENSION.md](docs/EXTENSION.md) for the exact contract for adding new target
-patterns and requirements.
+Use [docs/GLOSSARY.md](docs/GLOSSARY.md) for shared project language. Use
+[docs/PATTERN_AUTHORING.md](docs/PATTERN_AUTHORING.md) as the checklist for
+adding or changing a pattern. See [docs/EXTENSION.md](docs/EXTENSION.md) for the
+exact API contract for new target patterns and requirements.
 
 ## Code conventions
 
