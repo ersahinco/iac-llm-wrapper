@@ -244,8 +244,9 @@ They must satisfy the built-in `blocked-assessment-artifacts` contract.
 
 Generate a portable static review page when humans need one file to inspect.
 The page starts with readiness, contract status, allowed next action, raw LLM
-coverage, missing raw decision keys, and expected model weaknesses so reviewers
-do not have to open YAML first:
+coverage, missing raw decision keys, expected model weaknesses, and blocker
+traceability to requirement keys/questions so reviewers do not have to open YAML
+first:
 
 ```bash
 iac-llm-wrapper review html --input out/ --output out/handoff-review.html

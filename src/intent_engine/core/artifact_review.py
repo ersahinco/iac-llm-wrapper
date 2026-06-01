@@ -89,6 +89,7 @@ def build_review_context(
         "blockingGaps": blocking_gaps,
         "resolvedGaps": _trace_list(trace, "gaps", "resolved"),
         "blockingContradictions": blocking_contradictions,
+        "blockerRows": _blocker_rows(str(report.get("pattern", "")), readiness),
         "contractValidation": _coerce_list(contract_validation.get("contracts")),
         "contractValidationArtifact": contract_validation,
         "contractStatus": contract_status,
@@ -194,6 +195,81 @@ def _readiness(report: dict[str, Any], handoff: dict[str, Any]) -> dict[str, Any
 def _graph_decisions(report: dict[str, Any]) -> dict[str, Any]:
     ignored = {"deploymentReadiness", "handoffReadiness"}
     return {key: value for key, value in report.items() if key not in ignored}
+
+
+def _blocker_rows(pattern: str, readiness: dict[str, Any]) -> list[dict[str, str]]:
+    requirements_by_code, requirements_by_key = _requirement_indexes(pattern)
+    missing_by_reason = {
+        str(item.get("reason", "")): item
+        for item in _coerce_list(readiness.get("missingDecisions"))
+        if isinstance(item, dict)
+    }
+    conflicting_codes = {
+        str(item.get("code", ""))
+        for item in _coerce_list(readiness.get("conflictingDecisions"))
+        if isinstance(item, dict)
+    }
+    rows: list[dict[str, str]] = []
+    for blocker in _coerce_list(readiness.get("blockers")):
+        if not isinstance(blocker, dict):
+            continue
+        code = str(blocker.get("code", "unknown"))
+        message = str(blocker.get("message", ""))
+        requirement = requirements_by_code.get(code)
+        missing = missing_by_reason.get(message)
+        key = str(missing.get("key", "")) if isinstance(missing, dict) else ""
+        if not key and requirement is not None:
+            key = requirement.key
+        if not key:
+            key = _markdown_contradiction_key(code, message)
+        if requirement is None and key:
+            requirement = requirements_by_key.get(key)
+        rows.append(
+            {
+                "code": code,
+                "message": message,
+                "requirementKey": key or "unknown",
+                "label": str(missing.get("label", "") if isinstance(missing, dict) else "")
+                or (requirement.label if requirement is not None else "unknown"),
+                "question": str(missing.get("question", "") if isinstance(missing, dict) else "")
+                or (requirement.question if requirement is not None else "unknown"),
+                "resolutionType": _resolution_type(code, key, conflicting_codes),
+            }
+        )
+    return rows
+
+
+def _requirement_indexes(pattern: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    if not pattern:
+        return {}, {}
+    try:
+        graph = GLOBAL_REGISTRY.get(pattern).create_graph()
+    except KeyError:
+        return {}, {}
+    by_code = {
+        req.violation_code: req
+        for req in graph._requirements.values()
+        if req.violation_code is not None
+    }
+    by_key = {req.key: req for req in graph._requirements.values()}
+    return by_code, by_key
+
+
+def _markdown_contradiction_key(code: str, message: str) -> str:
+    if code.startswith("MARKDOWN_CONTRADICTION_"):
+        return code.removeprefix("MARKDOWN_CONTRADICTION_").lower()
+    marker = "decision '"
+    if marker not in message:
+        return ""
+    return message.split(marker, 1)[1].split("'", 1)[0]
+
+
+def _resolution_type(code: str, key: str, conflicting_codes: set[str]) -> str:
+    if code in conflicting_codes or code.startswith("MARKDOWN_CONTRADICTION_"):
+        return "conflicting"
+    if key and key != "unknown":
+        return "missing"
+    return "blocker"
 
 
 def _trace_list(trace: dict[str, Any], section: str, key: str) -> list[Any]:

@@ -85,6 +85,7 @@ def render_review_html(context: dict[str, Any]) -> str:
                 [
                     _kv("Handoff ready", str(readiness.get("deploymentAllowed", False))),
                     _kv("Allowed next action", str(readiness.get("allowedNextAction", ""))),
+                    _blocker_table(_coerce_list(context.get("blockerRows"))),
                     _list_block("Blockers", _coerce_list(readiness.get("blockers"))),
                     _list_block(
                         "Missing decisions",
@@ -240,6 +241,31 @@ def _contract_table(results: list[Any]) -> str:
             "</tr>"
         )
     return "<table>" + "".join(rows) + "</table>"
+
+
+def _blocker_table(rows: list[Any]) -> str:
+    if not rows:
+        return '<p class="muted">No blocker traceability rows.</p>'
+    rendered = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        rendered.append(
+            "<tr>"
+            f"<th>{escape(str(row.get('code', 'unknown')))}</th>"
+            f"<td>{escape(str(row.get('resolutionType', 'blocker')))}</td>"
+            f"<td>{escape(str(row.get('requirementKey', 'unknown')))}</td>"
+            f"<td>{escape(str(row.get('question', 'unknown')))}</td>"
+            f"<td>{escape(str(row.get('message', '')))}</td>"
+            "</tr>"
+        )
+    if not rendered:
+        return '<p class="muted">No blocker traceability rows.</p>'
+    header = (
+        "<tr><th>Code</th><th>Type</th><th>Requirement key</th>"
+        "<th>Question</th><th>Message</th></tr>"
+    )
+    return "<h3>Blocker Traceability</h3><table>" + header + "".join(rendered) + "</table>"
 
 
 def _artifact_table(artifacts: list[Any]) -> str:

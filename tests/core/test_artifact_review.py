@@ -30,7 +30,14 @@ def _write_review_bundle(input_dir: Path, *, mode: str = "llm") -> Path:
                 "status": "blocked",
                 "deploymentAllowed": False,
                 "blockers": [{"code": "MISSING_NETWORK", "message": "Network missing"}],
-                "missingDecisions": [{"key": "network_account"}],
+                "missingDecisions": [
+                    {
+                        "key": "network_account",
+                        "label": "Network Account",
+                        "reason": "Network missing",
+                        "question": "Which account owns shared networking?",
+                    }
+                ],
                 "conflictingDecisions": [{"code": "CIDR_CONFLICT"}],
                 "safeHandoffPath": ["Resolve network ownership."],
             },
@@ -116,7 +123,14 @@ def test_build_review_context_uses_report_readiness_and_artifact_rows(tmp_path: 
     assert context["readiness"]["status"] == "blocked"
     assert context["readiness"]["deploymentAllowed"] is False
     assert context["readiness"]["allowedNextAction"] == "Resolve blockers."
-    assert context["readiness"]["missingDecisions"] == [{"key": "network_account"}]
+    assert context["readiness"]["missingDecisions"] == [
+        {
+            "key": "network_account",
+            "label": "Network Account",
+            "reason": "Network missing",
+            "question": "Which account owns shared networking?",
+        }
+    ]
     assert context["readiness"]["conflictingDecisions"] == [{"code": "CIDR_CONFLICT"}]
     assert context["readiness"]["safeHandoffPath"] == ["Resolve network ownership."]
     assert context["graphDecisions"] == {
@@ -125,6 +139,16 @@ def test_build_review_context_uses_report_readiness_and_artifact_rows(tmp_path: 
     }
     assert context["acceptedDecisions"] == {"organization_name": "Contoso"}
     assert context["blockingGaps"] == [{"key": "network_account"}]
+    assert context["blockerRows"] == [
+        {
+            "code": "MISSING_NETWORK",
+            "message": "Network missing",
+            "requirementKey": "network_account",
+            "label": "Network Account",
+            "question": "Which account owns shared networking?",
+            "resolutionType": "missing",
+        }
+    ]
     assert context["contractValidation"][0]["name"] == "example-contract"
     assert context["contractStatus"] == "fail"
     assert context["reviewSummary"]["contractStatus"] == "fail"
@@ -165,6 +189,9 @@ def test_render_review_html_uses_existing_graph_exports(tmp_path: Path):
     assert "Blocking gap count" in html
     assert "Missing decisions" in html
     assert "Safe handoff path" in html
+    assert "Blocker Traceability" in html
+    assert "Requirement key" in html
+    assert "Which account owns shared networking?" in html
     assert "Contract status" in html
     assert "Raw LLM coverage" in html
     assert "0/1" in html
