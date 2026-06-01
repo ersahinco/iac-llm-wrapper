@@ -116,6 +116,8 @@ uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwe
 uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b --evidence-dir /tmp/iac-llm-evidence
 uv run python scripts/evaluate-golden-journey.py
 uv run python scripts/evaluate-golden-journey.py --llm --provider ollama --model qwen2.5:7b
+uv run python scripts/evaluate-golden-journey.py --llm --provider ollama --model qwen2.5:7b --require-conformant
+uv run python scripts/evaluate-golden-journey.py --llm --provider ollama --model qwen2.5:7b --keep-output tests/results/golden-qwen2.5-7b --benchmark-output tests/results/golden-qwen2.5-7b.yaml
 uv run python scripts/evaluate-usability.py
 uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b
 uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b --evidence-dir /tmp/iac-llm-evidence
@@ -130,7 +132,9 @@ on misses. The golden journey loop is the quickest product-confidence check:
 it compiles the customer-style AWS LZA fixture with `--no-raw-evidence`, writes
 `handoff-review.html`, and verifies readiness, allowed next action, contracts,
 manual gates, target artifacts, trace summary, model benchmark conformance, and
-raw evidence omission. The usability loop checks role-based trials for architect gap
+raw evidence omission. Use `--require-conformant` when an LLM run must prove
+`conformance=pass`; use `--benchmark-output` to keep the compact model summary
+without opening the full artifact bundle. The usability loop checks role-based trials for architect gap
 discovery, engineer handoff, and bring-your-own Terraform module input capture.
 It also includes a CloudFormation parameter handoff trial to prove BYOM
 orchestration beyond Terraform without generating a stack, plus static review

@@ -88,6 +88,8 @@ uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwe
 uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b --evidence-dir /tmp/iac-llm-evidence
 uv run python scripts/evaluate-golden-journey.py
 uv run python scripts/evaluate-golden-journey.py --llm --provider ollama --model qwen2.5:7b
+uv run python scripts/evaluate-golden-journey.py --llm --provider ollama --model qwen2.5:7b --require-conformant
+uv run python scripts/evaluate-golden-journey.py --llm --provider ollama --model qwen2.5:7b --keep-output tests/results/golden-qwen2.5-7b --benchmark-output tests/results/golden-qwen2.5-7b.yaml
 uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b
 uv run python scripts/battle-test.py --fixture aws-lza-complex-enterprise-handoff --llm --provider ollama --model qwen2.5:7b
 ```
@@ -100,7 +102,10 @@ verify LLM evidence when `--llm` is enabled. Use
 the customer-style AWS LZA fixture through service-style compile
 (`--no-raw-evidence`), static review generation, readiness checks, contract and
 manual-gate checks, target artifact checks, trace/benchmark checks, and model
-conformance visibility.
+conformance visibility. Add `--require-conformant` when the run should fail
+unless the model has `conformance=pass`; add `--benchmark-output` when you want
+a compact YAML summary of readiness, model, raw coverage, raw missing decisions,
+and conformance.
 
 Every compile writes `model-benchmark.yaml` next to the handoff artifacts. Use it
 to compare provider/model behavior, latency, token reporting, readiness, raw LLM

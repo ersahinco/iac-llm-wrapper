@@ -58,6 +58,7 @@ class JourneyConfig:
     use_llm: bool
     provider: str
     model: str
+    require_conformant: bool
 
     @property
     def mode(self) -> str:
@@ -69,6 +70,7 @@ class JourneyResult:
     status: str
     failures: list[str]
     output_dir: Path
+    benchmark_summary: dict[str, Any]
 
 
 def _yaml_load(path: Path) -> dict[str, Any]:
@@ -126,7 +128,7 @@ def _evaluate(config: JourneyConfig, output_dir: Path) -> JourneyResult:
     if compile_proc.returncode != 0:
         failures.append("compile command failed")
         failures.append((compile_proc.stderr or compile_proc.stdout).strip())
-        return JourneyResult("FAIL", failures, output_dir)
+        return JourneyResult("FAIL", failures, output_dir, {})
 
     review_proc = _run_cli(
         [
@@ -142,10 +144,17 @@ def _evaluate(config: JourneyConfig, output_dir: Path) -> JourneyResult:
     if review_proc.returncode != 0:
         failures.append("review html command failed")
         failures.append((review_proc.stderr or review_proc.stdout).strip())
-        return JourneyResult("FAIL", failures, output_dir)
+        return JourneyResult("FAIL", failures, output_dir, {})
 
     failures.extend(_validate_output(config, output_dir))
-    return JourneyResult("PASS" if not failures else "FAIL", failures, output_dir)
+    benchmark_summary = _benchmark_summary(output_dir / "model-benchmark.yaml")
+    failures.extend(_required_conformance_failures(config, benchmark_summary))
+    return JourneyResult(
+        "PASS" if not failures else "FAIL",
+        failures,
+        output_dir,
+        benchmark_summary,
+    )
 
 
 def _validate_output(config: JourneyConfig, output_dir: Path) -> list[str]:
@@ -284,6 +293,46 @@ def _validate_benchmark(config: JourneyConfig, benchmark: dict[str, Any]) -> lis
     return failures
 
 
+def _benchmark_summary(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    benchmark = _yaml_load(path)
+    run = _dict(benchmark.get("run"))
+    readiness = _dict(benchmark.get("readiness"))
+    quality = _dict(benchmark.get("quality"))
+    conformance = _dict(benchmark.get("conformance"))
+    accepted = int(quality.get("acceptedDecisionCount", 0) or 0)
+    raw_coverage = int(quality.get("rawLlmAcceptedCoverageCount", 0) or 0)
+    raw_missing = int(quality.get("rawLlmMissingAcceptedDecisionCount", 0) or 0)
+    return {
+        "mode": str(run.get("mode", "unknown")),
+        "provider": str(run.get("provider", "unknown")),
+        "model": str(run.get("model", "unknown")),
+        "readiness": str(readiness.get("status", "unknown")),
+        "conformance": str(conformance.get("status", "unknown")),
+        "conformanceReason": str(conformance.get("reason", "")),
+        "accepted": accepted,
+        "rawCoverage": f"{raw_coverage}/{accepted}" if accepted else "0/0",
+        "rawMissing": raw_missing,
+        "missingKeys": [
+            str(item) for item in _coerce_list(quality.get("rawLlmMissingAcceptedDecisions"))
+        ],
+        "parseErrors": int(quality.get("parseErrorCount", 0) or 0),
+    }
+
+
+def _required_conformance_failures(
+    config: JourneyConfig,
+    benchmark_summary: dict[str, Any],
+) -> list[str]:
+    if not config.require_conformant or not config.use_llm:
+        return []
+    conformance = str(benchmark_summary.get("conformance", "unknown"))
+    if conformance == "pass":
+        return []
+    return [f"LLM golden journey is not conformant: {conformance}"]
+
+
 def _validate_review_html(html: str) -> list[str]:
     failures: list[str] = []
     signals = [
@@ -339,6 +388,16 @@ def main() -> int:
     parser.add_argument("--provider", default="ollama", help="LLM provider when --llm is set.")
     parser.add_argument("--model", default="", help="LLM model when --llm is set.")
     parser.add_argument(
+        "--require-conformant",
+        action="store_true",
+        help="Exit non-zero unless an LLM golden journey has conformance=pass.",
+    )
+    parser.add_argument(
+        "--benchmark-output",
+        type=Path,
+        help="Optional path to write a compact golden journey benchmark summary.",
+    )
+    parser.add_argument(
         "--keep-output",
         type=Path,
         help="Directory to keep the generated golden journey bundle.",
@@ -351,6 +410,7 @@ def main() -> int:
         use_llm=args.llm,
         provider=args.provider,
         model=args.model,
+        require_conformant=args.require_conformant,
     )
     if not config.fixture.exists():
         print(f"Missing fixture: {config.fixture}", file=sys.stderr)
@@ -362,8 +422,26 @@ def main() -> int:
     else:
         with tempfile.TemporaryDirectory() as temp_dir:
             result = _evaluate(config, Path(temp_dir))
+            _write_benchmark_summary(args.benchmark_output, result.benchmark_summary)
             return _print_result(result, config)
+    _write_benchmark_summary(args.benchmark_output, result.benchmark_summary)
     return _print_result(result, config)
+
+
+def _write_benchmark_summary(path: Path | None, summary: dict[str, Any]) -> None:
+    if path is None:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    yaml = ruamel.yaml.YAML()
+    yaml.default_flow_style = False
+    with path.open("w") as handle:
+        yaml.dump(
+            {
+                "schemaVersion": "intent-engine/golden-journey-benchmark/v1",
+                **summary,
+            },
+            handle,
+        )
 
 
 def _print_result(result: JourneyResult, config: JourneyConfig) -> int:
@@ -371,6 +449,12 @@ def _print_result(result: JourneyResult, config: JourneyConfig) -> int:
     print(f"Mode: {config.mode}")
     print(f"Fixture: {config.fixture}")
     print(f"Output: {result.output_dir}")
+    if result.benchmark_summary:
+        print(f"Readiness: {result.benchmark_summary.get('readiness', 'unknown')}")
+        print(f"Model: {result.benchmark_summary.get('model', 'unknown')}")
+        print(f"Raw coverage: {result.benchmark_summary.get('rawCoverage', '0/0')}")
+        print(f"Raw missing: {result.benchmark_summary.get('rawMissing', 0)}")
+        print(f"Conformance: {result.benchmark_summary.get('conformance', 'unknown')}")
     if result.failures:
         print("Failures:")
         for failure in result.failures:

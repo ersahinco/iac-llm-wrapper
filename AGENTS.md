@@ -95,23 +95,23 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy.
 
 ### Current Goal
 
-T27: Golden customer journey harness
+T28: LLM golden journey conformance baseline
 
 ### Status
 
-- **Tests**: 316 passing, 1 skipped
+- **Tests**: 319 passing, 1 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added `scripts/evaluate-golden-journey.py` as the canonical customer-doc to reviewed-handoff harness. It compiles the AWS LZA customer board-notes fixture with `--no-raw-evidence`, generates `handoff-review.html`, and verifies readiness, allowed next action, contracts, manual gates, target artifacts, trace summary, model benchmark conformance, and raw evidence omission.
+- **Last session**: Added LLM conformance enforcement and compact benchmark output to the golden journey harness. `scripts/evaluate-golden-journey.py` now prints readiness/model/raw coverage/raw missing/conformance, supports `--require-conformant` for LLM model-quality gates, and can write a compact `intent-engine/golden-journey-benchmark/v1` summary with `--benchmark-output`.
 
 ### Done
 
 - Core: graph-driven extraction/discovery/interview/validation, pattern registry, contracts, handoff generation, static review, contract validation, benchmark/battle artifacts, sample matching, and CLI commands are implemented and covered.
 - Built-ins: `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, and `terraform-vpc` are contract-backed handoff paths. Current built-ins make no cloud API calls and do not deploy from prose.
 - Evaluation: deterministic extraction corpus includes clean, blocked, BYOM, and customer-style prose cases; role usability trials, forbidden-artifact checks, fixture drift guard, contract validation tests, battle-summary tests, static review tests, stakeholder handoff-confidence checks, and full repo gate are green.
-- Golden journey: `scripts/evaluate-golden-journey.py` is the quickest product-confidence check for the core promise: messy customer-style AWS LZA notes to service-style reviewed handoff bundle.
+- Golden journey: `scripts/evaluate-golden-journey.py` is the quickest product-confidence check for the core promise: messy customer-style AWS LZA notes to service-style reviewed handoff bundle. It supports `--require-conformant` and `--benchmark-output` for model baseline checks.
 - Observability: `model-benchmark.yaml` now reports raw LLM coverage of accepted decisions, missing accepted keys, and model conformance (`pass`, `review`, `fail`, `not-applicable`); LLM battle summaries surface raw-model misses as expected weaknesses instead of hiding them behind deterministic Markdown success.
 - Model comparison: `scripts/compare-model-benchmarks.py` shows `rawCoverage`, `rawMissing`, `missingKeys`, and `conformance`; `--require-conformant` fails non-conformant LLM benchmark runs.
 - Static review: `handoff-review.html` starts with a human summary of readiness, contract status, allowed next action, blocker traceability, model conformance, raw LLM coverage, missing raw decision keys, and expected weaknesses.
@@ -121,9 +121,9 @@ T27: Golden customer journey harness
 
 ### Next
 
-1. Run `evaluate-golden-journey.py --llm`, `evaluate-extraction.py --llm`, `evaluate-usability.py --llm`, and `compare-model-benchmarks.py --require-conformant` with the approved Bedrock gateway model when available.
-2. If reviewers still struggle to resolve blockers, consider adding lightweight anchors from blocker rows to exported requirement graph nodes without adding JavaScript.
-3. Treat `qwen2.5:7b` AWS Identity Center misses and `llama3.2:3b` AWS broad misses as tracked model weaknesses unless future evidence shows a prompt-level fix.
+1. Add T29 golden blocked journey: messy blocked input to safe assessment artifacts, blocker ownership, requirement questions, and no deployable artifacts.
+2. Run `evaluate-golden-journey.py --llm --require-conformant`, `evaluate-extraction.py --llm`, `evaluate-usability.py --llm`, and `compare-model-benchmarks.py --require-conformant` with the approved Bedrock gateway model when available.
+3. If reviewers still struggle to resolve blockers, consider adding lightweight anchors from blocker rows to exported requirement graph nodes without adding JavaScript.
 4. Continue AWS LZA schema depth only where real customer inputs justify it.
 
 ### Durable Decisions
