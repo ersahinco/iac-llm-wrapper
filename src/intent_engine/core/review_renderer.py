@@ -43,6 +43,27 @@ def render_review_html(context: dict[str, Any]) -> str:
                 "Review Summary",
                 [
                     _kv("Readiness", str(review_summary.get("readiness", "unknown"))),
+                    _kv(
+                        "Deployment allowed",
+                        str(review_summary.get("deploymentAllowed", False)),
+                    ),
+                    _kv("Blocker count", str(review_summary.get("blockerCount", 0))),
+                    _kv(
+                        "Missing decision count",
+                        str(review_summary.get("missingDecisionCount", 0)),
+                    ),
+                    _kv(
+                        "Conflicting decision count",
+                        str(review_summary.get("conflictingDecisionCount", 0)),
+                    ),
+                    _kv(
+                        "Blocking gap count",
+                        str(review_summary.get("blockingGapCount", 0)),
+                    ),
+                    _kv(
+                        "Blocking contradiction count",
+                        str(review_summary.get("blockingContradictionCount", 0)),
+                    ),
                     _kv("Contract status", str(review_summary.get("contractStatus", "unknown"))),
                     _kv(
                         "Allowed next action",
@@ -65,6 +86,18 @@ def render_review_html(context: dict[str, Any]) -> str:
                     _kv("Handoff ready", str(readiness.get("deploymentAllowed", False))),
                     _kv("Allowed next action", str(readiness.get("allowedNextAction", ""))),
                     _list_block("Blockers", _coerce_list(readiness.get("blockers"))),
+                    _list_block(
+                        "Missing decisions",
+                        _coerce_list(readiness.get("missingDecisions")),
+                    ),
+                    _list_block(
+                        "Conflicting decisions",
+                        _coerce_list(readiness.get("conflictingDecisions")),
+                    ),
+                    _list_block(
+                        "Safe handoff path",
+                        _coerce_list(readiness.get("safeHandoffPath")),
+                    ),
                 ],
             ),
             _section(

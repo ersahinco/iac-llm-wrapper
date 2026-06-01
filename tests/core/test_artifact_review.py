@@ -30,6 +30,9 @@ def _write_review_bundle(input_dir: Path, *, mode: str = "llm") -> Path:
                 "status": "blocked",
                 "deploymentAllowed": False,
                 "blockers": [{"code": "MISSING_NETWORK", "message": "Network missing"}],
+                "missingDecisions": [{"key": "network_account"}],
+                "conflictingDecisions": [{"code": "CIDR_CONFLICT"}],
+                "safeHandoffPath": ["Resolve network ownership."],
             },
             "deploymentReadiness": {
                 "status": "blocked",
@@ -113,6 +116,9 @@ def test_build_review_context_uses_report_readiness_and_artifact_rows(tmp_path: 
     assert context["readiness"]["status"] == "blocked"
     assert context["readiness"]["deploymentAllowed"] is False
     assert context["readiness"]["allowedNextAction"] == "Resolve blockers."
+    assert context["readiness"]["missingDecisions"] == [{"key": "network_account"}]
+    assert context["readiness"]["conflictingDecisions"] == [{"code": "CIDR_CONFLICT"}]
+    assert context["readiness"]["safeHandoffPath"] == ["Resolve network ownership."]
     assert context["graphDecisions"] == {
         "pattern": "example-pattern",
         "organizationName": "Contoso",
@@ -122,6 +128,12 @@ def test_build_review_context_uses_report_readiness_and_artifact_rows(tmp_path: 
     assert context["contractValidation"][0]["name"] == "example-contract"
     assert context["contractStatus"] == "fail"
     assert context["reviewSummary"]["contractStatus"] == "fail"
+    assert context["reviewSummary"]["deploymentAllowed"] is False
+    assert context["reviewSummary"]["blockerCount"] == 1
+    assert context["reviewSummary"]["missingDecisionCount"] == 1
+    assert context["reviewSummary"]["conflictingDecisionCount"] == 1
+    assert context["reviewSummary"]["blockingGapCount"] == 1
+    assert context["reviewSummary"]["blockingContradictionCount"] == 0
     assert context["modelQuality"]["rawCoverage"] == "0/1"
     assert context["modelQuality"]["rawMissingCount"] == 1
     assert context["modelQuality"]["missingKeys"] == ["organization_name"]
@@ -146,6 +158,13 @@ def test_render_review_html_uses_existing_graph_exports(tmp_path: Path):
 
     assert "example-pattern handoff review" in html
     assert "Review Summary" in html
+    assert "Deployment allowed" in html
+    assert "Blocker count" in html
+    assert "Missing decision count" in html
+    assert "Conflicting decision count" in html
+    assert "Blocking gap count" in html
+    assert "Missing decisions" in html
+    assert "Safe handoff path" in html
     assert "Contract status" in html
     assert "Raw LLM coverage" in html
     assert "0/1" in html

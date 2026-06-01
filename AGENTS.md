@@ -94,7 +94,7 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy.
 
 ### Current Goal
 
-T23: Static review stakeholder usability contract
+T24: Blocked-bundle review ergonomics
 
 ### Status
 
@@ -103,7 +103,7 @@ T23: Static review stakeholder usability contract
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added a deterministic static-review stakeholder trial to `scripts/evaluate-usability.py`, covering architect, platform engineer, security reviewer, and model developer signals in generated `handoff-review.html`; fixed deterministic review summaries so raw LLM misses are only reported when an LLM actually ran.
+- **Last session**: Added blocked-bundle review ergonomics: `handoff-review.html` now surfaces deployment allowed, blocker count, missing/conflicting decision counts, blocking gap/contradiction counts, missing decisions, conflicting decisions, and safe handoff path; `scripts/evaluate-usability.py` now verifies a blocked AWS LZA review page exposes fail-closed signals.
 
 ### Done
 
@@ -113,14 +113,14 @@ T23: Static review stakeholder usability contract
 - Observability: `model-benchmark.yaml` now reports raw LLM coverage of accepted decisions and missing accepted keys; LLM battle summaries surface raw-model misses as expected weaknesses instead of hiding them behind deterministic Markdown success.
 - Model comparison: `scripts/compare-model-benchmarks.py` shows `rawCoverage`, `rawMissing`, and `missingKeys` so ready handoffs are not mistaken for strong raw-model extraction.
 - Static review: `handoff-review.html` starts with a human summary of readiness, contract status, allowed next action, raw LLM coverage, missing raw decision keys, and expected weaknesses.
-- Usability: `scripts/evaluate-usability.py` now includes a static-review stakeholder trial that verifies role-specific review-page signals from a real AWS LZA customer bundle.
+- Usability: `scripts/evaluate-usability.py` now includes ready and blocked static-review stakeholder trials that verify role-specific review-page signals from real AWS LZA customer bundles.
 - Cleanup: removed stale LZA research/extension/diff/apply/default-normalizer surfaces, no-contract artifact fallback, pattern `extra_artifacts`, duplicate fixture normalization, and stale duplicate LLM docs.
 - Language: user-facing docs now prefer handoff readiness; `deploymentReadiness` remains a legacy compatibility alias in artifacts. Docs now also state that secrets should travel as secret-store references and expected parameter names, never raw values.
 
 ### Next
 
-1. Run the static review trial with an approved Bedrock gateway model when available, then compare raw coverage and human-review signals against local baselines.
-2. Consider a tiny static-review fixture for an explicitly blocked bundle if reviewers need blocked-state ergonomics beyond existing context tests.
+1. Run the static review trials with an approved Bedrock gateway model when available, then compare raw coverage and human-review signals against local baselines.
+2. Consider whether blocked review pages should link directly from each blocker to the related requirement graph node if real reviewers still struggle to resolve ownership.
 3. Treat `qwen2.5:7b` AWS Identity Center misses and `llama3.2:3b` AWS broad misses as tracked model weaknesses unless future evidence shows a prompt-level fix.
 4. Continue AWS LZA schema depth only where real customer inputs justify it.
 

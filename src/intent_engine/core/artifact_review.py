@@ -64,12 +64,20 @@ def build_review_context(
     )
     model_quality = _model_quality(benchmark, trace)
     contract_status = _contract_status(contract_validation)
+    blocking_gaps = _trace_list(trace, "gaps", "blocking")
+    blocking_contradictions = _trace_list(trace, "contradictions", "blocking")
 
     return {
         "pattern": str(report.get("pattern", handoff.get("pattern", "handoff"))),
         "readiness": readiness,
         "reviewSummary": {
             "readiness": readiness.get("status", "unknown"),
+            "deploymentAllowed": readiness.get("deploymentAllowed", False),
+            "blockerCount": len(_coerce_list(readiness.get("blockers"))),
+            "missingDecisionCount": len(_coerce_list(readiness.get("missingDecisions"))),
+            "conflictingDecisionCount": len(_coerce_list(readiness.get("conflictingDecisions"))),
+            "blockingGapCount": len(blocking_gaps),
+            "blockingContradictionCount": len(blocking_contradictions),
             "contractStatus": contract_status,
             "allowedNextAction": readiness.get("allowedNextAction", ""),
             "modelQuality": model_quality,
@@ -78,9 +86,9 @@ def build_review_context(
         "graphExports": graph_exports,
         "acceptedDecisions": _dict(trace.get("acceptedDecisions")),
         "graphDecisions": _graph_decisions(report),
-        "blockingGaps": _trace_list(trace, "gaps", "blocking"),
+        "blockingGaps": blocking_gaps,
         "resolvedGaps": _trace_list(trace, "gaps", "resolved"),
-        "blockingContradictions": _trace_list(trace, "contradictions", "blocking"),
+        "blockingContradictions": blocking_contradictions,
         "contractValidation": _coerce_list(contract_validation.get("contracts")),
         "contractValidationArtifact": contract_validation,
         "contractStatus": contract_status,
@@ -159,20 +167,27 @@ def _readiness(report: dict[str, Any], handoff: dict[str, Any]) -> dict[str, Any
             handoff_readiness.get("deploymentAllowed", True),
         )
     )
+    status = str(report_readiness.get("status", handoff_readiness.get("status", "ready"))).lower()
+    default_action = (
+        "Resolve blockers before passing artifacts to an implementation toolchain."
+        if status == "blocked"
+        else "Review generated artifacts with the owning teams before handoff."
+    )
     return {
-        "status": str(
-            report_readiness.get("status", handoff_readiness.get("status", "ready"))
-        ).lower(),
+        "status": status,
         "deploymentAllowed": allowed,
         "allowedNextAction": str(
             handoff.get(
                 "allowedNextAction",
-                "Review generated artifacts with the owning teams before handoff.",
+                default_action,
             )
         ),
         "blockers": _coerce_list(
             report_readiness.get("blockers", handoff_readiness.get("blockers", []))
         ),
+        "missingDecisions": _coerce_list(report_readiness.get("missingDecisions")),
+        "conflictingDecisions": _coerce_list(report_readiness.get("conflictingDecisions")),
+        "safeHandoffPath": _coerce_list(report_readiness.get("safeHandoffPath")),
     }
 
 

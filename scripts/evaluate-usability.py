@@ -493,6 +493,93 @@ def _trial_static_review_stakeholders(config: TrialConfig) -> TrialResult:
     )
 
 
+def _trial_static_review_blocked(config: TrialConfig) -> TrialResult:
+    failures: list[str] = []
+    evidence_files: list[Path] = []
+    with tempfile.TemporaryDirectory() as temp_dir:
+        output_dir = Path(temp_dir)
+        evidence_path = _trial_evidence_path(config, "static-review-blocked", output_dir)
+        compile_proc = _run(
+            [
+                "compile",
+                "--input",
+                str(EVAL_DIR / "aws-lza-enterprise-messy-blocked.md"),
+                "--output",
+                str(output_dir),
+                "--pattern",
+                "aws-lza",
+            ],
+            config,
+            evidence_path,
+        )
+        if evidence_path is not None:
+            evidence_files.append(evidence_path)
+        if compile_proc.returncode == 0:
+            failures.append("blocked compile unexpectedly passed")
+
+        review_proc = _run(
+            [
+                "review",
+                "html",
+                "--input",
+                str(output_dir),
+                "--output",
+                str(output_dir / "handoff-review.html"),
+            ],
+            config,
+        )
+        if review_proc.returncode != 0:
+            failures.append("review html command failed")
+            failures.append((review_proc.stderr or review_proc.stdout).strip())
+            return TrialResult(
+                "review",
+                "static-review-blocked",
+                config.mode,
+                "FAIL",
+                failures,
+                evidence_files,
+            )
+
+        html = (output_dir / "handoff-review.html").read_text()
+        required_signals = [
+            "blocked",
+            "Deployment allowed",
+            "False",
+            "Blocker count",
+            "Blocking gap count",
+            "Allowed next action",
+            "Resolve blockers before passing artifacts to an implementation toolchain.",
+            "AWS_LZA_NETWORK_ACCOUNT_REQUIRED",
+            "AWS_LZA_IDENTITY_CENTER_PERMISSION_SETS_REQUIRED",
+            "AWS_LZA_IDENTITY_CENTER_ASSIGNMENTS_REQUIRED",
+            "AWS_LZA_HOME_REGION_NOT_ENABLED",
+            "MARKDOWN_CONTRADICTION_NETWORK_CIDR",
+            "network_account",
+            "identity_center_permission_sets",
+            "identity_center_assignments",
+            "Contract status",
+            "blocked-assessment-artifacts",
+            "Raw LLM coverage",
+        ]
+        for signal in required_signals:
+            if signal not in html:
+                failures.append(f"blocked review signal missing: {signal}")
+
+        for unexpected_file in ("main.tf", "terraform.tfvars", "terragrunt.hcl"):
+            if (output_dir / unexpected_file).exists():
+                failures.append(f"unexpected deployable artifact {unexpected_file}")
+        failures.extend(_evidence_failures(config, evidence_path))
+
+    return TrialResult(
+        "review",
+        "static-review-blocked",
+        config.mode,
+        "PASS" if not failures else "FAIL",
+        failures,
+        evidence_files,
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -521,6 +608,7 @@ def main() -> int:
         _trial_byom_terraform_vpc,
         _trial_byom_cloudformation_parameters,
         _trial_static_review_stakeholders,
+        _trial_static_review_blocked,
     ]
     results = [trial(config) for trial in trials]
 
