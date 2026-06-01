@@ -3,15 +3,66 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
+import ruamel.yaml
+
+from intent_engine.core.contracts import ArtifactContract, TargetContract
 from intent_engine.core.generator import (
     GeneratorRegistry,
     _hcl_value,
+    gen_handoff_plan,
     gen_sample_recommendations,
     gen_tfvars,
 )
 from intent_engine.core.module_mapping import IaCIntentPayload, ModuleInputs
+from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern
+from intent_engine.core.requirements import Requirement, RequirementGraph
 from intent_engine.core.sample_config import GLOBAL_SAMPLE_REGISTRY, SampleConfig
+
+
+def _yaml_load(path: Path) -> dict:
+    yaml = ruamel.yaml.YAML(typ="safe")
+    data = yaml.load(path.read_text())
+    assert isinstance(data, dict)
+    return data
+
+
+def _handoff_graph() -> RequirementGraph:
+    graph = RequirementGraph()
+    graph.add(
+        Requirement(
+            key="region",
+            label="Region",
+            question="Which region?",
+            target_field="region",
+        )
+    )
+    return graph
+
+
+def _register_handoff_pattern() -> dict[str, Pattern]:
+    original = dict(GLOBAL_REGISTRY._patterns)
+    GLOBAL_REGISTRY.register(
+        Pattern(
+            name="handoff-semantic-test",
+            description="Handoff semantic test",
+            graph_factory=_handoff_graph,
+            contracts=[
+                TargetContract(
+                    name="handoff-test-contract",
+                    kind="yaml-config",
+                    source_url="https://example.com/contract",
+                    artifacts=[
+                        ArtifactContract(name="network-config.yaml"),
+                        ArtifactContract(name="security-config.yaml"),
+                    ],
+                    required_decisions=["region"],
+                )
+            ],
+        )
+    )
+    return original
 
 
 class TestGeneratorRegistry:
@@ -166,6 +217,63 @@ class TestGenTFVars:
         assert "# Module: mod-b" in content
         assert "x = 1" in content
         assert "y = false" in content
+
+
+class TestGenHandoffPlan:
+    def test_ready_handoff_requires_review_before_toolchain_action(self, tmp_path: Path):
+        original = _register_handoff_pattern()
+        try:
+            payload = SimpleNamespace(
+                pattern="handoff-semantic-test",
+                deployment_readiness={"status": "ready", "deploymentAllowed": True},
+            )
+
+            gen_handoff_plan(payload, tmp_path)
+
+            plan = _yaml_load(tmp_path / "handoff-plan.yaml")
+            assert plan["allowedNextAction"] == (
+                "Pass the reviewed artifacts to the existing target toolchain after manual gates."
+            )
+            assert "downstream generation, execution" in plan["boundary"]
+            steps = {step["id"]: step for step in plan["steps"]}
+            assert steps["approve-handoff"]["dependsOn"] == [
+                "review-network-config-yaml",
+                "review-security-config-yaml",
+            ]
+            assert steps["validate-target-contracts"]["dependsOn"] == ["resolve-decisions"]
+            for step in plan["steps"]:
+                assert step["owner"]
+                assert step["manualGate"] is True
+                assert step["rollback"]
+        finally:
+            GLOBAL_REGISTRY._patterns = original
+
+    def test_blocked_handoff_allows_only_resolution_action(self, tmp_path: Path):
+        original = _register_handoff_pattern()
+        try:
+            payload = SimpleNamespace(
+                pattern="handoff-semantic-test",
+                deployment_readiness={
+                    "status": "blocked",
+                    "deploymentAllowed": False,
+                    "blockers": [{"code": "REGION_REQUIRED", "message": "Region required."}],
+                },
+            )
+
+            gen_handoff_plan(payload, tmp_path)
+
+            plan = _yaml_load(tmp_path / "handoff-plan.yaml")
+            assert plan["allowedNextAction"] == (
+                "Resolve blockers and re-run compile before any downstream handoff."
+            )
+            assert plan["readiness"]["status"] == "blocked"
+            assert plan["readiness"]["deploymentAllowed"] is False
+            assert plan["readiness"]["blockers"] == [
+                {"code": "REGION_REQUIRED", "message": "Region required."}
+            ]
+            assert "Do not mutate downstream systems from this plan." in plan["rollback"]
+        finally:
+            GLOBAL_REGISTRY._patterns = original
 
 
 class TestGenSampleRecommendations:
