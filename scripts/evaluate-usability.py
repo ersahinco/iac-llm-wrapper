@@ -16,6 +16,7 @@ import ruamel.yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 FIXTURES_DIR = REPO_ROOT / "fixtures" / "usability"
+EVAL_DIR = REPO_ROOT / "fixtures" / "eval"
 
 
 @dataclass(frozen=True)
@@ -389,6 +390,109 @@ def _trial_byom_cloudformation_parameters(config: TrialConfig) -> TrialResult:
     )
 
 
+def _trial_static_review_stakeholders(config: TrialConfig) -> TrialResult:
+    failures: list[str] = []
+    evidence_files: list[Path] = []
+    with tempfile.TemporaryDirectory() as temp_dir:
+        output_dir = Path(temp_dir)
+        evidence_path = _trial_evidence_path(config, "static-review-stakeholders", output_dir)
+        compile_proc = _run(
+            [
+                "compile",
+                "--input",
+                str(EVAL_DIR / "aws-lza-customer-board-notes.md"),
+                "--output",
+                str(output_dir),
+                "--pattern",
+                "aws-lza",
+            ],
+            config,
+            evidence_path,
+        )
+        if evidence_path is not None:
+            evidence_files.append(evidence_path)
+        if compile_proc.returncode != 0:
+            failures.append("compile command failed")
+            failures.append((compile_proc.stderr or compile_proc.stdout).strip())
+            return TrialResult(
+                "review",
+                "static-review-stakeholders",
+                config.mode,
+                "FAIL",
+                failures,
+                evidence_files,
+            )
+
+        review_proc = _run(
+            [
+                "review",
+                "html",
+                "--input",
+                str(output_dir),
+                "--output",
+                str(output_dir / "handoff-review.html"),
+            ],
+            config,
+        )
+        if review_proc.returncode != 0:
+            failures.append("review html command failed")
+            failures.append((review_proc.stderr or review_proc.stdout).strip())
+            return TrialResult(
+                "review",
+                "static-review-stakeholders",
+                config.mode,
+                "FAIL",
+                failures,
+                evidence_files,
+            )
+
+        html = (output_dir / "handoff-review.html").read_text()
+        role_signals = {
+            "architect": [
+                "Review Summary",
+                "Readiness",
+                "Contract status",
+                "Allowed next action",
+                "Handoff Readiness",
+            ],
+            "platform engineer": [
+                "Target Artifacts",
+                "accounts-config.yaml",
+                "iam-config.yaml",
+                "handoff-plan.yaml",
+                "Pass the reviewed artifacts",
+            ],
+            "security reviewer": [
+                "security-config.yaml",
+                "identity_center_permission_sets",
+                "Raw evidence",
+                "Contract Validation",
+            ],
+            "model developer": [
+                "Model Benchmark",
+                "Model mode",
+                "Raw LLM coverage",
+                "Raw missing decisions",
+                "Raw trace summary",
+                "Raw model benchmark",
+            ],
+        }
+        for role, signals in role_signals.items():
+            for signal in signals:
+                if signal not in html:
+                    failures.append(f"{role} signal missing: {signal}")
+        failures.extend(_evidence_failures(config, evidence_path))
+
+    return TrialResult(
+        "review",
+        "static-review-stakeholders",
+        config.mode,
+        "PASS" if not failures else "FAIL",
+        failures,
+        evidence_files,
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -416,6 +520,7 @@ def main() -> int:
         _trial_engineer_handoff,
         _trial_byom_terraform_vpc,
         _trial_byom_cloudformation_parameters,
+        _trial_static_review_stakeholders,
     ]
     results = [trial(config) for trial in trials]
 

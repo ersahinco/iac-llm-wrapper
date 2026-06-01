@@ -17,7 +17,7 @@ def _write_yaml(path: Path, data: dict[str, Any]) -> None:
         yaml.dump(data, handle)
 
 
-def _write_review_bundle(input_dir: Path) -> Path:
+def _write_review_bundle(input_dir: Path, *, mode: str = "llm") -> Path:
     input_dir.mkdir(parents=True)
     evidence_path = input_dir / "raw-evidence.yaml"
     evidence_path.write_text("calls: []\n")
@@ -51,7 +51,7 @@ def _write_review_bundle(input_dir: Path) -> Path:
     _write_yaml(
         input_dir / "model-benchmark.yaml",
         {
-            "run": {"mode": "llm", "provider": "ollama", "model": "small"},
+            "run": {"mode": mode, "provider": "ollama", "model": "small"},
             "quality": {
                 "acceptedDecisionCount": 1,
                 "rawLlmAcceptedCoverageCount": 0,
@@ -154,3 +154,21 @@ def test_render_review_html_uses_existing_graph_exports(tmp_path: Path):
     assert "requirement-graph.json" in html
     assert "requirement-graph.mmd" in html
     assert "raw-evidence.yaml" in html
+
+
+def test_review_context_does_not_report_llm_misses_for_deterministic_run(tmp_path: Path):
+    input_dir = tmp_path / "out"
+    validation_path = _write_review_bundle(input_dir, mode="deterministic")
+
+    context = build_review_context(
+        input_dir,
+        link_base_dir=input_dir,
+        graph_exports={},
+        contract_validation_path=validation_path,
+    )
+
+    assert context["modelQuality"]["mode"] == "deterministic"
+    assert context["modelQuality"]["rawCoverage"] == "not-run"
+    assert context["modelQuality"]["rawMissingCount"] == 0
+    assert context["modelQuality"]["missingKeys"] == []
+    assert context["modelQuality"]["expectedWeaknesses"] == []

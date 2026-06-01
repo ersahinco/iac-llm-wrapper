@@ -94,16 +94,16 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy.
 
 ### Current Goal
 
-T22: Human-readable review summary for model-quality evidence
+T23: Static review stakeholder usability contract
 
 ### Status
 
-- **Tests**: 310 passing, 1 skipped
+- **Tests**: 311 passing, 1 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added a top-level review summary to `handoff-review.html` for readiness, contract status, allowed next action, raw LLM coverage, missing raw decision keys, and expected model weaknesses; verified the AWS customer `qwen2.5:7b` battle page shows the Identity Center misses without opening YAML.
+- **Last session**: Added a deterministic static-review stakeholder trial to `scripts/evaluate-usability.py`, covering architect, platform engineer, security reviewer, and model developer signals in generated `handoff-review.html`; fixed deterministic review summaries so raw LLM misses are only reported when an LLM actually ran.
 
 ### Done
 
@@ -113,13 +113,14 @@ T22: Human-readable review summary for model-quality evidence
 - Observability: `model-benchmark.yaml` now reports raw LLM coverage of accepted decisions and missing accepted keys; LLM battle summaries surface raw-model misses as expected weaknesses instead of hiding them behind deterministic Markdown success.
 - Model comparison: `scripts/compare-model-benchmarks.py` shows `rawCoverage`, `rawMissing`, and `missingKeys` so ready handoffs are not mistaken for strong raw-model extraction.
 - Static review: `handoff-review.html` starts with a human summary of readiness, contract status, allowed next action, raw LLM coverage, missing raw decision keys, and expected weaknesses.
+- Usability: `scripts/evaluate-usability.py` now includes a static-review stakeholder trial that verifies role-specific review-page signals from a real AWS LZA customer bundle.
 - Cleanup: removed stale LZA research/extension/diff/apply/default-normalizer surfaces, no-contract artifact fallback, pattern `extra_artifacts`, duplicate fixture normalization, and stale duplicate LLM docs.
 - Language: user-facing docs now prefer handoff readiness; `deploymentReadiness` remains a legacy compatibility alias in artifacts. Docs now also state that secrets should travel as secret-store references and expected parameter names, never raw values.
 
 ### Next
 
-1. Run a stakeholder-style usability pass against the static review page: architect, platform engineer, security reviewer, and model developer should each find their decision signal in under a minute.
-2. If an approved Bedrock gateway is available, run the same two customer fixtures and compare raw coverage against local baselines before adding provider-specific support.
+1. Run the static review trial with an approved Bedrock gateway model when available, then compare raw coverage and human-review signals against local baselines.
+2. Consider a tiny static-review fixture for an explicitly blocked bundle if reviewers need blocked-state ergonomics beyond existing context tests.
 3. Treat `qwen2.5:7b` AWS Identity Center misses and `llama3.2:3b` AWS broad misses as tracked model weaknesses unless future evidence shows a prompt-level fix.
 4. Continue AWS LZA schema depth only where real customer inputs justify it.
 

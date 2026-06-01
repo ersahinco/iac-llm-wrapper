@@ -48,8 +48,9 @@ def render_review_html(context: dict[str, Any]) -> str:
                         "Allowed next action",
                         str(review_summary.get("allowedNextAction", "")),
                     ),
+                    _kv("Model mode", str(model_quality.get("mode", "unknown"))),
                     _kv("Model", str(model_quality.get("model", "unknown"))),
-                    _kv("Raw LLM coverage", str(model_quality.get("rawCoverage", "0/0"))),
+                    _kv("Raw LLM coverage", str(model_quality.get("rawCoverage", "not-run"))),
                     _kv("Raw missing decisions", str(model_quality.get("rawMissingCount", 0))),
                     _list_block("Missing raw decision keys", model_quality.get("missingKeys", [])),
                     _list_block(

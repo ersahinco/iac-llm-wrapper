@@ -92,7 +92,8 @@ uv run python scripts/battle-test.py --fixture aws-lza-complex-enterprise-handof
 
 These compile checked-in role/eval fixtures, including customer-style board
 notes and BYOM module notes, compare handoff artifacts against expected
-outcomes, and verify LLM evidence when `--llm` is enabled.
+outcomes, verify static review-page stakeholder signals, and verify LLM evidence
+when `--llm` is enabled.
 
 Every compile writes `model-benchmark.yaml` next to the handoff artifacts. Use it
 to compare provider/model behavior, latency, token reporting, readiness, raw LLM

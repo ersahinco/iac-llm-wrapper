@@ -202,6 +202,7 @@ def _model_quality(benchmark: dict[str, Any], trace: dict[str, Any]) -> dict[str
     quality = _dict(benchmark.get("quality"))
     run = _dict(benchmark.get("run"))
     applied = _dict(trace.get("appliedDecisions"))
+    mode = str(run.get("mode", "unknown"))
     accepted = int(quality.get("acceptedDecisionCount", 0) or 0)
     raw_coverage = int(quality.get("rawLlmAcceptedCoverageCount", 0) or 0)
     raw_missing = int(quality.get("rawLlmMissingAcceptedDecisionCount", 0) or 0)
@@ -211,15 +212,18 @@ def _model_quality(benchmark: dict[str, Any], trace: dict[str, Any]) -> dict[str
     llm_applied = _coerce_list(applied.get("llm"))
     markdown_applied = _coerce_list(applied.get("markdown"))
     warnings: list[str] = []
-    if raw_missing:
+    if mode != "llm":
+        raw_missing = 0
+        missing_keys = []
+    if mode == "llm" and raw_missing:
         warnings.append("Raw LLM missed accepted decisions: " + ", ".join(missing_keys) + ".")
-    if run.get("mode") == "llm" and markdown_applied and not llm_applied:
+    if mode == "llm" and markdown_applied and not llm_applied:
         warnings.append("Structured Markdown carried the handoff; LLM added no accepted decisions.")
     return {
-        "mode": str(run.get("mode", "unknown")),
+        "mode": mode,
         "model": str(run.get("model", "unknown")),
         "acceptedDecisionCount": accepted,
-        "rawCoverage": f"{raw_coverage}/{accepted}" if accepted else "0/0",
+        "rawCoverage": (f"{raw_coverage}/{accepted}" if mode == "llm" and accepted else "not-run"),
         "rawMissingCount": raw_missing,
         "missingKeys": missing_keys,
         "expectedWeaknesses": warnings,

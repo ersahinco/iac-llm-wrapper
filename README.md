@@ -126,7 +126,9 @@ entity names/counts, required files, trace shape, and contract checks, then exit
 on misses. The usability loop checks role-based trials for architect gap
 discovery, engineer handoff, and bring-your-own Terraform module input capture.
 It also includes a CloudFormation parameter handoff trial to prove BYOM
-orchestration beyond Terraform without generating a stack.
+orchestration beyond Terraform without generating a stack, plus a static review
+page trial that checks architect, platform engineer, security reviewer, and
+model developer signals in `handoff-review.html`.
 Deterministic mode is the CI harness gate; `--llm` is the model-quality gate.
 LLM-backed `compile` keeps prompt/response YAML at
 `<output>/raw-evidence.yaml` by default. Use `--evidence-output` to choose a
