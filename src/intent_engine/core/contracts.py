@@ -181,6 +181,9 @@ class ContractValidator:
                     )
                 )
                 continue
+            if not artifact.required_paths and not artifact.value_assertions:
+                data_by_artifact[artifact.name] = {}
+                continue
             data, load_violations = self._load_yaml_mapping(artifact.name, artifact_path)
             if load_violations:
                 schema_invalid_artifacts.add(artifact.name)

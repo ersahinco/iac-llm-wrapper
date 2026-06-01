@@ -418,43 +418,9 @@ arbitrary deployable infrastructure from prose.
 
 ## LLM Testing
 
-Tested with local Ollama models on real design documents:
-
-| Model | Size | Payments LZA | K8s Platform | Enterprise Hybrid |
-|-------|------|-------------|-------------|-------------------|
-| qwen2.5:3b | 3B | ✓ | ✓ | ✓ |
-| llama3.2:3b | 3B | ✓ | — | — |
-
-**What a 3B model can extract in current fixtures:**
-- Region, topology, CIDR blocks
-- Security settings (audit retention, logging, encryption)
-- IAM Identity Center permission sets and assignments
-- Kubernetes cluster name, version, node pools
-
-**What it struggles with:**
-- Complex account/OU lists (use `--decisions` JSON)
-- Multi-workload parsing (structured format helps)
-- Implicit requirements (signal detection covers these)
-
-Run deterministic and LLM-backed eval loops:
-
-```bash
-uv run python scripts/evaluate-extraction.py
-uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b
-uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b --evidence-dir /tmp/iac-llm-evidence
-uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b
-uv run python scripts/battle-test.py --fixture aws-lza-complex-enterprise-handoff --llm --provider ollama --model qwen2.5:7b
-uv run python scripts/compare-model-benchmarks.py tests/results/*/model-benchmark.yaml
-```
-
-Each compile also emits `model-benchmark.yaml`. It is intentionally artifact
-only: provider/model, latency, token availability, readiness, decision/gap
-counts, and cost-estimation status are captured for external analysis tools.
-Battle-test outputs are local, ignored, and written under `tests/results/`.
-Each battle bundle includes `battle-summary.yaml` so model/tool regressions and
-expected weaknesses are explicit.
-
-See [docs/LLM_SETUP.md](docs/LLM_SETUP.md) for detailed model setup and troubleshooting.
+Use [docs/LLM_SETUP.md](docs/LLM_SETUP.md) for model recommendations,
+LLM-backed eval commands, benchmark comparison, and troubleshooting. The README
+keeps only the quick-start path; the model-quality workflow lives there.
 
 ## Project Status
 

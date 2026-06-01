@@ -22,6 +22,9 @@ targetContracts:
       - network-config.yaml
       - organization-config.yaml
       - security-config.yaml
+      - decision-report.yaml
+      - lineage-manifest.yaml
+      - deployment-runbook.md
 steps:
   - id: resolve-decisions
     title: Confirm captured decisions and blockers
@@ -79,6 +82,27 @@ steps:
       - validate-target-contracts
     manualGate: true
     rollback: Reject the handoff, correct the source intent, and re-run compile.
+  - id: review-decision-report-yaml
+    title: Review decision-report.yaml
+    owner: target-owner
+    dependsOn:
+      - validate-target-contracts
+    manualGate: true
+    rollback: Reject the handoff, correct the source intent, and re-run compile.
+  - id: review-lineage-manifest-yaml
+    title: Review lineage-manifest.yaml
+    owner: target-owner
+    dependsOn:
+      - validate-target-contracts
+    manualGate: true
+    rollback: Reject the handoff, correct the source intent, and re-run compile.
+  - id: review-deployment-runbook-md
+    title: Review deployment-runbook.md
+    owner: target-owner
+    dependsOn:
+      - validate-target-contracts
+    manualGate: true
+    rollback: Reject the handoff, correct the source intent, and re-run compile.
   - id: approve-handoff
     title: Approve handoff to existing provisioning toolchain
     owner: release-owner
@@ -89,6 +113,9 @@ steps:
       - review-network-config-yaml
       - review-organization-config-yaml
       - review-security-config-yaml
+      - review-decision-report-yaml
+      - review-lineage-manifest-yaml
+      - review-deployment-runbook-md
     manualGate: true
     rollback: Keep the previous approved artifact bundle as the active handoff.
 manualGates:

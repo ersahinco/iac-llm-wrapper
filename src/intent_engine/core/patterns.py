@@ -32,8 +32,6 @@ class Pattern:
     free_form_examples: dict[str, list[str]] = field(default_factory=dict)
     # Extra validators: list of functions(intent) -> list[Violation]
     validators: list[Callable[[Any], list[Any]]] = field(default_factory=list)
-    # Extra artifacts produced by pattern generators beyond target contract files
-    extra_artifacts: list[str] = field(default_factory=list)
     # Target contracts that drive decisions, validation, and generated artifacts
     contracts: list[TargetContract] = field(default_factory=list)
 
@@ -50,7 +48,6 @@ class Pattern:
         artifacts: list[str] = []
         for contract in self.contracts:
             artifacts.extend(contract.required_artifacts)
-        artifacts.extend(self.extra_artifacts)
         if self.contracts:
             artifacts.append("handoff-plan.yaml")
         if GLOBAL_SAMPLE_REGISTRY.find_by_pattern(self.name):

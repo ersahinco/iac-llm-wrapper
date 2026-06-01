@@ -105,11 +105,10 @@ def test_check_pattern_reports_contract_and_empty_artifact_failures(tmp_path: Pa
                 name="bad-contract",
                 kind="yaml",
                 source_url="https://example.com",
-                artifacts=[ArtifactContract(name="config.yaml")],
+                artifacts=[ArtifactContract(name="config.yaml"), ArtifactContract(name="")],
                 required_decisions=["missing"],
             )
         ],
-        extra_artifacts=[""],
     )
 
     result = check_pattern(pattern, fixtures_root=tmp_path)

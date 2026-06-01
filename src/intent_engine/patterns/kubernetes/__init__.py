@@ -1,413 +1,32 @@
-"""Kubernetes cluster pattern — acceptance test for generic framework.
-
-This module demonstrates that a new use case can be added without
-modifying any core framework file (extractor, compiler, validator,
-interview, cli, generator core).
-
-Steps taken:
-1. Define Pydantic models in kubernetes_models.py
-2. Define RequirementGraph factory below
-3. Register generators below
-4. Register Pattern in GLOBAL_REGISTRY below
-"""
+"""Kubernetes cluster handoff pattern registration."""
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
-from intent_engine.core.contracts import (
-    GLOBAL_CONTRACT_REGISTRY,
-    ArtifactContract,
-    DecisionLineage,
-    TargetContract,
-)
 from intent_engine.core.generator import register_generator
 from intent_engine.core.module_mapping import ModuleInputs, register_module_mapper
 from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern
-from intent_engine.core.requirements import Requirement, RequirementGraph
 
+from .contracts import K8S_CONTRACT
+from .generators import gen_cluster_config, gen_k8s_decision_report, gen_namespace_config
+from .graph import (
+    K8S_FREE_FORM_EXAMPLES,
+    K8S_SECTION_MAP,
+    K8S_SECTION_ORDER,
+    build_k8s_graph,
+)
 from .models import K8sIntent
-
-
-def _k8s_intent(payload: Any) -> K8sIntent | None:
-    intent = getattr(payload, "intent", payload)
-    if isinstance(intent, K8sIntent):
-        return intent
-    return None
-
-
-# ---------------------------------------------------------------------------
-# Requirement graph
-# ---------------------------------------------------------------------------
-
-
-def _k8s_graph_factory() -> RequirementGraph:
-    g = RequirementGraph()
-
-    g.add(
-        Requirement(
-            key="cluster_name",
-            target_field="cluster_name",
-            target_type="string",
-            label="Cluster Name",
-            question="What is the name of the Kubernetes cluster?",
-            default="k8s-cluster",
-            category="general",
-        )
-    )
-
-    g.add(
-        Requirement(
-            key="cluster_version",
-            target_field="cluster_version",
-            target_type="string",
-            label="Cluster Version",
-            question="Which Kubernetes version should be used?",
-            default="1.29",
-            category="general",
-        )
-    )
-
-    g.add(
-        Requirement(
-            key="network_policy_enabled",
-            target_field="network_policy_enabled",
-            target_type="bool",
-            label="Network Policy",
-            question="Enable network policies for pod-to-pod traffic control?",
-            options=["true", "false"],
-            default="true",
-            category="network",
-        )
-    )
-
-    g.add(
-        Requirement(
-            key="pod_cidr",
-            target_field="pod_cidr",
-            target_type="string",
-            label="Pod CIDR",
-            question="What CIDR block should be used for pod IPs?",
-            default="10.244.0.0/16",
-            category="network",
-        )
-    )
-
-    g.add(
-        Requirement(
-            key="service_cidr",
-            target_field="service_cidr",
-            target_type="string",
-            label="Service CIDR",
-            question="What CIDR block should be used for service IPs?",
-            default="10.96.0.0/12",
-            category="network",
-        )
-    )
-
-    g.add(
-        Requirement(
-            key="node_pool_name",
-            target_field="node_pool_name",
-            target_type="string",
-            label="Node Pool Name",
-            question="What is the name of the primary node pool?",
-            default="default",
-            category="workload",
-        )
-    )
-
-    g.add(
-        Requirement(
-            key="node_pool_instance_type",
-            target_field="node_pool_instance_type",
-            target_type="string",
-            label="Node Pool Instance Type",
-            question="What instance type should the nodes use?",
-            default="t3.medium",
-            category="workload",
-        )
-    )
-
-    g.add(
-        Requirement(
-            key="node_pool_min_size",
-            target_field="node_pool_min_size",
-            target_type="int",
-            label="Node Pool Min Size",
-            question="Minimum number of nodes in the pool?",
-            default="1",
-            category="workload",
-        )
-    )
-
-    g.add(
-        Requirement(
-            key="node_pool_max_size",
-            target_field="node_pool_max_size",
-            target_type="int",
-            label="Node Pool Max Size",
-            question="Maximum number of nodes in the pool?",
-            default="3",
-            category="workload",
-        )
-    )
-
-    g.add(
-        Requirement(
-            key="namespace_name",
-            target_field="namespace_name",
-            target_type="string",
-            label="Namespace Name",
-            question="What is the name of the primary namespace?",
-            default="default",
-            category="general",
-            required_when_applicable=False,
-        )
-    )
-
-    return g
-
-
-# ---------------------------------------------------------------------------
-# Generators
-# ---------------------------------------------------------------------------
-
-
-def gen_cluster_config(intent: Any, output_dir: Path) -> None:
-    intent = _k8s_intent(intent)
-    if intent is None:
-        return
-    import ruamel.yaml
-
-    yaml = ruamel.yaml.YAML()
-    yaml.default_flow_style = False
-    yaml.indent(mapping=2, sequence=4, offset=2)
-    from io import StringIO
-
-    data = {
-        "cluster": {
-            "name": intent.cluster_name,
-            "version": intent.cluster_version,
-            "network": {
-                "podCidr": intent.pod_cidr,
-                "serviceCidr": intent.service_cidr,
-                "networkPolicyEnabled": intent.network_policy_enabled,
-            },
-            "nodePools": [
-                {
-                    "name": intent.node_pool_name,
-                    "instanceType": intent.node_pool_instance_type,
-                    "minSize": intent.node_pool_min_size,
-                    "maxSize": intent.node_pool_max_size,
-                },
-            ],
-        },
-    }
-    buf = StringIO()
-    yaml.dump(data, buf)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "cluster-config.yaml").write_text(buf.getvalue())
-
-
-def gen_namespace_config(intent: Any, output_dir: Path) -> None:
-    intent = _k8s_intent(intent)
-    if intent is None:
-        return
-    import ruamel.yaml
-
-    yaml = ruamel.yaml.YAML()
-    yaml.default_flow_style = False
-    yaml.indent(mapping=2, sequence=4, offset=2)
-    from io import StringIO
-
-    data = {
-        "namespaces": [
-            {"name": intent.namespace_name},
-        ],
-    }
-    buf = StringIO()
-    yaml.dump(data, buf)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "namespace-config.yaml").write_text(buf.getvalue())
-
-
-def gen_k8s_decision_report(intent: Any, output_dir: Path) -> None:
-    intent = _k8s_intent(intent)
-    if intent is None:
-        return
-    import ruamel.yaml
-
-    yaml = ruamel.yaml.YAML()
-    yaml.default_flow_style = False
-    yaml.indent(mapping=2, sequence=4, offset=2)
-    from io import StringIO
-
-    data = {
-        "clusterName": intent.cluster_name,
-        "clusterVersion": intent.cluster_version,
-        "network": {
-            "podCidr": intent.pod_cidr,
-            "serviceCidr": intent.service_cidr,
-            "networkPolicyEnabled": intent.network_policy_enabled,
-        },
-        "nodePool": {
-            "name": intent.node_pool_name,
-            "instanceType": intent.node_pool_instance_type,
-            "minSize": intent.node_pool_min_size,
-            "maxSize": intent.node_pool_max_size,
-        },
-        "namespace": intent.namespace_name,
-    }
-    buf = StringIO()
-    yaml.dump(data, buf)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "decision-report.yaml").write_text(buf.getvalue())
-
+from .samples import register_k8s_samples
 
 _K8S_GENERATOR_SCOPE = {"kubernetes-cluster"}
 
 
-# Register generators at the pattern boundary; guards inside generators are fallback safety.
-register_generator(
-    "k8s-cluster-config",
-    gen_cluster_config,
-    priority=10,
-    category="core",
-    applies_to=_K8S_GENERATOR_SCOPE,
-)
-register_generator(
-    "k8s-namespace-config",
-    gen_namespace_config,
-    priority=11,
-    category="core",
-    applies_to=_K8S_GENERATOR_SCOPE,
-)
-register_generator(
-    "k8s-decision-report",
-    gen_k8s_decision_report,
-    priority=5,
-    category="meta",
-    applies_to=_K8S_GENERATOR_SCOPE,
-)
-
-
-# ---------------------------------------------------------------------------
-# Pattern registration
-# ---------------------------------------------------------------------------
-
-K8S_SECTION_MAP: dict[str, tuple[str, str | None]] = {
-    "cluster_name": ("Cluster", "name"),
-    "cluster_version": ("Cluster", "version"),
-    "network_policy_enabled": ("Network", "network_policy_enabled"),
-    "pod_cidr": ("Network", "pod_cidr"),
-    "service_cidr": ("Network", "service_cidr"),
-    "node_pool_name": ("Node Pools", "node_pool_name"),
-    "node_pool_instance_type": ("Node Pools", "node_pool_instance_type"),
-    "node_pool_min_size": ("Node Pools", "node_pool_min_size"),
-    "node_pool_max_size": ("Node Pools", "node_pool_max_size"),
-    "namespace_name": ("Namespaces", "namespace_name"),
-}
-
-K8S_SECTION_ORDER = [
-    "Cluster",
-    "Network",
-    "Node Pools",
-    "Namespaces",
-]
-
-K8S_FREE_FORM_EXAMPLES: dict[str, list[str]] = {
-    "Node Pools": [
-        "primary: instance_type=t3.large, min_size=2, max_size=5",
-    ],
-    "Namespaces": [
-        "production: labels=env=prod,team=platform",
-    ],
-}
-
-
-_K8S_CONTRACT = TargetContract(
-    name="kubernetes-cluster-config",
-    kind="kubernetes-cluster-config",
-    source_url="https://github.com/terraform-aws-modules/terraform-aws-eks",
-    artifacts=[
-        ArtifactContract(
-            name="cluster-config.yaml",
-            description="Cluster, network, and node pool configuration.",
-            required_paths=[
-                "cluster.name",
-                "cluster.version",
-                "cluster.network.podCidr",
-                "cluster.network.serviceCidr",
-                "cluster.nodePools[]",
-                "cluster.nodePools[].name",
-                "cluster.nodePools[].instanceType",
-            ],
-        ),
-        ArtifactContract(
-            name="namespace-config.yaml",
-            description="Primary namespace configuration.",
-            required_paths=["namespaces[]", "namespaces[].name"],
-        ),
-        ArtifactContract(
-            name="decision-report.yaml",
-            description="Kubernetes decision report.",
-            required_paths=["clusterName", "clusterVersion", "network", "nodePool"],
-        ),
-    ],
-    required_decisions=[
-        "cluster_name",
-        "cluster_version",
-        "network_policy_enabled",
-        "pod_cidr",
-        "service_cidr",
-        "node_pool_name",
-        "node_pool_instance_type",
-        "node_pool_min_size",
-        "node_pool_max_size",
-    ],
-    lineage=[
-        DecisionLineage(
-            decision="cluster_name",
-            artifact="cluster-config.yaml",
-            path="cluster.name",
-        ),
-        DecisionLineage(
-            decision="cluster_version",
-            artifact="cluster-config.yaml",
-            path="cluster.version",
-        ),
-        DecisionLineage(
-            decision="pod_cidr",
-            artifact="cluster-config.yaml",
-            path="cluster.network.podCidr",
-        ),
-        DecisionLineage(
-            decision="service_cidr",
-            artifact="cluster-config.yaml",
-            path="cluster.network.serviceCidr",
-        ),
-        DecisionLineage(
-            decision="node_pool_name",
-            artifact="cluster-config.yaml",
-            path="cluster.nodePools[].name",
-        ),
-        DecisionLineage(
-            decision="namespace_name",
-            artifact="namespace-config.yaml",
-            path="namespaces[].name",
-        ),
-    ],
-)
-
-GLOBAL_CONTRACT_REGISTRY.register(_K8S_CONTRACT)
-
-
-def map_k8s_intent_to_modules(intent: K8sIntent) -> list[ModuleInputs]:
-    """Map Kubernetes intent to IaC module variable inputs."""
-    modules: list[ModuleInputs] = []
-    modules.append(
+def map_k8s_intent_to_modules(intent: Any) -> list[ModuleInputs]:
+    """Map Kubernetes intent to optional IaC module variable references."""
+    if not isinstance(intent, K8sIntent):
+        return []
+    return [
         ModuleInputs(
             module_name="terraform-aws-eks",
             variables={
@@ -417,79 +36,60 @@ def map_k8s_intent_to_modules(intent: K8sIntent) -> list[ModuleInputs]:
                 "subnet_ids": "${module.vpc.private_subnets}",
             },
         )
+    ]
+
+
+def _register_generators() -> None:
+    register_generator(
+        "k8s-cluster-config",
+        gen_cluster_config,
+        priority=10,
+        category="core",
+        applies_to=_K8S_GENERATOR_SCOPE,
     )
-    return modules
+    register_generator(
+        "k8s-namespace-config",
+        gen_namespace_config,
+        priority=11,
+        category="core",
+        applies_to=_K8S_GENERATOR_SCOPE,
+    )
+    register_generator(
+        "k8s-decision-report",
+        gen_k8s_decision_report,
+        priority=5,
+        category="meta",
+        applies_to=_K8S_GENERATOR_SCOPE,
+    )
 
 
+def _register_pattern() -> None:
+    GLOBAL_REGISTRY.register(
+        Pattern(
+            name="kubernetes-cluster",
+            description=(
+                "Kubernetes cluster handoff with optional Terraform EKS module input references"
+            ),
+            graph_factory=build_k8s_graph,
+            intent_factory=K8sIntent,
+            section_map=dict(K8S_SECTION_MAP),
+            section_order=list(K8S_SECTION_ORDER),
+            free_form_examples=dict(K8S_FREE_FORM_EXAMPLES),
+            prompt_context=(
+                "This pattern designs Kubernetes cluster configurations. "
+                "The design document uses Markdown sections. Extract values as follows:\n"
+                "- Cluster Configuration section -> cluster_name, cluster_version\n"
+                "- Network section -> pod_cidr, service_cidr, network_policy_enabled\n"
+                "- Node Pool section -> node_pool_name, node_pool_instance_type, "
+                "node_pool_min_size, node_pool_max_size\n"
+                "- Namespace section -> namespace_name"
+            ),
+            contracts=[K8S_CONTRACT],
+        )
+    )
+
+
+_register_generators()
 register_module_mapper("kubernetes-cluster", map_k8s_intent_to_modules)
-
-
-GLOBAL_REGISTRY.register(
-    Pattern(
-        name="kubernetes-cluster",
-        description=(
-            "Kubernetes cluster handoff with optional Terraform EKS module input references"
-        ),
-        graph_factory=_k8s_graph_factory,
-        intent_factory=K8sIntent,
-        section_map=dict(K8S_SECTION_MAP),
-        section_order=list(K8S_SECTION_ORDER),
-        free_form_examples=dict(K8S_FREE_FORM_EXAMPLES),
-        prompt_context=(
-            "This pattern designs Kubernetes cluster configurations. "
-            "The design document uses Markdown sections. Extract values as follows:\n"
-            "- Cluster Configuration section → cluster_name, cluster_version\n"
-            "- Network section → pod_cidr, service_cidr, network_policy_enabled\n"
-            "- Node Pool section → node_pool_name, node_pool_instance_type, "
-            "node_pool_min_size, node_pool_max_size\n"
-            "- Namespace section → namespace_name"
-        ),
-        contracts=[_K8S_CONTRACT],
-    )
-)
-
-# ---------------------------------------------------------------------------
-# Versioned sample configuration
-# ---------------------------------------------------------------------------
-
-from intent_engine.core.sample_config import (  # noqa: E402
-    GLOBAL_SAMPLE_REGISTRY,
-    ModuleRef,
-    SampleConfig,
-)
-
-GLOBAL_SAMPLE_REGISTRY.register(
-    SampleConfig(
-        name="k8s-cluster-v1",
-        pattern="kubernetes-cluster",
-        version="1.0.0",
-        release_date="2025-06-01",
-        source_url="https://github.com/terraform-aws-modules/terraform-aws-eks",
-        decisions={
-            "cluster_name": "prod-k8s",
-            "cluster_version": "1.30",
-            "network_policy_enabled": "true",
-            "pod_cidr": "10.244.0.0/16",
-            "service_cidr": "10.96.0.0/12",
-            "node_pool_name": "primary",
-            "node_pool_instance_type": "t3.large",
-            "node_pool_min_size": "2",
-            "node_pool_max_size": "5",
-            "namespace_name": "production",
-        },
-        module_refs=[
-            ModuleRef(
-                module_name="terraform-aws-eks",
-                source="terraform-aws-modules/eks/aws",
-                version="~> 20.0",
-                description="EKS cluster with managed node groups, IRSA, security groups",
-            ),
-            ModuleRef(
-                module_name="terraform-aws-vpc",
-                source="terraform-aws-modules/vpc/aws",
-                version="~> 5.0",
-                description="VPC with public/private subnets for EKS cluster",
-            ),
-        ],
-    )
-)
+_register_pattern()
+register_k8s_samples()

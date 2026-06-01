@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import importlib.util
 import subprocess
 import sys
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 import ruamel.yaml
@@ -18,6 +20,16 @@ def _yaml_load(path: Path) -> dict[str, Any]:
     data = yaml.load(path.read_text())
     assert isinstance(data, dict)
     return data
+
+
+def _load_script() -> ModuleType:
+    spec = importlib.util.spec_from_file_location("evaluate_extraction_script", SCRIPT)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_evaluate_extraction_writes_eval_results_artifact(tmp_path: Path):
@@ -50,3 +62,12 @@ def test_evaluate_extraction_writes_eval_results_artifact(tmp_path: Path):
     assert data["cases"][0]["name"] == "cloudformation-parameters-handoff"
     assert data["cases"][0]["status"] == "pass"
     assert data["cases"][0]["outputDir"] == str(keep_output / "cloudformation-parameters-handoff")
+
+
+def test_evaluate_extraction_flags_forbidden_artifacts(tmp_path: Path):
+    script = _load_script()
+    (tmp_path / "main.tf").write_text("resource null_resource example {}\n")
+
+    failures = script._compare_forbidden_artifacts(tmp_path, ["main.tf", "template.yaml"])
+
+    assert failures == ["forbidden artifact present: main.tf"]

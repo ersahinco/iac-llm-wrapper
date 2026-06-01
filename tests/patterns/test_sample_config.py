@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-import re
+import importlib.util
+import sys
 from pathlib import Path
+from types import ModuleType
 
 import ruamel.yaml
 
@@ -12,19 +14,21 @@ from intent_engine.core.sample_config import GLOBAL_SAMPLE_REGISTRY
 from intent_engine.patterns import load_builtin_patterns
 
 FIXTURES = Path(__file__).parent.parent.parent / "fixtures"
+SYNC_SCRIPT = Path(__file__).parent.parent.parent / "scripts" / "sync-sample-fixtures.py"
 load_builtin_patterns()
 
 
-def _normalized_artifact_text(file_name: str, text: str) -> str:
-    text = re.sub(r"[ \t]+$", "", text, flags=re.MULTILINE)
-    if file_name != "decision-audit.yaml":
-        return text
-    return re.sub(
-        r"(^\s*-?\s*timestamp:\s*).+$",
-        r"\1<TIMESTAMP>",
-        text,
-        flags=re.MULTILINE,
-    )
+def _load_sync_script() -> ModuleType:
+    spec = importlib.util.spec_from_file_location("sync_sample_fixtures_script", SYNC_SCRIPT)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+_normalized_artifact_text = _load_sync_script()._normalized_artifact_text
 
 
 class TestAwsLzaSampleConfigRegistered:

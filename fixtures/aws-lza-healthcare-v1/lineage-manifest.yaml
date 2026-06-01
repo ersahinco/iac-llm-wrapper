@@ -223,6 +223,56 @@ artifacts:
       - path: centralSecurityServices.securityHub.notificationLevel
         equals: HIGH
         oneOf: []
+  - name: decision-report.yaml
+    required: true
+    description: Accepted AWS LZA decisions and readiness.
+    requiredPaths:
+      - pattern
+      - baseline
+      - orgMode
+      - organizationName
+      - homeRegion
+      - enabledRegions[]
+      - organizationalUnits[]
+      - accounts.audit
+      - accounts.logArchive
+      - accounts.securityTooling
+      - identity.identityCenterDelegatedAdmin
+      - identity.identityCenterPermissionSets[]
+      - identity.identityCenterAssignments[]
+      - network.topology
+      - network.cidr
+      - security.centralizedLogging
+      - security.securityHubEnabled
+      - security.guardDutyEnabled
+      - security.complianceOverlay
+    valueAssertions:
+      - path: pattern
+        equals: aws-lza
+        oneOf: []
+  - name: lineage-manifest.yaml
+    required: true
+    description: Decision-to-artifact lineage for AWS LZA handoff files.
+    requiredPaths:
+      - sourceContract.name
+      - sourceContract.kind
+      - sourceContract.url
+      - sourceContract.mandatoryConfigFiles[]
+      - artifacts[]
+      - artifacts[].name
+      - lineage[]
+      - lineage[].decision
+      - lineage[].artifact
+      - lineage[].path
+    valueAssertions:
+      - path: sourceContract.name
+        equals: aws-lza-sample-configuration
+        oneOf: []
+  - name: deployment-runbook.md
+    required: true
+    description: Human review runbook for AWS LZA handoff sequencing.
+    requiredPaths: []
+    valueAssertions: []
 lineage:
   - decision: org_mode
     artifact: global-config.yaml

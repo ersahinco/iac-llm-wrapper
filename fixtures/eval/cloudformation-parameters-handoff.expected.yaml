@@ -15,6 +15,11 @@ expect:
     - handoff-plan.yaml
     - llm-trace-summary.yaml
     - model-benchmark.yaml
+  forbiddenArtifacts:
+    - main.tf
+    - terraform.tfvars
+    - template.yaml
+    - stack.yaml
   trace:
     required:
       - rawLlmDecisions

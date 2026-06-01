@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from .contracts import AWS_LZA_CONFIG_ARTIFACTS
 from .utils import (
     _INFRASTRUCTURE_OU,
     _LZA_CONTRACT,
@@ -183,7 +184,7 @@ def gen_lza_lineage_manifest(intent: Any, output_dir: Path) -> None:
             "kind": _LZA_CONTRACT.kind,
             "url": _LZA_CONTRACT.source_url,
             "baseline": str(intent.baseline),
-            "mandatoryConfigFiles": _LZA_CONTRACT.required_artifacts,
+            "mandatoryConfigFiles": AWS_LZA_CONFIG_ARTIFACTS,
         },
         "artifacts": [artifact.model_dump(by_alias=True) for artifact in _LZA_CONTRACT.artifacts],
         "lineage": [item.model_dump() for item in _LZA_CONTRACT.lineage],
@@ -211,7 +212,7 @@ def gen_lza_deployment_runbook(intent: Any, output_dir: Path) -> None:
         "",
         "Mandatory configuration files:",
         "",
-        *[f"- `{name}`" for name in _LZA_CONTRACT.required_artifacts],
+        *[f"- `{name}`" for name in AWS_LZA_CONFIG_ARTIFACTS],
         "",
         "## Recommended Sample Configs",
         "",

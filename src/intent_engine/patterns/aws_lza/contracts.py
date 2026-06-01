@@ -10,6 +10,15 @@ from intent_engine.core.contracts import (
     TargetContract,
 )
 
+AWS_LZA_CONFIG_ARTIFACTS = [
+    "accounts-config.yaml",
+    "global-config.yaml",
+    "iam-config.yaml",
+    "network-config.yaml",
+    "organization-config.yaml",
+    "security-config.yaml",
+]
+
 AWS_LZA_SAMPLE_CONFIG_CONTRACT = TargetContract(
     name="aws-lza-sample-configuration",
     kind="aws-lza-sample-configuration",
@@ -230,6 +239,58 @@ AWS_LZA_SAMPLE_CONFIG_CONTRACT = TargetContract(
                     equals="HIGH",
                 ),
             ],
+        ),
+        ArtifactContract(
+            name="decision-report.yaml",
+            description="Accepted AWS LZA decisions and readiness.",
+            required_paths=[
+                "pattern",
+                "baseline",
+                "orgMode",
+                "organizationName",
+                "homeRegion",
+                "enabledRegions[]",
+                "organizationalUnits[]",
+                "accounts.audit",
+                "accounts.logArchive",
+                "accounts.securityTooling",
+                "identity.identityCenterDelegatedAdmin",
+                "identity.identityCenterPermissionSets[]",
+                "identity.identityCenterAssignments[]",
+                "network.topology",
+                "network.cidr",
+                "security.centralizedLogging",
+                "security.securityHubEnabled",
+                "security.guardDutyEnabled",
+                "security.complianceOverlay",
+            ],
+            value_assertions=[ArtifactValueAssertion(path="pattern", equals="aws-lza")],
+        ),
+        ArtifactContract(
+            name="lineage-manifest.yaml",
+            description="Decision-to-artifact lineage for AWS LZA handoff files.",
+            required_paths=[
+                "sourceContract.name",
+                "sourceContract.kind",
+                "sourceContract.url",
+                "sourceContract.mandatoryConfigFiles[]",
+                "artifacts[]",
+                "artifacts[].name",
+                "lineage[]",
+                "lineage[].decision",
+                "lineage[].artifact",
+                "lineage[].path",
+            ],
+            value_assertions=[
+                ArtifactValueAssertion(
+                    path="sourceContract.name",
+                    equals="aws-lza-sample-configuration",
+                ),
+            ],
+        ),
+        ArtifactContract(
+            name="deployment-runbook.md",
+            description="Human review runbook for AWS LZA handoff sequencing.",
         ),
     ],
     required_decisions=[

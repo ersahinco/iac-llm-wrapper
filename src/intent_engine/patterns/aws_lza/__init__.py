@@ -144,11 +144,6 @@ def _register_pattern() -> None:
                 "Extract only decisions needed for LZA configuration and handoff; do not "
                 "infer custom Terraform unless explicitly requested."
             ),
-            extra_artifacts=[
-                "decision-report.yaml",
-                "lineage-manifest.yaml",
-                "deployment-runbook.md",
-            ],
             contracts=[AWS_LZA_SAMPLE_CONFIG_CONTRACT],
         )
     )

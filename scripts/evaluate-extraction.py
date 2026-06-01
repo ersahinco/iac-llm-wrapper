@@ -161,6 +161,9 @@ def _compare_report(case: EvalCase, output_dir: Path, use_llm: bool) -> list[str
     failures.extend(_compare_counts(report, case.expected.get("counts", {})))
     failures.extend(_compare_names(report, case.expected.get("names", {})))
     failures.extend(_compare_artifacts(output_dir, case.expected.get("artifacts", [])))
+    failures.extend(
+        _compare_forbidden_artifacts(output_dir, case.expected.get("forbiddenArtifacts", []))
+    )
     failures.extend(_compare_trace(output_dir, case.expected.get("trace", {}), use_llm))
     return failures
 
@@ -214,6 +217,20 @@ def _compare_artifacts(output_dir: Path, expected_artifacts: Any) -> list[str]:
             failures.append("expect.artifacts entries must be strings")
         elif not (output_dir / artifact).exists():
             failures.append(f"missing artifact: {artifact}")
+    return failures
+
+
+def _compare_forbidden_artifacts(output_dir: Path, forbidden_artifacts: Any) -> list[str]:
+    if not forbidden_artifacts:
+        return []
+    if not isinstance(forbidden_artifacts, list):
+        return ["expect.forbiddenArtifacts must be a list"]
+    failures: list[str] = []
+    for artifact in forbidden_artifacts:
+        if not isinstance(artifact, str):
+            failures.append("expect.forbiddenArtifacts entries must be strings")
+        elif (output_dir / artifact).exists():
+            failures.append(f"forbidden artifact present: {artifact}")
     return failures
 
 
@@ -321,6 +338,9 @@ def _compare_failure(
                 failures.append(f"missing violation in output: {violation}")
 
     failures.extend(_compare_artifacts(output_dir, case.expected.get("artifacts", [])))
+    failures.extend(
+        _compare_forbidden_artifacts(output_dir, case.expected.get("forbiddenArtifacts", []))
+    )
     failures.extend(_compare_contracts(output_dir, case.expected.get("contracts", [])))
     failures.extend(_compare_trace(output_dir, case.expected.get("trace", {}), use_llm))
     report_path = output_dir / "decision-report.yaml"

@@ -82,6 +82,12 @@ expect:
     - lineage-manifest.yaml
     - deployment-runbook.md
     - sample-recommendations.yaml
+  forbiddenArtifacts:
+    - main.tf
+    - terraform.tfvars
+    - terragrunt.hcl
+    - template.yaml
+    - stack.yaml
   trace:
     required:
       - rawLlmDecisions
