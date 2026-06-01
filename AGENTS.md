@@ -94,7 +94,7 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy.
 
 ### Current Goal
 
-T18: Clarify handoff boundary, evidence hygiene, and private pattern guidance
+T19: Real-design-doc extraction hardening with evidence-backed regressions
 
 ### Status
 
@@ -103,20 +103,20 @@ T18: Clarify handoff boundary, evidence hygiene, and private pattern guidance
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added `handoffReadiness` alongside the legacy `deploymentReadiness` key, switched human-facing wording to handoff readiness, defaulted LLM CLI compiles to preserve `raw-evidence.yaml`, documented raw evidence hygiene/private patterns, refreshed eval expectations, compacted session memory; full gate green
+- **Last session**: Added customer-style extraction gold cases for AWS LZA board notes and Terraform VPC module notes, documented eval fixture intent, verified expanded eval corpus and deterministic battle runs; full gate green
 
 ### Done
 
 - Core: graph-driven extraction/discovery/interview/validation, pattern registry, contracts, handoff generation, static review, contract validation, benchmark/battle artifacts, sample matching, and CLI commands are implemented and covered.
 - Built-ins: `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, and `terraform-vpc` are contract-backed handoff paths. Current built-ins make no cloud API calls and do not deploy from prose.
-- Evaluation: deterministic extraction corpus, role usability trials, forbidden-artifact checks, fixture drift guard, contract validation tests, battle-summary tests, static review tests, and full repo gate are green.
+- Evaluation: deterministic extraction corpus includes clean, blocked, BYOM, and customer-style prose cases; role usability trials, forbidden-artifact checks, fixture drift guard, contract validation tests, battle-summary tests, static review tests, and full repo gate are green.
 - Cleanup: removed stale LZA research/extension/diff/apply/default-normalizer surfaces, no-contract artifact fallback, pattern `extra_artifacts`, duplicate fixture normalization, and stale duplicate LLM docs.
 - Language: user-facing docs now prefer handoff readiness; `deploymentReadiness` remains a legacy compatibility alias in artifacts.
 
 ### Next
 
-1. Run local LLM usability with evidence output when new models are available; deterministic usability remains green.
-2. Use `scripts/battle-test.py`, `battle-summary.yaml`, `model-benchmark.yaml`, and `scripts/compare-model-benchmarks.py` to tune prompts only when deterministic harness cannot classify the issue.
+1. Run local LLM eval/usability with evidence output against the customer-style fixtures when models are available.
+2. Promote repeated LLM misses into expected fixture checks before prompt tuning.
 3. Continue AWS LZA schema depth only where real customer inputs justify it.
 4. Keep private pattern work package-local until a real consumer needs packaged external distribution; do not add a generic loader speculatively.
 
@@ -127,3 +127,4 @@ T18: Clarify handoff boundary, evidence hygiene, and private pattern guidance
 - Handoff artifacts are not deployments. `handoffReadiness` is the clearer term; legacy `deploymentReadiness` stays for backward compatibility.
 - Raw LLM evidence is important and should be preserved for observability, but treated as customer design material and kept out of accidental commits.
 - Built-ins are enough until a team has proprietary modules, controls, sample bundles, or gates that justify private patterns.
+- Customer-style eval fixtures should mix prose, meeting notes, review reminders, and structured decisions so the harness protects real handoff behavior, not only template-shaped examples.

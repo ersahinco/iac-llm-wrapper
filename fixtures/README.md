@@ -23,4 +23,7 @@ with `uv run python scripts/sync-sample-fixtures.py`; CI checks drift with
   and BYOM module flow.
 - `eval/`: extraction gold corpus. Each `*.md` has a matching
   `*.expected.yaml`.
+  Customer-style cases use board notes, meeting summaries, and review reminders
+  around structured decisions so regressions are caught against realistic prose,
+  not only clean templates.
 New product examples should go under `usability/` or `eval/`, not root.
