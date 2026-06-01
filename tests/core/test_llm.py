@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -11,10 +12,12 @@ import pytest
 from intent_engine.core.compiler import compile_design
 from intent_engine.core.extractor import Extractor
 from intent_engine.core.llm_caller import (
+    BedrockCliBackend,
     LLMBackend,
     LLMCaller,
     LLMEvidence,
     LLMEvidenceStore,
+    auto_detect_llm,
     create_backend,
 )
 from intent_engine.core.observability import build_model_benchmark
@@ -212,6 +215,67 @@ class TestCreateBackend:
     def test_ollama_backend_created(self):
         backend = create_backend("ollama", base_url="http://localhost:11434/v1")
         assert backend.base_url == "http://localhost:11434/v1"
+
+    def test_bedrock_backend_created(self):
+        backend = create_backend("bedrock", model="eu.amazon.nova-2-lite-v1:0")
+
+        assert isinstance(backend, BedrockCliBackend)
+        assert backend.model == "eu.amazon.nova-2-lite-v1:0"
+
+    def test_bedrock_backend_uses_aws_cli_converse(self):
+        backend = BedrockCliBackend(model="eu.amazon.nova-2-lite-v1:0", region="eu-central-1")
+        stdout = json.dumps(
+            {
+                "output": {
+                    "message": {
+                        "content": [{"text": '{"decisions": {"home_region": "eu-central-1"}}'}]
+                    }
+                },
+                "usage": {"inputTokens": 10, "outputTokens": 5, "totalTokens": 15},
+            }
+        )
+
+        with patch("intent_engine.core.llm_caller.subprocess.run") as run:
+            run.return_value = subprocess.CompletedProcess(
+                args=[],
+                returncode=0,
+                stdout=stdout,
+                stderr="",
+            )
+
+            response = backend.complete("extract this")
+
+        assert response == '{"decisions": {"home_region": "eu-central-1"}}'
+        assert backend.last_token_usage == {
+            "prompt_tokens": 10,
+            "completion_tokens": 5,
+            "total_tokens": 15,
+        }
+        command = run.call_args.args[0]
+        assert command[:3] == ["aws", "bedrock-runtime", "converse"]
+        assert "eu.amazon.nova-2-lite-v1:0" in command
+        assert "eu-central-1" in command
+
+    def test_bedrock_backend_surfaces_cli_failure(self):
+        backend = BedrockCliBackend()
+
+        with patch("intent_engine.core.llm_caller.subprocess.run") as run:
+            run.return_value = subprocess.CompletedProcess(
+                args=[],
+                returncode=254,
+                stdout="",
+                stderr="model access denied",
+            )
+
+            with pytest.raises(RuntimeError, match="model access denied"):
+                backend.complete("extract this")
+
+    def test_auto_detect_bedrock_does_not_require_openai_key(self):
+        with patch.dict("os.environ", {}, clear=True):
+            caller = auto_detect_llm(provider="bedrock", model="eu.amazon.nova-2-lite-v1:0")
+
+        assert isinstance(caller, LLMCaller)
+        assert isinstance(caller.backend, BedrockCliBackend)
 
     def test_unknown_provider_raises(self):
         with pytest.raises(ValueError, match="Unknown provider"):

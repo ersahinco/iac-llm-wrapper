@@ -288,7 +288,7 @@ def compile(
     provider: str = typer.Option(
         os.environ.get("INTENT_ENGINE_PROVIDER", "openai"),
         "--provider",
-        help="LLM provider: openai, ollama",
+        help="LLM provider: openai, ollama, bedrock",
     ),
     model: str = typer.Option(
         os.environ.get("INTENT_ENGINE_MODEL", ""),
@@ -441,7 +441,7 @@ def discover(
     provider: str = typer.Option(
         os.environ.get("INTENT_ENGINE_PROVIDER", "openai"),
         "--provider",
-        help="LLM provider: openai, ollama",
+        help="LLM provider: openai, ollama, bedrock",
     ),
     model: str = typer.Option(
         os.environ.get("INTENT_ENGINE_MODEL", ""),

@@ -92,6 +92,11 @@ No API key required. A 3B model (2GB RAM) extracts region, topology, CIDR, accou
 # OpenAI
 export OPENAI_API_KEY=sk-...
 iac-llm-wrapper compile -i design.md -o out/ --provider openai
+
+# Amazon Bedrock through the local AWS CLI credentials/session
+iac-llm-wrapper compile -i design.md -o out/ \
+  --provider bedrock \
+  --model eu.amazon.nova-2-lite-v1:0
 ```
 
 ### Without LLM (Bootstrap Only)
@@ -120,6 +125,7 @@ uv run python scripts/evaluate-golden-journey.py --scenario all --output tests/r
 uv run python scripts/evaluate-golden-journey.py --llm --provider ollama --model qwen2.5:7b
 uv run python scripts/evaluate-golden-journey.py --llm --provider ollama --model qwen2.5:7b --require-conformant
 uv run python scripts/evaluate-golden-journey.py --llm --provider ollama --model qwen2.5:7b --keep-output tests/results/golden-qwen2.5-7b --benchmark-output tests/results/golden-qwen2.5-7b.yaml
+uv run python scripts/evaluate-golden-journey.py --scenario all --llm --provider bedrock --model eu.amazon.nova-2-lite-v1:0 --keep-output tests/results/golden-bedrock-nova-2-lite --output tests/results/golden-journey-bedrock-nova-2-lite.yaml
 uv run python scripts/evaluate-usability.py
 uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b
 uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b --evidence-dir /tmp/iac-llm-evidence

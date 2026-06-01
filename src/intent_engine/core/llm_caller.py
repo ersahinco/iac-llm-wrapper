@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import time
 from abc import ABC, abstractmethod
 from typing import Any
@@ -106,6 +107,77 @@ class OpenAICompatibleBackend(LLMBackend):
         if last_exc:
             raise last_exc
         raise RuntimeError("Unexpected: retries exhausted without result")
+
+
+class BedrockCliBackend(LLMBackend):
+    """Amazon Bedrock Converse backend using the local AWS CLI."""
+
+    def __init__(
+        self,
+        model: str = "eu.amazon.nova-2-lite-v1:0",
+        region: str | None = None,
+        timeout: int = 180,
+    ) -> None:
+        self.model = model
+        self.region = (
+            region
+            or os.environ.get("INTENT_ENGINE_AWS_REGION")
+            or os.environ.get("AWS_REGION")
+            or os.environ.get("AWS_DEFAULT_REGION")
+            or "eu-central-1"
+        )
+        self.timeout = timeout
+        self.last_token_usage: dict[str, int] = {}
+
+    def complete(self, prompt: str, **kwargs: Any) -> str:
+        inference_config = {
+            "maxTokens": int(kwargs.get("max_tokens") or 4096),
+            "temperature": float(kwargs.get("temperature", 0.1)),
+        }
+        messages = [{"role": "user", "content": [{"text": prompt}]}]
+        result = subprocess.run(
+            [
+                "aws",
+                "bedrock-runtime",
+                "converse",
+                "--region",
+                self.region,
+                "--model-id",
+                str(kwargs.get("model") or self.model),
+                "--messages",
+                json.dumps(messages),
+                "--inference-config",
+                json.dumps(inference_config),
+                "--output",
+                "json",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=kwargs.get("timeout", self.timeout),
+            check=False,
+        )
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout).strip()
+            raise RuntimeError(detail or f"Bedrock CLI exited with {result.returncode}")
+
+        data = json.loads(result.stdout)
+        usage = data.get("usage")
+        self.last_token_usage = (
+            {
+                "prompt_tokens": int(usage.get("inputTokens", 0) or 0),
+                "completion_tokens": int(usage.get("outputTokens", 0) or 0),
+                "total_tokens": int(usage.get("totalTokens", 0) or 0),
+            }
+            if isinstance(usage, dict)
+            else {}
+        )
+        content = data.get("output", {}).get("message", {}).get("content", [])
+        text_parts = [
+            str(part["text"])
+            for part in content
+            if isinstance(part, dict) and isinstance(part.get("text"), str)
+        ]
+        return "\n".join(text_parts)
 
 
 class LLMEvidence:
@@ -231,8 +303,15 @@ def auto_detect_llm(
     if os.environ.get("INTENT_ENGINE_DISABLE_LLM"):
         return None
 
+    backend_kwargs: dict[str, Any] = {}
+    if provider == "bedrock":
+        if model:
+            backend_kwargs["model"] = model
+        backend = create_backend(provider, **backend_kwargs)
+        return LLMCaller(backend)
+
     if api_key or os.environ.get("OPENAI_API_KEY"):
-        backend_kwargs: dict[str, Any] = {}
+        backend_kwargs = {}
         if api_key:
             backend_kwargs["api_key"] = api_key
         if base_url:
@@ -279,4 +358,6 @@ def create_backend(
     if provider == "ollama":
         base_url = kwargs.pop("base_url", "http://localhost:11434/v1")
         return OpenAICompatibleBackend(base_url=base_url, **kwargs)
+    if provider == "bedrock":
+        return BedrockCliBackend(**kwargs)
     raise ValueError(f"Unknown provider: {provider}")

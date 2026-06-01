@@ -92,6 +92,7 @@ uv run python scripts/evaluate-golden-journey.py --scenario all --output tests/r
 uv run python scripts/evaluate-golden-journey.py --llm --provider ollama --model qwen2.5:7b
 uv run python scripts/evaluate-golden-journey.py --llm --provider ollama --model qwen2.5:7b --require-conformant
 uv run python scripts/evaluate-golden-journey.py --llm --provider ollama --model qwen2.5:7b --keep-output tests/results/golden-qwen2.5-7b --benchmark-output tests/results/golden-qwen2.5-7b.yaml
+uv run python scripts/evaluate-golden-journey.py --scenario all --llm --provider bedrock --model eu.amazon.nova-2-lite-v1:0 --keep-output tests/results/golden-bedrock-nova-2-lite --output tests/results/golden-journey-bedrock-nova-2-lite.yaml
 uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b
 uv run python scripts/battle-test.py --fixture aws-lza-complex-enterprise-handoff --llm --provider ollama --model qwen2.5:7b
 ```
@@ -225,12 +226,25 @@ If local models are insufficient:
 export OPENAI_API_KEY=sk-...
 iac-llm-wrapper compile -i design.md -o out/ --provider openai --model gpt-4o-mini
 
-# Amazon Bedrock through an approved OpenAI-compatible gateway or proxy
+# Amazon Bedrock through local AWS CLI credentials/session
+aws sts get-caller-identity
+aws bedrock-runtime converse \
+  --region eu-central-1 \
+  --model-id eu.amazon.nova-2-lite-v1:0 \
+  --messages '[{"role":"user","content":[{"text":"Return only OK"}]}]' \
+  --inference-config '{"maxTokens":16,"temperature":0.1}'
+
+iac-llm-wrapper compile -i design.md -o out/ \
+  --provider bedrock \
+  --model eu.amazon.nova-2-lite-v1:0
+
+# Amazon Bedrock through an approved OpenAI-compatible gateway or proxy,
+# when teams require gateway mediation instead of direct AWS CLI invocation.
 export OPENAI_API_KEY=bedrock-gateway-token
 iac-llm-wrapper compile -i design.md -o out/ \
   --provider openai \
   --base-url https://bedrock-gateway.example.com/v1 \
-  --model amazon.nova-micro-v1:0
+  --model eu.amazon.nova-2-lite-v1:0
 ```
 
 For Bedrock, keep the repo data model provider-neutral: choose the cheapest

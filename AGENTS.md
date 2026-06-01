@@ -95,16 +95,16 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy.
 
 ### Current Goal
 
-T30: Golden journey result artifact
+T31: Direct Bedrock Nova 2 Lite golden journey
 
 ### Status
 
-- **Tests**: 326 passing, 1 skipped
+- **Tests**: 330 passing, 1 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added `--output` and `--scenario all` to `scripts/evaluate-golden-journey.py`. The harness now writes `intent-engine/golden-journey-results/v1` YAML with ready/blocked scenario status, readiness, conformance, raw coverage, raw missing count, blocker count, contract status, raw evidence status, failures, and validated checks.
+- **Last session**: Verified AWS identity and Bedrock model availability in `eu-central-1`, added a narrow AWS CLI-backed `bedrock` LLM provider, and ran the existing golden journey against `eu.amazon.nova-2-lite-v1:0` with local result artifacts under ignored `tests/results/`.
 
 ### Done
 
@@ -112,6 +112,7 @@ T30: Golden journey result artifact
 - Built-ins: `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, and `terraform-vpc` are contract-backed handoff paths. Current built-ins make no cloud API calls and do not deploy from prose.
 - Evaluation: deterministic extraction corpus includes clean, blocked, BYOM, and customer-style prose cases; role usability trials, forbidden-artifact checks, fixture drift guard, contract validation tests, battle-summary tests, static review tests, stakeholder handoff-confidence checks, and full repo gate are green.
 - Golden journey: `scripts/evaluate-golden-journey.py` is the quickest product-confidence check for the core promise: messy customer-style AWS LZA notes to service-style reviewed handoff bundle. It supports `--scenario ready`, `--scenario blocked`, `--scenario all`, `--require-conformant`, `--benchmark-output`, and `--output` for readiness, blocked-safety, model baseline checks, and CI/archive result artifacts.
+- Bedrock: `--provider bedrock` uses the local AWS CLI session with Bedrock Runtime Converse, defaulting region from `INTENT_ENGINE_AWS_REGION`, `AWS_REGION`, `AWS_DEFAULT_REGION`, then `eu-central-1`; it records Bedrock token usage in the existing trace/benchmark schema without adding a new harness or SDK dependency.
 - Observability: `model-benchmark.yaml` now reports raw LLM coverage of accepted decisions, missing accepted keys, and model conformance (`pass`, `review`, `fail`, `not-applicable`); LLM battle summaries surface raw-model misses as expected weaknesses instead of hiding them behind deterministic Markdown success.
 - Model comparison: `scripts/compare-model-benchmarks.py` shows `rawCoverage`, `rawMissing`, `missingKeys`, and `conformance`; `--require-conformant` fails non-conformant LLM benchmark runs.
 - Static review: `handoff-review.html` starts with a human summary of readiness, contract status, allowed next action, blocker traceability, model conformance, raw LLM coverage, missing raw decision keys, and expected weaknesses.
@@ -122,7 +123,7 @@ T30: Golden journey result artifact
 ### Next
 
 1. Stop harness expansion unless real local/Bedrock model runs expose pain.
-2. Run `evaluate-golden-journey.py --scenario all --llm --output tests/results/golden-journey-<model>.yaml`, `evaluate-extraction.py --llm`, `evaluate-usability.py --llm`, and `compare-model-benchmarks.py --require-conformant` with approved local/Bedrock models; use result artifacts to decide whether prompts or fixtures need tightening.
+2. Run `evaluate-extraction.py --llm`, `evaluate-usability.py --llm`, and `compare-model-benchmarks.py --require-conformant` with approved local/Bedrock models when broader model regression confidence is needed; use result artifacts to decide whether prompts or fixtures need tightening.
 3. If reviewers still struggle to resolve blockers, consider adding lightweight anchors from blocker rows to exported requirement graph nodes without adding JavaScript.
 4. Continue AWS LZA schema depth only where real customer inputs justify it.
 
@@ -137,3 +138,4 @@ T30: Golden journey result artifact
 - Customer-style eval fixtures should mix prose, meeting notes, review reminders, and structured decisions so the harness protects real handoff behavior, not only template-shaped examples.
 - Local customer-fixture hardening should prefer the best model a work MacBook Pro can handle, currently `qwen2.5:7b` in this workspace; Bedrock remains an approved cloud path through an OpenAI-compatible gateway/proxy when cost and policy require it.
 - Local T21 comparison showed `qwen2.5:3b` had the best raw AWS LZA coverage on the customer board-notes fixture in this run, while `qwen2.5:7b` remained ready but missed Identity Center keys and `llama3.2:3b` was weak for AWS board notes.
+- Direct Bedrock T31 run used SSO role `AWSReservedSSO_AWSAdministratorAccess_0f7a04d12908e8e3` in account `691627364817`. Catalog showed `amazon.nova-2-lite-v1:0` in `eu-central-1`, but runtime required inference profile `eu.amazon.nova-2-lite-v1:0`. Golden journey result: ready `20/20` raw coverage, conformance `pass`, 3657 tokens, 3926.3 ms; blocked `17/17` raw coverage, safely blocked, 4292 tokens, 4314.4 ms. No prompt or fixture tightening needed from this run.

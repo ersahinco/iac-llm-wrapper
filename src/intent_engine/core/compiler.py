@@ -353,6 +353,8 @@ def _readable_provider(provider: Any) -> str:
     value = str(provider or "unknown")
     if value == "OpenAICompatibleBackend":
         return "openai-compatible"
+    if value == "BedrockCliBackend":
+        return "bedrock"
     if value.endswith("Backend"):
         value = value[: -len("Backend")]
     return value.replace("_", "-").lower() or "unknown"
