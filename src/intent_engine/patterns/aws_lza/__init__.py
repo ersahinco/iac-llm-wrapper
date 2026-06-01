@@ -62,8 +62,12 @@ _AWS_LZA_FREE_FORM_EXAMPLES = {
     "Regions": ["enabled_regions: eu-central-1, eu-west-1"],
     "Accounts": ["workload_accounts: Dev, Test, Prod"],
     "Identity": [
+        "identity_center_delegated_admin_account: SecurityTooling",
         "identity_center_permission_sets: ReadOnlyAccess, PowerUserAccess",
-        "identity_center_assignments: PlatformAdmins:PowerUserAccess:Management",
+        (
+            "identity_center_assignments: PlatformAdmins:PowerUserAccess:Management, "
+            "AppTeam:ReadOnlyAccess:Prod"
+        ),
     ],
 }
 

@@ -28,6 +28,11 @@ def _nested(data: dict[str, Any], section: str, key: str, default: Any = "") -> 
 
 def _row(path: Path) -> dict[str, str]:
     data = _yaml_load(path)
+    quality = data.get("quality", {}) if isinstance(data.get("quality"), dict) else {}
+    accepted = int(quality.get("acceptedDecisionCount", 0) or 0)
+    raw_coverage = int(quality.get("rawLlmAcceptedCoverageCount", 0) or 0)
+    missing = quality.get("rawLlmMissingAcceptedDecisions", [])
+    missing_keys = ", ".join(str(item) for item in missing) if isinstance(missing, list) else ""
     return {
         "path": str(path),
         "mode": str(_nested(data, "run", "mode", "unknown")),
@@ -36,7 +41,10 @@ def _row(path: Path) -> dict[str, str]:
         "readiness": str(_nested(data, "readiness", "status", "unknown")),
         "latencyMs": str(_nested(data, "latency", "totalMs", 0)),
         "tokens": str(_nested(data, "tokens", "totalTokens", 0)),
-        "accepted": str(_nested(data, "quality", "acceptedDecisionCount", 0)),
+        "accepted": str(accepted),
+        "rawCoverage": f"{raw_coverage}/{accepted}" if accepted else "0/0",
+        "rawMissing": str(_nested(data, "quality", "rawLlmMissingAcceptedDecisionCount", 0)),
+        "missingKeys": missing_keys,
         "blockers": str(_nested(data, "readiness", "blockerCount", 0)),
         "parseErrors": str(_nested(data, "quality", "parseErrorCount", 0)),
     }
@@ -51,6 +59,9 @@ def _print_table(rows: list[dict[str, str]]) -> None:
         "latencyMs",
         "tokens",
         "accepted",
+        "rawCoverage",
+        "rawMissing",
+        "missingKeys",
         "blockers",
         "parseErrors",
         "path",

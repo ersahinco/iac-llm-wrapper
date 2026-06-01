@@ -232,8 +232,9 @@ For `aws-lza`, successful output includes:
 - `sample-recommendations.yaml` — closest pinned reference bundles for handoff
 - `llm-trace-summary.yaml` — provider/model, calls, raw and accepted decisions,
   resolved/blocking gaps, blocking contradictions, and raw evidence status
-- `model-benchmark.yaml` — latency, token, quality, readiness, and cost-status
-  rollups for LLM evaluation without embedding an observability platform
+- `model-benchmark.yaml` — latency, token, raw LLM coverage, quality,
+  readiness, and cost-status rollups for LLM evaluation without embedding an
+  observability platform
 
 When compile is blocked, only safe assessment artifacts are written:
 `decision-report.yaml`, `llm-trace-summary.yaml`, and `model-benchmark.yaml`.

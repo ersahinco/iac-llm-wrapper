@@ -94,7 +94,7 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy.
 
 ### Current Goal
 
-T20: LLM evidence-backed customer fixture hardening
+T21: Actionable model-quality gate from raw LLM coverage
 
 ### Status
 
@@ -103,7 +103,7 @@ T20: LLM evidence-backed customer fixture hardening
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Ran `qwen2.5:7b` LLM evals against customer-style AWS LZA and BYOM Terraform fixtures with raw evidence, added raw LLM coverage metrics to `model-benchmark.yaml`, surfaced raw-model misses in battle summaries, documented local/Bedrock model strategy and secret-reference hygiene, and verified the full local gate plus pre-commit.
+- **Last session**: Upgraded model benchmark comparison to show raw coverage and missing keys, added a narrow prompt rule for explicit schema-key bullets, compared `qwen2.5:7b`, `qwen2.5:3b`, and `llama3.2:3b` on customer-style AWS LZA and BYOM Terraform fixtures, and verified the AWS customer battle harness tracks `qwen2.5:7b` Identity Center misses as expected model weaknesses.
 
 ### Done
 
@@ -111,13 +111,14 @@ T20: LLM evidence-backed customer fixture hardening
 - Built-ins: `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, and `terraform-vpc` are contract-backed handoff paths. Current built-ins make no cloud API calls and do not deploy from prose.
 - Evaluation: deterministic extraction corpus includes clean, blocked, BYOM, and customer-style prose cases; role usability trials, forbidden-artifact checks, fixture drift guard, contract validation tests, battle-summary tests, static review tests, and full repo gate are green.
 - Observability: `model-benchmark.yaml` now reports raw LLM coverage of accepted decisions and missing accepted keys; LLM battle summaries surface raw-model misses as expected weaknesses instead of hiding them behind deterministic Markdown success.
+- Model comparison: `scripts/compare-model-benchmarks.py` shows `rawCoverage`, `rawMissing`, and `missingKeys` so ready handoffs are not mistaken for strong raw-model extraction.
 - Cleanup: removed stale LZA research/extension/diff/apply/default-normalizer surfaces, no-contract artifact fallback, pattern `extra_artifacts`, duplicate fixture normalization, and stale duplicate LLM docs.
 - Language: user-facing docs now prefer handoff readiness; `deploymentReadiness` remains a legacy compatibility alias in artifacts. Docs now also state that secrets should travel as secret-store references and expected parameter names, never raw values.
 
 ### Next
 
-1. Use the new raw LLM coverage metrics to compare `qwen2.5:7b`, smaller local models, and any approved Bedrock gateway model before prompt tuning.
-2. Promote repeated raw-model misses into expected fixture checks or prompt fixes only after at least two evidence-backed runs show the same gap.
+1. If an approved Bedrock gateway is available, run the same two customer fixtures and compare raw coverage against local baselines before adding provider-specific support.
+2. Treat `qwen2.5:7b` AWS Identity Center misses and `llama3.2:3b` AWS broad misses as tracked model weaknesses unless future evidence shows a prompt-level fix.
 3. Continue AWS LZA schema depth only where real customer inputs justify it.
 4. Keep private pattern work package-local until a real consumer needs packaged external distribution; do not add a generic loader speculatively.
 
@@ -131,3 +132,4 @@ T20: LLM evidence-backed customer fixture hardening
 - Built-ins are enough until a team has proprietary modules, controls, sample bundles, or gates that justify private patterns.
 - Customer-style eval fixtures should mix prose, meeting notes, review reminders, and structured decisions so the harness protects real handoff behavior, not only template-shaped examples.
 - Local customer-fixture hardening should prefer the best model a work MacBook Pro can handle, currently `qwen2.5:7b` in this workspace; Bedrock remains an approved cloud path through an OpenAI-compatible gateway/proxy when cost and policy require it.
+- Local T21 comparison showed `qwen2.5:3b` had the best raw AWS LZA coverage on the customer board-notes fixture in this run, while `qwen2.5:7b` remained ready but missed Identity Center keys and `llama3.2:3b` was weak for AWS board notes.

@@ -228,6 +228,7 @@ class TestEndToEndLLM:
         prompt = Extractor(pattern="aws-lza").build_prompt("Design doc text here")
 
         assert "Use only SCHEMA keys for decisions" in prompt
+        assert "explicit 'schema_key: value' bullets" in prompt
         assert "Do not report gaps for design_doc, accounts, OUs, or workloads metadata" in prompt
         assert "If unsure about a SCHEMA key" in prompt
 

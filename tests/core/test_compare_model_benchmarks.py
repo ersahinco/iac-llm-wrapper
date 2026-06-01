@@ -43,7 +43,16 @@ def test_compare_model_benchmarks_prints_table(tmp_path: Path):
             "readiness": {"status": "ready", "blockerCount": 0},
             "latency": {"totalMs": 123.4},
             "tokens": {"totalTokens": 4321},
-            "quality": {"acceptedDecisionCount": 20, "parseErrorCount": 0},
+            "quality": {
+                "acceptedDecisionCount": 20,
+                "rawLlmAcceptedCoverageCount": 18,
+                "rawLlmMissingAcceptedDecisionCount": 2,
+                "rawLlmMissingAcceptedDecisions": [
+                    "identity_center_permission_sets",
+                    "identity_center_assignments",
+                ],
+                "parseErrorCount": 0,
+            },
         },
     )
 
@@ -55,6 +64,10 @@ def test_compare_model_benchmarks_prints_table(tmp_path: Path):
     assert "llama3.2:3b" in result.stdout
     assert "123.4" in result.stdout
     assert "4321" in result.stdout
+    assert "rawCoverage" in result.stdout
+    assert "18/20" in result.stdout
+    assert "rawMissing" in result.stdout
+    assert "identity_center_permission_sets, identity_center_assignments" in result.stdout
     assert str(benchmark) in result.stdout
 
 

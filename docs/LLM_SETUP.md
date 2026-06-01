@@ -107,6 +107,11 @@ Compare multiple runs with:
 uv run python scripts/compare-model-benchmarks.py tests/results/*/model-benchmark.yaml
 ```
 
+Treat `readiness=ready` as necessary but not sufficient when comparing models.
+Prefer models that also show high `rawCoverage` and low `rawMissing`; a ready
+handoff can still be carried by structured Markdown while the model misses
+accepted decisions.
+
 ## Raw Evidence Hygiene
 
 LLM-backed `compile` writes raw prompt/response evidence to

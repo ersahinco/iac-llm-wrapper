@@ -9,7 +9,7 @@ execution path and passes graph, contract, gate, evidence, and rollback checks.
 | `decision-report.yaml` | Accepted decisions, handoff readiness, blockers, and safe handoff path. | Core + pattern | Every compile, including blocked compiles. | No |
 | `handoff-plan.yaml` | Ordered review/handoff steps, owners, dependencies, manual gates, rollback, boundary, and allowed next action. | Core | Contract-backed successful handoffs. | No |
 | `llm-trace-summary.yaml` | Provider/model, latency, raw and accepted decisions, applied decisions, gaps, contradictions, and raw evidence status. | Core | Every compile. | No |
-| `model-benchmark.yaml` | Mode, provider/model, latency, token availability, quality counts, readiness, cost status, and external-observability boundary. | Core | Every compile. | No |
+| `model-benchmark.yaml` | Mode, provider/model, latency, token availability, raw LLM coverage, quality counts, readiness, cost status, and external-observability boundary. | Core | Every compile. | No |
 | `contract-validation.yaml` | Standalone pass/fail validation of emitted artifacts against target contracts. | Core review tooling | `iac-llm-wrapper review html`. | No |
 | `battle-summary.yaml` | Battle-test verdict, confidence categories, findings, and improvement items. | Battle harness | `scripts/battle-test.py`. | No |
 | `handoff-review.html` | Static human review page linking graph, evidence, benchmark, contract validation, handoff plan, and target artifacts. | Core review tooling | `iac-llm-wrapper review html`. | No |

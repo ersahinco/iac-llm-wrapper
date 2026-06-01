@@ -258,15 +258,18 @@ class Extractor:
             "5. Identify GAPS: applicable requirements that are not mentioned.\n"
             "6. Boolean values must be strings: 'true' or 'false'.\n"
             "7. Integer values must be strings (e.g., '2555', not 2555).\n"
-            "8. If the document mentions accounts, workloads, or OUs, include them as "
+            "8. If the document contains explicit 'schema_key: value' bullets or lines "
+            "where schema_key appears in the SCHEMA, copy those keys into decisions "
+            "exactly unless the value is contradicted later.\n"
+            "9. If the document mentions accounts, workloads, or OUs, include them as "
             "top-level JSON arrays in the output.\n"
-            '9. Account format: {"name": "...", "ou": "...", "description": "..."}\n'
-            '10. Workload format: {"name": "...", "target_account": "...", '
+            '10. Account format: {"name": "...", "ou": "...", "description": "..."}\n'
+            '11. Workload format: {"name": "...", "target_account": "...", '
             '"network_mode": "private" (or "public"), '
             '"runtime": "ecs-fargate" (or "ec2" or "eks"), '
             '"public_ingress": false, "port": 8080, "cpu": 256, "memory": 512}\n'
-            '11. OU format: {"name": "...", "description": "..."}\n'
-            "12. Use only SCHEMA keys for decisions, signal_decisions, gaps, and "
+            '12. OU format: {"name": "...", "description": "..."}\n'
+            "13. Use only SCHEMA keys for decisions, signal_decisions, gaps, and "
             "contradictions. Do not report gaps for design_doc, accounts, OUs, or "
             "workloads metadata.\n\n"
             "=== EXAMPLE OUTPUT ===\n"
