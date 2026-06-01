@@ -62,10 +62,19 @@ def build_review_context(
         if contract_validation_path is not None
         else build_contract_validation(input_dir)
     )
+    model_quality = _model_quality(benchmark, trace)
+    contract_status = _contract_status(contract_validation)
 
     return {
         "pattern": str(report.get("pattern", handoff.get("pattern", "handoff"))),
         "readiness": readiness,
+        "reviewSummary": {
+            "readiness": readiness.get("status", "unknown"),
+            "contractStatus": contract_status,
+            "allowedNextAction": readiness.get("allowedNextAction", ""),
+            "modelQuality": model_quality,
+        },
+        "modelQuality": model_quality,
         "graphExports": graph_exports,
         "acceptedDecisions": _dict(trace.get("acceptedDecisions")),
         "graphDecisions": _graph_decisions(report),
@@ -74,6 +83,7 @@ def build_review_context(
         "blockingContradictions": _trace_list(trace, "contradictions", "blocking"),
         "contractValidation": _coerce_list(contract_validation.get("contracts")),
         "contractValidationArtifact": contract_validation,
+        "contractStatus": contract_status,
         "artifacts": _artifact_rows(input_dir, _artifact_names(input_dir, handoff, lineage)),
         "handoff": handoff,
         "trace": trace,
@@ -176,6 +186,45 @@ def _trace_list(trace: dict[str, Any], section: str, key: str) -> list[Any]:
     if not isinstance(value, dict):
         return []
     return _coerce_list(value.get(key, []))
+
+
+def _contract_status(contract_validation: dict[str, Any]) -> str:
+    summary = contract_validation.get("summary")
+    if isinstance(summary, dict):
+        return str(summary.get("status", "unknown"))
+    contracts = _coerce_list(contract_validation.get("contracts"))
+    if not contracts:
+        return "unknown"
+    return "fail" if any(_dict(item).get("status") == "fail" for item in contracts) else "pass"
+
+
+def _model_quality(benchmark: dict[str, Any], trace: dict[str, Any]) -> dict[str, Any]:
+    quality = _dict(benchmark.get("quality"))
+    run = _dict(benchmark.get("run"))
+    applied = _dict(trace.get("appliedDecisions"))
+    accepted = int(quality.get("acceptedDecisionCount", 0) or 0)
+    raw_coverage = int(quality.get("rawLlmAcceptedCoverageCount", 0) or 0)
+    raw_missing = int(quality.get("rawLlmMissingAcceptedDecisionCount", 0) or 0)
+    missing_keys = [
+        str(item) for item in _coerce_list(quality.get("rawLlmMissingAcceptedDecisions"))
+    ]
+    llm_applied = _coerce_list(applied.get("llm"))
+    markdown_applied = _coerce_list(applied.get("markdown"))
+    warnings: list[str] = []
+    if raw_missing:
+        warnings.append("Raw LLM missed accepted decisions: " + ", ".join(missing_keys) + ".")
+    if run.get("mode") == "llm" and markdown_applied and not llm_applied:
+        warnings.append("Structured Markdown carried the handoff; LLM added no accepted decisions.")
+    return {
+        "mode": str(run.get("mode", "unknown")),
+        "model": str(run.get("model", "unknown")),
+        "acceptedDecisionCount": accepted,
+        "rawCoverage": f"{raw_coverage}/{accepted}" if accepted else "0/0",
+        "rawMissingCount": raw_missing,
+        "missingKeys": missing_keys,
+        "expectedWeaknesses": warnings,
+        "parseErrorCount": int(quality.get("parseErrorCount", 0) or 0),
+    }
 
 
 def _artifact_names(input_dir: Path, handoff: dict[str, Any], lineage: dict[str, Any]) -> list[str]:

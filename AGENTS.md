@@ -94,7 +94,7 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy.
 
 ### Current Goal
 
-T21: Actionable model-quality gate from raw LLM coverage
+T22: Human-readable review summary for model-quality evidence
 
 ### Status
 
@@ -103,7 +103,7 @@ T21: Actionable model-quality gate from raw LLM coverage
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Upgraded model benchmark comparison to show raw coverage and missing keys, added a narrow prompt rule for explicit schema-key bullets, compared `qwen2.5:7b`, `qwen2.5:3b`, and `llama3.2:3b` on customer-style AWS LZA and BYOM Terraform fixtures, and verified the AWS customer battle harness tracks `qwen2.5:7b` Identity Center misses as expected model weaknesses.
+- **Last session**: Added a top-level review summary to `handoff-review.html` for readiness, contract status, allowed next action, raw LLM coverage, missing raw decision keys, and expected model weaknesses; verified the AWS customer `qwen2.5:7b` battle page shows the Identity Center misses without opening YAML.
 
 ### Done
 
@@ -112,15 +112,16 @@ T21: Actionable model-quality gate from raw LLM coverage
 - Evaluation: deterministic extraction corpus includes clean, blocked, BYOM, and customer-style prose cases; role usability trials, forbidden-artifact checks, fixture drift guard, contract validation tests, battle-summary tests, static review tests, and full repo gate are green.
 - Observability: `model-benchmark.yaml` now reports raw LLM coverage of accepted decisions and missing accepted keys; LLM battle summaries surface raw-model misses as expected weaknesses instead of hiding them behind deterministic Markdown success.
 - Model comparison: `scripts/compare-model-benchmarks.py` shows `rawCoverage`, `rawMissing`, and `missingKeys` so ready handoffs are not mistaken for strong raw-model extraction.
+- Static review: `handoff-review.html` starts with a human summary of readiness, contract status, allowed next action, raw LLM coverage, missing raw decision keys, and expected weaknesses.
 - Cleanup: removed stale LZA research/extension/diff/apply/default-normalizer surfaces, no-contract artifact fallback, pattern `extra_artifacts`, duplicate fixture normalization, and stale duplicate LLM docs.
 - Language: user-facing docs now prefer handoff readiness; `deploymentReadiness` remains a legacy compatibility alias in artifacts. Docs now also state that secrets should travel as secret-store references and expected parameter names, never raw values.
 
 ### Next
 
-1. If an approved Bedrock gateway is available, run the same two customer fixtures and compare raw coverage against local baselines before adding provider-specific support.
-2. Treat `qwen2.5:7b` AWS Identity Center misses and `llama3.2:3b` AWS broad misses as tracked model weaknesses unless future evidence shows a prompt-level fix.
-3. Continue AWS LZA schema depth only where real customer inputs justify it.
-4. Keep private pattern work package-local until a real consumer needs packaged external distribution; do not add a generic loader speculatively.
+1. Run a stakeholder-style usability pass against the static review page: architect, platform engineer, security reviewer, and model developer should each find their decision signal in under a minute.
+2. If an approved Bedrock gateway is available, run the same two customer fixtures and compare raw coverage against local baselines before adding provider-specific support.
+3. Treat `qwen2.5:7b` AWS Identity Center misses and `llama3.2:3b` AWS broad misses as tracked model weaknesses unless future evidence shows a prompt-level fix.
+4. Continue AWS LZA schema depth only where real customer inputs justify it.
 
 ### Durable Decisions
 

@@ -240,7 +240,10 @@ When compile is blocked, only safe assessment artifacts are written:
 `decision-report.yaml`, `llm-trace-summary.yaml`, and `model-benchmark.yaml`.
 They must satisfy the built-in `blocked-assessment-artifacts` contract.
 
-Generate a portable static review page when humans need one file to inspect:
+Generate a portable static review page when humans need one file to inspect.
+The page starts with readiness, contract status, allowed next action, raw LLM
+coverage, missing raw decision keys, and expected model weaknesses so reviewers
+do not have to open YAML first:
 
 ```bash
 iac-llm-wrapper review html --input out/ --output out/handoff-review.html

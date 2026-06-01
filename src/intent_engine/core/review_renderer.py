@@ -16,6 +16,8 @@ def render_review_html(context: dict[str, Any]) -> str:
     trace = _dict(context.get("trace"))
     benchmark = _dict(context.get("benchmark"))
     links = _dict(context.get("links"))
+    review_summary = _dict(context.get("reviewSummary"))
+    model_quality = _dict(context.get("modelQuality"))
 
     return "\n".join(
         [
@@ -37,6 +39,25 @@ def render_review_html(context: dict[str, Any]) -> str:
             f'<div class="status {escape(str(readiness.get("status", "unknown")))}">'
             f"{escape(str(readiness.get('status', 'unknown')))}</div>",
             "</header>",
+            _section(
+                "Review Summary",
+                [
+                    _kv("Readiness", str(review_summary.get("readiness", "unknown"))),
+                    _kv("Contract status", str(review_summary.get("contractStatus", "unknown"))),
+                    _kv(
+                        "Allowed next action",
+                        str(review_summary.get("allowedNextAction", "")),
+                    ),
+                    _kv("Model", str(model_quality.get("model", "unknown"))),
+                    _kv("Raw LLM coverage", str(model_quality.get("rawCoverage", "0/0"))),
+                    _kv("Raw missing decisions", str(model_quality.get("rawMissingCount", 0))),
+                    _list_block("Missing raw decision keys", model_quality.get("missingKeys", [])),
+                    _list_block(
+                        "Expected weaknesses",
+                        model_quality.get("expectedWeaknesses", []),
+                    ),
+                ],
+            ),
             _section(
                 "Handoff Readiness",
                 [
@@ -106,6 +127,8 @@ def render_review_html(context: dict[str, Any]) -> str:
                         "Accepted decisions",
                         _nested_str(benchmark, "quality", "acceptedDecisionCount"),
                     ),
+                    _kv("Raw LLM coverage", str(model_quality.get("rawCoverage", "0/0"))),
+                    _kv("Raw missing decisions", str(model_quality.get("rawMissingCount", 0))),
                     _artifact_link_row("Model benchmark", links.get("modelBenchmark")),
                     _artifact_link_row("Contract validation", links.get("contractValidation")),
                     _details("Raw model benchmark", _yaml_dump(benchmark)),

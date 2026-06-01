@@ -45,13 +45,20 @@ def _write_review_bundle(input_dir: Path) -> Path:
             "gaps": {"blocking": [{"key": "network_account"}], "resolved": []},
             "contradictions": {"blocking": []},
             "rawEvidence": {"status": "captured", "path": str(evidence_path)},
+            "appliedDecisions": {"markdown": ["organization_name"], "llm": []},
         },
     )
     _write_yaml(
         input_dir / "model-benchmark.yaml",
         {
-            "run": {"mode": "deterministic", "provider": "none", "model": "none"},
-            "quality": {"acceptedDecisionCount": 1},
+            "run": {"mode": "llm", "provider": "ollama", "model": "small"},
+            "quality": {
+                "acceptedDecisionCount": 1,
+                "rawLlmAcceptedCoverageCount": 0,
+                "rawLlmMissingAcceptedDecisionCount": 1,
+                "rawLlmMissingAcceptedDecisions": ["organization_name"],
+                "parseErrorCount": 0,
+            },
         },
     )
     _write_yaml(
@@ -113,6 +120,15 @@ def test_build_review_context_uses_report_readiness_and_artifact_rows(tmp_path: 
     assert context["acceptedDecisions"] == {"organization_name": "Contoso"}
     assert context["blockingGaps"] == [{"key": "network_account"}]
     assert context["contractValidation"][0]["name"] == "example-contract"
+    assert context["contractStatus"] == "fail"
+    assert context["reviewSummary"]["contractStatus"] == "fail"
+    assert context["modelQuality"]["rawCoverage"] == "0/1"
+    assert context["modelQuality"]["rawMissingCount"] == 1
+    assert context["modelQuality"]["missingKeys"] == ["organization_name"]
+    assert context["modelQuality"]["expectedWeaknesses"] == [
+        "Raw LLM missed accepted decisions: organization_name.",
+        "Structured Markdown carried the handoff; LLM added no accepted decisions.",
+    ]
     assert context["links"]["rawEvidence"] == "raw-evidence.yaml"
     assert context["rawEvidence"].startswith("captured")
     assert {"name": "present.yaml", "status": "present"} in context["artifacts"]
@@ -129,6 +145,12 @@ def test_render_review_html_uses_existing_graph_exports(tmp_path: Path):
     html = render_review_html(input_dir)
 
     assert "example-pattern handoff review" in html
+    assert "Review Summary" in html
+    assert "Contract status" in html
+    assert "Raw LLM coverage" in html
+    assert "0/1" in html
+    assert "organization_name" in html
+    assert "Structured Markdown carried the handoff" in html
     assert "requirement-graph.json" in html
     assert "requirement-graph.mmd" in html
     assert "raw-evidence.yaml" in html
