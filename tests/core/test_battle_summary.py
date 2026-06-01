@@ -149,6 +149,41 @@ def test_expected_blocked_compile_failure_with_violation_passes(tmp_path: Path):
     assert summary["confidence"]["safety"] == "pass"
 
 
+def test_compile_result_mismatch_fails(tmp_path: Path):
+    repo_root = tmp_path / "repo"
+    output_dir = repo_root / "out"
+    _write_ready_bundle(output_dir, artifacts=("accounts-config.yaml",))
+
+    summary = _summary(
+        tmp_path,
+        case=_case(repo_root, expected_compile="fail", expected_artifacts=()),
+        output_dir=output_dir,
+    )
+
+    assert summary["verdict"] == "fail"
+    assert {
+        "type": "fail",
+        "area": "safety",
+        "message": "Compile result mismatch: expected fail, got pass.",
+    } in summary["findings"]
+
+
+def test_review_page_missing_required_section_fails(tmp_path: Path):
+    repo_root = tmp_path / "repo"
+    output_dir = repo_root / "out"
+    _write_ready_bundle(output_dir, artifacts=("accounts-config.yaml",))
+    (output_dir / "handoff-review.html").write_text("<h1>Readiness</h1>")
+
+    summary = _summary(tmp_path, case=_case(repo_root), output_dir=output_dir)
+
+    assert summary["verdict"] == "fail"
+    assert {
+        "type": "fail",
+        "area": "handoff",
+        "message": "Review page missing section: Contract Validation.",
+    } in summary["findings"]
+
+
 def test_raw_invented_llm_decision_is_improvement_not_failure(tmp_path: Path):
     repo_root = tmp_path / "repo"
     output_dir = repo_root / "out"

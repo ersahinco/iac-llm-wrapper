@@ -54,6 +54,26 @@ A repeatable local confidence run that writes an ignored bundle under
 `tests/results/`. It emits `battle-summary.yaml` with verdict, confidence
 categories, findings, and improvement items.
 
+## Battle Summary
+
+The verdict artifact for a battle test.
+
+```yaml
+verdict: pass | fail
+confidence:
+  extraction: pass | fail | improvement | expected-weakness
+  handoff: pass | fail | improvement | expected-weakness
+  safety: pass | fail | improvement | expected-weakness
+  model: pass | fail | improvement | expected-weakness
+  regression: pass | fail
+findings: []
+improvementItems: []
+```
+
+`fail` means a real regression or unsafe weakness was found. `improvement`
+means the run passed but found something worth tightening. `expected-weakness`
+means the run passed while preserving a known model or tool limitation.
+
 ## Evidence
 
 Prompt, response, trace, benchmark, and validation data that explains how the

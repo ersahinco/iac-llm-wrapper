@@ -9,8 +9,8 @@ handoff artifacts for engineers.
 The repository and package are named `iac-llm-wrapper`. The core is
 **intent-engine**. Today it wraps LLM extraction with deterministic decision
 validation and emits handoff artifacts. Generation, execution, dashboards, and
-cloud changes stay downstream unless a registered target adapter explicitly owns
-them and passes graph, contract, and gate checks.
+cloud changes stay downstream unless a registered pattern explicitly owns them
+and passes graph, contract, and gate checks.
 The primary CLI is `iac-llm-wrapper`; `intent-engine` is kept as an optional
 alias for the core engine.
 
@@ -401,8 +401,8 @@ iac-llm-wrapper/
 Those tools provision infrastructure. This tool captures and validates the
 decisions that must be made before provisioning. Today it emits handoff artifacts
 engineers use with existing accelerators, sample configurations, and IaC modules.
-Generation or execution stays downstream unless a registered target adapter owns
-that behavior and passes graph, contract, and gate checks. It does not generate
+Generation or execution stays downstream unless a registered pattern owns that
+behavior and passes graph, contract, and gate checks. It does not generate
 arbitrary deployable infrastructure from prose.
 
 ## LLM Testing

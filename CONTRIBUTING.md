@@ -50,7 +50,9 @@ uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwe
 uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b
 ```
 
-The deterministic fallback (`INTENT_ENGINE_DISABLE_LLM=1`) exists for unit tests and CI bootstrapping only. It applies defaults and does keyword matching — it cannot parse free-form prose. Do not treat it as a production extraction path.
+The deterministic fallback (`INTENT_ENGINE_DISABLE_LLM=1`) exists for unit tests
+and CI bootstrapping only. It applies defaults and does keyword matching; it
+cannot parse free-form prose. Do not treat it as a production extraction path.
 
 5. **Open a pull request** describing the problem and solution.
 
@@ -66,7 +68,9 @@ exact API contract for new target patterns and requirements.
 - **Type safety**: Pydantic v2 models for all data structures. No `dict` for domain objects.
 - **Pattern-driven**: New target path = new pattern, not modifications to core code.
 - **Data-driven**: New requirement = new `Requirement` node. The LLM prompt, interview questions, defaults, validation, and artifact emission all update automatically.
-- **No arbitrary IaC generation**: Current paths emit validated handoff artifacts, not deployable infrastructure from prose. Future target adapters must run behind graph, contract, gate, evidence, and rollback checks.
+- **No arbitrary IaC generation**: Current paths emit validated handoff artifacts,
+  not deployable infrastructure from prose. Future pattern-owned execution paths
+  must run behind graph, contract, gate, evidence, and rollback checks.
 
 ## Getting started
 
@@ -96,7 +100,7 @@ PRs should pass all CI jobs:
 - `lint` (ruff, format, type check, fixture drift check)
 - `test` (multi-version tests with coverage threshold)
 - `security` (`pip-audit`, `bandit`, SBOM generation)
-- `pre-commit` (optional but recommended — lower friction for reviewers)
+- `pre-commit` (optional but recommended - lower friction for reviewers)
 
 Branch protection should enforce:
 
