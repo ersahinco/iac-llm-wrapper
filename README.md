@@ -128,7 +128,10 @@ discovery, engineer handoff, and bring-your-own Terraform module input capture.
 It also includes a CloudFormation parameter handoff trial to prove BYOM
 orchestration beyond Terraform without generating a stack.
 Deterministic mode is the CI harness gate; `--llm` is the model-quality gate.
-Use `--evidence-dir` to keep prompt/response YAML for inspection.
+LLM-backed `compile` keeps prompt/response YAML at
+`<output>/raw-evidence.yaml` by default. Use `--evidence-output` to choose a
+different path, or `--evidence-dir` in eval scripts to keep per-case evidence.
+Treat raw evidence as customer design material.
 Use `battle-test.py` for repeatable local artifact bundles under ignored
 `tests/results/`; each run writes `battle-summary.yaml` with a verdict,
 confidence categories, findings, and improvement items.
@@ -219,7 +222,7 @@ iac-llm-wrapper compile -i design.md -o out/ --pattern aws-lza
 ```
 
 For `aws-lza`, successful output includes:
-- `decision-report.yaml` — decisions, deployment readiness, blockers, and safe handoff path
+- `decision-report.yaml` — decisions, handoff readiness, blockers, and safe handoff path
 - `accounts-config.yaml`, `global-config.yaml`, `iam-config.yaml`, `network-config.yaml`, `organization-config.yaml`, `security-config.yaml` — AWS LZA handoff config files
 - `lineage-manifest.yaml` — decision-to-artifact path map
 - `handoff-plan.yaml` — ordered owners, dependencies, gates, rollback, boundary, and allowed next action
@@ -395,6 +398,11 @@ GLOBAL_REGISTRY.register(
 See the [extension guide](docs/EXTENSION.md) for the full contract.
 Use [docs/PATTERN_AUTHORING.md](docs/PATTERN_AUTHORING.md) as the checklist for
 adding or changing a pattern.
+
+Private/internal patterns are useful only when a team has proprietary modules,
+control language, sample bundles, or review gates that should stay outside this
+repo. Built-ins are enough when the handoff target fits the shared pattern
+library.
 
 ## Architecture
 

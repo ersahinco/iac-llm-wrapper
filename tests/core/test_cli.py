@@ -4,13 +4,23 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from typer.testing import CliRunner
 
 from intent_engine.cli import app
+from intent_engine.core.llm_caller import LLMBackend, LLMCaller
 
 FIXTURES = Path(__file__).parent.parent.parent / "fixtures"
 runner = CliRunner()
+
+
+class _MockBackend(LLMBackend):
+    def __init__(self, response: str) -> None:
+        self.response = response
+
+    def complete(self, prompt: str, **kwargs: Any) -> str:
+        return self.response
 
 
 class TestCompileCommand:
@@ -32,6 +42,34 @@ class TestCompileCommand:
         assert (output / "accounts-config.yaml").exists()
         assert (output / "lineage-manifest.yaml").exists()
         assert not (output / "terraform.tfvars").exists()
+
+    def test_compile_with_llm_keeps_raw_evidence_by_default(
+        self,
+        tmp_path: Path,
+        monkeypatch,
+    ):
+        output = tmp_path / "output"
+        response = json.dumps({"decisions": {}, "signal_decisions": {}, "gaps": []})
+        monkeypatch.setattr(
+            "intent_engine.cli.auto_detect_llm",
+            lambda **kwargs: LLMCaller(_MockBackend(response)),
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "compile",
+                "--input",
+                str(FIXTURES / "usability" / "engineer-handoff-lza.md"),
+                "--output",
+                str(output),
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "LLM evidence written to:" in result.stdout
+        assert (output / "raw-evidence.yaml").exists()
+        assert "raw-evidence.yaml" in (output / "llm-trace-summary.yaml").read_text()
 
     def test_compile_missing_input_fails(self, tmp_path: Path):
         result = runner.invoke(

@@ -247,10 +247,21 @@ class TestContractValidator:
     def test_blocked_assessment_contract_validates_safe_artifacts(self, tmp_path: Path):
         (tmp_path / "decision-report.yaml").write_text(
             """pattern: aws-lza
+handoffReadiness:
+  deploymentAllowed: false
+  status: blocked
+  summary: Cannot hand off yet.
+  blockers:
+    - code: EXAMPLE
+      message: blocked
+  missingDecisions: []
+  conflictingDecisions: []
+  safeHandoffPath:
+    - Fix blockers.
 deploymentReadiness:
   deploymentAllowed: false
   status: blocked
-  summary: Cannot deploy yet.
+  summary: Cannot hand off yet.
   blockers:
     - code: EXAMPLE
       message: blocked
@@ -280,6 +291,12 @@ gaps:
   blocking: []
 contradictions:
   blocking: []
+handoffReadiness:
+  deploymentAllowed: false
+  status: blocked
+  blockerCount: 1
+  blockingGapCount: 0
+  blockingContradictionCount: 0
 deploymentReadiness:
   deploymentAllowed: false
   status: blocked

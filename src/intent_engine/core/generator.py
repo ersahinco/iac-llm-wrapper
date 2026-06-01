@@ -276,7 +276,10 @@ def gen_handoff_plan(intent: Any, output_dir: Path) -> None:
     from .patterns import GLOBAL_REGISTRY as PATTERN_REGISTRY
 
     pattern_obj = PATTERN_REGISTRY.get(pattern)
-    readiness = getattr(intent, "deployment_readiness", {}) or {}
+    readiness = getattr(intent, "handoff_readiness", None)
+    if readiness is None:
+        readiness = getattr(intent, "deployment_readiness", {})
+    readiness = readiness or {}
     allowed = bool(readiness.get("deploymentAllowed", True))
     contracts = pattern_obj.contracts
     required_artifacts = list(

@@ -53,6 +53,8 @@ expect:
     security.securityHubEnabled: true
     security.guardDutyEnabled: true
     security.complianceOverlay: regulated
+    handoffReadiness.status: ready
+    handoffReadiness.deploymentAllowed: true
   counts:
     enabledRegions: 3
     organizationalUnits: 6
@@ -101,6 +103,7 @@ expect:
       - rawEvidencePath
     values:
       pattern: aws-lza
+      handoffReadiness.status: ready
       deploymentReadiness.status: ready
     deterministicValues:
       callCount: 0

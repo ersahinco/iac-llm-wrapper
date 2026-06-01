@@ -38,9 +38,9 @@ def render_review_html(context: dict[str, Any]) -> str:
             f"{escape(str(readiness.get('status', 'unknown')))}</div>",
             "</header>",
             _section(
-                "Readiness",
+                "Handoff Readiness",
                 [
-                    _kv("Deployment allowed", str(readiness.get("deploymentAllowed", False))),
+                    _kv("Handoff ready", str(readiness.get("deploymentAllowed", False))),
                     _kv("Allowed next action", str(readiness.get("allowedNextAction", ""))),
                     _list_block("Blockers", _coerce_list(readiness.get("blockers"))),
                 ],

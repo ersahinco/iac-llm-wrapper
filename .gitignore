@@ -33,3 +33,6 @@ output/
 tests/results/*
 !tests/results/.gitkeep
 *.generated.yaml
+raw-evidence.yaml
+*.evidence.yaml
+iac-llm-evidence/

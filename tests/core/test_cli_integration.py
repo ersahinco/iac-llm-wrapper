@@ -93,11 +93,11 @@ class TestCLICompile:
             ],
         )
         assert result.exit_code != 0
-        assert "cannot deploy yet" in result.output
+        assert "handoff is blocked" in result.output
         assert "AWS_LZA_NETWORK_ACCOUNT_REQUIRED" in result.output
         report = (output_dir / "decision-report.yaml").read_text()
         assert "deploymentAllowed: false" in report
-        assert "Cannot deploy yet" in report
+        assert "Cannot hand off yet" in report
         trace = (output_dir / "llm-trace-summary.yaml").read_text()
         assert "callCount: 0" in trace
         assert "acceptedDecisions:" in trace

@@ -146,7 +146,7 @@ Workload notes:
 - Sandbox Tools should not be created in production landing-zone wave unless a
   separate OU and SCP path are approved.
 
-## Deployment Readiness Notes
+## Handoff Readiness Notes
 
 Do not deploy yet.
 

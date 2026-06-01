@@ -6,7 +6,7 @@ execution path and passes graph, contract, gate, evidence, and rollback checks.
 
 | Artifact | Purpose | Owner | Emitted When | Deployable |
 | --- | --- | --- | --- | --- |
-| `decision-report.yaml` | Accepted decisions, readiness, blockers, and safe handoff path. | Core + pattern | Every compile, including blocked compiles. | No |
+| `decision-report.yaml` | Accepted decisions, handoff readiness, blockers, and safe handoff path. | Core + pattern | Every compile, including blocked compiles. | No |
 | `handoff-plan.yaml` | Ordered review/handoff steps, owners, dependencies, manual gates, rollback, boundary, and allowed next action. | Core | Contract-backed successful handoffs. | No |
 | `llm-trace-summary.yaml` | Provider/model, latency, raw and accepted decisions, applied decisions, gaps, contradictions, and raw evidence status. | Core | Every compile. | No |
 | `model-benchmark.yaml` | Mode, provider/model, latency, token availability, quality counts, readiness, cost status, and external-observability boundary. | Core | Every compile. | No |
@@ -25,6 +25,8 @@ execution path and passes graph, contract, gate, evidence, and rollback checks.
   lineage, and the allowed next action.
 - Contributors use `llm-trace-summary.yaml`, `model-benchmark.yaml`,
   `battle-summary.yaml`, and eval results to improve extraction and model value.
+- LLM reviewers keep `raw-evidence.yaml` with the bundle for audit/debugging and
+  redact it before sharing outside the project team.
 - External UI or observability projects may read these files, but this repo stays
   CLI- and artifact-first.
 

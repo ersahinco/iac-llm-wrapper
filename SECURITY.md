@@ -8,6 +8,15 @@
 - insecure coding patterns in repository code
 - safe handling of decision artifacts and user inputs
 
+## Raw LLM evidence
+
+LLM-backed runs can preserve raw prompt/response evidence for auditability. That
+evidence is useful and should be kept with the handoff bundle, but it can contain
+customer design prose, account names, topology, control requirements, and model
+outputs. Store it in restricted output locations, keep secrets out of design
+docs, pass API keys through environment variables or `--api-key`, and redact raw
+evidence before sharing outside the project team.
+
 ## CI security checks
 
 The `security` CI job runs:

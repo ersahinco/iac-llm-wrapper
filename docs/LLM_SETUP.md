@@ -98,6 +98,20 @@ Compare multiple runs with:
 uv run python scripts/compare-model-benchmarks.py tests/results/*/model-benchmark.yaml
 ```
 
+## Raw Evidence Hygiene
+
+LLM-backed `compile` writes raw prompt/response evidence to
+`<output>/raw-evidence.yaml` unless you pass `--evidence-output` to choose a
+different path. Keep this artifact: it is the clearest way to inspect what the
+model saw, what it returned, and why graph acceptance behaved the way it did.
+
+Treat raw evidence like customer design material. It may contain account names,
+network topology, control requirements, document excerpts, and model responses.
+Use a restricted output directory, avoid secrets in design docs, provide API
+keys through environment variables or `--api-key`, and redact evidence before
+sharing outside the project team. The repo ignores common raw-evidence file
+names to reduce accidental commits.
+
 ## LLM vs Deterministic Fallback
 
 ### With LLM (Model-Assisted Path)

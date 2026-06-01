@@ -63,6 +63,11 @@ class IaCIntentPayload:
     extraction_summary: dict[str, Any] = field(default_factory=dict)
     deployment_readiness: dict[str, Any] = field(default_factory=dict)
 
+    @property
+    def handoff_readiness(self) -> dict[str, Any]:
+        """Preferred readiness name; deployment_readiness remains a compatibility alias."""
+        return self.deployment_readiness
+
     def __getattr__(self, name: str) -> Any:
         """Proxy attribute access to the underlying intent model.
 
@@ -76,6 +81,7 @@ class IaCIntentPayload:
             "pattern",
             "decisions",
             "extraction_summary",
+            "handoff_readiness",
             "deployment_readiness",
         ):
             return object.__getattribute__(self, name)

@@ -20,6 +20,8 @@ contract lives in [EXTENSION.md](EXTENSION.md).
 
 - Do not add provider-specific logic to core CLI, compiler, extractor,
   validator, interview, or generator modules.
+- Keep private/customer-specific pattern code in the pattern package that owns
+  those contracts, controls, samples, and generators.
 - Do not emit deployable scaffolding unless a target contract explicitly owns
   that artifact type.
 - Do not make LLM output authoritative. Raw model output must pass through the

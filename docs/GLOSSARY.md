@@ -33,10 +33,14 @@ required decisions, value assertions, and lineage checks.
 A file emitted for humans or downstream IaC toolchains. Current handoff artifacts
 are not deployments and do not make cloud changes.
 
-## Readiness
+## Handoff Readiness
 
 The status that says whether a handoff is ready, blocked, or missing required
 input. Readiness is graph- and contract-owned, not model-owned.
+
+Artifacts may still expose the legacy YAML key `deploymentReadiness` for
+backward compatibility. Treat it as an alias for handoff readiness, not as
+permission to deploy from prose.
 
 ## Allowed Next Action
 

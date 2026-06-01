@@ -45,7 +45,7 @@ def _build_payload(
     decisions: dict[str, Any] | None = None,
     design_doc_data: dict[str, Any] | None = None,
     extraction_summary: dict[str, Any] | None = None,
-    deployment_readiness: dict[str, Any] | None = None,
+    handoff_readiness: dict[str, Any] | None = None,
 ) -> Any:
     """Wrap intent in IaCIntentPayload with design doc and module inputs."""
     from .module_mapping import DesignDocument, IaCIntentPayload, map_intent_to_modules
@@ -65,7 +65,7 @@ def _build_payload(
         pattern=pattern,
         decisions=decisions or {},
         extraction_summary=extraction_summary or {},
-        deployment_readiness=deployment_readiness or {},
+        deployment_readiness=handoff_readiness or {},
     )
 
 
@@ -245,7 +245,7 @@ def _violation_conflicts(violations: list[Violation]) -> list[dict[str, str]]:
     return conflicts
 
 
-def _build_deployment_readiness(
+def _build_handoff_readiness(
     graph,
     violations: list[Violation],
     llm_result: LLMGraphResult,
@@ -255,23 +255,23 @@ def _build_deployment_readiness(
     llm_gaps = _blocking_gaps(graph, llm_result.gaps)
     llm_contradictions = _blocking_contradictions(graph, llm_result.contradictions)
     blockers = [{"code": v.code, "message": v.message} for v in violations]
-    deployment_allowed = not blockers
+    handoff_allowed = not blockers
     return {
-        "deploymentAllowed": deployment_allowed,
-        "status": "ready" if deployment_allowed else "blocked",
+        "deploymentAllowed": handoff_allowed,
+        "status": "ready" if handoff_allowed else "blocked",
         "summary": (
             "Ready for handoff."
-            if deployment_allowed
-            else "Cannot deploy yet; missing or conflicting decisions must be resolved."
+            if handoff_allowed
+            else "Cannot hand off yet; missing or conflicting decisions must be resolved."
         ),
         "blockers": blockers,
         "missingDecisions": missing + llm_gaps,
         "conflictingDecisions": conflicts + llm_contradictions,
         "safeHandoffPath": [
-            "Do not run downstream deployment from this output while status is blocked.",
+            "Do not mutate downstream systems from this output while status is blocked.",
             "Resolve missing and conflicting decisions with the owning architect/platform team.",
             "Re-run compile and preserve decision-report.yaml plus lineage artifacts for handoff.",
-            "Use existing accelerator/module deployment path only after deploymentAllowed is true.",
+            "Use the existing accelerator/module toolchain only after handoff readiness is ready.",
         ],
     }
 
@@ -330,6 +330,14 @@ def _build_extraction_summary(
             "blocking": blocking_contradictions,
             "raw": llm_result.contradictions,
         },
+        "handoffReadiness": {
+            "deploymentAllowed": readiness["deploymentAllowed"],
+            "status": readiness["status"],
+            "blockerCount": len(readiness["blockers"]),
+            "blockingGapCount": len(blocking_gaps),
+            "blockingContradictionCount": len(blocking_contradictions),
+        },
+        # Backward-compatible alias for existing artifact consumers.
         "deploymentReadiness": {
             "deploymentAllowed": readiness["deploymentAllowed"],
             "status": readiness["status"],
@@ -374,6 +382,8 @@ def _write_failed_compile_artifacts(
         {
             "pattern": pattern,
             "decisions": _to_builtin(graph.typed_decisions()),
+            "handoffReadiness": readiness,
+            # Backward-compatible alias for existing artifact consumers.
             "deploymentReadiness": readiness,
         },
     )
@@ -518,7 +528,7 @@ def compile_design(
     violations = validate(intent, graph=graph, extra_validators=pattern_obj.validators)
     violations.extend(_markdown_contradiction_violations(markdown_result.contradictions))
     violations.extend(_llm_result_violations(graph, llm_result))
-    readiness = _build_deployment_readiness(graph, violations, llm_result)
+    readiness = _build_handoff_readiness(graph, violations, llm_result)
     extraction_summary = _build_extraction_summary(
         pattern=pattern,
         evidence_store=evidence_store,
@@ -552,7 +562,7 @@ def compile_design(
         graph.typed_decisions(),
         llm_result.design_doc,
         extraction_summary=extraction_summary,
-        deployment_readiness=readiness,
+        handoff_readiness=readiness,
     )
     generate_all(payload, output_dir, pattern=pattern)
 

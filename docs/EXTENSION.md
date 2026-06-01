@@ -33,6 +33,20 @@ Everything target-specific lives here:
 
 Follow these steps. None should require touching core framework files.
 
+### Built-In vs Private Patterns
+
+Built-in patterns are enough when the target shape is reusable across teams and
+safe to keep in this repository. Private patterns are useful when an organization
+has internal accelerators, proprietary module variables, confidential sample
+bundles, customer-specific control language, or review gates that should not
+live in the public/core pattern library.
+
+Keep private patterns on the same contract: they still own models, graphs,
+contracts, validators, samples, and generators, and they should avoid core
+changes. Do not add a generic external plugin loader until there is a real
+consumer that needs packaged private pattern distribution; importing the private
+package before CLI use is enough for local/internal runs.
+
 ### 1. Define Pydantic Models
 
 Create a new pattern module (e.g., `src/intent_engine/patterns/my_pattern/models.py`):
@@ -173,8 +187,8 @@ Prefer these locations, in order:
 ### 6. CLI Usage
 
 Built-in patterns are available after `load_builtin_patterns()` imports them. If you add a
-new built-in pattern, add its package import there. External patterns can import/register
-their package before CLI use.
+new built-in pattern, add its package import there. Private/internal patterns can
+import/register their package before CLI use.
 
 ```bash
 iac-llm-wrapper template --pattern kubernetes-cluster --output k8s-design.md

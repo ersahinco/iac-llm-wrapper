@@ -33,6 +33,7 @@ expect:
       - rawEvidencePath
     values:
       pattern: cloudformation-parameters
+      handoffReadiness.status: ready
       deploymentReadiness.status: ready
     deterministicValues:
       callCount: 0

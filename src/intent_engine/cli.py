@@ -66,6 +66,20 @@ def _write_evidence_output(evidence_output: Path | None, evidence_store: LLMEvid
     typer.echo(f"LLM evidence written to: {evidence_output}")
 
 
+def _default_evidence_output(
+    *,
+    llm_caller: object | None,
+    evidence_output: Path | None,
+    output: Path,
+    dry_run: bool,
+) -> Path | None:
+    if evidence_output is not None:
+        return evidence_output
+    if llm_caller is None or dry_run:
+        return None
+    return output / "raw-evidence.yaml"
+
+
 def _get_pattern_or_exit(pattern: str) -> Pattern:
     if pattern not in GLOBAL_REGISTRY.list():
         typer.echo(f"Unknown pattern: {pattern}. Available: {_available_patterns()}", err=True)
@@ -291,7 +305,10 @@ def compile(
     evidence_output: Path = typer.Option(
         None,
         "--evidence-output",
-        help="Path to write LLM call evidence YAML",
+        help=(
+            "Path to write LLM call evidence YAML. Defaults to "
+            "<output>/raw-evidence.yaml for LLM compiles."
+        ),
     ),
     dry_run: bool = typer.Option(
         False,
@@ -325,6 +342,12 @@ def compile(
             "Set OPENAI_API_KEY or run Ollama locally for LLM-powered extraction.",
             err=True,
         )
+    evidence_path = _default_evidence_output(
+        llm_caller=llm_caller,
+        evidence_output=evidence_output,
+        output=output,
+        dry_run=dry_run,
+    )
 
     try:
         compile_design(
@@ -333,12 +356,12 @@ def compile(
             graph=graph,
             llm_caller=llm_caller,
             evidence_store=evidence_store,
-            raw_evidence_path=evidence_output,
+            raw_evidence_path=evidence_path,
             dry_run=dry_run,
             pattern=pattern,
         )
     except CompileError as e:
-        typer.echo("Compilation failed: cannot deploy yet.", err=True)
+        typer.echo("Compilation failed: handoff is blocked.", err=True)
         typer.echo("Violations:", err=True)
         for v in e.violations:
             typer.echo(f"  [{v.code}] {v.message}", err=True)
@@ -348,7 +371,7 @@ def compile(
                 "decision-report.yaml, llm-trace-summary.yaml, model-benchmark.yaml",
                 err=True,
             )
-        _write_evidence_output(evidence_output, evidence_store)
+        _write_evidence_output(evidence_path, evidence_store)
         typer.echo(
             "",
             err=True,
@@ -363,13 +386,13 @@ def compile(
 
     if dry_run:
         typer.echo("[Dry-run] Validation successful. No files written.")
-        _write_evidence_output(evidence_output, evidence_store)
+        _write_evidence_output(evidence_path, evidence_store)
         return
 
     typer.echo(f"Compilation successful. Output written to: {output}")
 
     _emit_sample_matches(pattern, graph.typed_decisions())
-    _write_evidence_output(evidence_output, evidence_store)
+    _write_evidence_output(evidence_path, evidence_store)
 
 
 @app.command()

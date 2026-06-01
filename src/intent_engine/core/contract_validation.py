@@ -83,7 +83,7 @@ def _read_yaml(path: Path) -> dict[str, Any]:
 
 
 def _readiness(report: dict[str, Any], handoff: dict[str, Any]) -> dict[str, Any]:
-    report_readiness = report.get("deploymentReadiness")
+    report_readiness = report.get("handoffReadiness") or report.get("deploymentReadiness")
     if not isinstance(report_readiness, dict):
         report_readiness = {}
     handoff_readiness = handoff.get("readiness")

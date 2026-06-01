@@ -26,6 +26,11 @@ def _write_review_bundle(input_dir: Path) -> Path:
         {
             "pattern": "example-pattern",
             "organizationName": "Contoso",
+            "handoffReadiness": {
+                "status": "blocked",
+                "deploymentAllowed": False,
+                "blockers": [{"code": "MISSING_NETWORK", "message": "Network missing"}],
+            },
             "deploymentReadiness": {
                 "status": "blocked",
                 "deploymentAllowed": False,

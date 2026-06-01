@@ -72,6 +72,7 @@ def _write_ready_bundle(output_dir: Path, *, include_config: bool = True) -> Non
         output_dir / "decision-report.yaml",
         {
             "pattern": "contract-validation-example",
+            "handoffReadiness": {"status": "ready", "deploymentAllowed": True},
             "deploymentReadiness": {"status": "ready", "deploymentAllowed": True},
         },
     )
@@ -120,7 +121,11 @@ def _write_blocked_bundle(output_dir: Path) -> None:
     }
     _write_yaml(
         output_dir / "decision-report.yaml",
-        {"pattern": "contract-validation-example", "deploymentReadiness": readiness},
+        {
+            "pattern": "contract-validation-example",
+            "handoffReadiness": readiness,
+            "deploymentReadiness": readiness,
+        },
     )
     _write_yaml(
         output_dir / "llm-trace-summary.yaml",
@@ -137,6 +142,13 @@ def _write_blocked_bundle(output_dir: Path) -> None:
             "signalDecisions": {},
             "gaps": {"resolved": [], "blocking": [{"key": "region"}]},
             "contradictions": {"blocking": []},
+            "handoffReadiness": {
+                "deploymentAllowed": False,
+                "status": "blocked",
+                "blockerCount": 1,
+                "blockingGapCount": 1,
+                "blockingContradictionCount": 0,
+            },
             "deploymentReadiness": {
                 "deploymentAllowed": False,
                 "status": "blocked",
@@ -220,6 +232,7 @@ def test_unknown_ready_pattern_fails_without_guessing_contracts(tmp_path: Path):
         tmp_path / "decision-report.yaml",
         {
             "pattern": "unknown-pattern",
+            "handoffReadiness": {"status": "ready", "deploymentAllowed": True},
             "deploymentReadiness": {"status": "ready", "deploymentAllowed": True},
         },
     )

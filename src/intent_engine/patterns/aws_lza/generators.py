@@ -193,7 +193,9 @@ def gen_lza_lineage_manifest(intent: Any, output_dir: Path) -> None:
 
 
 def gen_lza_deployment_runbook(intent: Any, output_dir: Path) -> None:
-    readiness = getattr(intent, "deployment_readiness", {})
+    readiness = getattr(intent, "handoff_readiness", None)
+    if readiness is None:
+        readiness = getattr(intent, "deployment_readiness", {})
     intent = _aws_lza_intent(intent)
     if intent is None:
         return
@@ -277,17 +279,19 @@ def gen_lza_deployment_runbook(intent: Any, output_dir: Path) -> None:
         lines.extend(
             [
                 "",
-                "## Deployment Readiness",
+                "## Handoff Readiness",
                 "",
                 f"- Status: `{readiness.get('status', 'unknown')}`",
-                f"- Deployment allowed: `{readiness.get('deploymentAllowed', False)}`",
+                f"- Handoff ready: `{readiness.get('deploymentAllowed', False)}`",
             ]
         )
     (output_dir / "deployment-runbook.md").write_text("\n".join(lines) + "\n")
 
 
 def gen_lza_decision_report(intent: Any, output_dir: Path) -> None:
-    readiness = getattr(intent, "deployment_readiness", {})
+    readiness = getattr(intent, "handoff_readiness", None)
+    if readiness is None:
+        readiness = getattr(intent, "deployment_readiness", {})
     intent = _aws_lza_intent(intent)
     if intent is None:
         return
@@ -323,5 +327,7 @@ def gen_lza_decision_report(intent: Any, output_dir: Path) -> None:
         },
     }
     if readiness:
+        data["handoffReadiness"] = readiness
+        # Backward-compatible alias for existing artifact consumers.
         data["deploymentReadiness"] = readiness
     _write_yaml(output_dir, "decision-report.yaml", data)

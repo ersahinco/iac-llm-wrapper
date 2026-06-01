@@ -141,7 +141,7 @@ def _dict(value: Any) -> dict[str, Any]:
 
 
 def _readiness(report: dict[str, Any], handoff: dict[str, Any]) -> dict[str, Any]:
-    report_readiness = _dict(report.get("deploymentReadiness"))
+    report_readiness = _dict(report.get("handoffReadiness") or report.get("deploymentReadiness"))
     handoff_readiness = _dict(handoff.get("readiness"))
     allowed = bool(
         report_readiness.get(
@@ -167,7 +167,7 @@ def _readiness(report: dict[str, Any], handoff: dict[str, Any]) -> dict[str, Any
 
 
 def _graph_decisions(report: dict[str, Any]) -> dict[str, Any]:
-    ignored = {"deploymentReadiness"}
+    ignored = {"deploymentReadiness", "handoffReadiness"}
     return {key: value for key, value in report.items() if key not in ignored}
 
 
