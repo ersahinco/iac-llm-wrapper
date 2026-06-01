@@ -88,6 +88,7 @@ uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwe
 uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b --evidence-dir /tmp/iac-llm-evidence
 uv run python scripts/evaluate-golden-journey.py --scenario ready
 uv run python scripts/evaluate-golden-journey.py --scenario blocked
+uv run python scripts/evaluate-golden-journey.py --scenario all --output tests/results/golden-journey.yaml
 uv run python scripts/evaluate-golden-journey.py --llm --provider ollama --model qwen2.5:7b
 uv run python scripts/evaluate-golden-journey.py --llm --provider ollama --model qwen2.5:7b --require-conformant
 uv run python scripts/evaluate-golden-journey.py --llm --provider ollama --model qwen2.5:7b --keep-output tests/results/golden-qwen2.5-7b --benchmark-output tests/results/golden-qwen2.5-7b.yaml
@@ -109,7 +110,8 @@ blocker ownership/questions, trace/benchmark checks, and no deployable or target
 handoff artifacts. Add `--require-conformant` when the run should fail unless
 the model has `conformance=pass`; add `--benchmark-output` when you want a
 compact YAML summary of readiness, model, raw coverage, raw missing decisions,
-and conformance.
+and conformance. Add `--output` to write a ready/blocked result artifact for
+CI archives or model-run comparison.
 
 Every compile writes `model-benchmark.yaml` next to the handoff artifacts. Use it
 to compare provider/model behavior, latency, token reporting, readiness, raw LLM

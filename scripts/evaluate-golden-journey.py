@@ -98,6 +98,32 @@ BLOCKED_REVIEW_SIGNALS = (
     "Model Benchmark",
     "Model conformance",
 )
+SCENARIOS = ("ready", "blocked")
+VALIDATED_CHECKS = {
+    "ready": [
+        "ready-readiness",
+        "allowed-next-action",
+        "target-contracts",
+        "manual-gates",
+        "target-artifacts",
+        "trace-summary",
+        "model-benchmark-conformance",
+        "review-html",
+        "raw-evidence-omitted",
+    ],
+    "blocked": [
+        "blocked-readiness",
+        "safe-assessment-artifacts",
+        "blocked-assessment-contract",
+        "blocker-traceability",
+        "requirement-questions",
+        "trace-summary",
+        "model-benchmark-conformance",
+        "review-html",
+        "raw-evidence-omitted",
+        "no-deployable-or-target-handoff-artifacts",
+    ],
+}
 
 
 @dataclass(frozen=True)
@@ -547,7 +573,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--scenario",
-        choices=("ready", "blocked"),
+        choices=("ready", "blocked", "all"),
         default="ready",
         help="Golden journey scenario to evaluate.",
     )
@@ -576,35 +602,85 @@ def main() -> int:
         help="Optional path to write a compact golden journey benchmark summary.",
     )
     parser.add_argument(
+        "--output",
+        type=Path,
+        help="Optional path to write the golden journey result artifact.",
+    )
+    parser.add_argument(
         "--keep-output",
         type=Path,
         help="Directory to keep the generated golden journey bundle.",
     )
     args = parser.parse_args()
 
-    config = JourneyConfig(
-        scenario=args.scenario,
-        fixture=args.fixture or _default_fixture(args.scenario),
-        pattern=args.pattern,
-        use_llm=args.llm,
-        provider=args.provider,
-        model=args.model,
-        require_conformant=args.require_conformant,
-    )
-    if not config.fixture.exists():
-        print(f"Missing fixture: {config.fixture}", file=sys.stderr)
+    if args.scenario == "all" and args.fixture is not None:
+        print(
+            "--fixture is only supported with --scenario ready or --scenario blocked",
+            file=sys.stderr,
+        )
         return 1
 
     if args.keep_output is not None:
         args.keep_output.mkdir(parents=True, exist_ok=True)
-        result = _evaluate(config, args.keep_output)
-    else:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            result = _evaluate(config, Path(temp_dir))
-            _write_benchmark_summary(args.benchmark_output, result.benchmark_summary)
-            return _print_result(result, config)
-    _write_benchmark_summary(args.benchmark_output, result.benchmark_summary)
-    return _print_result(result, config)
+        results = _evaluate_scenarios(args, args.keep_output)
+        artifact = _results_artifact(results, keep_output=True)
+        _write_results(args.output, artifact)
+        _write_single_benchmark(args.benchmark_output, results)
+        return _print_results(results, artifact)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        results = _evaluate_scenarios(args, Path(temp_dir))
+        artifact = _results_artifact(results, keep_output=False)
+        _write_results(args.output, artifact)
+        _write_single_benchmark(args.benchmark_output, results)
+        return _print_results(results, artifact)
+
+
+def _evaluate_scenarios(
+    args: argparse.Namespace, base_output_dir: Path
+) -> list[tuple[JourneyConfig, JourneyResult]]:
+    scenarios = list(SCENARIOS) if args.scenario == "all" else [args.scenario]
+    results: list[tuple[JourneyConfig, JourneyResult]] = []
+    for scenario in scenarios:
+        config = JourneyConfig(
+            scenario=scenario,
+            fixture=args.fixture or _default_fixture(scenario),
+            pattern=args.pattern,
+            use_llm=args.llm,
+            provider=args.provider,
+            model=args.model,
+            require_conformant=args.require_conformant,
+        )
+        if not config.fixture.exists():
+            result = JourneyResult(
+                "FAIL",
+                [f"Missing fixture: {config.fixture}"],
+                base_output_dir / scenario,
+                {},
+            )
+            results.append((config, result))
+            continue
+        output_dir = base_output_dir if args.scenario != "all" else base_output_dir / scenario
+        output_dir.mkdir(parents=True, exist_ok=True)
+        results.append((config, _evaluate(config, output_dir)))
+    return results
+
+
+def _write_single_benchmark(
+    path: Path | None,
+    results: list[tuple[JourneyConfig, JourneyResult]],
+) -> None:
+    if path is None or len(results) != 1:
+        return
+    _write_benchmark_summary(path, results[0][1].benchmark_summary)
+
+
+def _print_results(
+    results: list[tuple[JourneyConfig, JourneyResult]],
+    artifact: dict[str, Any],
+) -> int:
+    for config, result in results:
+        _print_result(result, config)
+    return 0 if _dict(artifact.get("summary")).get("status") == "pass" else 1
 
 
 def _write_benchmark_summary(path: Path | None, summary: dict[str, Any]) -> None:
@@ -621,6 +697,76 @@ def _write_benchmark_summary(path: Path | None, summary: dict[str, Any]) -> None
             },
             handle,
         )
+
+
+def _write_results(path: Path | None, artifact: dict[str, Any]) -> None:
+    if path is None:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    yaml = ruamel.yaml.YAML()
+    yaml.default_flow_style = False
+    with path.open("w") as handle:
+        yaml.dump(artifact, handle)
+
+
+def _results_artifact(
+    results: list[tuple[JourneyConfig, JourneyResult]],
+    *,
+    keep_output: bool,
+) -> dict[str, Any]:
+    scenarios = [
+        _scenario_result(config, result, keep_output=keep_output) for config, result in results
+    ]
+    failed = sum(1 for item in scenarios if item["status"] != "pass")
+    return {
+        "schemaVersion": "intent-engine/golden-journey-results/v1",
+        "mode": results[0][0].mode if results else "unknown",
+        "provider": results[0][0].provider if results else "unknown",
+        "model": results[0][0].model if results else "",
+        "summary": {
+            "scenarioCount": len(scenarios),
+            "passed": len(scenarios) - failed,
+            "failed": failed,
+            "status": "pass" if failed == 0 else "fail",
+        },
+        "scenarios": scenarios,
+    }
+
+
+def _scenario_result(
+    config: JourneyConfig,
+    result: JourneyResult,
+    *,
+    keep_output: bool,
+) -> dict[str, Any]:
+    benchmark = (
+        _yaml_load(result.output_dir / "model-benchmark.yaml")
+        if (result.output_dir / "model-benchmark.yaml").exists()
+        else {}
+    )
+    contract_validation = (
+        _yaml_load(result.output_dir / "contract-validation.yaml")
+        if (result.output_dir / "contract-validation.yaml").exists()
+        else {}
+    )
+    readiness = _dict(benchmark.get("readiness"))
+    raw_evidence = _dict(benchmark.get("rawEvidence"))
+    contract_summary = _dict(contract_validation.get("summary"))
+    return {
+        "scenario": config.scenario,
+        "status": result.status.lower(),
+        "fixture": str(config.fixture),
+        "outputDir": str(result.output_dir) if keep_output else "",
+        "readiness": result.benchmark_summary.get("readiness", readiness.get("status", "unknown")),
+        "conformance": result.benchmark_summary.get("conformance", "unknown"),
+        "rawCoverage": result.benchmark_summary.get("rawCoverage", "0/0"),
+        "rawMissing": result.benchmark_summary.get("rawMissing", 0),
+        "blockerCount": int(readiness.get("blockerCount", 0) or 0),
+        "contractStatus": str(contract_summary.get("status", "unknown")),
+        "rawEvidenceStatus": str(raw_evidence.get("status", "unknown")),
+        "failures": result.failures,
+        "validatedChecks": VALIDATED_CHECKS.get(config.scenario, []),
+    }
 
 
 def _print_result(result: JourneyResult, config: JourneyConfig) -> int:

@@ -116,6 +116,7 @@ uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwe
 uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b --evidence-dir /tmp/iac-llm-evidence
 uv run python scripts/evaluate-golden-journey.py --scenario ready
 uv run python scripts/evaluate-golden-journey.py --scenario blocked
+uv run python scripts/evaluate-golden-journey.py --scenario all --output tests/results/golden-journey.yaml
 uv run python scripts/evaluate-golden-journey.py --llm --provider ollama --model qwen2.5:7b
 uv run python scripts/evaluate-golden-journey.py --llm --provider ollama --model qwen2.5:7b --require-conformant
 uv run python scripts/evaluate-golden-journey.py --llm --provider ollama --model qwen2.5:7b --keep-output tests/results/golden-qwen2.5-7b --benchmark-output tests/results/golden-qwen2.5-7b.yaml
@@ -138,7 +139,9 @@ proves messy blocked input stays safe: compile fails closed, only assessment and
 review artifacts are emitted, blocker ownership/questions are visible, and no
 deployable or target handoff artifacts appear. Use `--require-conformant` when
 an LLM run must prove `conformance=pass`; use `--benchmark-output` to keep the
-compact model summary without opening the full artifact bundle. The usability loop checks role-based trials for architect gap
+compact model summary without opening the full artifact bundle. Use `--output`
+to write a compact ready/blocked result artifact for CI archives or model-run
+comparison. The usability loop checks role-based trials for architect gap
 discovery, engineer handoff, and bring-your-own Terraform module input capture.
 It also includes a CloudFormation parameter handoff trial to prove BYOM
 orchestration beyond Terraform without generating a stack, plus static review

@@ -121,6 +121,138 @@ def test_evaluate_golden_journey_writes_benchmark_summary(tmp_path: Path):
     assert data["rawCoverage"] == "0/20"
 
 
+def test_evaluate_golden_journey_writes_ready_result_artifact(tmp_path: Path):
+    output_dir = tmp_path / "golden"
+    result_path = tmp_path / "golden-results.yaml"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--scenario",
+            "ready",
+            "--keep-output",
+            str(output_dir),
+            "--output",
+            str(result_path),
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    data = _yaml_load(result_path)
+    assert data["schemaVersion"] == "intent-engine/golden-journey-results/v1"
+    assert data["summary"] == {
+        "scenarioCount": 1,
+        "passed": 1,
+        "failed": 0,
+        "status": "pass",
+    }
+    assert data["scenarios"][0]["scenario"] == "ready"
+    assert data["scenarios"][0]["status"] == "pass"
+    assert data["scenarios"][0]["outputDir"] == str(output_dir)
+    assert data["scenarios"][0]["readiness"] == "ready"
+    assert data["scenarios"][0]["contractStatus"] == "pass"
+    assert data["scenarios"][0]["rawEvidenceStatus"] == "not-requested"
+    assert "target-artifacts" in data["scenarios"][0]["validatedChecks"]
+
+
+def test_evaluate_golden_journey_writes_blocked_result_artifact(tmp_path: Path):
+    output_dir = tmp_path / "blocked"
+    result_path = tmp_path / "blocked-results.yaml"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--scenario",
+            "blocked",
+            "--keep-output",
+            str(output_dir),
+            "--output",
+            str(result_path),
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    data = _yaml_load(result_path)
+    assert data["summary"]["status"] == "pass"
+    assert data["scenarios"][0]["scenario"] == "blocked"
+    assert data["scenarios"][0]["readiness"] == "blocked"
+    assert data["scenarios"][0]["blockerCount"] > 0
+    assert data["scenarios"][0]["contractStatus"] == "pass"
+    assert "no-deployable-or-target-handoff-artifacts" in data["scenarios"][0]["validatedChecks"]
+
+
+def test_evaluate_golden_journey_writes_combined_result_artifact(tmp_path: Path):
+    output_dir = tmp_path / "all"
+    result_path = tmp_path / "all-results.yaml"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--scenario",
+            "all",
+            "--keep-output",
+            str(output_dir),
+            "--output",
+            str(result_path),
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=90,
+    )
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    data = _yaml_load(result_path)
+    assert data["summary"] == {
+        "scenarioCount": 2,
+        "passed": 2,
+        "failed": 0,
+        "status": "pass",
+    }
+    scenarios = {item["scenario"]: item for item in data["scenarios"]}
+    assert set(scenarios) == {"ready", "blocked"}
+    assert scenarios["ready"]["outputDir"] == str(output_dir / "ready")
+    assert scenarios["blocked"]["outputDir"] == str(output_dir / "blocked")
+
+
+def test_golden_journey_result_artifact_records_failures(tmp_path: Path):
+    script = _load_script()
+    config: Any = script.JourneyConfig(
+        scenario="blocked",
+        fixture=SCRIPT,
+        pattern="aws-lza",
+        use_llm=False,
+        provider="ollama",
+        model="",
+        require_conformant=False,
+    )
+    result: Any = script.JourneyResult(
+        status="FAIL",
+        failures=["blocked review html missing signal: Blocker Traceability"],
+        output_dir=tmp_path,
+        benchmark_summary={"readiness": "blocked", "conformance": "not-applicable"},
+    )
+
+    data: dict[str, Any] = script._results_artifact([(config, result)], keep_output=False)
+
+    assert data["summary"]["status"] == "fail"
+    assert data["scenarios"][0]["outputDir"] == ""
+    assert data["scenarios"][0]["failures"] == [
+        "blocked review html missing signal: Blocker Traceability"
+    ]
+
+
 def test_golden_journey_validation_flags_raw_evidence(tmp_path: Path):
     script = _load_script()
     output_dir = tmp_path / "golden"
