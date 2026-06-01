@@ -86,7 +86,8 @@ Run deterministic and LLM-backed eval loops:
 uv run python scripts/evaluate-extraction.py
 uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b
 uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b --evidence-dir /tmp/iac-llm-evidence
-uv run python scripts/evaluate-golden-journey.py
+uv run python scripts/evaluate-golden-journey.py --scenario ready
+uv run python scripts/evaluate-golden-journey.py --scenario blocked
 uv run python scripts/evaluate-golden-journey.py --llm --provider ollama --model qwen2.5:7b
 uv run python scripts/evaluate-golden-journey.py --llm --provider ollama --model qwen2.5:7b --require-conformant
 uv run python scripts/evaluate-golden-journey.py --llm --provider ollama --model qwen2.5:7b --keep-output tests/results/golden-qwen2.5-7b --benchmark-output tests/results/golden-qwen2.5-7b.yaml
@@ -98,13 +99,16 @@ These compile checked-in role/eval fixtures, including customer-style board
 notes and BYOM module notes, compare handoff artifacts against expected
 outcomes, verify ready and blocked static review-page stakeholder signals, and
 verify LLM evidence when `--llm` is enabled. Use
-`evaluate-golden-journey.py` as the fastest product-confidence check: it runs
-the customer-style AWS LZA fixture through service-style compile
-(`--no-raw-evidence`), static review generation, readiness checks, contract and
-manual-gate checks, target artifact checks, trace/benchmark checks, and model
-conformance visibility. Add `--require-conformant` when the run should fail
-unless the model has `conformance=pass`; add `--benchmark-output` when you want
-a compact YAML summary of readiness, model, raw coverage, raw missing decisions,
+`evaluate-golden-journey.py` as the fastest product-confidence check.
+`--scenario ready` runs the customer-style AWS LZA fixture through service-style
+compile (`--no-raw-evidence`), static review generation, readiness checks,
+contract and manual-gate checks, target artifact checks, trace/benchmark checks,
+and model conformance visibility. `--scenario blocked` proves a messy blocked
+input fails closed while still producing safe assessment/review artifacts,
+blocker ownership/questions, trace/benchmark checks, and no deployable or target
+handoff artifacts. Add `--require-conformant` when the run should fail unless
+the model has `conformance=pass`; add `--benchmark-output` when you want a
+compact YAML summary of readiness, model, raw coverage, raw missing decisions,
 and conformance.
 
 Every compile writes `model-benchmark.yaml` next to the handoff artifacts. Use it

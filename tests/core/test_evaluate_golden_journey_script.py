@@ -56,6 +56,41 @@ def test_evaluate_golden_journey_passes_service_style_path(tmp_path: Path):
     assert not (output_dir / "raw-evidence.yaml").exists()
 
 
+def test_evaluate_golden_journey_passes_blocked_service_style_path(tmp_path: Path):
+    output_dir = tmp_path / "blocked"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--scenario",
+            "blocked",
+            "--keep-output",
+            str(output_dir),
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "Golden journey: PASS" in result.stdout
+    assert "Scenario: blocked" in result.stdout
+    assert "Readiness: blocked" in result.stdout
+    assert (
+        "Validated: blocked readiness, safe assessment artifacts, blocker traceability"
+        in result.stdout
+    )
+    assert "Validated: no deployable or target handoff artifacts" in result.stdout
+    assert (output_dir / "decision-report.yaml").exists()
+    assert (output_dir / "handoff-review.html").exists()
+    assert (output_dir / "contract-validation.yaml").exists()
+    assert not (output_dir / "network-config.yaml").exists()
+    assert not (output_dir / "handoff-plan.yaml").exists()
+    assert not (output_dir / "raw-evidence.yaml").exists()
+
+
 def test_evaluate_golden_journey_writes_benchmark_summary(tmp_path: Path):
     output_dir = tmp_path / "golden"
     benchmark_output = tmp_path / "golden-benchmark.yaml"
@@ -97,9 +132,38 @@ def test_golden_journey_validation_flags_raw_evidence(tmp_path: Path):
     assert "forbidden artifact present: raw-evidence.yaml" in failures
 
 
+def test_golden_blocked_journey_flags_deployable_or_handoff_artifacts(tmp_path: Path):
+    script = _load_script()
+    output_dir = tmp_path / "blocked"
+    output_dir.mkdir()
+    (output_dir / "network-config.yaml").write_text("homeRegion: eu-central-1\n")
+    (output_dir / "main.tf").write_text("resource null_resource example {}\n")
+
+    failures: list[str] = script._validate_blocked_files(output_dir)
+
+    assert "forbidden blocked artifact present: network-config.yaml" in failures
+    assert "forbidden blocked artifact present: main.tf" in failures
+
+
+def test_golden_blocked_journey_requires_blocker_traceability():
+    script = _load_script()
+
+    failures: list[str] = script._validate_blocked_review_html(
+        "<html><body>blocked AWS_LZA_NETWORK_ACCOUNT_REQUIRED</body></html>"
+    )
+
+    assert "blocked review html missing signal: Blocker Traceability" in failures
+    assert "blocked review html missing signal: network_account" in failures
+    assert (
+        "blocked review html missing signal: Which IAM Identity Center assignments are approved?"
+        in failures
+    )
+
+
 def test_golden_journey_benchmark_requires_conformance(tmp_path: Path):
     script = _load_script()
     config: Any = script.JourneyConfig(
+        scenario="ready",
         fixture=SCRIPT,
         pattern="aws-lza",
         use_llm=False,
@@ -125,6 +189,7 @@ def test_golden_journey_benchmark_requires_conformance(tmp_path: Path):
 def test_golden_journey_require_conformant_ignores_deterministic(tmp_path: Path):
     script = _load_script()
     config: Any = script.JourneyConfig(
+        scenario="ready",
         fixture=SCRIPT,
         pattern="aws-lza",
         use_llm=False,
@@ -144,6 +209,7 @@ def test_golden_journey_require_conformant_ignores_deterministic(tmp_path: Path)
 def test_golden_journey_require_conformant_fails_llm_review_or_fail(tmp_path: Path):
     script = _load_script()
     config: Any = script.JourneyConfig(
+        scenario="ready",
         fixture=SCRIPT,
         pattern="aws-lza",
         use_llm=True,

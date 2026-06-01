@@ -15,10 +15,14 @@ from typing import Any
 import ruamel.yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_FIXTURE = REPO_ROOT / "fixtures" / "eval" / "aws-lza-customer-board-notes.md"
+READY_FIXTURE = REPO_ROOT / "fixtures" / "eval" / "aws-lza-customer-board-notes.md"
+BLOCKED_FIXTURE = REPO_ROOT / "fixtures" / "eval" / "aws-lza-enterprise-messy-blocked.md"
 DEFAULT_PATTERN = "aws-lza"
 EXPECTED_ALLOWED_NEXT_ACTION = (
     "Pass the reviewed artifacts to the existing target toolchain after manual gates."
+)
+EXPECTED_BLOCKED_ALLOWED_NEXT_ACTION = (
+    "Resolve blockers before passing artifacts to an implementation toolchain."
 )
 EXPECTED_TARGET_ARTIFACTS = (
     "accounts-config.yaml",
@@ -49,10 +53,56 @@ FORBIDDEN_ARTIFACTS = (
     "template.yaml",
     "stack.yaml",
 )
+BLOCKED_SAFE_ARTIFACTS = (
+    "decision-report.yaml",
+    "llm-trace-summary.yaml",
+    "model-benchmark.yaml",
+    "handoff-review.html",
+    "contract-validation.yaml",
+    "requirement-graph.json",
+    "requirement-graph.mmd",
+)
+BLOCKED_FORBIDDEN_ARTIFACTS = (
+    "accounts-config.yaml",
+    "global-config.yaml",
+    "iam-config.yaml",
+    "network-config.yaml",
+    "organization-config.yaml",
+    "security-config.yaml",
+    "lineage-manifest.yaml",
+    "deployment-runbook.md",
+    "handoff-plan.yaml",
+    "sample-recommendations.yaml",
+    *FORBIDDEN_ARTIFACTS,
+)
+BLOCKED_REVIEW_SIGNALS = (
+    "blocked",
+    "Deployment allowed",
+    "False",
+    "Allowed next action",
+    EXPECTED_BLOCKED_ALLOWED_NEXT_ACTION,
+    "Blocker Traceability",
+    "Requirement key",
+    "AWS_LZA_NETWORK_ACCOUNT_REQUIRED",
+    "AWS_LZA_IDENTITY_CENTER_PERMISSION_SETS_REQUIRED",
+    "AWS_LZA_IDENTITY_CENTER_ASSIGNMENTS_REQUIRED",
+    "MARKDOWN_CONTRADICTION_NETWORK_CIDR",
+    "network_account",
+    "Which account owns shared networking?",
+    "identity_center_permission_sets",
+    "Which IAM Identity Center permission sets are approved?",
+    "identity_center_assignments",
+    "Which IAM Identity Center assignments are approved?",
+    "network_cidr",
+    "blocked-assessment-artifacts",
+    "Model Benchmark",
+    "Model conformance",
+)
 
 
 @dataclass(frozen=True)
 class JourneyConfig:
+    scenario: str
     fixture: Path
     pattern: str
     use_llm: bool
@@ -125,10 +175,12 @@ def _evaluate(config: JourneyConfig, output_dir: Path) -> JourneyResult:
         ],
         config,
     )
-    if compile_proc.returncode != 0:
+    if config.scenario == "ready" and compile_proc.returncode != 0:
         failures.append("compile command failed")
         failures.append((compile_proc.stderr or compile_proc.stdout).strip())
         return JourneyResult("FAIL", failures, output_dir, {})
+    if config.scenario == "blocked" and compile_proc.returncode == 0:
+        failures.append("blocked compile unexpectedly passed")
 
     review_proc = _run_cli(
         [
@@ -146,7 +198,10 @@ def _evaluate(config: JourneyConfig, output_dir: Path) -> JourneyResult:
         failures.append((review_proc.stderr or review_proc.stdout).strip())
         return JourneyResult("FAIL", failures, output_dir, {})
 
-    failures.extend(_validate_output(config, output_dir))
+    if config.scenario == "ready":
+        failures.extend(_validate_ready_output(config, output_dir))
+    else:
+        failures.extend(_validate_blocked_output(config, output_dir))
     benchmark_summary = _benchmark_summary(output_dir / "model-benchmark.yaml")
     failures.extend(_required_conformance_failures(config, benchmark_summary))
     return JourneyResult(
@@ -157,7 +212,7 @@ def _evaluate(config: JourneyConfig, output_dir: Path) -> JourneyResult:
     )
 
 
-def _validate_output(config: JourneyConfig, output_dir: Path) -> list[str]:
+def _validate_ready_output(config: JourneyConfig, output_dir: Path) -> list[str]:
     failures: list[str] = []
     failures.extend(_validate_files(output_dir))
 
@@ -190,6 +245,35 @@ def _validate_output(config: JourneyConfig, output_dir: Path) -> list[str]:
     return failures
 
 
+def _validate_blocked_output(config: JourneyConfig, output_dir: Path) -> list[str]:
+    failures: list[str] = []
+    failures.extend(_validate_blocked_files(output_dir))
+
+    if not (output_dir / "decision-report.yaml").exists():
+        return failures + ["missing decision-report.yaml"]
+    if not (output_dir / "llm-trace-summary.yaml").exists():
+        return failures + ["missing llm-trace-summary.yaml"]
+    if not (output_dir / "model-benchmark.yaml").exists():
+        return failures + ["missing model-benchmark.yaml"]
+    if not (output_dir / "contract-validation.yaml").exists():
+        return failures + ["missing contract-validation.yaml"]
+    if not (output_dir / "handoff-review.html").exists():
+        return failures + ["missing handoff-review.html"]
+
+    report = _yaml_load(output_dir / "decision-report.yaml")
+    trace = _yaml_load(output_dir / "llm-trace-summary.yaml")
+    benchmark = _yaml_load(output_dir / "model-benchmark.yaml")
+    contract_validation = _yaml_load(output_dir / "contract-validation.yaml")
+    html = (output_dir / "handoff-review.html").read_text()
+
+    failures.extend(_validate_blocked_readiness(report))
+    failures.extend(_validate_blocked_contracts(contract_validation))
+    failures.extend(_validate_trace(trace))
+    failures.extend(_validate_blocked_benchmark(config, benchmark))
+    failures.extend(_validate_blocked_review_html(html))
+    return failures
+
+
 def _validate_files(output_dir: Path) -> list[str]:
     failures: list[str] = []
     for artifact in (*EXPECTED_TARGET_ARTIFACTS, *EXPECTED_REVIEW_ARTIFACTS):
@@ -198,6 +282,17 @@ def _validate_files(output_dir: Path) -> list[str]:
     for artifact in FORBIDDEN_ARTIFACTS:
         if (output_dir / artifact).exists():
             failures.append(f"forbidden artifact present: {artifact}")
+    return failures
+
+
+def _validate_blocked_files(output_dir: Path) -> list[str]:
+    failures: list[str] = []
+    for artifact in BLOCKED_SAFE_ARTIFACTS:
+        if not (output_dir / artifact).exists():
+            failures.append(f"missing blocked artifact: {artifact}")
+    for artifact in BLOCKED_FORBIDDEN_ARTIFACTS:
+        if (output_dir / artifact).exists():
+            failures.append(f"forbidden blocked artifact present: {artifact}")
     return failures
 
 
@@ -215,6 +310,33 @@ def _validate_readiness(report: dict[str, Any], handoff_plan: dict[str, Any]) ->
         failures.append("handoff plan does not allow handoff")
     if handoff_plan.get("allowedNextAction") != EXPECTED_ALLOWED_NEXT_ACTION:
         failures.append("handoff plan missing clear allowed next action")
+    return failures
+
+
+def _validate_blocked_readiness(report: dict[str, Any]) -> list[str]:
+    failures: list[str] = []
+    readiness = _dict(report.get("handoffReadiness") or report.get("deploymentReadiness"))
+    if readiness.get("status") != "blocked":
+        failures.append("decision report is not blocked")
+    if readiness.get("deploymentAllowed") is not False:
+        failures.append("blocked decision report allows handoff")
+    if not _coerce_list(readiness.get("blockers")):
+        failures.append("blocked decision report has no blockers")
+    missing_keys = {
+        str(item.get("key", "")) for item in _list_of_dicts(readiness.get("missingDecisions"))
+    }
+    for key in (
+        "network_account",
+        "identity_center_permission_sets",
+        "identity_center_assignments",
+    ):
+        if key not in missing_keys:
+            failures.append(f"blocked decision report missing decision {key}")
+    conflicting_codes = {
+        str(item.get("code", "")) for item in _list_of_dicts(readiness.get("conflictingDecisions"))
+    }
+    if "MARKDOWN_CONTRADICTION_NETWORK_CIDR" not in conflicting_codes:
+        failures.append("blocked decision report missing network CIDR contradiction")
     return failures
 
 
@@ -256,6 +378,20 @@ def _validate_contracts(contract_validation: dict[str, Any]) -> list[str]:
     return failures
 
 
+def _validate_blocked_contracts(contract_validation: dict[str, Any]) -> list[str]:
+    failures: list[str] = []
+    summary = _dict(contract_validation.get("summary"))
+    if summary.get("status") != "pass":
+        failures.append("blocked contract validation did not pass")
+    contract_names = {
+        str(contract.get("name", ""))
+        for contract in _list_of_dicts(contract_validation.get("contracts"))
+    }
+    if "blocked-assessment-artifacts" not in contract_names:
+        failures.append("contract validation missing blocked-assessment-artifacts")
+    return failures
+
+
 def _validate_trace(trace: dict[str, Any]) -> list[str]:
     failures: list[str] = []
     raw_evidence = _dict(trace.get("rawEvidence"))
@@ -287,6 +423,30 @@ def _validate_benchmark(config: JourneyConfig, benchmark: dict[str, Any]) -> lis
     quality = _dict(benchmark.get("quality"))
     if int(quality.get("acceptedDecisionCount", 0) or 0) <= 0:
         failures.append("benchmark missing accepted decisions")
+    raw_evidence = _dict(benchmark.get("rawEvidence"))
+    if raw_evidence.get("status") != "not-requested":
+        failures.append("benchmark does not show raw evidence was intentionally omitted")
+    return failures
+
+
+def _validate_blocked_benchmark(config: JourneyConfig, benchmark: dict[str, Any]) -> list[str]:
+    failures: list[str] = []
+    if benchmark.get("schemaVersion") != "intent-engine/model-benchmark/v1":
+        failures.append("benchmark has wrong schema version")
+    run = _dict(benchmark.get("run"))
+    if run.get("mode") != config.mode:
+        failures.append(f"benchmark mode mismatch: expected {config.mode}, got {run.get('mode')}")
+    readiness = _dict(benchmark.get("readiness"))
+    if readiness.get("status") != "blocked":
+        failures.append("blocked benchmark readiness is not blocked")
+    if int(readiness.get("blockerCount", 0) or 0) <= 0:
+        failures.append("blocked benchmark has no blockers")
+    conformance = _dict(benchmark.get("conformance"))
+    conformance_status = str(conformance.get("status", ""))
+    if conformance_status not in {"pass", "review", "fail", "not-applicable"}:
+        failures.append("benchmark missing valid conformance status")
+    if config.mode == "deterministic" and conformance_status != "not-applicable":
+        failures.append("deterministic benchmark should mark conformance not-applicable")
     raw_evidence = _dict(benchmark.get("rawEvidence"))
     if raw_evidence.get("status") != "not-requested":
         failures.append("benchmark does not show raw evidence was intentionally omitted")
@@ -359,6 +519,14 @@ def _validate_review_html(html: str) -> list[str]:
     return failures
 
 
+def _validate_blocked_review_html(html: str) -> list[str]:
+    failures: list[str] = []
+    for signal in BLOCKED_REVIEW_SIGNALS:
+        if signal not in html:
+            failures.append(f"blocked review html missing signal: {signal}")
+    return failures
+
+
 def _dict(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
@@ -371,12 +539,22 @@ def _list_of_dicts(value: Any) -> list[dict[str, Any]]:
     return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
 
 
+def _default_fixture(scenario: str) -> Path:
+    return BLOCKED_FIXTURE if scenario == "blocked" else READY_FIXTURE
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "--scenario",
+        choices=("ready", "blocked"),
+        default="ready",
+        help="Golden journey scenario to evaluate.",
+    )
+    parser.add_argument(
         "--fixture",
         type=Path,
-        default=DEFAULT_FIXTURE,
+        default=None,
         help="Customer-style design fixture to compile.",
     )
     parser.add_argument("--pattern", default=DEFAULT_PATTERN, help="Pattern to compile.")
@@ -405,7 +583,8 @@ def main() -> int:
     args = parser.parse_args()
 
     config = JourneyConfig(
-        fixture=args.fixture,
+        scenario=args.scenario,
+        fixture=args.fixture or _default_fixture(args.scenario),
         pattern=args.pattern,
         use_llm=args.llm,
         provider=args.provider,
@@ -446,6 +625,7 @@ def _write_benchmark_summary(path: Path | None, summary: dict[str, Any]) -> None
 
 def _print_result(result: JourneyResult, config: JourneyConfig) -> int:
     print(f"Golden journey: {result.status}")
+    print(f"Scenario: {config.scenario}")
     print(f"Mode: {config.mode}")
     print(f"Fixture: {config.fixture}")
     print(f"Output: {result.output_dir}")
@@ -460,6 +640,11 @@ def _print_result(result: JourneyResult, config: JourneyConfig) -> int:
         for failure in result.failures:
             print(f"  - {failure}")
         return 1
+    if config.scenario == "blocked":
+        print("Validated: blocked readiness, safe assessment artifacts, blocker traceability")
+        print("Validated: trace summary, model benchmark conformance, review HTML, no raw evidence")
+        print("Validated: no deployable or target handoff artifacts")
+        return 0
     print("Validated: readiness, allowed next action, contracts, manual gates, target artifacts")
     print("Validated: trace summary, model benchmark conformance, review HTML, no raw evidence")
     return 0
