@@ -12,7 +12,8 @@ contract lives in [EXTENSION.md](EXTENSION.md).
 5. Add sample configs only when they represent a reusable reference bundle.
 6. Add extraction fixtures for ready and blocked cases.
 7. Add usability or battle tests when the change affects handoff quality.
-8. Run `iac-llm-wrapper pattern check --pattern your-pattern`.
+8. Run `iac-llm-wrapper pattern check --pattern your-pattern` to validate graph
+   shape, contracts, expected artifacts, and sample fixtures.
 9. Run the full repo gate from `AGENTS.md`.
 
 ## Boundaries

@@ -19,13 +19,14 @@ from .core.compiler import (
     review_reports,
     validate_generated,
 )
-from .core.contracts import GLOBAL_CONTRACT_REGISTRY, ContractValidator, TargetContract
+from .core.contracts import GLOBAL_CONTRACT_REGISTRY, TargetContract
 from .core.discovery import DiscoveryEngine, generate_clarifying_questions
 from .core.extractor import Extractor
 from .core.graph_export import graph_to_json, graph_to_mermaid
 from .core.interview import InterviewEngine
 from .core.llm_caller import LLMEvidenceStore, auto_detect_llm
 from .core.markdown_extractor import extract_from_markdown
+from .core.pattern_check import check_pattern
 from .core.patterns import GLOBAL_REGISTRY, Pattern
 from .core.sample_config import GLOBAL_SAMPLE_REGISTRY, SampleConfig
 from .core.suggestion import SuggestionEngine
@@ -239,73 +240,18 @@ def pattern_check(
 ) -> None:
     """Validate a pattern's graph, contracts, samples, and artifact surface."""
     pattern_obj = _get_pattern_or_exit(pattern)
-    violations = _pattern_check_violations(pattern_obj)
-    if violations:
+    result = check_pattern(pattern_obj)
+    if result.violations:
         typer.echo(f"Pattern check failed: {pattern}", err=True)
-        for violation in violations:
+        for violation in result.violations:
             typer.echo(f"  - {violation}", err=True)
         raise typer.Exit(1)
 
-    graph = pattern_obj.create_graph()
     typer.echo(f"Pattern check passed: {pattern}")
-    typer.echo(f"  Requirements: {len(graph._requirements)}")
-    typer.echo(f"  Contracts: {len(pattern_obj.contracts)}")
-    typer.echo(f"  Expected artifacts: {len(pattern_obj.expected_artifacts())}")
-    typer.echo(f"  Samples: {len(GLOBAL_SAMPLE_REGISTRY.find_by_pattern(pattern))}")
-
-
-def _pattern_check_violations(pattern: Pattern) -> list[str]:
-    import networkx as nx
-
-    violations: list[str] = []
-    try:
-        graph = pattern.create_graph()
-    except Exception as exc:
-        return [f"graph factory failed: {exc}"]
-
-    if not graph._requirements:
-        violations.append("graph has no requirements")
-    try:
-        cycle = nx.find_cycle(graph._graph)
-    except nx.NetworkXNoCycle:
-        cycle = []
-    if cycle:
-        violations.append(f"requirement graph has a cycle: {cycle}")
-
-    for key, req in graph._requirements.items():
-        if not req.label:
-            violations.append(f"{key}: missing label")
-        if not req.question:
-            violations.append(f"{key}: missing question")
-        if not req.target_field:
-            violations.append(f"{key}: missing target field")
-        for dep in req.depends_on:
-            if dep not in graph._requirements:
-                violations.append(f"{key}: unknown dependency {dep}")
-        for dep in set(req.applies_if) | set(req.blocked_if):
-            if dep not in graph._requirements:
-                violations.append(f"{key}: unknown condition dependency {dep}")
-
-    for contract_obj in pattern.contracts:
-        validator = ContractValidator(contract_obj)
-        violations.extend(
-            f"{contract_obj.name}: {violation.message}"
-            for violation in validator.validate_contract() + validator.validate_graph(graph)
-        )
-
-    for artifact in pattern.expected_artifacts():
-        if not artifact:
-            violations.append("expected artifact list contains an empty name")
-
-    fixtures_root = Path("fixtures")
-    for sample in GLOBAL_SAMPLE_REGISTRY.find_by_pattern(pattern.name):
-        if not sample.decisions:
-            violations.append(f"{sample.name}: sample has no decisions")
-        if sample.fixture_dir or (fixtures_root / sample.fixture_name).exists():
-            fixture_dir = fixtures_root / sample.fixture_name
-            if not fixture_dir.exists():
-                violations.append(f"{sample.name}: missing fixture dir {fixture_dir}")
-    return violations
+    typer.echo(f"  Requirements: {result.requirements}")
+    typer.echo(f"  Contracts: {result.contracts}")
+    typer.echo(f"  Expected artifacts: {result.expected_artifacts}")
+    typer.echo(f"  Samples: {result.samples}")
 
 
 @app.command()

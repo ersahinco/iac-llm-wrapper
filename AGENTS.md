@@ -98,24 +98,24 @@ T17: Harden lean intent-to-IaC orchestration surface
 
 ### Status
 
-- **Tests**: 284 passing, 1 skipped
+- **Tests**: 289 passing, 1 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Tightened pattern-owned language, documented the battle-summary status contract, and added verdict regression tests for compile mismatches and incomplete review pages; full gate green
+- **Last session**: Moved pattern-check policy from CLI into a tested core helper and kept CLI rendering thin; full gate green
 
 ### Done
 
 | Area | Item |
 |------|------|
-| Core | models, extractor, requirements, lazy built-in pattern registry, patterns, interview, discovery, validator, generator, graph export, static review, review renderer, contracts, contract validation, battle summary, samples, module mapping, CLI |
+| Core | models, extractor, requirements, lazy built-in pattern registry, patterns, pattern check, interview, discovery, validator, generator, graph export, static review, review renderer, contracts, contract validation, battle summary, samples, module mapping, CLI |
 | Patterns | `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, `terraform-vpc` |
 | AWS LZA | Contract-backed LZA handoff YAML, IAM Identity Center permission sets/assignments, decision report/readiness, lineage manifest, deployment runbook, sample recommendations, focused pattern modules |
 | Contracts | Required artifacts, required paths, required decisions, lineage checks, value assertions, blocked assessment artifacts, contract-backed generic handoff plan |
 | Samples | Registry-backed `sample list/show`, match recommendations, fixture sync/drift guard |
 | LLM | Ollama/OpenAI-compatible backend factory, evidence store, provider token usage capture, local LLM integration tests, graph-scoped prompts and blocking findings |
-| Evaluation | Deterministic extraction gold corpus with AWS LZA standard/complex/blocked cases and CloudFormation pass/fail cases, trace quality assertions, battle-summary verdict unit tests for artifact, safety, model, and review failures, optional LLM evidence capture, and role-based usability trials including CloudFormation BYOM |
+| Evaluation | Deterministic extraction gold corpus with AWS LZA standard/complex/blocked cases and CloudFormation pass/fail cases, trace quality assertions, battle-summary verdict unit tests for artifact, safety, model, and review failures, pattern-check unit tests, optional LLM evidence capture, and role-based usability trials including CloudFormation BYOM |
 | Fixtures | AWS LZA emitted bundles, K8s emitted bundle, usability docs, eval corpus |
 | Cleanup | Removed old LZA research path, old diff/apply surfaces, extension registry, old fixtures/tests/helpers, global normalizer/defaults no-op surface, unused discovery hook fields, no-contract artifact fallback, overlapping capability doc |
 | Product docs | Standard root docs (`README`, `CONTRIBUTING`, `CHANGELOG`, `RELEASING`, `SECURITY`) plus lean glossary and pattern authoring docs define current DevOps workflow, product boundary, and shared language |
@@ -161,5 +161,5 @@ T17: Harden lean intent-to-IaC orchestration surface
 - Battle summaries treat expected blocked cases as pass when they remain blocked for clear graph/contract reasons and still emit review/validation artifacts.
 - LLM battles can pass with `expected-weakness` findings when deterministic Markdown carried the value and the model added no accepted decisions; that limitation becomes an explicit improvement item instead of hidden optimism.
 - The latest AWS LZA complex deterministic run was ready with 20 accepted decisions, and the local `llama3.2:3b` run was ready with 4437 tokens, 81410.2 ms latency, 20 accepted decisions, zero parse errors, contract validation pass, and model confidence marked as expected weakness.
-- `iac-llm-wrapper pattern check --pattern aws-lza` validates graph shape, contract graph alignment, expected artifact names, and sample fixture presence.
+- `iac-llm-wrapper pattern check --pattern aws-lza` is backed by `src/intent_engine/core/pattern_check.py`; it validates graph shape, contract graph alignment, expected artifact names, and sample fixture presence.
 - `docs/GLOSSARY.md` owns ubiquitous language; `docs/PATTERN_AUTHORING.md` owns the contributor checklist, while `docs/EXTENSION.md` remains the detailed API contract.
