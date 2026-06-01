@@ -71,6 +71,10 @@ def render_review_html(context: dict[str, Any]) -> str:
                     ),
                     _kv("Model mode", str(model_quality.get("mode", "unknown"))),
                     _kv("Model", str(model_quality.get("model", "unknown"))),
+                    _kv(
+                        "Model conformance",
+                        str(model_quality.get("conformanceStatus", "unknown")),
+                    ),
                     _kv("Raw LLM coverage", str(model_quality.get("rawCoverage", "not-run"))),
                     _kv("Raw missing decisions", str(model_quality.get("rawMissingCount", 0))),
                     _list_block("Missing raw decision keys", model_quality.get("missingKeys", [])),
@@ -158,6 +162,11 @@ def render_review_html(context: dict[str, Any]) -> str:
                     _kv("Latency total", f"{_nested_str(benchmark, 'latency', 'totalMs')} ms"),
                     _kv("Tokens", _token_summary(benchmark)),
                     _kv("Cost", _nested_str(benchmark, "cost", "status")),
+                    _kv("Conformance", str(model_quality.get("conformanceStatus", "unknown"))),
+                    _kv(
+                        "Conformance reason",
+                        str(model_quality.get("conformanceReason", "")),
+                    ),
                     _kv(
                         "Accepted decisions",
                         _nested_str(benchmark, "quality", "acceptedDecisionCount"),

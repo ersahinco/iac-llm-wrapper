@@ -71,6 +71,35 @@ class TestCompileCommand:
         assert (output / "raw-evidence.yaml").exists()
         assert "raw-evidence.yaml" in (output / "llm-trace-summary.yaml").read_text()
 
+    def test_compile_with_llm_can_skip_raw_evidence(
+        self,
+        tmp_path: Path,
+        monkeypatch,
+    ):
+        output = tmp_path / "output"
+        response = json.dumps({"decisions": {}, "signal_decisions": {}, "gaps": []})
+        monkeypatch.setattr(
+            "intent_engine.cli.auto_detect_llm",
+            lambda **kwargs: LLMCaller(_MockBackend(response)),
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "compile",
+                "--input",
+                str(FIXTURES / "usability" / "engineer-handoff-lza.md"),
+                "--output",
+                str(output),
+                "--no-raw-evidence",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "LLM evidence written to:" not in result.stdout
+        assert not (output / "raw-evidence.yaml").exists()
+        assert "status: not-requested" in (output / "llm-trace-summary.yaml").read_text()
+
     def test_compile_missing_input_fails(self, tmp_path: Path):
         result = runner.invoke(
             app,

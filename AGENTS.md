@@ -94,32 +94,32 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy.
 
 ### Current Goal
 
-T25: Blocker-to-requirement review traceability
+T26: End-user handoff confidence and model conformance
 
 ### Status
 
-- **Tests**: 311 passing, 1 skipped
+- **Tests**: 313 passing, 1 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added blocker-to-requirement traceability in `handoff-review.html`: blockers now render with resolution type, requirement key, owning question, and message where graph metadata can identify the requirement; blocked static-review usability now checks network, Identity Center, and markdown contradiction traceability.
+- **Last session**: Added model conformance to `model-benchmark.yaml`, surfaced it in `handoff-review.html`, added `--require-conformant` for benchmark comparison, added `--no-raw-evidence` for service-style compiles, and extended usability with a stakeholder handoff-confidence trial that verifies ready status, allowed next action, contracts, gates, and no raw prompt/response storage.
 
 ### Done
 
 - Core: graph-driven extraction/discovery/interview/validation, pattern registry, contracts, handoff generation, static review, contract validation, benchmark/battle artifacts, sample matching, and CLI commands are implemented and covered.
 - Built-ins: `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, and `terraform-vpc` are contract-backed handoff paths. Current built-ins make no cloud API calls and do not deploy from prose.
-- Evaluation: deterministic extraction corpus includes clean, blocked, BYOM, and customer-style prose cases; role usability trials, forbidden-artifact checks, fixture drift guard, contract validation tests, battle-summary tests, static review tests, and full repo gate are green.
-- Observability: `model-benchmark.yaml` now reports raw LLM coverage of accepted decisions and missing accepted keys; LLM battle summaries surface raw-model misses as expected weaknesses instead of hiding them behind deterministic Markdown success.
-- Model comparison: `scripts/compare-model-benchmarks.py` shows `rawCoverage`, `rawMissing`, and `missingKeys` so ready handoffs are not mistaken for strong raw-model extraction.
-- Static review: `handoff-review.html` starts with a human summary of readiness, contract status, allowed next action, blocker traceability, raw LLM coverage, missing raw decision keys, and expected weaknesses.
-- Usability: `scripts/evaluate-usability.py` now includes ready and blocked static-review stakeholder trials that verify role-specific review-page signals from real AWS LZA customer bundles.
+- Evaluation: deterministic extraction corpus includes clean, blocked, BYOM, and customer-style prose cases; role usability trials, forbidden-artifact checks, fixture drift guard, contract validation tests, battle-summary tests, static review tests, stakeholder handoff-confidence checks, and full repo gate are green.
+- Observability: `model-benchmark.yaml` now reports raw LLM coverage of accepted decisions, missing accepted keys, and model conformance (`pass`, `review`, `fail`, `not-applicable`); LLM battle summaries surface raw-model misses as expected weaknesses instead of hiding them behind deterministic Markdown success.
+- Model comparison: `scripts/compare-model-benchmarks.py` shows `rawCoverage`, `rawMissing`, `missingKeys`, and `conformance`; `--require-conformant` fails non-conformant LLM benchmark runs.
+- Static review: `handoff-review.html` starts with a human summary of readiness, contract status, allowed next action, blocker traceability, model conformance, raw LLM coverage, missing raw decision keys, and expected weaknesses.
+- Usability: `scripts/evaluate-usability.py` now includes ready and blocked static-review stakeholder trials plus a service-style handoff-confidence trial that verifies what is ready, what can move next, target contracts, manual gates, and raw evidence omission.
 - Cleanup: removed stale LZA research/extension/diff/apply/default-normalizer surfaces, no-contract artifact fallback, pattern `extra_artifacts`, duplicate fixture normalization, and stale duplicate LLM docs.
 - Language: user-facing docs now prefer handoff readiness; `deploymentReadiness` remains a legacy compatibility alias in artifacts. Docs now also state that secrets should travel as secret-store references and expected parameter names, never raw values.
 
 ### Next
 
-1. Run the static review trials with an approved Bedrock gateway model when available, then compare raw coverage and human-review signals against local baselines.
+1. Run `evaluate-extraction.py --llm`, `evaluate-usability.py --llm`, and `compare-model-benchmarks.py --require-conformant` with the approved Bedrock gateway model when available.
 2. If reviewers still struggle to resolve blockers, consider adding lightweight anchors from blocker rows to exported requirement graph nodes without adding JavaScript.
 3. Treat `qwen2.5:7b` AWS Identity Center misses and `llama3.2:3b` AWS broad misses as tracked model weaknesses unless future evidence shows a prompt-level fix.
 4. Continue AWS LZA schema depth only where real customer inputs justify it.
@@ -129,7 +129,7 @@ T25: Blocker-to-requirement review traceability
 - Core stays domain-agnostic; pattern packages own models, graphs, contracts, validators, samples, and generators.
 - Graph and contracts own readiness. LLM output is evidence until accepted by graph requirements and artifact contracts.
 - Handoff artifacts are not deployments. `handoffReadiness` is the clearer term; legacy `deploymentReadiness` stays for backward compatibility.
-- Raw LLM evidence is important and should be preserved for observability, but treated as customer design material and kept out of accidental commits.
+- Raw LLM evidence is local development/debug material. Service-style runs can disable raw prompt/response storage with `--no-raw-evidence` while preserving `llm-trace-summary.yaml`, `model-benchmark.yaml`, and `handoff-review.html` for interpretation review.
 - Secrets must be represented as secret-store references plus expected parameter names so values do not enter prompts, raw evidence, review HTML, Git, or handoff artifacts.
 - Built-ins are enough until a team has proprietary modules, controls, sample bundles, or gates that justify private patterns.
 - Customer-style eval fixtures should mix prose, meeting notes, review reminders, and structured decisions so the harness protects real handoff behavior, not only template-shaped examples.

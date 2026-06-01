@@ -69,6 +69,10 @@ def _write_review_bundle(input_dir: Path, *, mode: str = "llm") -> Path:
                 "rawLlmMissingAcceptedDecisions": ["organization_name"],
                 "parseErrorCount": 0,
             },
+            "conformance": {
+                "status": "review",
+                "reason": "raw LLM missed accepted decisions",
+            },
         },
     )
     _write_yaml(
@@ -161,6 +165,8 @@ def test_build_review_context_uses_report_readiness_and_artifact_rows(tmp_path: 
     assert context["modelQuality"]["rawCoverage"] == "0/1"
     assert context["modelQuality"]["rawMissingCount"] == 1
     assert context["modelQuality"]["missingKeys"] == ["organization_name"]
+    assert context["modelQuality"]["conformanceStatus"] == "review"
+    assert context["modelQuality"]["conformanceReason"] == "raw LLM missed accepted decisions"
     assert context["modelQuality"]["expectedWeaknesses"] == [
         "Raw LLM missed accepted decisions: organization_name.",
         "Structured Markdown carried the handoff; LLM added no accepted decisions.",
@@ -193,6 +199,8 @@ def test_render_review_html_uses_existing_graph_exports(tmp_path: Path):
     assert "Requirement key" in html
     assert "Which account owns shared networking?" in html
     assert "Contract status" in html
+    assert "Model conformance" in html
+    assert "review" in html
     assert "Raw LLM coverage" in html
     assert "0/1" in html
     assert "organization_name" in html

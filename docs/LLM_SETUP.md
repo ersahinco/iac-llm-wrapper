@@ -106,26 +106,37 @@ Compare multiple runs with:
 
 ```bash
 uv run python scripts/compare-model-benchmarks.py tests/results/*/model-benchmark.yaml
+uv run python scripts/compare-model-benchmarks.py --require-conformant tests/results/*/model-benchmark.yaml
 ```
 
 Treat `readiness=ready` as necessary but not sufficient when comparing models.
 Prefer models that also show high `rawCoverage` and low `rawMissing`; a ready
 handoff can still be carried by structured Markdown while the model misses
-accepted decisions.
+accepted decisions. `conformance=pass` means the LLM run was ready, had no parse
+errors, and had full raw coverage for accepted decisions. `conformance=review`
+means the handoff may be usable but model extraction still needs human review.
+`conformance=fail` means the model run should not be accepted as a model-quality
+baseline.
 
 ## Raw Evidence Hygiene
 
 LLM-backed `compile` writes raw prompt/response evidence to
-`<output>/raw-evidence.yaml` unless you pass `--evidence-output` to choose a
-different path. Keep this artifact: it is the clearest way to inspect what the
-model saw, what it returned, and why graph acceptance behaved the way it did.
+`<output>/raw-evidence.yaml` for local developer runs unless you pass
+`--evidence-output` to choose a different path or `--no-raw-evidence` to skip
+raw prompt/response storage. Keep raw evidence only when debugging extraction or
+tuning a model: it is the clearest way to inspect what the model saw, what it
+returned, and why graph acceptance behaved the way it did.
 
-Treat raw evidence like customer design material. It may contain account names,
-network topology, control requirements, document excerpts, and model responses.
-Use a restricted output directory, avoid secrets in design docs, provide API
-keys through environment variables or `--api-key`, and redact evidence before
-sharing outside the project team. The repo ignores common raw-evidence file
-names to reduce accidental commits.
+Treat raw evidence like temporary customer design material. It may contain
+account names, network topology, control requirements, document excerpts, and
+model responses. It is a development/debug artifact, not a required service
+artifact. A service deployment can use `llm-trace-summary.yaml`,
+`model-benchmark.yaml`, and `handoff-review.html` to show how the LLM interpreted
+the provided documents without storing raw prompts and responses. Use a
+restricted output directory, avoid secrets in design docs, provide API keys
+through environment variables or `--api-key`, and redact evidence before sharing
+outside the project team. The repo ignores common raw-evidence file names to
+reduce accidental commits.
 
 Do not place secret values in design docs, eval fixtures, prompts, raw evidence,
 or emitted handoff artifacts. Capture secret-store references plus expected

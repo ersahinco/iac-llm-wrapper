@@ -80,6 +80,8 @@ means the run passed while preserving a known model or tool limitation.
 
 ## Evidence
 
-Prompt, response, trace, benchmark, and validation data that explains how the
-bundle was produced. Evidence is for audit and improvement; it is not a separate
-source of authority.
+Trace, benchmark, validation, and optional raw prompt/response data that
+explains how the bundle was produced. Evidence is for audit and improvement; it
+is not a separate source of authority. Raw prompt/response evidence is a local
+development/debug artifact and can be disabled for service-style runs while
+keeping trace and benchmark summaries.

@@ -24,12 +24,15 @@ def build_model_benchmark(extraction_summary: dict[str, Any]) -> dict[str, Any]:
     raw_llm_keys = set(raw_decisions) | set(signal_decisions)
     missing_from_raw_llm = sorted(set(accepted) - raw_llm_keys)
     unaccepted_raw_llm = sorted(raw_llm_keys - set(accepted))
+    mode = "llm" if calls else "deterministic"
+    parse_error_count = sum(1 for call in calls if call.get("parseError"))
+    blocker_count = int(readiness.get("blockerCount", 0) or 0)
 
     return {
         "schemaVersion": "intent-engine/model-benchmark/v1",
         "pattern": extraction_summary.get("pattern", "unknown"),
         "run": {
-            "mode": "llm" if calls else "deterministic",
+            "mode": mode,
             "provider": extraction_summary.get("provider", "none"),
             "model": extraction_summary.get("model", "none"),
             "callCount": len(calls),
@@ -37,7 +40,7 @@ def build_model_benchmark(extraction_summary: dict[str, Any]) -> dict[str, Any]:
         "readiness": {
             "status": readiness.get("status", "unknown"),
             "deploymentAllowed": readiness.get("deploymentAllowed", False),
-            "blockerCount": readiness.get("blockerCount", 0),
+            "blockerCount": blocker_count,
         },
         "latency": {
             "totalMs": total_latency,
@@ -64,8 +67,16 @@ def build_model_benchmark(extraction_summary: dict[str, Any]) -> dict[str, Any]:
             "rawGapCount": len(_coerce_list(gaps.get("raw"))),
             "blockingContradictionCount": len(_coerce_list(contradictions.get("blocking"))),
             "rawContradictionCount": len(_coerce_list(contradictions.get("raw"))),
-            "parseErrorCount": sum(1 for call in calls if call.get("parseError")),
+            "parseErrorCount": parse_error_count,
         },
+        "conformance": _model_conformance(
+            mode=mode,
+            readiness_status=str(readiness.get("status", "unknown")),
+            blocker_count=blocker_count,
+            accepted_count=len(accepted),
+            missing_count=len(missing_from_raw_llm),
+            parse_error_count=parse_error_count,
+        ),
         "cost": {
             "status": "not-estimated",
             "reason": "No provider pricing table is configured in iac-llm-wrapper.",
@@ -102,6 +113,46 @@ def _token_totals(calls: list[dict[str, Any]]) -> dict[str, int]:
         )
         totals["totalTokens"] += int(usage.get("total_tokens", usage.get("totalTokens", 0)) or 0)
     return totals
+
+
+def _model_conformance(
+    *,
+    mode: str,
+    readiness_status: str,
+    blocker_count: int,
+    accepted_count: int,
+    missing_count: int,
+    parse_error_count: int,
+) -> dict[str, Any]:
+    reasons: list[str] = []
+    if mode != "llm":
+        return {
+            "status": "not-applicable",
+            "reason": "Deterministic runs do not measure model extraction quality.",
+            "reasons": [],
+        }
+    if readiness_status != "ready" or blocker_count:
+        reasons.append("handoff is not ready")
+    if parse_error_count:
+        reasons.append("LLM calls had parse errors")
+    if missing_count:
+        reasons.append("raw LLM missed accepted decisions")
+    if not accepted_count:
+        reasons.append("no accepted decisions to score")
+    if not reasons:
+        return {
+            "status": "pass",
+            "reason": "LLM run was ready with full raw coverage and no parse errors.",
+            "reasons": [],
+        }
+    status = (
+        "fail" if readiness_status != "ready" or blocker_count or parse_error_count else "review"
+    )
+    return {
+        "status": status,
+        "reason": "; ".join(reasons),
+        "reasons": reasons,
+    }
 
 
 def _dict(value: Any) -> dict[str, Any]:

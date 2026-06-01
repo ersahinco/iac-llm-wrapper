@@ -70,11 +70,14 @@ def _default_evidence_output(
     *,
     llm_caller: object | None,
     evidence_output: Path | None,
+    raw_evidence_enabled: bool,
     output: Path,
     dry_run: bool,
 ) -> Path | None:
     if evidence_output is not None:
         return evidence_output
+    if not raw_evidence_enabled:
+        return None
     if llm_caller is None or dry_run:
         return None
     return output / "raw-evidence.yaml"
@@ -310,6 +313,15 @@ def compile(
             "<output>/raw-evidence.yaml for LLM compiles."
         ),
     ),
+    raw_evidence: bool = typer.Option(
+        True,
+        "--raw-evidence/--no-raw-evidence",
+        help=(
+            "Write raw LLM prompt/response evidence for local development. "
+            "Use --no-raw-evidence for service-style runs that keep only "
+            "trace and benchmark summaries."
+        ),
+    ),
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
@@ -345,6 +357,7 @@ def compile(
     evidence_path = _default_evidence_output(
         llm_caller=llm_caller,
         evidence_output=evidence_output,
+        raw_evidence_enabled=raw_evidence,
         output=output,
         dry_run=dry_run,
     )

@@ -119,6 +119,7 @@ uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen
 uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b --evidence-dir /tmp/iac-llm-evidence
 uv run python scripts/battle-test.py --fixture aws-lza-complex-enterprise-handoff --llm --provider ollama --model qwen2.5:7b
 uv run python scripts/compare-model-benchmarks.py tests/results/*/model-benchmark.yaml
+uv run python scripts/compare-model-benchmarks.py --require-conformant tests/results/*/model-benchmark.yaml
 ```
 
 The eval loop compiles docs in `fixtures/eval/`, compares decision values,
@@ -128,14 +129,19 @@ discovery, engineer handoff, and bring-your-own Terraform module input capture.
 It also includes a CloudFormation parameter handoff trial to prove BYOM
 orchestration beyond Terraform without generating a stack, plus static review
 page trials that check ready and blocked `handoff-review.html` signals for
-architects, platform engineers, security reviewers, and model developers.
+architects, platform engineers, security reviewers, model developers, and
+non-developer stakeholders who need to know what is ready, what is blocked, and
+what can move to the provisioning toolchain.
 Deterministic mode is the CI harness gate; `--llm` is the model-quality gate.
 LLM-backed `compile` keeps prompt/response YAML at
 `<output>/raw-evidence.yaml` by default. Use `--evidence-output` to choose a
-different path, or `--evidence-dir` in eval scripts to keep per-case evidence.
-Treat raw evidence as customer design material. Keep secret values out of design
-docs and handoff artifacts; use secret-store references plus expected parameter
-names so downstream IaC tooling resolves values under its own access controls.
+different path, `--no-raw-evidence` for service-style runs that keep only trace
+and benchmark summaries, or `--evidence-dir` in eval scripts to keep per-case
+evidence. Treat raw evidence as local development/debug material that may
+contain customer design content; it is not needed as a service artifact. Keep
+secret values out of design docs and handoff artifacts; use secret-store
+references plus expected parameter names so downstream IaC tooling resolves
+values under its own access controls.
 Use `battle-test.py` for repeatable local artifact bundles under ignored
 `tests/results/`; each run writes `battle-summary.yaml` with a verdict,
 confidence categories, findings, and improvement items.
@@ -234,9 +240,9 @@ For `aws-lza`, successful output includes:
 - `sample-recommendations.yaml` — closest pinned reference bundles for handoff
 - `llm-trace-summary.yaml` — provider/model, calls, raw and accepted decisions,
   resolved/blocking gaps, blocking contradictions, and raw evidence status
-- `model-benchmark.yaml` — latency, token, raw LLM coverage, quality,
-  readiness, and cost-status rollups for LLM evaluation without embedding an
-  observability platform
+- `model-benchmark.yaml` — latency, token, raw LLM coverage, conformance,
+  quality, readiness, and cost-status rollups for LLM evaluation without
+  embedding an observability platform
 
 When compile is blocked, only safe assessment artifacts are written:
 `decision-report.yaml`, `llm-trace-summary.yaml`, and `model-benchmark.yaml`.

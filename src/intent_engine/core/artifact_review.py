@@ -292,6 +292,7 @@ def _contract_status(contract_validation: dict[str, Any]) -> str:
 def _model_quality(benchmark: dict[str, Any], trace: dict[str, Any]) -> dict[str, Any]:
     quality = _dict(benchmark.get("quality"))
     run = _dict(benchmark.get("run"))
+    conformance = _dict(benchmark.get("conformance"))
     applied = _dict(trace.get("appliedDecisions"))
     mode = str(run.get("mode", "unknown"))
     accepted = int(quality.get("acceptedDecisionCount", 0) or 0)
@@ -317,6 +318,8 @@ def _model_quality(benchmark: dict[str, Any], trace: dict[str, Any]) -> dict[str
         "rawCoverage": (f"{raw_coverage}/{accepted}" if mode == "llm" and accepted else "not-run"),
         "rawMissingCount": raw_missing,
         "missingKeys": missing_keys,
+        "conformanceStatus": str(conformance.get("status", "unknown")),
+        "conformanceReason": str(conformance.get("reason", "")),
         "expectedWeaknesses": warnings,
         "parseErrorCount": int(quality.get("parseErrorCount", 0) or 0),
     }

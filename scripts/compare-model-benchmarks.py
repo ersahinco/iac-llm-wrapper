@@ -29,6 +29,7 @@ def _nested(data: dict[str, Any], section: str, key: str, default: Any = "") -> 
 def _row(path: Path) -> dict[str, str]:
     data = _yaml_load(path)
     quality = data.get("quality", {}) if isinstance(data.get("quality"), dict) else {}
+    conformance = data.get("conformance", {}) if isinstance(data.get("conformance"), dict) else {}
     accepted = int(quality.get("acceptedDecisionCount", 0) or 0)
     raw_coverage = int(quality.get("rawLlmAcceptedCoverageCount", 0) or 0)
     missing = quality.get("rawLlmMissingAcceptedDecisions", [])
@@ -45,9 +46,25 @@ def _row(path: Path) -> dict[str, str]:
         "rawCoverage": f"{raw_coverage}/{accepted}" if accepted else "0/0",
         "rawMissing": str(_nested(data, "quality", "rawLlmMissingAcceptedDecisionCount", 0)),
         "missingKeys": missing_keys,
+        "conformance": str(conformance.get("status", _infer_conformance(data))),
         "blockers": str(_nested(data, "readiness", "blockerCount", 0)),
         "parseErrors": str(_nested(data, "quality", "parseErrorCount", 0)),
     }
+
+
+def _infer_conformance(data: dict[str, Any]) -> str:
+    mode = str(_nested(data, "run", "mode", "unknown"))
+    if mode != "llm":
+        return "not-applicable"
+    readiness = str(_nested(data, "readiness", "status", "unknown"))
+    blockers = int(_nested(data, "readiness", "blockerCount", 0) or 0)
+    parse_errors = int(_nested(data, "quality", "parseErrorCount", 0) or 0)
+    raw_missing = int(_nested(data, "quality", "rawLlmMissingAcceptedDecisionCount", 0) or 0)
+    if readiness != "ready" or blockers or parse_errors:
+        return "fail"
+    if raw_missing:
+        return "review"
+    return "pass"
 
 
 def _print_table(rows: list[dict[str, str]]) -> None:
@@ -62,6 +79,7 @@ def _print_table(rows: list[dict[str, str]]) -> None:
         "rawCoverage",
         "rawMissing",
         "missingKeys",
+        "conformance",
         "blockers",
         "parseErrors",
         "path",
@@ -76,6 +94,11 @@ def _print_table(rows: list[dict[str, str]]) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("benchmarks", nargs="+", type=Path)
+    parser.add_argument(
+        "--require-conformant",
+        action="store_true",
+        help="Exit non-zero unless every LLM benchmark has conformance=pass.",
+    )
     args = parser.parse_args()
 
     paths = [path for path in args.benchmarks if path.exists()]
@@ -88,6 +111,12 @@ def main() -> int:
         print("No benchmark files provided.", file=sys.stderr)
         return 1
     _print_table(rows)
+    if args.require_conformant:
+        failing = [row for row in rows if row["mode"] == "llm" and row["conformance"] != "pass"]
+        if failing:
+            failing_paths = ", ".join(row["path"] for row in failing)
+            print(f"Non-conformant LLM benchmark(s): {failing_paths}", file=sys.stderr)
+            return 1
     return 0
 
 

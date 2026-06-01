@@ -493,6 +493,107 @@ def _trial_static_review_stakeholders(config: TrialConfig) -> TrialResult:
     )
 
 
+def _trial_end_user_handoff_confidence(config: TrialConfig) -> TrialResult:
+    failures: list[str] = []
+    evidence_files: list[Path] = []
+    with tempfile.TemporaryDirectory() as temp_dir:
+        output_dir = Path(temp_dir)
+        compile_proc = _run(
+            [
+                "compile",
+                "--input",
+                str(EVAL_DIR / "aws-lza-customer-board-notes.md"),
+                "--output",
+                str(output_dir),
+                "--pattern",
+                "aws-lza",
+                "--no-raw-evidence",
+            ],
+            config,
+        )
+        if compile_proc.returncode != 0:
+            failures.append("compile command failed")
+            failures.append((compile_proc.stderr or compile_proc.stdout).strip())
+            return TrialResult(
+                "stakeholder",
+                "handoff-confidence",
+                config.mode,
+                "FAIL",
+                failures,
+                evidence_files,
+            )
+
+        review_proc = _run(
+            [
+                "review",
+                "html",
+                "--input",
+                str(output_dir),
+                "--output",
+                str(output_dir / "handoff-review.html"),
+            ],
+            config,
+        )
+        if review_proc.returncode != 0:
+            failures.append("review html command failed")
+            failures.append((review_proc.stderr or review_proc.stdout).strip())
+            return TrialResult(
+                "stakeholder",
+                "handoff-confidence",
+                config.mode,
+                "FAIL",
+                failures,
+                evidence_files,
+            )
+
+        html = (output_dir / "handoff-review.html").read_text()
+        handoff_plan = _yaml_load(output_dir / "handoff-plan.yaml")
+        trace = (output_dir / "llm-trace-summary.yaml").read_text()
+        benchmark = (output_dir / "model-benchmark.yaml").read_text()
+        expected_html_signals = [
+            "Review Summary",
+            "Handoff ready",
+            "True",
+            "Allowed next action",
+            "Pass the reviewed artifacts",
+            "Contract status",
+            "pass",
+            "Target Artifacts",
+            "accounts-config.yaml",
+            "iam-config.yaml",
+            "Model Benchmark",
+        ]
+        for signal in expected_html_signals:
+            if signal not in html:
+                failures.append(f"handoff confidence signal missing: {signal}")
+        if handoff_plan.get("allowedNextAction") != (
+            "Pass the reviewed artifacts to the existing target toolchain after manual gates."
+        ):
+            failures.append("handoff plan missing clear allowed next action")
+        readiness = handoff_plan.get("readiness", {})
+        if not isinstance(readiness, dict) or readiness.get("status") != "ready":
+            failures.append("handoff plan is not ready")
+        if not handoff_plan.get("targetContracts"):
+            failures.append("handoff plan missing target contracts")
+        if not handoff_plan.get("manualGates"):
+            failures.append("handoff plan missing manual gates")
+        if (output_dir / "raw-evidence.yaml").exists():
+            failures.append("service-style handoff wrote raw evidence")
+        if "status: not-requested" not in trace:
+            failures.append("trace does not show raw evidence was not requested")
+        if "conformance:" not in benchmark:
+            failures.append("benchmark missing model conformance section")
+
+    return TrialResult(
+        "stakeholder",
+        "handoff-confidence",
+        config.mode,
+        "PASS" if not failures else "FAIL",
+        failures,
+        evidence_files,
+    )
+
+
 def _trial_static_review_blocked(config: TrialConfig) -> TrialResult:
     failures: list[str] = []
     evidence_files: list[Path] = []
@@ -614,6 +715,7 @@ def main() -> int:
         _trial_byom_terraform_vpc,
         _trial_byom_cloudformation_parameters,
         _trial_static_review_stakeholders,
+        _trial_end_user_handoff_confidence,
         _trial_static_review_blocked,
     ]
     results = [trial(config) for trial in trials]

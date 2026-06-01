@@ -305,6 +305,7 @@ class TestEndToEndLLM:
         assert "schemaVersion: intent-engine/model-benchmark/v1" in benchmark
         assert "mode: llm" in benchmark
         assert "acceptedDecisionCount:" in benchmark
+        assert "conformance:" in benchmark
         assert "status: not-estimated" in benchmark
         assert not (output / "terraform.tfvars").exists()
 
