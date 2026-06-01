@@ -115,7 +115,8 @@ orchestration beyond Terraform without generating a stack.
 Deterministic mode is the CI harness gate; `--llm` is the model-quality gate.
 Use `--evidence-dir` to keep prompt/response YAML for inspection.
 Use `battle-test.py` for repeatable local artifact bundles under ignored
-`tests/results/`.
+`tests/results/`; each run writes `battle-summary.yaml` with a verdict,
+confidence categories, findings, and improvement items.
 
 Install from PyPI:
 
@@ -433,6 +434,8 @@ Each compile also emits `model-benchmark.yaml`. It is intentionally artifact
 only: provider/model, latency, token availability, readiness, decision/gap
 counts, and cost-estimation status are captured for external analysis tools.
 Battle-test outputs are local, ignored, and written under `tests/results/`.
+Each battle bundle includes `battle-summary.yaml` so model/tool regressions and
+expected weaknesses are explicit.
 
 See [docs/LLM_SETUP.md](docs/LLM_SETUP.md) for detailed model setup and troubleshooting.
 

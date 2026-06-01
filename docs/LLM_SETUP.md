@@ -90,6 +90,8 @@ Every compile writes `model-benchmark.yaml` next to the handoff artifacts. Use i
 to compare provider/model behavior, latency, token reporting, readiness, and
 decision/gap counts without adding a UI or observability service to this repo.
 `battle-test.py` keeps full local review bundles under ignored `tests/results/`.
+Each bundle includes `battle-summary.yaml` with a verdict, confidence categories,
+findings, and improvement items so model weaknesses become actionable.
 Compare multiple runs with:
 
 ```bash
