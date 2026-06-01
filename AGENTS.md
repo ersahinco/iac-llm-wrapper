@@ -19,6 +19,7 @@ uv run ruff check .
 uv run ruff format --check .
 uv run --extra dev mypy
 uv run python scripts/sync-sample-fixtures.py --check
+uv run python scripts/evaluate-golden-journey.py
 uv run python scripts/evaluate-extraction.py
 uv run python scripts/evaluate-usability.py
 uv run pre-commit run --all-files
@@ -94,22 +95,23 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy.
 
 ### Current Goal
 
-T26: End-user handoff confidence and model conformance
+T27: Golden customer journey harness
 
 ### Status
 
-- **Tests**: 313 passing, 1 skipped
+- **Tests**: 316 passing, 1 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added model conformance to `model-benchmark.yaml`, surfaced it in `handoff-review.html`, added `--require-conformant` for benchmark comparison, added `--no-raw-evidence` for service-style compiles, and extended usability with a stakeholder handoff-confidence trial that verifies ready status, allowed next action, contracts, gates, and no raw prompt/response storage.
+- **Last session**: Added `scripts/evaluate-golden-journey.py` as the canonical customer-doc to reviewed-handoff harness. It compiles the AWS LZA customer board-notes fixture with `--no-raw-evidence`, generates `handoff-review.html`, and verifies readiness, allowed next action, contracts, manual gates, target artifacts, trace summary, model benchmark conformance, and raw evidence omission.
 
 ### Done
 
 - Core: graph-driven extraction/discovery/interview/validation, pattern registry, contracts, handoff generation, static review, contract validation, benchmark/battle artifacts, sample matching, and CLI commands are implemented and covered.
 - Built-ins: `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, and `terraform-vpc` are contract-backed handoff paths. Current built-ins make no cloud API calls and do not deploy from prose.
 - Evaluation: deterministic extraction corpus includes clean, blocked, BYOM, and customer-style prose cases; role usability trials, forbidden-artifact checks, fixture drift guard, contract validation tests, battle-summary tests, static review tests, stakeholder handoff-confidence checks, and full repo gate are green.
+- Golden journey: `scripts/evaluate-golden-journey.py` is the quickest product-confidence check for the core promise: messy customer-style AWS LZA notes to service-style reviewed handoff bundle.
 - Observability: `model-benchmark.yaml` now reports raw LLM coverage of accepted decisions, missing accepted keys, and model conformance (`pass`, `review`, `fail`, `not-applicable`); LLM battle summaries surface raw-model misses as expected weaknesses instead of hiding them behind deterministic Markdown success.
 - Model comparison: `scripts/compare-model-benchmarks.py` shows `rawCoverage`, `rawMissing`, `missingKeys`, and `conformance`; `--require-conformant` fails non-conformant LLM benchmark runs.
 - Static review: `handoff-review.html` starts with a human summary of readiness, contract status, allowed next action, blocker traceability, model conformance, raw LLM coverage, missing raw decision keys, and expected weaknesses.
@@ -119,7 +121,7 @@ T26: End-user handoff confidence and model conformance
 
 ### Next
 
-1. Run `evaluate-extraction.py --llm`, `evaluate-usability.py --llm`, and `compare-model-benchmarks.py --require-conformant` with the approved Bedrock gateway model when available.
+1. Run `evaluate-golden-journey.py --llm`, `evaluate-extraction.py --llm`, `evaluate-usability.py --llm`, and `compare-model-benchmarks.py --require-conformant` with the approved Bedrock gateway model when available.
 2. If reviewers still struggle to resolve blockers, consider adding lightweight anchors from blocker rows to exported requirement graph nodes without adding JavaScript.
 3. Treat `qwen2.5:7b` AWS Identity Center misses and `llama3.2:3b` AWS broad misses as tracked model weaknesses unless future evidence shows a prompt-level fix.
 4. Continue AWS LZA schema depth only where real customer inputs justify it.

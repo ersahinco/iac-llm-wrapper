@@ -72,6 +72,7 @@ files = [
     "scripts/battle-test.py",
     "scripts/compare-model-benchmarks.py",
     "scripts/evaluate-extraction.py",
+    "scripts/evaluate-golden-journey.py",
     "scripts/evaluate-usability.py",
     "scripts/sync-sample-fixtures.py",
     "src/intent_engine",
