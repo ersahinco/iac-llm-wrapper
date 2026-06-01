@@ -5,7 +5,8 @@
 `iac-llm-wrapper` is an LLM-assisted intent-to-IaC orchestration framework. Local
 models via Ollama are the primary development path. No API key or cloud service
 required. A 3B parameter model running locally is sufficient for many structured
-design docs.
+design docs; use a 7B model when customer-style notes are the quality bar and
+your workstation can handle the latency.
 
 **Important**: LLM testing is a local developer responsibility. CI does not run LLM tests (no API keys in GitHub Actions, no Ollama in CI). Every developer validates extraction quality with their own local models before submitting PRs.
 
@@ -22,9 +23,14 @@ curl -fsSL https://ollama.com/install.sh | sh
 
 ### 2. Pull a Small Model
 
-For infrastructure extraction, small models (3B parameters) work well:
+For infrastructure extraction, small models (3B parameters) work well. On a
+modern MacBook Pro, prefer `qwen2.5:7b` for customer-style evals when the extra
+latency is acceptable:
 
 ```bash
+# Recommended customer-fixture model when local hardware can handle it
+ollama pull qwen2.5:7b
+
 # Recommended: Qwen 2.5 3B - fast, good instruction following
 ollama pull qwen2.5:3b
 
@@ -60,6 +66,7 @@ iac-llm-wrapper compile -i design.md -o out/ --pattern aws-lza
 
 | Model | Size | Speed | Quality | Best For |
 |-------|------|-------|---------|----------|
+| `qwen2.5:7b` | 7B | Medium | Better | Customer-style fixtures, richer notes |
 | `qwen2.5:3b` | 3B | Fast | Good | General extraction, structured output |
 | `llama3.2:3b` | 3B | Fast | Good | General extraction, longer contexts |
 | `phi4:14b` | 14B | Medium | Better | Complex multi-region designs |
@@ -88,11 +95,12 @@ notes and BYOM module notes, compare handoff artifacts against expected
 outcomes, and verify LLM evidence when `--llm` is enabled.
 
 Every compile writes `model-benchmark.yaml` next to the handoff artifacts. Use it
-to compare provider/model behavior, latency, token reporting, readiness, and
-decision/gap counts without adding a UI or observability service to this repo.
-`battle-test.py` keeps full local review bundles under ignored `tests/results/`.
-Each bundle includes `battle-summary.yaml` with a verdict, confidence categories,
-findings, and improvement items so model weaknesses become actionable.
+to compare provider/model behavior, latency, token reporting, readiness, raw LLM
+coverage of accepted decisions, and decision/gap counts without adding a UI or
+observability service to this repo. `battle-test.py` keeps full local review
+bundles under ignored `tests/results/`. Each bundle includes
+`battle-summary.yaml` with a verdict, confidence categories, findings, and
+improvement items so model weaknesses become actionable.
 Compare multiple runs with:
 
 ```bash
@@ -112,6 +120,13 @@ Use a restricted output directory, avoid secrets in design docs, provide API
 keys through environment variables or `--api-key`, and redact evidence before
 sharing outside the project team. The repo ignores common raw-evidence file
 names to reduce accidental commits.
+
+Do not place secret values in design docs, eval fixtures, prompts, raw evidence,
+or emitted handoff artifacts. Capture secret-store references plus expected
+parameter names instead, for example `aws-secretsmanager://team/app/db#password`,
+`aws-ssm-parameter://team/app/api-key`, or an approved enterprise vault URI. The
+downstream provisioning toolchain resolves the value; this wrapper should only
+carry the reference, owner, expected parameter name, and validation notes.
 
 ## LLM vs Deterministic Fallback
 
@@ -142,10 +157,10 @@ full architect intent.
 
 | Scenario | Recommendation |
 |----------|---------------|
-| Local development | Ollama with 3B model or API key |
-| CI with API key | Cloud LLM (set `OPENAI_API_KEY`) |
+| Local development | Ollama with 3B model; use `qwen2.5:7b` for customer-fixture hardening |
+| CI with API key | Cloud LLM through the OpenAI-compatible backend |
 | CI without API key | Deterministic fallback (limited) |
-| Complex enterprise docs | 7B+ model or cloud LLM |
+| Complex enterprise docs | 7B+ local model or approved cloud model |
 | Quick validation / unit tests | Deterministic fallback |
 
 ## Troubleshooting
@@ -174,7 +189,21 @@ If local models are insufficient:
 # OpenAI
 export OPENAI_API_KEY=sk-...
 iac-llm-wrapper compile -i design.md -o out/ --provider openai --model gpt-4o-mini
+
+# Amazon Bedrock through an approved OpenAI-compatible gateway or proxy
+export OPENAI_API_KEY=bedrock-gateway-token
+iac-llm-wrapper compile -i design.md -o out/ \
+  --provider openai \
+  --base-url https://bedrock-gateway.example.com/v1 \
+  --model amazon.nova-micro-v1:0
 ```
+
+For Bedrock, keep the repo data model provider-neutral: choose the cheapest
+approved model that passes `evaluate-extraction.py --llm` on customer-style
+fixtures, record the run in `model-benchmark.yaml`, and compare latency, token
+reporting, raw LLM coverage, parse errors, and readiness before changing prompts.
+Do not add provider-specific benchmark pricing tables unless repeated customer
+runs need that decision inside this repo.
 
 ## Performance Benchmarks
 

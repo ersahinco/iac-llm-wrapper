@@ -94,29 +94,30 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy.
 
 ### Current Goal
 
-T19: Real-design-doc extraction hardening with evidence-backed regressions
+T20: LLM evidence-backed customer fixture hardening
 
 ### Status
 
-- **Tests**: 308 passing, 1 skipped
+- **Tests**: 310 passing, 1 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added customer-style extraction gold cases for AWS LZA board notes and Terraform VPC module notes, documented eval fixture intent, verified expanded eval corpus and deterministic battle runs; full gate green
+- **Last session**: Ran `qwen2.5:7b` LLM evals against customer-style AWS LZA and BYOM Terraform fixtures with raw evidence, added raw LLM coverage metrics to `model-benchmark.yaml`, surfaced raw-model misses in battle summaries, documented local/Bedrock model strategy and secret-reference hygiene, and verified the full local gate plus pre-commit.
 
 ### Done
 
 - Core: graph-driven extraction/discovery/interview/validation, pattern registry, contracts, handoff generation, static review, contract validation, benchmark/battle artifacts, sample matching, and CLI commands are implemented and covered.
 - Built-ins: `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, and `terraform-vpc` are contract-backed handoff paths. Current built-ins make no cloud API calls and do not deploy from prose.
 - Evaluation: deterministic extraction corpus includes clean, blocked, BYOM, and customer-style prose cases; role usability trials, forbidden-artifact checks, fixture drift guard, contract validation tests, battle-summary tests, static review tests, and full repo gate are green.
+- Observability: `model-benchmark.yaml` now reports raw LLM coverage of accepted decisions and missing accepted keys; LLM battle summaries surface raw-model misses as expected weaknesses instead of hiding them behind deterministic Markdown success.
 - Cleanup: removed stale LZA research/extension/diff/apply/default-normalizer surfaces, no-contract artifact fallback, pattern `extra_artifacts`, duplicate fixture normalization, and stale duplicate LLM docs.
-- Language: user-facing docs now prefer handoff readiness; `deploymentReadiness` remains a legacy compatibility alias in artifacts.
+- Language: user-facing docs now prefer handoff readiness; `deploymentReadiness` remains a legacy compatibility alias in artifacts. Docs now also state that secrets should travel as secret-store references and expected parameter names, never raw values.
 
 ### Next
 
-1. Run local LLM eval/usability with evidence output against the customer-style fixtures when models are available.
-2. Promote repeated LLM misses into expected fixture checks before prompt tuning.
+1. Use the new raw LLM coverage metrics to compare `qwen2.5:7b`, smaller local models, and any approved Bedrock gateway model before prompt tuning.
+2. Promote repeated raw-model misses into expected fixture checks or prompt fixes only after at least two evidence-backed runs show the same gap.
 3. Continue AWS LZA schema depth only where real customer inputs justify it.
 4. Keep private pattern work package-local until a real consumer needs packaged external distribution; do not add a generic loader speculatively.
 
@@ -126,5 +127,7 @@ T19: Real-design-doc extraction hardening with evidence-backed regressions
 - Graph and contracts own readiness. LLM output is evidence until accepted by graph requirements and artifact contracts.
 - Handoff artifacts are not deployments. `handoffReadiness` is the clearer term; legacy `deploymentReadiness` stays for backward compatibility.
 - Raw LLM evidence is important and should be preserved for observability, but treated as customer design material and kept out of accidental commits.
+- Secrets must be represented as secret-store references plus expected parameter names so values do not enter prompts, raw evidence, review HTML, Git, or handoff artifacts.
 - Built-ins are enough until a team has proprietary modules, controls, sample bundles, or gates that justify private patterns.
 - Customer-style eval fixtures should mix prose, meeting notes, review reminders, and structured decisions so the harness protects real handoff behavior, not only template-shaped examples.
+- Local customer-fixture hardening should prefer the best model a work MacBook Pro can handle, currently `qwen2.5:7b` in this workspace; Bedrock remains an approved cloud path through an OpenAI-compatible gateway/proxy when cost and policy require it.

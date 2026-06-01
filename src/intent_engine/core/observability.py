@@ -21,6 +21,9 @@ def build_model_benchmark(extraction_summary: dict[str, Any]) -> dict[str, Any]:
     raw_decisions = _dict(extraction_summary.get("rawLlmDecisions"))
     signal_decisions = _dict(extraction_summary.get("rawLlmSignalDecisions"))
     applied = _dict(extraction_summary.get("appliedDecisions"))
+    raw_llm_keys = set(raw_decisions) | set(signal_decisions)
+    missing_from_raw_llm = sorted(set(accepted) - raw_llm_keys)
+    unaccepted_raw_llm = sorted(raw_llm_keys - set(accepted))
 
     return {
         "schemaVersion": "intent-engine/model-benchmark/v1",
@@ -49,6 +52,10 @@ def build_model_benchmark(extraction_summary: dict[str, Any]) -> dict[str, Any]:
             "acceptedDecisionCount": len(accepted),
             "rawLlmDecisionCount": len(raw_decisions),
             "rawLlmSignalDecisionCount": len(signal_decisions),
+            "rawLlmAcceptedCoverageCount": len(set(accepted) & raw_llm_keys),
+            "rawLlmMissingAcceptedDecisionCount": len(missing_from_raw_llm),
+            "rawLlmMissingAcceptedDecisions": missing_from_raw_llm,
+            "rawLlmUnacceptedDecisionCount": len(unaccepted_raw_llm),
             "appliedDecisionCounts": {
                 key: len(value) if isinstance(value, list) else 0 for key, value in applied.items()
             },

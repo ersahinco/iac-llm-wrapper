@@ -126,6 +126,7 @@ def build_battle_summary(
 
     accepted = trace.get("acceptedDecisions", {})
     raw_llm = trace.get("rawLlmDecisions", {})
+    raw_llm_signals = trace.get("rawLlmSignalDecisions", {})
     applied = trace.get("appliedDecisions", {})
     gaps = trace.get("gaps", {})
     contradictions = trace.get("contradictions", {})
@@ -149,6 +150,19 @@ def build_battle_summary(
                     "improvement",
                     "extraction",
                     f"Raw LLM decisions were not accepted by graph: {', '.join(invented)}.",
+                )
+            )
+    if use_llm and isinstance(accepted, dict) and isinstance(raw_llm, dict):
+        raw_llm_keys = set(raw_llm)
+        if isinstance(raw_llm_signals, dict):
+            raw_llm_keys.update(raw_llm_signals)
+        missing_from_raw_llm = sorted(set(accepted) - raw_llm_keys)
+        if missing_from_raw_llm:
+            findings.append(
+                _finding(
+                    "expected-weakness",
+                    "model",
+                    f"Raw LLM missed accepted decisions: {', '.join(missing_from_raw_llm)}.",
                 )
             )
     if isinstance(applied, dict):

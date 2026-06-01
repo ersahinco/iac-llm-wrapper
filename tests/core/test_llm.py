@@ -172,8 +172,34 @@ class TestModelBenchmark:
         assert benchmark["tokens"]["status"] == "captured"
         assert benchmark["tokens"]["totalTokens"] == 17
         assert benchmark["quality"]["acceptedDecisionCount"] == 1
+        assert benchmark["quality"]["rawLlmMissingAcceptedDecisionCount"] == 0
         assert benchmark["quality"]["parseErrorCount"] == 1
         assert benchmark["cost"]["status"] == "not-estimated"
+
+    def test_build_model_benchmark_reports_raw_llm_coverage(self):
+        benchmark = build_model_benchmark(
+            {
+                "pattern": "aws-lza",
+                "provider": "ollama",
+                "model": "qwen2.5:7b",
+                "calls": [{"latencyMs": 1}],
+                "acceptedDecisions": {
+                    "network_account": "Network",
+                    "identity_center_permission_sets": ["ReadOnlyAccess"],
+                    "identity_center_assignments": ["Admins:ReadOnlyAccess:Network"],
+                },
+                "rawLlmDecisions": {"network_account": "Network"},
+                "rawLlmSignalDecisions": {"identity_center_permission_sets": ["ReadOnlyAccess"]},
+                "appliedDecisions": {"markdown": ["identity_center_assignments"]},
+            }
+        )
+
+        assert benchmark["quality"]["rawLlmAcceptedCoverageCount"] == 2
+        assert benchmark["quality"]["rawLlmMissingAcceptedDecisionCount"] == 1
+        assert benchmark["quality"]["rawLlmMissingAcceptedDecisions"] == [
+            "identity_center_assignments"
+        ]
+        assert benchmark["quality"]["rawLlmUnacceptedDecisionCount"] == 0
 
 
 class TestCreateBackend:

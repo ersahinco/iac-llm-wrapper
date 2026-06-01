@@ -227,6 +227,29 @@ def test_llm_missing_token_usage_is_expected_weakness(tmp_path: Path):
     } in summary["improvementItems"]
 
 
+def test_llm_raw_decision_gap_is_expected_weakness(tmp_path: Path):
+    repo_root = tmp_path / "repo"
+    output_dir = repo_root / "out"
+    _write_ready_bundle(output_dir, artifacts=("accounts-config.yaml",))
+    (output_dir / "raw-evidence.yaml").write_text("requests: []\n")
+    benchmark = ruamel.yaml.YAML(typ="safe").load((output_dir / "model-benchmark.yaml").read_text())
+    benchmark["latency"] = {"totalMs": 100}
+    benchmark["tokens"] = {"totalTokens": 10}
+    _write_yaml(output_dir / "model-benchmark.yaml", benchmark)
+
+    summary = _summary(tmp_path, case=_case(repo_root), output_dir=output_dir, use_llm=True)
+
+    assert summary["verdict"] == "pass"
+    assert {
+        "type": "expected-weakness",
+        "area": "model",
+        "message": (
+            "Raw LLM missed accepted decisions: identity_center_assignments, "
+            "identity_center_permission_sets, network_account."
+        ),
+    } in summary["improvementItems"]
+
+
 def test_llm_missing_raw_evidence_fails(tmp_path: Path):
     repo_root = tmp_path / "repo"
     output_dir = repo_root / "out"

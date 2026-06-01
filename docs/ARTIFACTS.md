@@ -27,6 +27,8 @@ execution path and passes graph, contract, gate, evidence, and rollback checks.
   `battle-summary.yaml`, and eval results to improve extraction and model value.
 - LLM reviewers keep `raw-evidence.yaml` with the bundle for audit/debugging and
   redact it before sharing outside the project team.
+- Secret inputs should appear only as secret-store references with expected
+  parameter names, never as secret values in raw evidence or handoff artifacts.
 - External UI or observability projects may read these files, but this repo stays
   CLI- and artifact-first.
 

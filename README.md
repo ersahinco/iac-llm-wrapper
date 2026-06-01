@@ -131,7 +131,9 @@ Deterministic mode is the CI harness gate; `--llm` is the model-quality gate.
 LLM-backed `compile` keeps prompt/response YAML at
 `<output>/raw-evidence.yaml` by default. Use `--evidence-output` to choose a
 different path, or `--evidence-dir` in eval scripts to keep per-case evidence.
-Treat raw evidence as customer design material.
+Treat raw evidence as customer design material. Keep secret values out of design
+docs and handoff artifacts; use secret-store references plus expected parameter
+names so downstream IaC tooling resolves values under its own access controls.
 Use `battle-test.py` for repeatable local artifact bundles under ignored
 `tests/results/`; each run writes `battle-summary.yaml` with a verdict,
 confidence categories, findings, and improvement items.
