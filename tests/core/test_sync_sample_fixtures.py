@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -71,7 +71,7 @@ def test_drift_messages_report_missing_stale_and_changed_files(
 
 def test_sync_sample_reports_missing_fixture_dir(sync_script: ModuleType, tmp_path: Path):
     sample = _sample()
-    sync_script.FIXTURES_ROOT = tmp_path
+    cast(Any, sync_script).FIXTURES_ROOT = tmp_path
 
     assert sync_script._sync_sample(sample, check=True) == [
         "sample-v1: fixture dir missing at sample-v1"
@@ -87,7 +87,7 @@ def test_sync_sample_check_mode_reports_drift_without_writing(
     fixture_dir = tmp_path / sample.fixture_name
     fixture_dir.mkdir()
     (fixture_dir / "config.yaml").write_text("region: old\n")
-    sync_script.FIXTURES_ROOT = tmp_path
+    cast(Any, sync_script).FIXTURES_ROOT = tmp_path
 
     def fake_compile(decisions: dict[str, Any], output_dir: Path, *, pattern: str) -> None:
         assert decisions == sample.decisions

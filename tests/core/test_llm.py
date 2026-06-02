@@ -17,6 +17,7 @@ from intent_engine.core.llm_caller import (
     LLMCaller,
     LLMEvidence,
     LLMEvidenceStore,
+    OpenAICompatibleBackend,
     auto_detect_llm,
     create_backend,
 )
@@ -207,13 +208,12 @@ class TestModelBenchmark:
 
 class TestCreateBackend:
     def test_openai_backend_created(self):
-        from intent_engine.core.llm_caller import OpenAICompatibleBackend
-
         backend = create_backend("openai", api_key="sk-test")
         assert isinstance(backend, OpenAICompatibleBackend)
 
     def test_ollama_backend_created(self):
         backend = create_backend("ollama", base_url="http://localhost:11434/v1")
+        assert isinstance(backend, OpenAICompatibleBackend)
         assert backend.base_url == "http://localhost:11434/v1"
 
     def test_bedrock_backend_created(self):
@@ -284,6 +284,7 @@ class TestCreateBackend:
     def test_backend_uses_env_var_api_key(self):
         with patch.dict("os.environ", {"OPENAI_API_KEY": "env-key"}, clear=False):
             backend = create_backend("openai")
+            assert isinstance(backend, OpenAICompatibleBackend)
             assert backend.api_key == "env-key"
 
 

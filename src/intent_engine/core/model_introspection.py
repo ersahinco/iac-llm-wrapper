@@ -8,7 +8,7 @@ annotations, and coerce values generically.
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any, get_args, get_origin
+from typing import Any, cast, get_args, get_origin
 
 from pydantic import BaseModel
 
@@ -204,8 +204,13 @@ def discover_model_fields(
         # Skip list[BaseModel] — handled separately
         if origin is list:
             item_type = args[0] if args else Any
-            if isinstance(item_type, type) and issubclass(item_type, BaseModel):
-                continue
+            if isinstance(item_type, type):
+                item_cls = cast(type[Any], item_type)
+                try:
+                    if issubclass(item_cls, BaseModel):
+                        continue
+                except TypeError:
+                    pass
 
         # Recurse into nested BaseModel
         if isinstance(annotation, type) and issubclass(annotation, BaseModel):
@@ -243,7 +248,7 @@ def validate_requirement_against_model(
 def append_to_list_field(
     intent: BaseModel,
     dotted_path: str,
-    item_data: dict[str, Any],
+    item_data: Any,
 ) -> bool:
     """Append a model instance to a list[Model] field on an intent.
 
@@ -252,7 +257,7 @@ def append_to_list_field(
     try:
         _, annotation = resolve_field_info(type(intent), dotted_path)
         item_model = list_annotation_item_model(annotation)
-        if item_model is None:
+        if item_model is None or not isinstance(item_data, dict):
             return False
         instance = item_model(**item_data)
         # Navigate to the list and append

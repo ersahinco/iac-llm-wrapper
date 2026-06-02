@@ -18,6 +18,7 @@ uv run pytest
 uv run ruff check .
 uv run ruff format --check .
 uv run --extra dev mypy
+npx --yes pyright .
 uv run python scripts/sync-sample-fixtures.py --check
 uv run python scripts/evaluate-golden-journey.py
 uv run python scripts/evaluate-extraction.py
@@ -95,7 +96,7 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy.
 
 ### Current Goal
 
-T33: Real customer packet trial
+T34: Pylance/Pyright diagnostics cleanup
 
 ### Status
 
@@ -104,7 +105,7 @@ T33: Real customer packet trial
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added `fixtures/eval/customer-packet-banking-lza.md` with expected checks and a T33 trial record. Ran the packet through service-style Bedrock Nova 2 Lite compile/review and existing LLM eval; both were ready with full raw coverage and no prompt/graph fixes needed.
+- **Last session**: Added `pyrightconfig.json`, fixed concrete Pylance/Pyright diagnostics around LLM backend token usage, provider factory test narrowing, HTTP error response handling, model-introspection narrowing, and dynamic test module mutation. Verified `npx --yes pyright .` reports `0 errors, 0 warnings, 0 informations`.
 
 ### Done
 

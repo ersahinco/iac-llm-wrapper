@@ -421,8 +421,6 @@ class Extractor:
                 elif target_type in ("cidr_list", "string_list"):
                     if isinstance(raw_val, str):
                         parsed_val = [c.strip() for c in raw_val.split(",") if c.strip()]
-                    elif isinstance(raw_val, list):
-                        parsed_val = [str(c) for c in raw_val]
                 else:
                     # Try to find the type by name in the intent model's module
                     try:

@@ -15,6 +15,8 @@ import requests
 class LLMBackend(ABC):
     """Abstract base class for LLM backends."""
 
+    last_token_usage: dict[str, int]
+
     @abstractmethod
     def complete(self, prompt: str, **kwargs: Any) -> str:
         """Send a completion request and return the response text."""
@@ -97,8 +99,9 @@ class OpenAICompatibleBackend(LLMBackend):
                     continue
             except requests.exceptions.HTTPError as exc:
                 last_exc = exc
-                if response.status_code in (429,):
-                    retry_after = response.headers.get("Retry-After")
+                error_response = exc.response
+                if error_response is not None and error_response.status_code in (429,):
+                    retry_after = error_response.headers.get("Retry-After")
                     wait = int(retry_after) if retry_after else 2**attempt * 2
                     time.sleep(wait)
                     continue
