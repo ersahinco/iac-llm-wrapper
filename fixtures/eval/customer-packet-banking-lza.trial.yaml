@@ -1,0 +1,39 @@
+version: 1
+name: customer-packet-banking-lza
+purpose: T33 real customer packet trial
+provider: bedrock
+model: eu.amazon.nova-2-lite-v1:0
+serviceStyleRun:
+  outputDir: tests/results/customer-packet-banking-lza-bedrock
+  rawEvidence: omitted
+  readiness: ready
+  modelConformance: pass
+  rawCoverage: 20/20
+  rawMissing: 0
+  parseErrors: 0
+  tokens: 3771
+  latencyMs: 4139.2
+evalRun:
+  outputDir: tests/results/customer-packet-banking-lza-bedrock-eval/customer-packet-banking-lza
+  readiness: ready
+  modelConformance: pass
+  rawCoverage: 20/20
+  rawMissing: 0
+  parseErrors: 0
+  tokens: 3493
+  latencyMs: 3401.9
+reviewCategories:
+  promptModelMisses: []
+  graphModelMissingFields: []
+  reviewUsabilityFriction:
+    - The review page reports an expected weakness that structured Markdown
+      carried the accepted handoff. That is accurate for this packet because
+      the architect clarification pass intentionally records explicit decisions.
+      No code or prompt change is needed.
+decision:
+  outcome: no-change-needed
+  reason: >
+    The realistic packet compiled ready, Bedrock independently returned all
+    accepted decisions, service-style raw evidence was omitted, secret-store
+    references did not leak into generated artifacts, and review HTML showed
+    the expected readiness/model/contract signals.

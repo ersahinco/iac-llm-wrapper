@@ -95,7 +95,7 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy.
 
 ### Current Goal
 
-T32: Local developer visualization tooling
+T33: Real customer packet trial
 
 ### Status
 
@@ -104,7 +104,7 @@ T32: Local developer visualization tooling
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added local developer visualization tooling: `scripts/render-dev-views.py`, VS Code extension/settings recommendations, a devcontainer with Python/uv/AWS CLI/Node/Graphviz/jq, and `docs/DEVELOPER_VISUALS.md`. Installed the recommended VS Code extensions locally and generated ignored visual artifacts under `tests/results/dev-views/`.
+- **Last session**: Added `fixtures/eval/customer-packet-banking-lza.md` with expected checks and a T33 trial record. Ran the packet through service-style Bedrock Nova 2 Lite compile/review and existing LLM eval; both were ready with full raw coverage and no prompt/graph fixes needed.
 
 ### Done
 
@@ -117,6 +117,7 @@ T32: Local developer visualization tooling
 - Model comparison: `scripts/compare-model-benchmarks.py` shows `rawCoverage`, `rawMissing`, `missingKeys`, and `conformance`; `--require-conformant` fails non-conformant LLM benchmark runs.
 - Static review: `handoff-review.html` starts with a human summary of readiness, contract status, allowed next action, blocker traceability, model conformance, raw LLM coverage, missing raw decision keys, and expected weaknesses.
 - Developer visuals: `scripts/render-dev-views.py` writes local `tests/results/dev-views/index.html` plus Mermaid/JSON requirement graphs, Mermaid Pydantic intent model diagrams, a Mermaid module dependency graph, and Markdown summaries of golden journey/model benchmark artifacts. These are local development artifacts, not product UI.
+- Customer packet trial: `fixtures/eval/customer-packet-banking-lza.md` captures a realistic banking AWS LZA packet with client notes, architect clarification, security review, secret-store references, and engineer handoff reminders. Its expected artifact contract is part of the existing extraction eval corpus.
 - Usability: `scripts/evaluate-usability.py` now includes ready and blocked static-review stakeholder trials plus a service-style handoff-confidence trial that verifies what is ready, what can move next, target contracts, manual gates, and raw evidence omission.
 - Cleanup: removed stale LZA research/extension/diff/apply/default-normalizer surfaces, no-contract artifact fallback, pattern `extra_artifacts`, duplicate fixture normalization, and stale duplicate LLM docs.
 - Language: user-facing docs now prefer handoff readiness; `deploymentReadiness` remains a legacy compatibility alias in artifacts. Docs now also state that secrets should travel as secret-store references and expected parameter names, never raw values.
@@ -136,7 +137,8 @@ T32: Local developer visualization tooling
 - Raw LLM evidence is local development/debug material. Service-style runs can disable raw prompt/response storage with `--no-raw-evidence` while preserving `llm-trace-summary.yaml`, `model-benchmark.yaml`, and `handoff-review.html` for interpretation review.
 - Secrets must be represented as secret-store references plus expected parameter names so values do not enter prompts, raw evidence, review HTML, Git, or handoff artifacts.
 - Built-ins are enough until a team has proprietary modules, controls, sample bundles, or gates that justify private patterns.
-- Customer-style eval fixtures should mix prose, meeting notes, review reminders, and structured decisions so the harness protects real handoff behavior, not only template-shaped examples.
+- Customer-style eval fixtures should mix prose, meeting notes, architect clarification passes, review reminders, and structured decisions so the harness protects real handoff behavior, not only template-shaped examples.
 - Local customer-fixture hardening should prefer the best model a work MacBook Pro can handle, currently `qwen2.5:7b` in this workspace; Bedrock remains an approved cloud path through an OpenAI-compatible gateway/proxy when cost and policy require it.
 - Local T21 comparison showed `qwen2.5:3b` had the best raw AWS LZA coverage on the customer board-notes fixture in this run, while `qwen2.5:7b` remained ready but missed Identity Center keys and `llama3.2:3b` was weak for AWS board notes.
 - Direct Bedrock T31 run used SSO role `AWSReservedSSO_AWSAdministratorAccess_0f7a04d12908e8e3` in account `691627364817`. Catalog showed `amazon.nova-2-lite-v1:0` in `eu-central-1`, but runtime required inference profile `eu.amazon.nova-2-lite-v1:0`. Golden journey result: ready `20/20` raw coverage, conformance `pass`, 3657 tokens, 3926.3 ms; blocked `17/17` raw coverage, safely blocked, 4292 tokens, 4314.4 ms. No prompt or fixture tightening needed from this run.
+- T33 customer packet trial used `eu.amazon.nova-2-lite-v1:0`. Service-style compile with `--no-raw-evidence` wrote `tests/results/customer-packet-banking-lza-bedrock`, review HTML was ready/contract-pass/model-conformant, raw coverage was `20/20`, raw missing `0`, parse errors `0`, 3771 tokens, 4139.2 ms, and raw evidence was omitted. Existing LLM eval also passed with raw coverage `20/20`, 3493 tokens, 3401.9 ms. Review categories recorded no prompt/model misses and no missing graph/model fields; one expected review note remains that structured Markdown carried accepted decisions.

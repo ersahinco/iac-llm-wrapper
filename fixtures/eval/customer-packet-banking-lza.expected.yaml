@@ -1,0 +1,106 @@
+version: 1
+name: customer-packet-banking-lza
+input: customer-packet-banking-lza.md
+pattern: aws-lza
+expect:
+  compile: pass
+  values:
+    pattern: aws-lza
+    baseline: standard
+    orgMode: control-tower
+    organizationName: BlueRiverBank
+    homeRegion: eu-central-1
+    enabledRegions:
+      - eu-central-1
+      - eu-west-1
+    organizationalUnits:
+      - Security
+      - Infrastructure
+      - Workloads
+      - Sandbox
+    accounts.audit: Audit
+    accounts.logArchive: LogArchive
+    accounts.securityTooling: SecurityTooling
+    accounts.network: NetworkShared
+    accounts.workloads:
+      - DigitalBankingProd
+      - CardsProd
+      - DataShared
+      - SandboxDev
+    identity.identityCenterDelegatedAdmin: SecurityTooling
+    identity.identityCenterPermissionSets:
+      - ReadOnlyAccess
+      - SecurityAudit
+      - PowerUserAccess
+      - BreakGlassAdmin
+      - NetworkAdmin
+    identity.identityCenterAssignments:
+      - PlatformAdmins:PowerUserAccess:Management
+      - SecurityAuditors:SecurityAudit:Audit
+      - NetworkEngineers:NetworkAdmin:NetworkShared
+      - DigitalBankingEngineers:PowerUserAccess:DigitalBankingProd
+      - CardsEngineers:PowerUserAccess:CardsProd
+      - DataEngineers:ReadOnlyAccess:DataShared
+      - IncidentCommanders:BreakGlassAdmin:SecurityTooling
+      - SandboxDevelopers:ReadOnlyAccess:SandboxDev
+    network.topology: hub-spoke
+    network.cidr: 10.64.0.0/16
+    security.centralizedLogging: true
+    security.securityHubEnabled: true
+    security.guardDutyEnabled: true
+    security.complianceOverlay: financial-services
+    handoffReadiness.status: ready
+    handoffReadiness.deploymentAllowed: true
+  counts:
+    enabledRegions: 2
+    organizationalUnits: 4
+  names:
+    enabledRegions:
+      - eu-central-1
+      - eu-west-1
+    organizationalUnits:
+      - Security
+      - Infrastructure
+      - Workloads
+      - Sandbox
+  artifacts:
+    - accounts-config.yaml
+    - global-config.yaml
+    - iam-config.yaml
+    - network-config.yaml
+    - organization-config.yaml
+    - security-config.yaml
+    - decision-report.yaml
+    - handoff-plan.yaml
+    - llm-trace-summary.yaml
+    - model-benchmark.yaml
+    - lineage-manifest.yaml
+    - deployment-runbook.md
+    - sample-recommendations.yaml
+  forbiddenArtifacts:
+    - main.tf
+    - terraform.tfvars
+    - terragrunt.hcl
+    - template.yaml
+    - stack.yaml
+  trace:
+    required:
+      - rawLlmDecisions
+      - acceptedDecisions
+      - appliedDecisions.markdown
+      - gaps.resolved
+      - gaps.blocking
+      - rawEvidence.status
+    absent:
+      - extractedDecisions
+      - rawEvidencePath
+    values:
+      pattern: aws-lza
+      handoffReadiness.status: ready
+      deploymentReadiness.status: ready
+    deterministicValues:
+      callCount: 0
+      rawEvidence.status: not-requested
+    llmValues:
+      callCount: 1
+      rawEvidence.status: requested
