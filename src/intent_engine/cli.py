@@ -10,10 +10,16 @@ from typing import Any
 import typer
 
 from .core.artifact_review import write_review_html
+from .core.cli_guidance import (
+    blocked_next_step_lines,
+    compile_next_step_lines,
+    discovery_next_step_lines,
+    sample_match_lines,
+)
 from .core.compiler import (
     CompileError,
     compile_design,
-    compile_from_interview,
+    compile_from_graph,
     explain_report,
     generate_template,
     review_reports,
@@ -162,32 +168,8 @@ def _selected_samples_or_exit(
 
 
 def _emit_sample_matches(pattern: str, decisions: dict[str, Any]) -> None:
-    matches = GLOBAL_SAMPLE_REGISTRY.find_best_matches(decisions, pattern=pattern, limit=3)
-    if not matches:
-        return
-
-    typer.echo("")
-    typer.echo("=== Sample Match ===")
-    for idx, match in enumerate(matches, 1):
-        sample = match.sample
-        typer.echo(
-            "  "
-            f"{idx}. {sample.name} | same {match.same_count}/{match.total_sample_decisions}"
-            f" | different {match.different_count}"
-            f" | missing {match.missing_count}"
-        )
-        if sample.source_contract:
-            typer.echo(f"     Contract: {sample.source_contract}")
-        if sample.upstream_variant:
-            typer.echo(f"     Variant: {sample.upstream_variant}")
-        if sample.tags:
-            typer.echo(f"     Tags: {', '.join(sample.tags)}")
-
-    typer.echo(f"  Run '{APP_NAME} sample show --name {matches[0].sample.name}' for details.")
-
-
-def _review_html_command(output: Path) -> str:
-    return f"{APP_NAME} review html --input {output} --output {output / 'handoff-review.html'}"
+    for line in sample_match_lines(APP_NAME, pattern, decisions):
+        typer.echo(line)
 
 
 def _emit_compile_next_steps(
@@ -197,51 +179,29 @@ def _emit_compile_next_steps(
     llm_used: bool,
     raw_evidence_path: Path | None,
 ) -> None:
-    typer.echo("")
-    typer.echo("Next steps:")
-    typer.echo(f"  1. Generate the review page: {_review_html_command(output)}")
-    typer.echo(f"  2. Open {output / 'handoff-plan.yaml'} for owners, gates, and allowed action.")
-    typer.echo("  3. Review target artifacts and samples before using the downstream toolchain.")
-    typer.echo(f"  Pattern: {pattern}")
-    if llm_used and raw_evidence_path:
-        typer.echo(
-            "  Raw LLM evidence captured for local debugging. "
-            "Use --no-raw-evidence for service-style customer packet runs."
-        )
-    elif llm_used:
-        typer.echo(
-            "  Raw LLM prompt/response evidence omitted; use llm-trace-summary.yaml "
-            "and model-benchmark.yaml for review."
-        )
+    for line in compile_next_step_lines(
+        APP_NAME,
+        output=output,
+        pattern=pattern,
+        llm_used=llm_used,
+        raw_evidence_path=raw_evidence_path,
+    ):
+        typer.echo(line)
 
 
 def _emit_blocked_next_steps(output: Path) -> None:
-    typer.echo("", err=True)
-    typer.echo("Next steps:", err=True)
-    typer.echo(f"  1. Generate the blocked review page: {_review_html_command(output)}", err=True)
-    typer.echo(
-        "  2. Resolve the blocker questions in decision-report.yaml or the review page.",
-        err=True,
-    )
-    typer.echo("  3. Re-run compile after updating the source Markdown.", err=True)
+    for line in blocked_next_step_lines(APP_NAME, output):
+        typer.echo(line, err=True)
 
 
 def _emit_discovery_next_steps(*, input: Path, pattern: str, complete: bool) -> None:
-    typer.echo("")
-    typer.echo("=== Next Steps ===")
-    if complete:
-        typer.echo("  Compile service-style handoff artifacts without raw prompt/response storage:")
-        typer.echo(
-            f"    {APP_NAME} compile --input {input} --output out/ "
-            f"--pattern {pattern} --no-raw-evidence"
-        )
-        typer.echo(f"  Then create the review page: {_review_html_command(Path('out/'))}")
-        return
-    typer.echo("  Add answers for the clarifying questions to the Markdown source.")
-    typer.echo(
-        f"  Re-run discovery until no gaps remain, then compile with "
-        f"'{APP_NAME} compile --input {input} --output out/ --pattern {pattern}'."
-    )
+    for line in discovery_next_step_lines(
+        APP_NAME,
+        input_path=input,
+        pattern=pattern,
+        complete=complete,
+    ):
+        typer.echo(line)
 
 
 def _version_callback(value: bool) -> None:
@@ -550,12 +510,11 @@ def discover(
         raise typer.Exit(1)
 
     if resume:
-        engine = InterviewEngine.load_state(resume)
-        graph = engine.graph
-        pattern = engine.pattern
+        resumed = InterviewEngine.load_state(resume)
+        graph = resumed.graph
+        pattern = resumed.pattern
     else:
         graph = _get_pattern_or_exit(pattern).create_graph()
-        engine = InterviewEngine(graph)
 
     if input.is_dir():
         texts = []
@@ -569,26 +528,20 @@ def discover(
     if markdown_decisions:
         graph.apply_decisions(markdown_decisions)
 
-    use_llm = not no_llm and any(
-        [
-            model,
-            api_key,
-            base_url,
-            os.environ.get("INTENT_ENGINE_PROVIDER"),
-            os.environ.get("INTENT_ENGINE_MODEL"),
-            os.environ.get("INTENT_ENGINE_BASE_URL"),
-            os.environ.get("OPENAI_API_KEY"),
-        ]
-    )
-
     evidence_store = LLMEvidenceStore()
+    llm_caller = None
+    if not no_llm:
+        llm_caller = auto_detect_llm(
+            provider=provider,
+            api_key=api_key,
+            base_url=base_url,
+            model=model,
+            task="reason",
+        )
 
-    if use_llm:
+    if llm_caller is not None:
         from .core.compiler import LLMContextProvider
 
-        llm_caller = auto_detect_llm(
-            provider=provider, api_key=api_key, base_url=base_url, model=model
-        )
         llm_provider = LLMContextProvider(
             prose=text,
             graph=graph,
@@ -601,12 +554,13 @@ def discover(
         if llm_result.signal_decisions:
             graph.apply_decisions(llm_result.signal_decisions)
 
+    decision_dict = _parse_decisions_or_exit(decisions)
+    simulated_decisions: list[str] = []
+    if decision_dict:
+        simulated_decisions = graph.apply_decisions(decision_dict)
+
     extractor = Extractor(graph=graph)
     intent = extractor.extract(text)
-
-    decision_dict = _parse_decisions_or_exit(decisions)
-    if decision_dict:
-        engine.run_from_decisions(decision_dict)
 
     discovery = DiscoveryEngine(graph)
     result = discovery.discover(intent, text=text)
@@ -616,10 +570,17 @@ def discover(
 
     synced = result.synced
     if synced:
-        typer.echo(f"[+] Synced {len(synced)} values from design doc:")
+        source_label = "design doc and simulated decisions" if simulated_decisions else "design doc"
+        typer.echo(f"[+] Synced {len(synced)} values from {source_label}:")
         for k in synced:
             val = graph.get(k)
             typer.echo(f"    {k} = {val}")
+        typer.echo("")
+
+    if simulated_decisions:
+        typer.echo(f"[+] Applied {len(simulated_decisions)} simulated decision(s):")
+        for key in simulated_decisions:
+            typer.echo(f"    {key} = {graph.get(key)}")
         typer.echo("")
 
     if result.signals:
@@ -773,12 +734,7 @@ def interview(
         engine.to_intent()
         typer.echo(engine.summary())
         typer.echo("")
-        compile_from_interview(
-            engine.graph.decisions(),
-            output,
-            accept_defaults=not no_defaults,
-            pattern=actual_pattern,
-        )
+        compile_from_graph(engine.graph, output, pattern=actual_pattern)
         typer.echo(f"Compilation successful. Output written to: {output}")
         _emit_sample_matches(actual_pattern, engine.graph.typed_decisions())
         _emit_compile_next_steps(

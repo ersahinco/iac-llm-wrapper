@@ -644,7 +644,7 @@ def _trial_static_review_blocked(config: TrialConfig) -> TrialResult:
         html = (output_dir / "handoff-review.html").read_text()
         required_signals = [
             "blocked",
-            "Deployment allowed",
+            "Handoff allowed",
             "False",
             "Blocker count",
             "Blocking gap count",

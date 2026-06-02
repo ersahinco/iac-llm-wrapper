@@ -17,10 +17,16 @@ def _write_yaml(path: Path, data: dict[str, Any]) -> None:
         yaml.dump(data, handle)
 
 
-def _write_review_bundle(input_dir: Path, *, mode: str = "llm") -> Path:
+def _write_review_bundle(
+    input_dir: Path,
+    *,
+    mode: str = "llm",
+    raw_evidence_status: str = "requested",
+) -> Path:
     input_dir.mkdir(parents=True)
     evidence_path = input_dir / "raw-evidence.yaml"
-    evidence_path.write_text("calls: []\n")
+    if raw_evidence_status != "not-requested":
+        evidence_path.write_text("calls: []\n")
     _write_yaml(
         input_dir / "decision-report.yaml",
         {
@@ -28,6 +34,7 @@ def _write_review_bundle(input_dir: Path, *, mode: str = "llm") -> Path:
             "organizationName": "Contoso",
             "handoffReadiness": {
                 "status": "blocked",
+                "handoffAllowed": False,
                 "deploymentAllowed": False,
                 "blockers": [{"code": "MISSING_NETWORK", "message": "Network missing"}],
                 "missingDecisions": [
@@ -43,6 +50,7 @@ def _write_review_bundle(input_dir: Path, *, mode: str = "llm") -> Path:
             },
             "deploymentReadiness": {
                 "status": "blocked",
+                "handoffAllowed": False,
                 "deploymentAllowed": False,
                 "blockers": [{"code": "MISSING_NETWORK", "message": "Network missing"}],
             },
@@ -54,7 +62,12 @@ def _write_review_bundle(input_dir: Path, *, mode: str = "llm") -> Path:
             "acceptedDecisions": {"organization_name": "Contoso"},
             "gaps": {"blocking": [{"key": "network_account"}], "resolved": []},
             "contradictions": {"blocking": []},
-            "rawEvidence": {"status": "captured", "path": str(evidence_path)},
+            "rawEvidence": {
+                "status": raw_evidence_status,
+                "path": str(evidence_path)
+                if raw_evidence_status != "not-requested"
+                else "not-requested",
+            },
             "appliedDecisions": {"markdown": ["organization_name"], "llm": []},
         },
     )
@@ -79,7 +92,7 @@ def _write_review_bundle(input_dir: Path, *, mode: str = "llm") -> Path:
         input_dir / "handoff-plan.yaml",
         {
             "pattern": "example-pattern",
-            "readiness": {"status": "ready", "deploymentAllowed": True},
+            "readiness": {"status": "ready", "handoffAllowed": True, "deploymentAllowed": True},
             "allowedNextAction": "Resolve blockers.",
             "targetContracts": [
                 {
@@ -125,6 +138,7 @@ def test_build_review_context_uses_report_readiness_and_artifact_rows(tmp_path: 
 
     assert context["pattern"] == "example-pattern"
     assert context["readiness"]["status"] == "blocked"
+    assert context["readiness"]["handoffAllowed"] is False
     assert context["readiness"]["deploymentAllowed"] is False
     assert context["readiness"]["allowedNextAction"] == "Resolve blockers."
     assert context["readiness"]["missingDecisions"] == [
@@ -156,6 +170,7 @@ def test_build_review_context_uses_report_readiness_and_artifact_rows(tmp_path: 
     assert context["contractValidation"][0]["name"] == "example-contract"
     assert context["contractStatus"] == "fail"
     assert context["reviewSummary"]["contractStatus"] == "fail"
+    assert context["reviewSummary"]["handoffAllowed"] is False
     assert context["reviewSummary"]["deploymentAllowed"] is False
     assert context["reviewSummary"]["blockerCount"] == 1
     assert context["reviewSummary"]["missingDecisionCount"] == 1
@@ -178,7 +193,7 @@ def test_build_review_context_uses_report_readiness_and_artifact_rows(tmp_path: 
         "Treat raw-evidence.yaml as local debug material; do not share it as a service artifact.",
     ]
     assert context["links"]["rawEvidence"] == "raw-evidence.yaml"
-    assert context["rawEvidence"].startswith("captured")
+    assert context["rawEvidence"].startswith("requested")
     assert {"name": "present.yaml", "status": "present"} in context["artifacts"]
     assert {"name": "missing.yaml", "status": "missing"} in context["artifacts"]
     assert {"name": "lineage-only.yaml", "status": "missing"} in context["artifacts"]
@@ -197,7 +212,7 @@ def test_render_review_html_uses_existing_graph_exports(tmp_path: Path):
     assert "Reviewer Next Actions" in html
     assert "Do not pass target artifacts" in html
     assert "Treat raw-evidence.yaml as local debug material" in html
-    assert "Deployment allowed" in html
+    assert "Handoff allowed" in html
     assert "Blocker count" in html
     assert "Missing decision count" in html
     assert "Conflicting decision count" in html
@@ -235,3 +250,12 @@ def test_review_context_does_not_report_llm_misses_for_deterministic_run(tmp_pat
     assert context["modelQuality"]["rawMissingCount"] == 0
     assert context["modelQuality"]["missingKeys"] == []
     assert context["modelQuality"]["expectedWeaknesses"] == []
+
+
+def test_review_html_labels_omitted_raw_evidence_as_not_requested(tmp_path: Path):
+    input_dir = tmp_path / "out"
+    _write_review_bundle(input_dir, raw_evidence_status="not-requested")
+
+    html = render_review_html(input_dir)
+
+    assert "Raw evidence file</span><strong>not requested</strong>" in html

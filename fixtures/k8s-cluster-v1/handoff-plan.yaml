@@ -8,6 +8,7 @@ allowedNextAction: Pass the reviewed artifacts to the existing target toolchain
   after manual gates.
 readiness:
   status: ready
+  handoffAllowed: true
   deploymentAllowed: true
   blockers: []
 targetContracts:

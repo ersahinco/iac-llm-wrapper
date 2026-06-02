@@ -359,12 +359,17 @@ For `cloudformation-parameters`, `cloudformation-parameters.yaml` captures
 parameters for an existing approved template without emitting a stack:
 
 ```yaml
-cloudFormationParameters:
-  stackName: orders-network
-  templateUrl: s3://approved-templates/network.yaml
-  parameters:
-    EnvironmentName: orders
-    VpcCidr: 10.60.0.0/16
+stackName: orders-service-prod
+templateUrl: s3://approved-templates/orders-service.yaml
+region: eu-central-1
+parameters:
+  - ParameterKey: Environment
+    ParameterValue: prod
+  - ParameterKey: ServiceName
+    ParameterValue: orders
+capabilities:
+  - CAPABILITY_NAMED_IAM
+executionRoleArn: arn:aws:iam::123456789012:role/cfn-execution-orders
 ```
 
 Engineers apply BYOM inputs to their Terraform, CDK, or CloudFormation modules.

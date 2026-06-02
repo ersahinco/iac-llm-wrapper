@@ -18,6 +18,7 @@ def render_review_html(context: dict[str, Any]) -> str:
     links = _dict(context.get("links"))
     review_summary = _dict(context.get("reviewSummary"))
     model_quality = _dict(context.get("modelQuality"))
+    raw_evidence = str(context.get("rawEvidence", "unknown"))
 
     return "\n".join(
         [
@@ -44,8 +45,13 @@ def render_review_html(context: dict[str, Any]) -> str:
                 [
                     _kv("Readiness", str(review_summary.get("readiness", "unknown"))),
                     _kv(
-                        "Deployment allowed",
-                        str(review_summary.get("deploymentAllowed", False)),
+                        "Handoff allowed",
+                        str(
+                            review_summary.get(
+                                "handoffAllowed",
+                                review_summary.get("deploymentAllowed", False),
+                            )
+                        ),
                     ),
                     _kv("Blocker count", str(review_summary.get("blockerCount", 0))),
                     _kv(
@@ -91,7 +97,15 @@ def render_review_html(context: dict[str, Any]) -> str:
             _section(
                 "Handoff Readiness",
                 [
-                    _kv("Handoff ready", str(readiness.get("deploymentAllowed", False))),
+                    _kv(
+                        "Handoff ready",
+                        str(
+                            readiness.get(
+                                "handoffAllowed",
+                                readiness.get("deploymentAllowed", False),
+                            )
+                        ),
+                    ),
                     _kv("Allowed next action", str(readiness.get("allowedNextAction", ""))),
                     _blocker_table(_coerce_list(context.get("blockerRows"))),
                     _list_block("Blockers", _coerce_list(readiness.get("blockers"))),
@@ -153,9 +167,9 @@ def render_review_html(context: dict[str, Any]) -> str:
                     _kv("Provider", str(trace.get("provider", "unknown"))),
                     _kv("Model", str(trace.get("model", "unknown"))),
                     _kv("Call count", str(trace.get("callCount", "0"))),
-                    _kv("Raw evidence", str(context.get("rawEvidence", "unknown"))),
+                    _kv("Raw evidence", raw_evidence),
                     _artifact_link_row("LLM trace summary", links.get("llmTrace")),
-                    _artifact_link_row("Raw evidence file", links.get("rawEvidence")),
+                    _raw_evidence_link_row(raw_evidence, links.get("rawEvidence")),
                     _details("Raw trace summary", _yaml_dump(trace)),
                 ],
             ),
@@ -336,6 +350,17 @@ def _artifact_link_row(label: str, href: Any) -> str:
         f'<div class="kv"><span>{escape(label)}</span>'
         f'<strong><a href="{escape(value)}">{escape(name)}</a></strong></div>'
     )
+
+
+def _raw_evidence_link_row(raw_evidence: str, href: Any) -> str:
+    if href:
+        return _artifact_link_row("Raw evidence file", href)
+    status = raw_evidence.split(" ", 1)[0].strip()
+    if status == "not-requested":
+        return _kv("Raw evidence file", "not requested")
+    if status == "requested-empty":
+        return _kv("Raw evidence file", "requested, no calls recorded")
+    return _kv("Raw evidence file", "missing")
 
 
 def _details(title: str, content: str) -> str:

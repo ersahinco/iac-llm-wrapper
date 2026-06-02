@@ -146,12 +146,11 @@ class DiscoveryEngine:
                     else:
                         # Value matches model default — apply as default in graph
                         req = self.graph._requirements[key]
-                        if req.default is None:
+                        if req.default is None or str(req.default).strip() == "":
                             # Graph has no default; model default is not evidence
                             # that the design doc supplied this requirement.
                             continue
-                        else:
-                            self.graph.apply_default(key)
+                        self.graph.apply_default(key)
                     synced.append(key)
                 elif val != default_map.get(key):
                     _warnings.warn(

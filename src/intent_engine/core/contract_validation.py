@@ -18,7 +18,7 @@ def build_contract_validation(input_dir: Path) -> dict[str, Any]:
     readiness = _readiness(report, handoff)
     contracts = []
 
-    if readiness.get("deploymentAllowed", False):
+    if readiness.get("handoffAllowed", readiness.get("deploymentAllowed", False)):
         pattern = str(report.get("pattern", handoff.get("pattern", "")) or "")
         try:
             pattern_obj = GLOBAL_REGISTRY.get(pattern)
@@ -91,14 +91,21 @@ def _readiness(report: dict[str, Any], handoff: dict[str, Any]) -> dict[str, Any
         handoff_readiness = {}
     allowed = bool(
         report_readiness.get(
-            "deploymentAllowed",
-            handoff_readiness.get("deploymentAllowed", True),
+            "handoffAllowed",
+            report_readiness.get(
+                "deploymentAllowed",
+                handoff_readiness.get(
+                    "handoffAllowed",
+                    handoff_readiness.get("deploymentAllowed", True),
+                ),
+            ),
         )
     )
     return {
         "status": str(
             report_readiness.get("status", handoff_readiness.get("status", "ready"))
         ).lower(),
+        "handoffAllowed": allowed,
         "deploymentAllowed": allowed,
         "blockers": report_readiness.get("blockers", handoff_readiness.get("blockers", [])),
     }

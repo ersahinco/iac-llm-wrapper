@@ -49,6 +49,10 @@ class TestTerraformVpcPattern:
         assert module_inputs["variables"]["name"] == "orders-vpc"
         assert module_inputs["variables"]["azs"] == ["eu-central-1a", "eu-central-1b"]
         assert module_inputs["variables"]["single_nat_gateway"] is False
+        report = _yaml_load(tmp_path / "decision-report.yaml")
+        assert report["pattern"] == "terraform-vpc"
+        assert report["handoffReadiness"]["handoffAllowed"] is True
+        assert (tmp_path / "terraform.tfvars").exists()
         assert (tmp_path / "sample-recommendations.yaml").exists()
 
     def test_subnet_count_mismatch_fails(self, tmp_path: Path):

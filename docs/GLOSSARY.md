@@ -42,6 +42,13 @@ Artifacts may still expose the legacy YAML key `deploymentReadiness` for
 backward compatibility. Treat it as an alias for handoff readiness, not as
 permission to deploy from prose.
 
+## Handoff Allowed
+
+The `handoffAllowed` readiness field: whether the reviewed artifact bundle can
+move to the existing downstream toolchain after manual gates. Older artifacts may
+also expose `deploymentAllowed` as a compatibility alias. Neither field means
+this tool deploys infrastructure.
+
 ## Allowed Next Action
 
 The next safe action recorded in `handoff-plan.yaml`. It should tell an engineer
@@ -51,6 +58,13 @@ what can happen next without implying deployment when the bundle is blocked.
 
 A product path plugin. A pattern owns its Pydantic model, requirement graph,
 contracts, validators, sample configs, and artifact generators.
+
+## Design Context And Module Inputs
+
+The two generic objects carried through generation for patterns that need them:
+design context describes the business and architectural reason for the handoff,
+while module inputs are literal values for a known downstream module. Patterns
+may use either, both, or neither.
 
 ## Battle Test
 

@@ -74,6 +74,7 @@ def build_review_context(
         "readiness": readiness,
         "reviewSummary": {
             "readiness": readiness.get("status", "unknown"),
+            "handoffAllowed": readiness.get("handoffAllowed", False),
             "deploymentAllowed": readiness.get("deploymentAllowed", False),
             "blockerCount": len(_coerce_list(readiness.get("blockers"))),
             "missingDecisionCount": len(_coerce_list(readiness.get("missingDecisions"))),
@@ -172,8 +173,14 @@ def _readiness(report: dict[str, Any], handoff: dict[str, Any]) -> dict[str, Any
     handoff_readiness = _dict(handoff.get("readiness"))
     allowed = bool(
         report_readiness.get(
-            "deploymentAllowed",
-            handoff_readiness.get("deploymentAllowed", True),
+            "handoffAllowed",
+            report_readiness.get(
+                "deploymentAllowed",
+                handoff_readiness.get(
+                    "handoffAllowed",
+                    handoff_readiness.get("deploymentAllowed", True),
+                ),
+            ),
         )
     )
     status = str(report_readiness.get("status", handoff_readiness.get("status", "ready"))).lower()
@@ -184,6 +191,7 @@ def _readiness(report: dict[str, Any], handoff: dict[str, Any]) -> dict[str, Any
     )
     return {
         "status": status,
+        "handoffAllowed": allowed,
         "deploymentAllowed": allowed,
         "allowedNextAction": str(
             handoff.get(
@@ -378,8 +386,10 @@ def _reviewer_next_actions(
     artifacts: list[dict[str, str]],
 ) -> list[str]:
     status = str(readiness.get("status", "unknown"))
-    deployment_allowed = bool(readiness.get("deploymentAllowed", False))
-    if status == "blocked" or not deployment_allowed:
+    handoff_allowed = bool(
+        readiness.get("handoffAllowed", readiness.get("deploymentAllowed", False))
+    )
+    if status == "blocked" or not handoff_allowed:
         actions = [
             "Do not pass target artifacts to the provisioning toolchain yet.",
             "Resolve the blocker traceability rows with the listed requirement questions.",
@@ -404,17 +414,27 @@ def _reviewer_next_actions(
                 + ", ".join(missing_artifacts)
                 + ".",
             )
-    if raw_evidence.startswith("captured"):
+    raw_evidence_status = _raw_evidence_status_label(raw_evidence)
+    if raw_evidence_status in {"captured", "requested"}:
         actions.append(
             "Treat raw-evidence.yaml as local debug material; do not share it as "
             "a service artifact."
         )
-    elif raw_evidence.startswith("not-requested"):
+    elif raw_evidence_status == "requested-empty":
+        actions.append(
+            "Raw evidence was requested, but no LLM calls were recorded; confirm LLM setup "
+            "if that was unexpected."
+        )
+    elif raw_evidence_status == "not-requested":
         actions.append(
             "Raw prompt/response evidence was omitted; use trace and benchmark "
             "summaries for review."
         )
     return actions
+
+
+def _raw_evidence_status_label(raw_evidence: str) -> str:
+    return raw_evidence.split(" ", 1)[0].strip()
 
 
 def _artifact_href(input_dir: Path, link_base_dir: Path, artifact_name: str) -> str | None:

@@ -39,6 +39,10 @@ def build_model_benchmark(extraction_summary: dict[str, Any]) -> dict[str, Any]:
         },
         "readiness": {
             "status": readiness.get("status", "unknown"),
+            "handoffAllowed": readiness.get(
+                "handoffAllowed",
+                readiness.get("deploymentAllowed", False),
+            ),
             "deploymentAllowed": readiness.get("deploymentAllowed", False),
             "blockerCount": blocker_count,
         },

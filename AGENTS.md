@@ -96,16 +96,16 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy, pyr
 
 ### Current Goal
 
-T36: Real Packet Usability Hardening
+T38: Critical project review remediation
 
 ### Status
 
-- **Tests**: 331 passing, 1 skipped
+- **Tests**: 336 passing, 1 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Hardened the messy customer-packet to reviewed-handoff workflow without adding new harnesses or broader AWS schema depth. Added CLI next-step guidance for discovery, ready compile, blocked compile, and interview output; added reviewer next actions and evidence-handling guidance to `handoff-review.html`; clarified README/LLM setup first-packet local and Bedrock commands; and verified the full quality gate is green.
+- **Last session**: Completed the targeted critical re-review of the changed workflow seams and fixed the issues it exposed. `discover --decisions` now reports simulated values accurately, ready review bundles no longer show blocked-only safe handoff text, CLI interview compiles preserve default-vs-decided audit provenance by compiling from the walked graph, omitted raw evidence is labeled as not requested instead of missing, and the full quality gate is green.
 
 ### Done
 
@@ -124,6 +124,9 @@ T36: Real Packet Usability Hardening
 - Language: user-facing docs now prefer handoff readiness; `deploymentReadiness` remains a legacy compatibility alias in artifacts. Docs now also state that secrets should travel as secret-store references and expected parameter names, never raw values.
 - Quality gates: Ruff, Ruff format, mypy, Pyright/Pylance, fixture drift, coverage tests, extraction/usability/golden journey checks, Bandit, pip-audit, uv build, and pre-commit are wired into local/CI workflows as applicable.
 - T36 usability: CLI output now points first-time users from discovery and compile results to service-style compile, blocked review generation, `handoff-plan.yaml`, and static review creation. `handoff-review.html` now includes reviewer next actions derived from readiness, contract status, artifacts, and raw evidence state. README and LLM setup now include a concise real customer packet path for Ollama and direct Bedrock runs with `--no-raw-evidence`.
+- T37 remediation: review findings are resolved without adding new harnesses, dashboards, private pattern loading, or broad AWS schema depth. The fixes tighten discoverability, evidence handling, generator scope, terminology, and code organization while preserving legacy artifact compatibility where external consumers may still depend on older keys.
+- T38 remediation: discovery partial-input handling, public generator scoping, interview artifact parity, active handoff terminology, CloudFormation README accuracy, and discovery regression coverage are fixed. Sample fixtures now include deterministic `llm-trace-summary.yaml` and `model-benchmark.yaml` for interview-generated bundles so review pages no longer show unexplained missing evidence.
+- T38 targeted re-review: first-run CLI workflow, interview/compile artifact parity, generator scope, pattern report readiness, handoff terminology, fixture/docs consistency, and `cli_guidance` organization were rechecked. Follow-up fixes preserve interview default provenance, make simulated discovery decisions explicit, remove blocked wording from ready safe handoff paths, and improve raw-evidence omission wording in review HTML.
 
 ### Next
 

@@ -25,7 +25,8 @@ def _write_yaml(output_dir: Path, name: str, data: dict[str, Any]) -> None:
     buf = StringIO()
     yaml.dump(data, buf)
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / name).write_text(buf.getvalue())
+    rendered = "\n".join(line.rstrip() for line in buf.getvalue().splitlines()) + "\n"
+    (output_dir / name).write_text(rendered)
 
 
 def gen_cluster_config(intent: Any, output_dir: Path) -> None:
@@ -66,10 +67,14 @@ def gen_namespace_config(intent: Any, output_dir: Path) -> None:
 
 
 def gen_k8s_decision_report(intent: Any, output_dir: Path) -> None:
+    readiness = getattr(intent, "handoff_readiness", None)
+    if readiness is None:
+        readiness = getattr(intent, "deployment_readiness", {})
     model = _k8s_intent(intent)
     if model is None:
         return
     data = {
+        "pattern": "kubernetes-cluster",
         "clusterName": model.cluster_name,
         "clusterVersion": model.cluster_version,
         "network": {
@@ -85,4 +90,8 @@ def gen_k8s_decision_report(intent: Any, output_dir: Path) -> None:
         },
         "namespace": model.namespace_name,
     }
+    if readiness:
+        data["handoffReadiness"] = readiness
+        # Backward-compatible alias for existing artifact consumers.
+        data["deploymentReadiness"] = readiness
     _write_yaml(output_dir, "decision-report.yaml", data)

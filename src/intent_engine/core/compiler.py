@@ -65,7 +65,7 @@ def _build_payload(
         pattern=pattern,
         decisions=decisions or {},
         extraction_summary=extraction_summary or {},
-        deployment_readiness=handoff_readiness or {},
+        handoff_readiness=handoff_readiness or {},
     )
 
 
@@ -256,7 +256,23 @@ def _build_handoff_readiness(
     llm_contradictions = _blocking_contradictions(graph, llm_result.contradictions)
     blockers = [{"code": v.code, "message": v.message} for v in violations]
     handoff_allowed = not blockers
+    safe_handoff_path = (
+        [
+            "Review handoff-plan.yaml for owners, manual gates, and allowed next action.",
+            "Validate target contracts and artifact owner approvals before downstream use.",
+            "Pass only reviewed artifacts to the existing accelerator/module toolchain.",
+        ]
+        if handoff_allowed
+        else [
+            "Do not mutate downstream systems from this output while status is blocked.",
+            "Resolve missing and conflicting decisions with the owning architect/platform team.",
+            "Re-run compile and preserve decision-report.yaml plus lineage artifacts for handoff.",
+            "Use the existing accelerator/module toolchain only after handoff readiness is ready.",
+        ]
+    )
     return {
+        "handoffAllowed": handoff_allowed,
+        # Backward-compatible alias for existing artifact consumers.
         "deploymentAllowed": handoff_allowed,
         "status": "ready" if handoff_allowed else "blocked",
         "summary": (
@@ -267,12 +283,7 @@ def _build_handoff_readiness(
         "blockers": blockers,
         "missingDecisions": missing + llm_gaps,
         "conflictingDecisions": conflicts + llm_contradictions,
-        "safeHandoffPath": [
-            "Do not mutate downstream systems from this output while status is blocked.",
-            "Resolve missing and conflicting decisions with the owning architect/platform team.",
-            "Re-run compile and preserve decision-report.yaml plus lineage artifacts for handoff.",
-            "Use the existing accelerator/module toolchain only after handoff readiness is ready.",
-        ],
+        "safeHandoffPath": safe_handoff_path,
     }
 
 
@@ -331,6 +342,7 @@ def _build_extraction_summary(
             "raw": llm_result.contradictions,
         },
         "handoffReadiness": {
+            "handoffAllowed": readiness["handoffAllowed"],
             "deploymentAllowed": readiness["deploymentAllowed"],
             "status": readiness["status"],
             "blockerCount": len(readiness["blockers"]),
@@ -339,6 +351,7 @@ def _build_extraction_summary(
         },
         # Backward-compatible alias for existing artifact consumers.
         "deploymentReadiness": {
+            "handoffAllowed": readiness["handoffAllowed"],
             "deploymentAllowed": readiness["deploymentAllowed"],
             "status": readiness["status"],
             "blockerCount": len(readiness["blockers"]),
@@ -347,6 +360,26 @@ def _build_extraction_summary(
         },
         "rawEvidence": raw_evidence,
     }
+
+
+def _applied_decisions_from_audit(graph) -> dict[str, list[str]]:
+    applied: dict[str, list[str]] = {
+        "markdown": [],
+        "llm": [],
+        "signals": [],
+        "defaults": [],
+        "interview": [],
+    }
+    for entry in graph.audit_log():
+        key = str(entry.get("key", ""))
+        if not key:
+            continue
+        how = str(entry.get("how", ""))
+        if how == "defaulted":
+            applied["defaults"].append(key)
+        elif how == "decided":
+            applied["interview"].append(key)
+    return applied
 
 
 def _readable_provider(provider: Any) -> str:
@@ -581,12 +614,46 @@ def compile_from_interview(
     engine.run_from_decisions(decisions)
     if accept_defaults:
         engine.apply_defaults_for_remaining()
-    intent = engine.to_intent()
+    compile_from_graph(engine.graph, output_dir, pattern=pattern)
+
+
+def compile_from_graph(graph, output_dir: Path, pattern: str = "aws-lza") -> None:
+    """Validate and generate from an already-populated interview graph."""
+    pattern_obj = GLOBAL_REGISTRY.get(pattern)
+    intent = pattern_obj.intent_factory()
+    graph.apply_to_intent(intent)
     violations = validate(intent, graph=graph, extra_validators=pattern_obj.validators)
+    llm_result = LLMGraphResult()
+    readiness = _build_handoff_readiness(graph, violations, llm_result)
+    extraction_summary = _build_extraction_summary(
+        pattern=pattern,
+        evidence_store=None,
+        raw_evidence_path=None,
+        markdown_decisions={},
+        markdown_contradictions=[],
+        llm_result=llm_result,
+        readiness=readiness,
+        applied_decisions=_applied_decisions_from_audit(graph),
+        accepted_decisions=graph.typed_decisions(),
+        graph=graph,
+    )
     if violations:
-        raise CompileError(violations)
+        _write_failed_compile_artifacts(
+            output_dir,
+            pattern,
+            graph,
+            readiness,
+            extraction_summary,
+        )
+        raise CompileError(violations, readiness=readiness)
     generate_all(
-        _build_payload(intent, pattern, graph.typed_decisions()),
+        _build_payload(
+            intent,
+            pattern,
+            graph.typed_decisions(),
+            extraction_summary=extraction_summary,
+            handoff_readiness=readiness,
+        ),
         output_dir,
         pattern=pattern,
     )

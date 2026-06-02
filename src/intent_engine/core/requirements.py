@@ -140,7 +140,7 @@ class RequirementGraph:
         if key not in self._requirements:
             raise KeyError(f"Unknown requirement: {key}")
         req = self._requirements[key]
-        if not req.default:
+        if req.default is None:
             raise ValueError(f"No default for requirement: {key}")
         self._decisions[key] = req.default
         self._status[key] = RequirementStatus.DEFAULTED

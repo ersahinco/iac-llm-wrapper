@@ -77,7 +77,7 @@ BLOCKED_FORBIDDEN_ARTIFACTS = (
 )
 BLOCKED_REVIEW_SIGNALS = (
     "blocked",
-    "Deployment allowed",
+    "Handoff allowed",
     "False",
     "Allowed next action",
     EXPECTED_BLOCKED_ALLOWED_NEXT_ACTION,

@@ -109,6 +109,31 @@ class TestCompileCommand:
         assert "does not exist" in result.output
 
 
+class TestDiscoverCommand:
+    def test_discover_auto_detects_llm_without_extra_flags(self, monkeypatch):
+        calls: list[dict[str, Any]] = []
+        response = json.dumps({"decisions": {}, "signal_decisions": {}, "gaps": []})
+
+        def fake_auto_detect_llm(**kwargs: Any) -> LLMCaller:
+            calls.append(kwargs)
+            return LLMCaller(_MockBackend(response))
+
+        monkeypatch.setattr("intent_engine.cli.auto_detect_llm", fake_auto_detect_llm)
+
+        result = runner.invoke(
+            app,
+            [
+                "discover",
+                "--input",
+                str(FIXTURES / "usability" / "engineer-handoff-lza.md"),
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert calls
+        assert calls[0]["task"] == "reason"
+
+
 class TestValidateCommand:
     def test_validate_generated_output(self, tmp_path: Path):
         output = tmp_path / "output"
@@ -294,6 +319,18 @@ class TestInterviewCommand:
         assert result.exit_code == 0, result.output
         assert "Compilation successful" in result.stdout
         assert (output / "accounts-config.yaml").exists()
+        assert (output / "llm-trace-summary.yaml").exists()
+        assert (output / "model-benchmark.yaml").exists()
+        report = (output / "decision-report.yaml").read_text()
+        assert "handoffReadiness:" in report
+        assert "handoffAllowed: true" in report
+        assert "while status is blocked" not in report
+        assert "Pass only reviewed artifacts" in report
+        benchmark = (output / "model-benchmark.yaml").read_text()
+        assert "mode: deterministic" in benchmark
+        audit = (output / "decision-audit.yaml").read_text()
+        assert "key: baseline" in audit
+        assert "how: defaulted" in audit
 
     def test_interview_defaults_only_fails_closed(self, tmp_path: Path):
         output = tmp_path / "output"

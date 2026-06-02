@@ -1,6 +1,6 @@
 """Module mapping: bridge from validated intent to IaC module variable inputs.
 
-This layer implements the Double-Object Extraction Schema:
+This layer carries design context and module inputs:
 - DesignDocument: business/architectural context for documentation/PRs
 - ModuleInputs: literal variables for specific IaC modules
 - IaCIntentPayload: combined output passed to generators
@@ -51,7 +51,7 @@ class ModuleInputs(BaseModel):
     )
 
 
-@dataclass
+@dataclass(init=False)
 class IaCIntentPayload:
     """Combined output: design context + module inputs + the original intent."""
 
@@ -61,12 +61,46 @@ class IaCIntentPayload:
     pattern: str = ""
     decisions: dict[str, Any] = field(default_factory=dict)
     extraction_summary: dict[str, Any] = field(default_factory=dict)
-    deployment_readiness: dict[str, Any] = field(default_factory=dict)
+    _handoff_readiness: dict[str, Any] = field(default_factory=dict, repr=False)
+
+    def __init__(
+        self,
+        design_doc: DesignDocument,
+        module_inputs: list[ModuleInputs],
+        intent: Any,
+        pattern: str = "",
+        decisions: dict[str, Any] | None = None,
+        extraction_summary: dict[str, Any] | None = None,
+        handoff_readiness: dict[str, Any] | None = None,
+        deployment_readiness: dict[str, Any] | None = None,
+    ) -> None:
+        self.design_doc = design_doc
+        self.module_inputs = module_inputs
+        self.intent = intent
+        self.pattern = pattern
+        self.decisions = decisions or {}
+        self.extraction_summary = extraction_summary or {}
+        self._handoff_readiness = (
+            handoff_readiness if handoff_readiness is not None else deployment_readiness or {}
+        )
 
     @property
     def handoff_readiness(self) -> dict[str, Any]:
-        """Preferred readiness name; deployment_readiness remains a compatibility alias."""
-        return self.deployment_readiness
+        """Preferred readiness name for graph- and contract-owned handoff status."""
+        return self._handoff_readiness
+
+    @handoff_readiness.setter
+    def handoff_readiness(self, value: dict[str, Any]) -> None:
+        self._handoff_readiness = value
+
+    @property
+    def deployment_readiness(self) -> dict[str, Any]:
+        """Compatibility alias for older callers and artifacts."""
+        return self._handoff_readiness
+
+    @deployment_readiness.setter
+    def deployment_readiness(self, value: dict[str, Any]) -> None:
+        self._handoff_readiness = value
 
     def __getattr__(self, name: str) -> Any:
         """Proxy attribute access to the underlying intent model.
@@ -83,6 +117,7 @@ class IaCIntentPayload:
             "extraction_summary",
             "handoff_readiness",
             "deployment_readiness",
+            "_handoff_readiness",
         ):
             return object.__getattribute__(self, name)
         return getattr(self.intent, name)

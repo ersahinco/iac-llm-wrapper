@@ -260,12 +260,16 @@ def map_terraform_vpc_modules(intent: Any) -> list[ModuleInputs]:
 
 
 def gen_decision_report(intent: Any, output_dir: Path) -> None:
+    readiness = getattr(intent, "handoff_readiness", None)
+    if readiness is None:
+        readiness = getattr(intent, "deployment_readiness", {})
     model = _intent(intent)
     if model is None:
         return
     yaml = ruamel.yaml.YAML()
     yaml.default_flow_style = False
     data = {
+        "pattern": "terraform-vpc",
         "vpc": {
             "name": model.vpc_name,
             "region": model.primary_region,
@@ -282,6 +286,10 @@ def gen_decision_report(intent: Any, output_dir: Path) -> None:
             "source": "terraform-aws-modules/vpc/aws",
         },
     }
+    if readiness:
+        data["handoffReadiness"] = readiness
+        # Backward-compatible alias for existing artifact consumers.
+        data["deploymentReadiness"] = readiness
     output_dir.mkdir(parents=True, exist_ok=True)
     with open(output_dir / "decision-report.yaml", "w") as file:
         yaml.dump(data, file)

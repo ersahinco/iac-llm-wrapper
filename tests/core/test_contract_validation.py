@@ -72,8 +72,16 @@ def _write_ready_bundle(output_dir: Path, *, include_config: bool = True) -> Non
         output_dir / "decision-report.yaml",
         {
             "pattern": "contract-validation-example",
-            "handoffReadiness": {"status": "ready", "deploymentAllowed": True},
-            "deploymentReadiness": {"status": "ready", "deploymentAllowed": True},
+            "handoffReadiness": {
+                "status": "ready",
+                "handoffAllowed": True,
+                "deploymentAllowed": True,
+            },
+            "deploymentReadiness": {
+                "status": "ready",
+                "handoffAllowed": True,
+                "deploymentAllowed": True,
+            },
         },
     )
     _write_yaml(
@@ -82,7 +90,7 @@ def _write_ready_bundle(output_dir: Path, *, include_config: bool = True) -> Non
             "pattern": "contract-validation-example",
             "boundary": "handoff only",
             "allowedNextAction": "Review config.",
-            "readiness": {"status": "ready", "deploymentAllowed": True},
+            "readiness": {"status": "ready", "handoffAllowed": True, "deploymentAllowed": True},
             "targetContracts": [
                 {
                     "name": "example-config",
@@ -111,6 +119,7 @@ def _write_ready_bundle(output_dir: Path, *, include_config: bool = True) -> Non
 def _write_blocked_bundle(output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     readiness = {
+        "handoffAllowed": False,
         "deploymentAllowed": False,
         "status": "blocked",
         "summary": "Cannot hand off yet.",
@@ -143,6 +152,7 @@ def _write_blocked_bundle(output_dir: Path) -> None:
             "gaps": {"resolved": [], "blocking": [{"key": "region"}]},
             "contradictions": {"blocking": []},
             "handoffReadiness": {
+                "handoffAllowed": False,
                 "deploymentAllowed": False,
                 "status": "blocked",
                 "blockerCount": 1,
@@ -150,6 +160,7 @@ def _write_blocked_bundle(output_dir: Path) -> None:
                 "blockingContradictionCount": 0,
             },
             "deploymentReadiness": {
+                "handoffAllowed": False,
                 "deploymentAllowed": False,
                 "status": "blocked",
                 "blockerCount": 1,
@@ -167,6 +178,7 @@ def _write_blocked_bundle(output_dir: Path) -> None:
             "run": {"mode": "deterministic", "provider": "none", "model": "none", "callCount": 0},
             "readiness": {
                 "status": "blocked",
+                "handoffAllowed": False,
                 "deploymentAllowed": False,
                 "blockerCount": 1,
             },
@@ -224,6 +236,7 @@ def test_blocked_bundle_validates_blocked_assessment_only(tmp_path: Path):
 
     assert result["summary"]["status"] == "pass"
     assert [item["name"] for item in result["contracts"]] == ["blocked-assessment-artifacts"]
+    assert result["readiness"]["handoffAllowed"] is False
     assert result["readiness"]["deploymentAllowed"] is False
 
 
@@ -232,11 +245,22 @@ def test_unknown_ready_pattern_fails_without_guessing_contracts(tmp_path: Path):
         tmp_path / "decision-report.yaml",
         {
             "pattern": "unknown-pattern",
-            "handoffReadiness": {"status": "ready", "deploymentAllowed": True},
-            "deploymentReadiness": {"status": "ready", "deploymentAllowed": True},
+            "handoffReadiness": {
+                "status": "ready",
+                "handoffAllowed": True,
+                "deploymentAllowed": True,
+            },
+            "deploymentReadiness": {
+                "status": "ready",
+                "handoffAllowed": True,
+                "deploymentAllowed": True,
+            },
         },
     )
-    _write_yaml(tmp_path / "handoff-plan.yaml", {"readiness": {"deploymentAllowed": True}})
+    _write_yaml(
+        tmp_path / "handoff-plan.yaml",
+        {"readiness": {"handoffAllowed": True, "deploymentAllowed": True}},
+    )
 
     result = build_contract_validation(tmp_path)
 

@@ -38,6 +38,9 @@ def test_cloudformation_parameters_pattern_compiles(tmp_path: Path):
         {"ParameterKey": "ServiceName", "ParameterValue": "orders"},
         {"ParameterKey": "DesiredCount", "ParameterValue": "3"},
     ]
+    report = yaml.load((tmp_path / "decision-report.yaml").read_text())
+    assert report["pattern"] == "cloudformation-parameters"
+    assert report["handoffReadiness"]["handoffAllowed"] is True
 
 
 def test_cloudformation_parameters_pattern_is_registered():

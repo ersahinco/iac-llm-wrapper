@@ -115,7 +115,8 @@ def generate_all(intent: Any, output_dir: Path, pattern: str | None = None) -> N
             module_inputs=[],
             intent=intent,
         )
-    GLOBAL_REGISTRY.generate(payload, output_dir, pattern=pattern)
+    effective_pattern = pattern or getattr(payload, "pattern", "") or None
+    GLOBAL_REGISTRY.generate(payload, output_dir, pattern=effective_pattern)
 
 
 def gen_design_doc(intent: Any, output_dir: Path) -> None:
@@ -280,7 +281,7 @@ def gen_handoff_plan(intent: Any, output_dir: Path) -> None:
     if readiness is None:
         readiness = getattr(intent, "deployment_readiness", {})
     readiness = readiness or {}
-    allowed = bool(readiness.get("deploymentAllowed", True))
+    allowed = bool(readiness.get("handoffAllowed", readiness.get("deploymentAllowed", True)))
     contracts = pattern_obj.contracts
     required_artifacts = list(
         dict.fromkeys(
@@ -313,6 +314,8 @@ def gen_handoff_plan(intent: Any, output_dir: Path) -> None:
         ),
         "readiness": {
             "status": readiness.get("status", "ready" if allowed else "blocked"),
+            "handoffAllowed": allowed,
+            # Backward-compatible alias for existing artifact consumers.
             "deploymentAllowed": allowed,
             "blockers": readiness.get("blockers", []),
         },
@@ -378,4 +381,10 @@ register_generator(
     priority=5,
     category="meta",
 )
-register_generator("terraform-tfvars", gen_tfvars, priority=5, category="meta")
+register_generator(
+    "terraform-tfvars",
+    gen_tfvars,
+    priority=5,
+    category="meta",
+    applies_to={"terraform-vpc", "kubernetes-cluster"},
+)

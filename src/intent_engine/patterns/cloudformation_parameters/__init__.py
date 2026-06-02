@@ -205,10 +205,14 @@ def gen_cloudformation_parameters(intent: Any, output_dir: Path) -> None:
 
 
 def gen_decision_report(intent: Any, output_dir: Path) -> None:
+    readiness = getattr(intent, "handoff_readiness", None)
+    if readiness is None:
+        readiness = getattr(intent, "deployment_readiness", {})
     model = _intent(intent)
     if model is None:
         return
     data = {
+        "pattern": "cloudformation-parameters",
         "stack": {
             "name": model.stack_name,
             "templateUrl": model.template_url,
@@ -221,6 +225,10 @@ def gen_decision_report(intent: Any, output_dir: Path) -> None:
             "Parameter handoff for an existing CloudFormation template; no stack is generated."
         ),
     }
+    if readiness:
+        data["handoffReadiness"] = readiness
+        # Backward-compatible alias for existing artifact consumers.
+        data["deploymentReadiness"] = readiness
     _write_yaml(output_dir, "decision-report.yaml", data)
 
 

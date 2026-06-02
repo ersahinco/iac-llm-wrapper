@@ -45,6 +45,49 @@ class TestCLIDiscover:
         assert "--no-raw-evidence" in result.output
         assert "network_account" in result.output
 
+    def test_discover_with_decisions_shows_simulated_values(self):
+        result = runner.invoke(
+            app,
+            [
+                "discover",
+                "--input",
+                "fixtures/usability/architect-incomplete-lza.md",
+                "--pattern",
+                "aws-lza",
+                "--no-llm",
+                "--decisions",
+                (
+                    '{"network_account":"Network",'
+                    '"identity_center_permission_sets":"ReadOnlyAccess",'
+                    '"identity_center_assignments":"PlatformAdmins:ReadOnlyAccess:Management"}'
+                ),
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "values from design doc and simulated decisions" in result.output
+        assert "Applied 3 simulated decision(s)" in result.output
+        assert "network_account = Network" in result.output
+        assert "No gaps found" in result.output
+
+    def test_discover_cloudformation_missing_packet_reports_gaps_without_traceback(self):
+        result = runner.invoke(
+            app,
+            [
+                "discover",
+                "--input",
+                "fixtures/eval/cloudformation-parameters-missing-blocked.md",
+                "--pattern",
+                "cloudformation-parameters",
+                "--no-llm",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Traceback" not in result.output
+        assert "Template URL" in result.output
+        assert "Parameter Overrides" in result.output
+
 
 class TestCLICompile:
     def test_compile_default_aws_lza(self, tmp_path: Path, monkeypatch):

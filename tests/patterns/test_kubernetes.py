@@ -46,6 +46,7 @@ class TestKubernetesPattern:
         assert (output / "decision-report.yaml").exists()
         assert (output / "sample-recommendations.yaml").exists()
         assert (output / "module-inputs.yaml").exists()
+        assert (output / "terraform.tfvars").exists()
 
         # Verify module inputs content
         yaml = ruamel.yaml.YAML(typ="safe")
@@ -74,6 +75,11 @@ class TestKubernetesPattern:
         with open(output / "namespace-config.yaml") as f:
             ns = yaml.load(f)
         assert ns["namespaces"][0]["name"] == "production"
+
+        with open(output / "decision-report.yaml") as f:
+            report = yaml.load(f)
+        assert report["pattern"] == "kubernetes-cluster"
+        assert report["handoffReadiness"]["handoffAllowed"] is True
 
     def test_template_generation(self):
         from intent_engine.core.compiler import generate_template
@@ -124,6 +130,7 @@ boundary: Handoff only.
 allowedNextAction: Pass reviewed artifacts to the existing target toolchain.
 readiness:
   status: ready
+  handoffAllowed: true
   deploymentAllowed: true
 targetContracts:
   - name: kubernetes-cluster-config

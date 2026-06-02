@@ -35,3 +35,18 @@ security:
   securityHubEnabled: true
   guardDutyEnabled: true
   complianceOverlay: regulated
+handoffReadiness: &id001
+  handoffAllowed: true
+  deploymentAllowed: true
+  status: ready
+  summary: Ready for handoff.
+  blockers: []
+  missingDecisions: []
+  conflictingDecisions: []
+  safeHandoffPath:
+    - Review handoff-plan.yaml for owners, manual gates, and allowed next
+      action.
+    - Validate target contracts and artifact owner approvals before downstream
+      use.
+    - Pass only reviewed artifacts to the existing accelerator/module toolchain.
+deploymentReadiness: *id001

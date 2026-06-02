@@ -14,8 +14,9 @@ from intent_engine.core.generator import (
     gen_handoff_plan,
     gen_sample_recommendations,
     gen_tfvars,
+    generate_all,
 )
-from intent_engine.core.module_mapping import IaCIntentPayload, ModuleInputs
+from intent_engine.core.module_mapping import DesignDocument, IaCIntentPayload, ModuleInputs
 from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern
 from intent_engine.core.requirements import Requirement, RequirementGraph
 from intent_engine.core.sample_config import GLOBAL_SAMPLE_REGISTRY, SampleConfig
@@ -170,7 +171,7 @@ class TestHCLValue:
 class TestGenTFVars:
     def test_writes_file(self, tmp_path: Path):
         payload = IaCIntentPayload(
-            design_doc=None,  # type: ignore[arg-type]
+            design_doc=DesignDocument(),
             module_inputs=[
                 ModuleInputs(
                     module_name="lza-network",
@@ -218,6 +219,38 @@ class TestGenTFVars:
         assert "x = 1" in content
         assert "y = false" in content
 
+    def test_global_generation_scopes_tfvars_to_explicit_terraform_patterns(
+        self,
+        tmp_path: Path,
+    ):
+        original = dict(GLOBAL_REGISTRY._patterns)
+        try:
+            GLOBAL_REGISTRY.register(
+                Pattern(
+                    name="future-non-terraform-pattern",
+                    description="Future non-Terraform module handoff",
+                    graph_factory=_handoff_graph,
+                )
+            )
+            payload = IaCIntentPayload(
+                design_doc=DesignDocument(),
+                module_inputs=[
+                    ModuleInputs(
+                        module_name="future-module",
+                        variables={"name": "example"},
+                    )
+                ],
+                intent=None,
+                pattern="future-non-terraform-pattern",
+            )
+
+            generate_all(payload, tmp_path)
+
+            assert (tmp_path / "module-inputs.yaml").exists()
+            assert not (tmp_path / "terraform.tfvars").exists()
+        finally:
+            GLOBAL_REGISTRY._patterns = original
+
 
 class TestGenHandoffPlan:
     def test_ready_handoff_requires_review_before_toolchain_action(self, tmp_path: Path):
@@ -234,6 +267,7 @@ class TestGenHandoffPlan:
             assert plan["allowedNextAction"] == (
                 "Pass the reviewed artifacts to the existing target toolchain after manual gates."
             )
+            assert plan["readiness"]["handoffAllowed"] is True
             assert "downstream generation, execution" in plan["boundary"]
             steps = {step["id"]: step for step in plan["steps"]}
             assert steps["approve-handoff"]["dependsOn"] == [
@@ -267,6 +301,7 @@ class TestGenHandoffPlan:
                 "Resolve blockers and re-run compile before any downstream handoff."
             )
             assert plan["readiness"]["status"] == "blocked"
+            assert plan["readiness"]["handoffAllowed"] is False
             assert plan["readiness"]["deploymentAllowed"] is False
             assert plan["readiness"]["blockers"] == [
                 {"code": "REGION_REQUIRED", "message": "Region required."}
