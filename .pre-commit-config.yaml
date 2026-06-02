@@ -22,6 +22,11 @@ repos:
         entry: uv run --extra dev mypy
         language: system
         pass_filenames: false
+      - id: pyright
+        name: pyright
+        entry: uv run --extra dev pyright .
+        language: system
+        pass_filenames: false
       - id: sample-fixture-drift
         name: sample fixture drift
         entry: uv run python scripts/sync-sample-fixtures.py --check

@@ -18,7 +18,7 @@ uv run pytest
 uv run ruff check .
 uv run ruff format --check .
 uv run --extra dev mypy
-npx --yes pyright .
+uv run --extra dev pyright .
 uv run python scripts/sync-sample-fixtures.py --check
 uv run python scripts/evaluate-golden-journey.py
 uv run python scripts/evaluate-extraction.py
@@ -88,7 +88,7 @@ Do not add provider-specific branches to core CLI/compiler/extractor/generator.
 
 ## Stack
 
-Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy.
+Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy, pyright.
 
 ## Session State
 
@@ -96,16 +96,16 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy.
 
 ### Current Goal
 
-T34: Pylance/Pyright diagnostics cleanup
+T35: Quality gate review and Pyright enforcement
 
 ### Status
 
 - **Tests**: 331 passing, 1 skipped
 - **Lint**: clean
 - **Format**: clean
-- **Type check**: clean
+- **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added `pyrightconfig.json`, fixed concrete Pylance/Pyright diagnostics around LLM backend token usage, provider factory test narrowing, HTTP error response handling, model-introspection narrowing, and dynamic test module mutation. Verified `npx --yes pyright .` reports `0 errors, 0 warnings, 0 informations`.
+- **Last session**: Re-reviewed the quality gate before handoff, pinned Pyright as a uv-managed dev dependency, added Pyright/Pylance enforcement to pre-commit and CI, and verified lint, format, mypy, pyright, fixture drift, coverage tests, golden journeys, extraction/usability evals, security scan, dependency audit, build, and pre-commit are green.
 
 ### Done
 
@@ -122,6 +122,7 @@ T34: Pylance/Pyright diagnostics cleanup
 - Usability: `scripts/evaluate-usability.py` now includes ready and blocked static-review stakeholder trials plus a service-style handoff-confidence trial that verifies what is ready, what can move next, target contracts, manual gates, and raw evidence omission.
 - Cleanup: removed stale LZA research/extension/diff/apply/default-normalizer surfaces, no-contract artifact fallback, pattern `extra_artifacts`, duplicate fixture normalization, and stale duplicate LLM docs.
 - Language: user-facing docs now prefer handoff readiness; `deploymentReadiness` remains a legacy compatibility alias in artifacts. Docs now also state that secrets should travel as secret-store references and expected parameter names, never raw values.
+- Quality gates: Ruff, Ruff format, mypy, Pyright/Pylance, fixture drift, coverage tests, extraction/usability/golden journey checks, Bandit, pip-audit, uv build, and pre-commit are wired into local/CI workflows as applicable.
 
 ### Next
 
