@@ -87,6 +87,42 @@ iac-llm-wrapper compile -i fixtures/usability/engineer-handoff-lza.md -o out/ \
 
 No API key required. A 3B model (2GB RAM) extracts region, topology, CIDR, accounts, and security settings from Markdown in 8-15 seconds on modern laptops.
 
+## First Successful Customer Packet Run
+
+Use this path for messy real notes, meeting summaries, and architect
+clarifications. Keep secret values out of the packet; write secret-store
+references and expected parameter names instead.
+
+```bash
+# 1. Check what the packet already answers and what still needs an owner
+iac-llm-wrapper discover -i customer-packet.md --pattern aws-lza \
+  --provider ollama --model qwen2.5:7b
+
+# 2. Compile service-style artifacts without storing raw prompts/responses
+iac-llm-wrapper compile -i customer-packet.md -o out/customer-packet \
+  --pattern aws-lza --provider ollama --model qwen2.5:7b --no-raw-evidence
+
+# 3. Generate the one-file human review page
+iac-llm-wrapper review html --input out/customer-packet \
+  --output out/customer-packet/handoff-review.html
+```
+
+For Bedrock, keep the same command shape and swap only provider/model:
+
+```bash
+aws sts get-caller-identity
+iac-llm-wrapper compile -i customer-packet.md -o out/customer-packet \
+  --pattern aws-lza --provider bedrock \
+  --model eu.amazon.nova-2-lite-v1:0 --no-raw-evidence
+```
+
+If compile is blocked, the CLI still writes safe assessment artifacts. Generate
+the same review page, answer the blocker traceability questions in the source
+Markdown, and re-run compile. If compile is ready, reviewers use
+`handoff-review.html`, `handoff-plan.yaml`, `deployment-runbook.md`, target
+artifact files, and `sample-recommendations.yaml` before passing anything to the
+existing provisioning toolchain.
+
 ### Alternative: Cloud LLM
 
 ```bash
@@ -273,10 +309,10 @@ When compile is blocked, only safe assessment artifacts are written:
 They must satisfy the built-in `blocked-assessment-artifacts` contract.
 
 Generate a portable static review page when humans need one file to inspect.
-The page starts with readiness, contract status, allowed next action, raw LLM
-coverage, missing raw decision keys, expected model weaknesses, and blocker
-traceability to requirement keys/questions so reviewers do not have to open YAML
-first:
+The page starts with readiness, contract status, allowed next action, reviewer
+next actions, raw LLM coverage, missing raw decision keys, expected model
+weaknesses, and blocker traceability to requirement keys/questions so reviewers
+do not have to open YAML first:
 
 ```bash
 iac-llm-wrapper review html --input out/ --output out/handoff-review.html
@@ -284,10 +320,10 @@ iac-llm-wrapper review html --input out/ --output out/handoff-review.html
 
 The page summarizes readiness, allowed next action, blockers, decisions,
 requirement graph exports, contract validation, artifacts, handoff-plan steps,
-raw evidence links, LLM trace summary, and model benchmark without running a
-server. It writes `requirement-graph.json` and `requirement-graph.mmd` beside
-the handoff artifacts for external viewers, and writes `contract-validation.yaml`
-for tools that should not scrape HTML.
+raw evidence links or omission status, LLM trace summary, and model benchmark
+without running a server. It writes `requirement-graph.json` and
+`requirement-graph.mmd` beside the handoff artifacts for external viewers, and
+writes `contract-validation.yaml` for tools that should not scrape HTML.
 
 ### 5. Engineer Handoff
 

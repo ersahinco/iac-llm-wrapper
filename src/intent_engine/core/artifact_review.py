@@ -66,6 +66,8 @@ def build_review_context(
     contract_status = _contract_status(contract_validation)
     blocking_gaps = _trace_list(trace, "gaps", "blocking")
     blocking_contradictions = _trace_list(trace, "contradictions", "blocking")
+    artifacts = _artifact_rows(input_dir, _artifact_names(input_dir, handoff, lineage))
+    raw_evidence = _raw_evidence(trace)
 
     return {
         "pattern": str(report.get("pattern", handoff.get("pattern", "handoff"))),
@@ -93,11 +95,17 @@ def build_review_context(
         "contractValidation": _coerce_list(contract_validation.get("contracts")),
         "contractValidationArtifact": contract_validation,
         "contractStatus": contract_status,
-        "artifacts": _artifact_rows(input_dir, _artifact_names(input_dir, handoff, lineage)),
+        "reviewerNextActions": _reviewer_next_actions(
+            readiness=readiness,
+            contract_status=contract_status,
+            raw_evidence=raw_evidence,
+            artifacts=artifacts,
+        ),
+        "artifacts": artifacts,
         "handoff": handoff,
         "trace": trace,
         "benchmark": benchmark,
-        "rawEvidence": _raw_evidence(trace),
+        "rawEvidence": raw_evidence,
         "links": {
             "llmTrace": _artifact_href(input_dir, link_base_dir, "llm-trace-summary.yaml"),
             "rawEvidence": _raw_evidence_href(link_base_dir, trace),
@@ -360,6 +368,53 @@ def _raw_evidence(trace: dict[str, Any]) -> str:
     status = raw.get("status", "unknown")
     path = raw.get("path")
     return f"{status} ({path})" if path else str(status)
+
+
+def _reviewer_next_actions(
+    *,
+    readiness: dict[str, Any],
+    contract_status: str,
+    raw_evidence: str,
+    artifacts: list[dict[str, str]],
+) -> list[str]:
+    status = str(readiness.get("status", "unknown"))
+    deployment_allowed = bool(readiness.get("deploymentAllowed", False))
+    if status == "blocked" or not deployment_allowed:
+        actions = [
+            "Do not pass target artifacts to the provisioning toolchain yet.",
+            "Resolve the blocker traceability rows with the listed requirement questions.",
+            "Update the source Markdown, re-run compile, then regenerate this review page.",
+        ]
+    else:
+        missing_artifacts = [row["name"] for row in artifacts if row.get("status") == "missing"]
+        actions = [
+            "Review handoff-plan.yaml for owners, manual gates, and the allowed next action.",
+            (
+                "Review the target artifact files listed below with platform, security, "
+                "and network owners."
+            ),
+            "Pass only reviewed artifacts to the existing target toolchain after manual gates.",
+        ]
+        if contract_status != "pass":
+            actions.insert(0, "Resolve contract-validation.yaml before handoff.")
+        if missing_artifacts:
+            actions.insert(
+                0,
+                "Resolve missing required artifacts before handoff: "
+                + ", ".join(missing_artifacts)
+                + ".",
+            )
+    if raw_evidence.startswith("captured"):
+        actions.append(
+            "Treat raw-evidence.yaml as local debug material; do not share it as "
+            "a service artifact."
+        )
+    elif raw_evidence.startswith("not-requested"):
+        actions.append(
+            "Raw prompt/response evidence was omitted; use trace and benchmark "
+            "summaries for review."
+        )
+    return actions
 
 
 def _artifact_href(input_dir: Path, link_base_dir: Path, artifact_name: str) -> str | None:

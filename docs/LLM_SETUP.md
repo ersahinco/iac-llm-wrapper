@@ -72,6 +72,32 @@ iac-llm-wrapper compile -i design.md -o out/ --pattern aws-lza
 | `phi4:14b` | 14B | Medium | Better | Complex multi-region designs |
 | `deepseek-r1:7b` | 7B | Medium | Better | Reasoning-intensive discovery |
 
+## Real Packet Defaults
+
+For a first customer packet run, prefer a model path that your team can repeat:
+
+```bash
+# Local workstation path for customer-style notes
+iac-llm-wrapper discover -i customer-packet.md --pattern aws-lza \
+  --provider ollama --model qwen2.5:7b
+iac-llm-wrapper compile -i customer-packet.md -o out/customer-packet \
+  --pattern aws-lza --provider ollama --model qwen2.5:7b --no-raw-evidence
+
+# Direct Bedrock path through the local AWS CLI session
+aws sts get-caller-identity
+iac-llm-wrapper compile -i customer-packet.md -o out/customer-packet \
+  --pattern aws-lza --provider bedrock \
+  --model eu.amazon.nova-2-lite-v1:0 --no-raw-evidence
+
+# Human review page for either path
+iac-llm-wrapper review html --input out/customer-packet \
+  --output out/customer-packet/handoff-review.html
+```
+
+Use `--no-raw-evidence` for service-style packet runs. Keep raw prompt/response
+evidence only for local extraction debugging, preferably outside the repo with
+`--evidence-output` or the eval script `--evidence-dir` option.
+
 ### Hardware Requirements
 
 - **3B models**: ~2GB RAM, runs on most laptops

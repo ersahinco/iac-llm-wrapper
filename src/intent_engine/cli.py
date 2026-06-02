@@ -186,6 +186,64 @@ def _emit_sample_matches(pattern: str, decisions: dict[str, Any]) -> None:
     typer.echo(f"  Run '{APP_NAME} sample show --name {matches[0].sample.name}' for details.")
 
 
+def _review_html_command(output: Path) -> str:
+    return f"{APP_NAME} review html --input {output} --output {output / 'handoff-review.html'}"
+
+
+def _emit_compile_next_steps(
+    *,
+    output: Path,
+    pattern: str,
+    llm_used: bool,
+    raw_evidence_path: Path | None,
+) -> None:
+    typer.echo("")
+    typer.echo("Next steps:")
+    typer.echo(f"  1. Generate the review page: {_review_html_command(output)}")
+    typer.echo(f"  2. Open {output / 'handoff-plan.yaml'} for owners, gates, and allowed action.")
+    typer.echo("  3. Review target artifacts and samples before using the downstream toolchain.")
+    typer.echo(f"  Pattern: {pattern}")
+    if llm_used and raw_evidence_path:
+        typer.echo(
+            "  Raw LLM evidence captured for local debugging. "
+            "Use --no-raw-evidence for service-style customer packet runs."
+        )
+    elif llm_used:
+        typer.echo(
+            "  Raw LLM prompt/response evidence omitted; use llm-trace-summary.yaml "
+            "and model-benchmark.yaml for review."
+        )
+
+
+def _emit_blocked_next_steps(output: Path) -> None:
+    typer.echo("", err=True)
+    typer.echo("Next steps:", err=True)
+    typer.echo(f"  1. Generate the blocked review page: {_review_html_command(output)}", err=True)
+    typer.echo(
+        "  2. Resolve the blocker questions in decision-report.yaml or the review page.",
+        err=True,
+    )
+    typer.echo("  3. Re-run compile after updating the source Markdown.", err=True)
+
+
+def _emit_discovery_next_steps(*, input: Path, pattern: str, complete: bool) -> None:
+    typer.echo("")
+    typer.echo("=== Next Steps ===")
+    if complete:
+        typer.echo("  Compile service-style handoff artifacts without raw prompt/response storage:")
+        typer.echo(
+            f"    {APP_NAME} compile --input {input} --output out/ "
+            f"--pattern {pattern} --no-raw-evidence"
+        )
+        typer.echo(f"  Then create the review page: {_review_html_command(Path('out/'))}")
+        return
+    typer.echo("  Add answers for the clarifying questions to the Markdown source.")
+    typer.echo(
+        f"  Re-run discovery until no gaps remain, then compile with "
+        f"'{APP_NAME} compile --input {input} --output out/ --pattern {pattern}'."
+    )
+
+
 def _version_callback(value: bool) -> None:
     if value:
         typer.echo(f"{APP_NAME} {APP_VERSION}")
@@ -385,10 +443,7 @@ def compile(
                 err=True,
             )
         _write_evidence_output(evidence_path, evidence_store)
-        typer.echo(
-            "",
-            err=True,
-        )
+        _emit_blocked_next_steps(output)
         typer.echo(
             "Fix violations in your Markdown and re-run. "
             f"Run '{APP_NAME} template --pattern <pattern>' to generate "
@@ -406,6 +461,12 @@ def compile(
 
     _emit_sample_matches(pattern, graph.typed_decisions())
     _write_evidence_output(evidence_path, evidence_store)
+    _emit_compile_next_steps(
+        output=output,
+        pattern=pattern,
+        llm_used=llm_caller is not None,
+        raw_evidence_path=evidence_path,
+    )
 
 
 @app.command()
@@ -629,6 +690,7 @@ def discover(
             typer.echo(f"  {status_icon} {item['key']} = {val}{ctx}")
 
     _write_evidence_output(evidence_output, evidence_store)
+    _emit_discovery_next_steps(input=input, pattern=pattern, complete=result.is_complete())
 
 
 @app.command()
@@ -719,6 +781,12 @@ def interview(
         )
         typer.echo(f"Compilation successful. Output written to: {output}")
         _emit_sample_matches(actual_pattern, engine.graph.typed_decisions())
+        _emit_compile_next_steps(
+            output=output,
+            pattern=actual_pattern,
+            llm_used=False,
+            raw_evidence_path=None,
+        )
     except CompileError as e:
         typer.echo("Compilation failed with violations:", err=True)
         for v in e.violations:

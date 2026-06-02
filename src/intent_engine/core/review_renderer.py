@@ -85,6 +85,10 @@ def render_review_html(context: dict[str, Any]) -> str:
                 ],
             ),
             _section(
+                "Reviewer Next Actions",
+                [_ordered_list(_coerce_list(context.get("reviewerNextActions")))],
+            ),
+            _section(
                 "Handoff Readiness",
                 [
                     _kv("Handoff ready", str(readiness.get("deploymentAllowed", False))),
@@ -220,6 +224,13 @@ def _list_block(title: str, items: list[Any]) -> str:
         return f'<h3>{escape(title)}</h3><p class="muted">None</p>'
     rendered = "".join(f"<li>{escape(_summarize(item))}</li>" for item in items)
     return f"<h3>{escape(title)}</h3><ul>{rendered}</ul>"
+
+
+def _ordered_list(items: list[Any]) -> str:
+    if not items:
+        return '<p class="muted">No next actions found.</p>'
+    rendered = "".join(f"<li>{escape(_summarize(item))}</li>" for item in items)
+    return f'<ol class="steps">{rendered}</ol>'
 
 
 def _mapping_table(data: dict[str, Any]) -> str:

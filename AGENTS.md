@@ -96,7 +96,7 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy, pyr
 
 ### Current Goal
 
-T35: Quality gate review and Pyright enforcement
+T36: Real Packet Usability Hardening
 
 ### Status
 
@@ -105,7 +105,7 @@ T35: Quality gate review and Pyright enforcement
 - **Format**: clean
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Re-reviewed the quality gate before handoff, pinned Pyright as a uv-managed dev dependency, added Pyright/Pylance enforcement to pre-commit and CI, and verified lint, format, mypy, pyright, fixture drift, coverage tests, golden journeys, extraction/usability evals, security scan, dependency audit, build, and pre-commit are green.
+- **Last session**: Hardened the messy customer-packet to reviewed-handoff workflow without adding new harnesses or broader AWS schema depth. Added CLI next-step guidance for discovery, ready compile, blocked compile, and interview output; added reviewer next actions and evidence-handling guidance to `handoff-review.html`; clarified README/LLM setup first-packet local and Bedrock commands; and verified the full quality gate is green.
 
 ### Done
 
@@ -123,6 +123,7 @@ T35: Quality gate review and Pyright enforcement
 - Cleanup: removed stale LZA research/extension/diff/apply/default-normalizer surfaces, no-contract artifact fallback, pattern `extra_artifacts`, duplicate fixture normalization, and stale duplicate LLM docs.
 - Language: user-facing docs now prefer handoff readiness; `deploymentReadiness` remains a legacy compatibility alias in artifacts. Docs now also state that secrets should travel as secret-store references and expected parameter names, never raw values.
 - Quality gates: Ruff, Ruff format, mypy, Pyright/Pylance, fixture drift, coverage tests, extraction/usability/golden journey checks, Bandit, pip-audit, uv build, and pre-commit are wired into local/CI workflows as applicable.
+- T36 usability: CLI output now points first-time users from discovery and compile results to service-style compile, blocked review generation, `handoff-plan.yaml`, and static review creation. `handoff-review.html` now includes reviewer next actions derived from readiness, contract status, artifacts, and raw evidence state. README and LLM setup now include a concise real customer packet path for Ollama and direct Bedrock runs with `--no-raw-evidence`.
 
 ### Next
 

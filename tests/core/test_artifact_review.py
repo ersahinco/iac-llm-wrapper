@@ -171,6 +171,12 @@ def test_build_review_context_uses_report_readiness_and_artifact_rows(tmp_path: 
         "Raw LLM missed accepted decisions: organization_name.",
         "Structured Markdown carried the handoff; LLM added no accepted decisions.",
     ]
+    assert context["reviewerNextActions"] == [
+        "Do not pass target artifacts to the provisioning toolchain yet.",
+        "Resolve the blocker traceability rows with the listed requirement questions.",
+        "Update the source Markdown, re-run compile, then regenerate this review page.",
+        "Treat raw-evidence.yaml as local debug material; do not share it as a service artifact.",
+    ]
     assert context["links"]["rawEvidence"] == "raw-evidence.yaml"
     assert context["rawEvidence"].startswith("captured")
     assert {"name": "present.yaml", "status": "present"} in context["artifacts"]
@@ -188,6 +194,9 @@ def test_render_review_html_uses_existing_graph_exports(tmp_path: Path):
 
     assert "example-pattern handoff review" in html
     assert "Review Summary" in html
+    assert "Reviewer Next Actions" in html
+    assert "Do not pass target artifacts" in html
+    assert "Treat raw-evidence.yaml as local debug material" in html
     assert "Deployment allowed" in html
     assert "Blocker count" in html
     assert "Missing decision count" in html

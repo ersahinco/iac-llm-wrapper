@@ -24,6 +24,8 @@ class TestCLIDiscover:
             ],
         )
         assert result.exit_code == 0, result.output
+        assert "Next Steps" in result.output
+        assert "Re-run discovery until no gaps remain" in result.output
         assert "network_account" in result.output
         assert "Clarifying questions" in result.output
 
@@ -39,6 +41,8 @@ class TestCLIDiscover:
             ],
         )
         assert result.exit_code == 0, result.output
+        assert "Next Steps" in result.output
+        assert "--no-raw-evidence" in result.output
         assert "network_account" in result.output
 
 
@@ -57,6 +61,9 @@ class TestCLICompile:
             ],
         )
         assert result.exit_code == 0, result.output
+        assert "Next steps:" in result.output
+        assert "review html" in result.output
+        assert "handoff-plan.yaml" in result.output
         assert (output_dir / "decision-report.yaml").exists()
         assert (output_dir / "lineage-manifest.yaml").exists()
         assert not (output_dir / "terraform.tfvars").exists()
@@ -94,6 +101,8 @@ class TestCLICompile:
         )
         assert result.exit_code != 0
         assert "handoff is blocked" in result.output
+        assert "Generate the blocked review page" in result.output
+        assert "Resolve the blocker questions" in result.output
         assert "AWS_LZA_NETWORK_ACCOUNT_REQUIRED" in result.output
         report = (output_dir / "decision-report.yaml").read_text()
         assert "deploymentAllowed: false" in report
@@ -167,6 +176,8 @@ class TestCLIInterview:
             ],
         )
         assert result.exit_code == 0, result.output
+        assert "Next steps:" in result.output
+        assert "review html" in result.output
         assert (output_dir / "accounts-config.yaml").exists()
 
     def test_interview_missing_required_fails(self, tmp_path: Path):
@@ -261,6 +272,8 @@ class TestCLIReview:
         assert "aws-lza handoff review" in html
         assert "ContosoEnterprise" in html
         assert "Readiness" in html
+        assert "Reviewer Next Actions" in html
+        assert "Pass only reviewed artifacts" in html
         assert "Accepted Decisions" in html
         assert "Graph Decisions" in html
         assert "Requirement Graph" in html
