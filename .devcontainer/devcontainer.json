@@ -1,0 +1,36 @@
+{
+    "name": "iac-llm-wrapper",
+    "image": "mcr.microsoft.com/devcontainers/python:3.12-bookworm",
+    "features": {
+        "ghcr.io/devcontainers/features/aws-cli:1": {},
+        "ghcr.io/devcontainers/features/node:1": {"version": "lts"},
+        "ghcr.io/devcontainers/features/github-cli:1": {},
+    },
+    "remoteEnv": {"UV_LINK_MODE": "copy"},
+    "mounts": [
+        "source=${localEnv:HOME}/.aws,target=/home/vscode/.aws,type=bind,consistency=cached"
+    ],
+    "onCreateCommand": "sudo apt-get update && sudo apt-get install -y graphviz jq",
+    "postCreateCommand": "python -m pip install --user uv && uv sync --extra dev && uv run pre-commit install && uv run python scripts/render-dev-views.py",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "charliermarsh.ruff",
+                "matangover.mypy",
+                "bierner.markdown-mermaid",
+                "redhat.vscode-yaml",
+                "tamasfe.even-better-toml",
+                "ms-azuretools.vscode-containers",
+            ],
+            "settings": {
+                "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+                "python.testing.pytestEnabled": true,
+                "python.testing.pytestArgs": ["tests"],
+                "ruff.importStrategy": "fromEnvironment",
+                "mypy-type-checker.importStrategy": "fromEnvironment",
+            },
+        }
+    },
+}

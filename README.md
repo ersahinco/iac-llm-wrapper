@@ -61,6 +61,7 @@ readiness, allowed next action, pattern, battle test, and evidence.
 | Run a local handoff | [Quick Start](#quick-start-ollama--uv) |
 | Understand the core flow | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | Understand emitted files | [docs/ARTIFACTS.md](docs/ARTIFACTS.md) |
+| Visualize graphs and results | [docs/DEVELOPER_VISUALS.md](docs/DEVELOPER_VISUALS.md) |
 | Add or change a pattern | [docs/PATTERN_AUTHORING.md](docs/PATTERN_AUTHORING.md) |
 | Tune or compare LLMs | [docs/LLM_SETUP.md](docs/LLM_SETUP.md) |
 | Contribute safely | [CONTRIBUTING.md](CONTRIBUTING.md) |

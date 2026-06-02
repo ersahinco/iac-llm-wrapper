@@ -95,16 +95,16 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy.
 
 ### Current Goal
 
-T31: Direct Bedrock Nova 2 Lite golden journey
+T32: Local developer visualization tooling
 
 ### Status
 
-- **Tests**: 330 passing, 1 skipped
+- **Tests**: 331 passing, 1 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Verified AWS identity and Bedrock model availability in `eu-central-1`, added a narrow AWS CLI-backed `bedrock` LLM provider, and ran the existing golden journey against `eu.amazon.nova-2-lite-v1:0` with local result artifacts under ignored `tests/results/`.
+- **Last session**: Added local developer visualization tooling: `scripts/render-dev-views.py`, VS Code extension/settings recommendations, a devcontainer with Python/uv/AWS CLI/Node/Graphviz/jq, and `docs/DEVELOPER_VISUALS.md`. Installed the recommended VS Code extensions locally and generated ignored visual artifacts under `tests/results/dev-views/`.
 
 ### Done
 
@@ -116,6 +116,7 @@ T31: Direct Bedrock Nova 2 Lite golden journey
 - Observability: `model-benchmark.yaml` now reports raw LLM coverage of accepted decisions, missing accepted keys, and model conformance (`pass`, `review`, `fail`, `not-applicable`); LLM battle summaries surface raw-model misses as expected weaknesses instead of hiding them behind deterministic Markdown success.
 - Model comparison: `scripts/compare-model-benchmarks.py` shows `rawCoverage`, `rawMissing`, `missingKeys`, and `conformance`; `--require-conformant` fails non-conformant LLM benchmark runs.
 - Static review: `handoff-review.html` starts with a human summary of readiness, contract status, allowed next action, blocker traceability, model conformance, raw LLM coverage, missing raw decision keys, and expected weaknesses.
+- Developer visuals: `scripts/render-dev-views.py` writes local `tests/results/dev-views/index.html` plus Mermaid/JSON requirement graphs, Mermaid Pydantic intent model diagrams, a Mermaid module dependency graph, and Markdown summaries of golden journey/model benchmark artifacts. These are local development artifacts, not product UI.
 - Usability: `scripts/evaluate-usability.py` now includes ready and blocked static-review stakeholder trials plus a service-style handoff-confidence trial that verifies what is ready, what can move next, target contracts, manual gates, and raw evidence omission.
 - Cleanup: removed stale LZA research/extension/diff/apply/default-normalizer surfaces, no-contract artifact fallback, pattern `extra_artifacts`, duplicate fixture normalization, and stale duplicate LLM docs.
 - Language: user-facing docs now prefer handoff readiness; `deploymentReadiness` remains a legacy compatibility alias in artifacts. Docs now also state that secrets should travel as secret-store references and expected parameter names, never raw values.
