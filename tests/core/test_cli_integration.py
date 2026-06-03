@@ -293,6 +293,68 @@ class TestCLIReview:
         assert "eu-central-1" in result.output
         assert "eu-west-1" in result.output
 
+    def test_review_compare_generated_bundles(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setenv("INTENT_ENGINE_DISABLE_LLM", "1")
+        before_dir = tmp_path / "before"
+        after_dir = tmp_path / "after"
+        after_doc = tmp_path / "after.md"
+        source = Path("fixtures/eval/aws-lza-standard-handoff.md").read_text()
+        after_doc.write_text(
+            source.replace(
+                "- workload_accounts: AppProd",
+                "- workload_accounts: AppProd, DataProd",
+            )
+        )
+
+        before_compile = runner.invoke(
+            app,
+            [
+                "compile",
+                "--input",
+                "fixtures/eval/aws-lza-standard-handoff.md",
+                "--output",
+                str(before_dir),
+                "--no-raw-evidence",
+            ],
+        )
+        assert before_compile.exit_code == 0, before_compile.output
+        after_compile = runner.invoke(
+            app,
+            [
+                "compile",
+                "--input",
+                str(after_doc),
+                "--output",
+                str(after_dir),
+                "--no-raw-evidence",
+            ],
+        )
+        assert after_compile.exit_code == 0, after_compile.output
+
+        report = tmp_path / "handoff-comparison.yaml"
+        result = runner.invoke(
+            app,
+            [
+                "review",
+                "compare",
+                "--before",
+                str(before_dir),
+                "--after",
+                str(after_dir),
+                "--output",
+                str(report),
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Handoff Bundle Comparison" in result.output
+        assert "workload_accounts" in result.output
+        assert "artifact file delta" in result.output
+        assert report.exists()
+        report_text = report.read_text()
+        assert "schemaVersion: intent-engine/handoff-comparison/v1" in report_text
+        assert "workload_accounts" in report_text
+
     def test_review_html_from_complex_lza_handoff(self, tmp_path: Path, monkeypatch):
         monkeypatch.setenv("INTENT_ENGINE_DISABLE_LLM", "1")
         output_dir = tmp_path / "out"

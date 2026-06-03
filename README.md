@@ -325,6 +325,19 @@ without running a server. It writes `requirement-graph.json` and
 `requirement-graph.mmd` beside the handoff artifacts for external viewers, and
 writes `contract-validation.yaml` for tools that should not scrape HTML.
 
+For incremental packet or sample updates, compare two generated handoff bundles
+instead of re-reviewing everything from scratch or asking the model to reinterpret
+the full document again:
+
+```bash
+iac-llm-wrapper review compare --before out/before --after out/after \
+  --output out/handoff-comparison.yaml
+```
+
+The comparison report summarizes readiness, requirement completeness, accepted
+decision deltas, changed artifact files, blocker changes, model quality changes,
+and sample recommendation rank/score changes.
+
 ### 5. Engineer Handoff
 
 Engineers use the handoff artifacts alongside sample configurations:

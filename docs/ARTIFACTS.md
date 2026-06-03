@@ -11,6 +11,7 @@ execution path and passes graph, contract, gate, evidence, and rollback checks.
 | `llm-trace-summary.yaml` | Provider/model, latency, raw and accepted decisions, applied decisions, gaps, contradictions, and raw evidence status. | Core | Every compile. | No |
 | `model-benchmark.yaml` | Mode, provider/model, latency, token availability, raw LLM coverage, conformance, quality counts, readiness, cost status, and external-observability boundary. | Core | Every compile. | No |
 | `contract-validation.yaml` | Standalone pass/fail validation of emitted artifacts against target contracts. | Core review tooling | `iac-llm-wrapper review html`. | No |
+| `handoff-comparison.yaml` | Compact before/after bundle delta for incremental packet or sample updates: readiness, requirement completeness, decisions, blockers, artifacts, model quality, and sample recommendations. | Core review tooling | `iac-llm-wrapper review compare --output`. | No |
 | `battle-summary.yaml` | Battle-test verdict, confidence categories, findings, and improvement items. | Battle harness | `scripts/battle-test.py`. | No |
 | `handoff-review.html` | Static human review page summarizing readiness, contract status, allowed next action, reviewer next actions, blocker traceability, raw LLM coverage, expected weaknesses, graph, evidence, benchmark, contract validation, handoff plan, and target artifacts. | Core review tooling | `iac-llm-wrapper review html`. | No |
 | `requirement-graph.json` | Machine-readable graph export for external viewers and tools. | Core review tooling | `iac-llm-wrapper review html` or `graph export`. | No |
@@ -23,6 +24,8 @@ execution path and passes graph, contract, gate, evidence, and rollback checks.
   `handoff-review.html` to understand readiness and blockers.
 - Platform engineers use pattern-specific handoff files, target contracts,
   lineage, and the allowed next action.
+- Reviewers use `handoff-comparison.yaml` to inspect only the deltas from an
+  incremental document or sample-configuration update.
 - Contributors use `llm-trace-summary.yaml`, `model-benchmark.yaml`,
   `battle-summary.yaml`, and eval results to improve extraction and model value.
 - LLM reviewers may keep `raw-evidence.yaml` in local development/debug bundles,

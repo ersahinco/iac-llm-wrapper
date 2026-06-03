@@ -10,6 +10,11 @@ from typing import Any
 import typer
 
 from .core.artifact_review import write_review_html
+from .core.bundle_compare import (
+    compare_handoff_bundles,
+    render_bundle_comparison_text,
+    write_bundle_comparison,
+)
 from .core.cli_guidance import (
     blocked_next_step_lines,
     compile_next_step_lines,
@@ -961,19 +966,19 @@ def explain(
 def review(
     action: str = typer.Argument(
         "diff",
-        help="Action: diff, html",
+        help="Action: diff, compare, html",
     ),
     before: Path = typer.Option(
         None,
         "--before",
         "-b",
-        help="Before decision report (decision-report.yaml)",
+        help="Before decision report for diff or artifact directory for compare",
     ),
     after: Path = typer.Option(
         None,
         "--after",
         "-a",
-        help="After decision report (decision-report.yaml)",
+        help="After decision report for diff or artifact directory for compare",
     ),
     input: Path = typer.Option(
         None,
@@ -988,7 +993,7 @@ def review(
         help="Output path for html review",
     ),
 ) -> None:
-    """Review generated artifacts: diff reports or write static HTML."""
+    """Review generated artifacts: diff reports, compare bundles, or write static HTML."""
     if action == "html":
         if input is None or output is None:
             typer.echo("Error: review html requires --input and --output", err=True)
@@ -1000,8 +1005,25 @@ def review(
         typer.echo(f"Review HTML written to: {output}")
         return
 
+    if action == "compare":
+        if before is None or after is None:
+            typer.echo("Error: review compare requires --before and --after directories", err=True)
+            raise typer.Exit(1)
+        if not before.is_dir():
+            typer.echo(f"Error: before path is not a directory: {before}", err=True)
+            raise typer.Exit(1)
+        if not after.is_dir():
+            typer.echo(f"Error: after path is not a directory: {after}", err=True)
+            raise typer.Exit(1)
+        comparison = compare_handoff_bundles(before, after)
+        typer.echo(render_bundle_comparison_text(comparison), nl=False)
+        if output is not None:
+            write_bundle_comparison(comparison, output)
+            typer.echo(f"Comparison report written to: {output}")
+        return
+
     if action != "diff":
-        typer.echo("Unknown review action. Use: diff, html", err=True)
+        typer.echo("Unknown review action. Use: diff, compare, html", err=True)
         raise typer.Exit(1)
     if before is None or after is None:
         typer.echo("Error: review diff requires --before and --after", err=True)
