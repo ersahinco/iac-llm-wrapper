@@ -101,9 +101,14 @@ def discovery_next_step_lines(
         [
             "  Add answers for the clarifying questions to the Markdown source.",
             (
-                "  Re-run discovery until no gaps remain, then compile with "
-                f"'{app_name} compile --input {input_path} --output out/ --pattern {pattern}'."
+                "  Re-run discovery until no gaps remain, then compile "
+                "service-style handoff artifacts:"
             ),
+            (
+                f"    {app_name} compile --input {input_path} --output out/ "
+                f"--pattern {pattern} --no-raw-evidence"
+            ),
+            f"  Then create the review page: {review_html_command(app_name, Path('out/'))}",
         ]
     )
     return lines

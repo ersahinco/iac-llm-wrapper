@@ -96,16 +96,16 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy, pyr
 
 ### Current Goal
 
-T38: Critical project review remediation
+T39: Packet-based requirement harvesting rhythm
 
 ### Status
 
-- **Tests**: 336 passing, 1 skipped
+- **Tests**: 332 passing, 5 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Completed the targeted critical re-review of the changed workflow seams and fixed the issues it exposed. `discover --decisions` now reports simulated values accurately, ready review bundles no longer show blocked-only safe handoff text, CLI interview compiles preserve default-vs-decided audit provenance by compiling from the walked graph, omitted raw evidence is labeled as not requested instead of missing, and the full quality gate is green.
+- **Last session**: Ran five realistic packet trials through discover, compile with `--no-raw-evidence`, and review HTML. The only repeated stuck point was blocked discovery guidance dropping the service-style compile flag and review-page step, so incomplete discovery now preserves that first-run path. Full pytest, Ruff, Ruff format, mypy, and Pyright are clean.
 
 ### Done
 
@@ -127,13 +127,15 @@ T38: Critical project review remediation
 - T37 remediation: review findings are resolved without adding new harnesses, dashboards, private pattern loading, or broad AWS schema depth. The fixes tighten discoverability, evidence handling, generator scope, terminology, and code organization while preserving legacy artifact compatibility where external consumers may still depend on older keys.
 - T38 remediation: discovery partial-input handling, public generator scoping, interview artifact parity, active handoff terminology, CloudFormation README accuracy, and discovery regression coverage are fixed. Sample fixtures now include deterministic `llm-trace-summary.yaml` and `model-benchmark.yaml` for interview-generated bundles so review pages no longer show unexplained missing evidence.
 - T38 targeted re-review: first-run CLI workflow, interview/compile artifact parity, generator scope, pattern report readiness, handoff terminology, fixture/docs consistency, and `cli_guidance` organization were rechecked. Follow-up fixes preserve interview default provenance, make simulated discovery decisions explicit, remove blocked wording from ready safe handoff paths, and improve raw-evidence omission wording in review HTML.
+- T39 operating rhythm: Ran banking AWS LZA, retail board-note AWS LZA, blocked AWS LZA, BYOM Terraform VPC, and blocked BYOM CloudFormation packets through `discover -> compile --no-raw-evidence -> review html`. Ready packets were clear enough for reviewed handoff, blocked compile/review artifacts were safe, and the repeated first-success friction in blocked discovery next steps was fixed without adding harnesses or dashboard surface.
 
 ### Next
 
-1. Stop harness expansion unless real local/Bedrock model runs expose pain.
-2. Run `evaluate-extraction.py --llm`, `evaluate-usability.py --llm`, and `compare-model-benchmarks.py --require-conformant` with approved local/Bedrock models when broader model regression confidence is needed; use result artifacts to decide whether prompts or fixtures need tightening.
-3. If reviewers still struggle to resolve blockers, consider adding lightweight anchors from blocker rows to exported requirement graph nodes without adding JavaScript.
-4. Continue AWS LZA schema depth only where real customer inputs justify it.
+1. Continue packet-based requirement harvesting before adding product surface: run 3-5 real or realistic packets, record only stuck/mistrust/manual-translation moments, and implement only repeated or handoff-blocking requirements.
+2. Stop harness expansion unless real local/Bedrock model runs expose pain.
+3. Run `evaluate-extraction.py --llm`, `evaluate-usability.py --llm`, and `compare-model-benchmarks.py --require-conformant` with approved local/Bedrock models when broader model regression confidence is needed; use result artifacts to decide whether prompts or fixtures need tightening.
+4. If reviewers still struggle to resolve blockers, consider adding lightweight anchors from blocker rows to exported requirement graph nodes without adding JavaScript.
+5. Continue AWS LZA schema depth only where real customer inputs justify it.
 
 ### Durable Decisions
 

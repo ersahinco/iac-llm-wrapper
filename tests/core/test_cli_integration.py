@@ -26,6 +26,8 @@ class TestCLIDiscover:
         assert result.exit_code == 0, result.output
         assert "Next Steps" in result.output
         assert "Re-run discovery until no gaps remain" in result.output
+        assert "--no-raw-evidence" in result.output
+        assert "review html" in result.output
         assert "network_account" in result.output
         assert "Clarifying questions" in result.output
 
@@ -87,6 +89,8 @@ class TestCLIDiscover:
         assert "Traceback" not in result.output
         assert "Template URL" in result.output
         assert "Parameter Overrides" in result.output
+        assert "--no-raw-evidence" in result.output
+        assert "review html" in result.output
 
 
 class TestCLICompile:
