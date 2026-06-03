@@ -52,6 +52,9 @@ class TestTerraformVpcPattern:
         report = _yaml_load(tmp_path / "decision-report.yaml")
         assert report["pattern"] == "terraform-vpc"
         assert report["handoffReadiness"]["handoffAllowed"] is True
+        safe_path = " ".join(report["handoffReadiness"]["safeHandoffPath"])
+        assert "existing target toolchain" in safe_path
+        assert "accelerator/module toolchain" not in safe_path
         assert (tmp_path / "terraform.tfvars").exists()
         assert (tmp_path / "sample-recommendations.yaml").exists()
 

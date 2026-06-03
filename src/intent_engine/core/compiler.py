@@ -311,7 +311,7 @@ def _build_handoff_readiness(
         [
             "Review handoff-plan.yaml for owners, manual gates, and allowed next action.",
             "Validate target contracts and artifact owner approvals before downstream use.",
-            "Pass only reviewed artifacts to the existing accelerator/module toolchain.",
+            "Pass only reviewed artifacts to the existing target toolchain.",
             *(
                 [
                     "Route unsupported workload-specific requests through a separate "
@@ -326,7 +326,7 @@ def _build_handoff_readiness(
             "Do not mutate downstream systems from this output while status is blocked.",
             "Resolve missing and conflicting decisions with the owning architect/platform team.",
             "Re-run compile and preserve decision-report.yaml plus lineage artifacts for handoff.",
-            "Use the existing accelerator/module toolchain only after handoff readiness is ready.",
+            "Use the existing target toolchain only after handoff readiness is ready.",
         ]
     )
     readiness: dict[str, Any] = {

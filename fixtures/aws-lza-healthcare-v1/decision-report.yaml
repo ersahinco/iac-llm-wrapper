@@ -47,7 +47,7 @@ handoffReadiness: &id001
       action.
     - Validate target contracts and artifact owner approvals before downstream
       use.
-    - Pass only reviewed artifacts to the existing accelerator/module toolchain.
+    - Pass only reviewed artifacts to the existing target toolchain.
   targetCapabilities:
     selectedTargetPath:
       - accelerator

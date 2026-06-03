@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import ruamel.yaml
 from typer.testing import CliRunner
 
 from intent_engine.cli import app
@@ -30,6 +31,10 @@ class TestCLIDiscover:
         assert "review html" in result.output
         assert "network_account" in result.output
         assert "Clarifying questions" in result.output
+        assert "  [1] Network Account" in result.output
+        assert "  [2] Identity Center Permission Sets" in result.output
+        assert "  [3] Identity Center Assignments" in result.output
+        assert result.output.count("  [1] ") == 1
         assert "[network_account] Which account owns shared networking?" in result.output
         assert "[network_account]What" not in result.output
 
@@ -184,6 +189,12 @@ class TestCLICompile:
         assert "Changed decisions: 1" in result.output
         assert (after_dir / "input-diff-report.yaml").exists()
         assert (after_dir / "incremental-compile-report.yaml").exists()
+        yaml = ruamel.yaml.YAML(typ="safe")
+        input_diff = yaml.load((after_dir / "input-diff-report.yaml").read_text())
+        changed_line = input_diff["changedStructuredDecisionLines"][0]
+        assert changed_line["key"] == "workload_accounts"
+        assert changed_line["before"] == ["AppProd"]
+        assert changed_line["after"] == ["AppProd", "DataProd"]
         incremental_report = (after_dir / "incremental-compile-report.yaml").read_text()
         assert "workload_accounts" in incremental_report
         assert "validationBoundary" in incremental_report
@@ -444,6 +455,8 @@ class TestCLIReview:
         assert "ContosoEnterprise" in html
         assert "Readiness" in html
         assert "Reviewer Next Actions" in html
+        assert "owning implementation, platform, security, or network reviewers" in html
+        assert "platform, security, and network owners" not in html
         assert "Pass only reviewed artifacts" in html
         assert "Accepted Decisions" in html
         assert "Graph Decisions" in html

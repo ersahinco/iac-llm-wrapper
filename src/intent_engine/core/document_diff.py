@@ -20,6 +20,7 @@ def build_input_diff_report(
     """Build a compact source-delta report for incremental packet updates."""
     after_markdown = extract_from_markdown_with_diagnostics(after_text, graph)
     changed_structured = _changed_structured_decisions(
+        graph,
         baseline_decisions,
         after_markdown.decisions,
     )
@@ -119,6 +120,7 @@ def incremental_decision_report(
 
 
 def _changed_structured_decisions(
+    graph,
     baseline_decisions: dict[str, Any],
     after_decisions: dict[str, str],
 ) -> list[dict[str, Any]]:
@@ -127,17 +129,36 @@ def _changed_structured_decisions(
         after_value = after_decisions[key]
         before_value = baseline_decisions.get(key)
         if key not in baseline_decisions:
-            changed.append({"key": key, "before": None, "after": after_value, "change": "added"})
+            changed.append(
+                {
+                    "key": key,
+                    "before": None,
+                    "after": _report_value(graph, key, after_value),
+                    "change": "added",
+                }
+            )
         elif not _values_match(before_value, after_value):
             changed.append(
                 {
                     "key": key,
-                    "before": SampleConfig.to_builtin(before_value),
-                    "after": SampleConfig.to_builtin(after_value),
+                    "before": _report_value(graph, key, before_value),
+                    "after": _report_value(graph, key, after_value),
                     "change": "changed",
                 }
             )
     return changed
+
+
+def _report_value(graph, key: str, value: Any) -> Any:
+    req = getattr(graph, "_requirements", {}).get(key)
+    if req is None or not isinstance(value, str):
+        return SampleConfig.to_builtin(value)
+    try:
+        return SampleConfig.to_builtin(
+            graph._convert_value(value, req.target_type, req.target_field)
+        )
+    except Exception:
+        return SampleConfig.to_builtin(value)
 
 
 def _changed_lines(before_text: str | None, after_text: str) -> list[dict[str, Any]]:

@@ -694,8 +694,8 @@ def discover(
         typer.echo("")
 
         if result.missing:
-            for gap in result.missing:
-                typer.echo(f"  [{gap.priority}] {gap.label}")
+            for index, gap in enumerate(result.missing, 1):
+                typer.echo(f"  [{index}] {gap.label}")
                 typer.echo(f"      Reason: {gap.reason}")
                 typer.echo(f"      Suggestion: {gap.suggestion}")
                 typer.echo("")

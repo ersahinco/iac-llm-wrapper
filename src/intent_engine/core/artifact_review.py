@@ -440,8 +440,8 @@ def _reviewer_next_actions(
         actions = [
             "Review handoff-plan.yaml for owners, manual gates, and the allowed next action.",
             (
-                "Review the target artifact files listed below with platform, security, "
-                "and network owners."
+                "Review the target artifact files listed below with the owning "
+                "implementation, platform, security, or network reviewers."
             ),
             "Pass only reviewed artifacts to the existing target toolchain after manual gates.",
         ]

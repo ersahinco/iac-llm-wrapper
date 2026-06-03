@@ -41,6 +41,9 @@ def test_cloudformation_parameters_pattern_compiles(tmp_path: Path):
     report = yaml.load((tmp_path / "decision-report.yaml").read_text())
     assert report["pattern"] == "cloudformation-parameters"
     assert report["handoffReadiness"]["handoffAllowed"] is True
+    safe_path = " ".join(report["handoffReadiness"]["safeHandoffPath"])
+    assert "existing target toolchain" in safe_path
+    assert "accelerator/module toolchain" not in safe_path
 
 
 def test_cloudformation_parameters_pattern_is_registered():
