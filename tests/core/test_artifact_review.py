@@ -341,6 +341,7 @@ def test_render_review_html_uses_existing_graph_exports(tmp_path: Path):
     assert "Do not pass target artifacts" in html
     assert "Treat raw-evidence.yaml as local debug material" in html
     assert "Handoff allowed" in html
+    assert "Handoff ready" not in html
     assert "Blocker count" in html
     assert "Missing decision count" in html
     assert "Conflicting decision count" in html

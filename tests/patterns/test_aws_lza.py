@@ -266,6 +266,8 @@ class TestAwsLzaPattern:
         assert "sample-recommendations.yaml" in runbook
         assert "Populate customer-specific Identity Center assignments" in runbook
         assert "parallel Terraform or Terragrunt" in runbook
+        assert "- Handoff allowed: `True`" in runbook
+        assert "- Handoff ready:" not in runbook
 
     def test_aws_lza_flags_workload_infrastructure_for_separate_target(
         self,

@@ -523,7 +523,7 @@ def _validate_review_html(html: str) -> list[str]:
     failures: list[str] = []
     signals = [
         "Review Summary",
-        "Handoff ready",
+        "Handoff allowed",
         "True",
         "Allowed next action",
         "Pass the reviewed artifacts",

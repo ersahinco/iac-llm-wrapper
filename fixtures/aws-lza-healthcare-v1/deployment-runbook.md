@@ -67,4 +67,4 @@ Use AWS LZA for landing-zone deployment unless a documented gap requires custom 
 ## Handoff Readiness
 
 - Status: `ready`
-- Handoff ready: `True`
+- Handoff allowed: `True`

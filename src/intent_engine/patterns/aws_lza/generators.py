@@ -276,13 +276,17 @@ def gen_lza_deployment_runbook(intent: Any, output_dir: Path) -> None:
         "Use AWS LZA for landing-zone deployment unless a documented gap requires custom IaC.",
     ]
     if readiness:
+        handoff_allowed = readiness.get(
+            "handoffAllowed",
+            readiness.get("deploymentAllowed", False),
+        )
         lines.extend(
             [
                 "",
                 "## Handoff Readiness",
                 "",
                 f"- Status: `{readiness.get('status', 'unknown')}`",
-                f"- Handoff ready: `{readiness.get('deploymentAllowed', False)}`",
+                f"- Handoff allowed: `{handoff_allowed}`",
             ]
         )
     (output_dir / "deployment-runbook.md").write_text("\n".join(lines) + "\n")

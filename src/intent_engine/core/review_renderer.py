@@ -113,7 +113,7 @@ def render_review_html(context: dict[str, Any]) -> str:
                 "Handoff Readiness",
                 [
                     _kv(
-                        "Handoff ready",
+                        "Handoff allowed",
                         str(
                             readiness.get(
                                 "handoffAllowed",

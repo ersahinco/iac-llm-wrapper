@@ -552,7 +552,7 @@ def _trial_end_user_handoff_confidence(config: TrialConfig) -> TrialResult:
         benchmark = (output_dir / "model-benchmark.yaml").read_text()
         expected_html_signals = [
             "Review Summary",
-            "Handoff ready",
+            "Handoff allowed",
             "True",
             "Allowed next action",
             "Pass the reviewed artifacts",
