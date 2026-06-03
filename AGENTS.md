@@ -105,7 +105,7 @@ T39: Packet-based requirement harvesting rhythm
 - **Format**: clean
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Ran five realistic packet trials through discover, compile with `--no-raw-evidence`, and review HTML. The only repeated stuck point was blocked discovery guidance dropping the service-style compile flag and review-page step, so incomplete discovery now preserves that first-run path. Full pytest, Ruff, Ruff format, mypy, and Pyright are clean.
+- **Last session**: Committed and pushed the blocked discovery handoff-path fix, then ran a second five-packet operating-rhythm cycle. The previous fix held, ready and blocked handoffs were readable/safe, and no new finding met the repeat-or-block-handoff threshold.
 
 ### Done
 
@@ -128,6 +128,7 @@ T39: Packet-based requirement harvesting rhythm
 - T38 remediation: discovery partial-input handling, public generator scoping, interview artifact parity, active handoff terminology, CloudFormation README accuracy, and discovery regression coverage are fixed. Sample fixtures now include deterministic `llm-trace-summary.yaml` and `model-benchmark.yaml` for interview-generated bundles so review pages no longer show unexplained missing evidence.
 - T38 targeted re-review: first-run CLI workflow, interview/compile artifact parity, generator scope, pattern report readiness, handoff terminology, fixture/docs consistency, and `cli_guidance` organization were rechecked. Follow-up fixes preserve interview default provenance, make simulated discovery decisions explicit, remove blocked wording from ready safe handoff paths, and improve raw-evidence omission wording in review HTML.
 - T39 operating rhythm: Ran banking AWS LZA, retail board-note AWS LZA, blocked AWS LZA, BYOM Terraform VPC, and blocked BYOM CloudFormation packets through `discover -> compile --no-raw-evidence -> review html`. Ready packets were clear enough for reviewed handoff, blocked compile/review artifacts were safe, and the repeated first-success friction in blocked discovery next steps was fixed without adding harnesses or dashboard surface.
+- T39 follow-up rhythm: Ran complex AWS LZA, standard AWS LZA, incomplete architect AWS LZA, BYOM CloudFormation, and BYOM Terraform packets through the same path. The previous discovery guidance fix held. No stuck, mistrust, or manual-translation point repeated or blocked handoff, so no engine change was made.
 
 ### Next
 
