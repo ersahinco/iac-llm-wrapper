@@ -21,7 +21,11 @@ def test_compare_handoff_bundles_reports_blocker_and_sample_deltas(tmp_path: Pat
         handoff_allowed=False,
         blockers=["OLD_BLOCKER"],
         missing=["network_account"],
-        decisions={"network_account": None, "home_region": "eu-central-1"},
+        decisions={
+            "network_account": None,
+            "home_region": "eu-central-1",
+            "legacy_decision": "old-value",
+        },
         samples=[
             {"name": "sample-a", "sameDecisionCount": 8, "differentDecisionCount": 1},
             {"name": "sample-b", "sameDecisionCount": 7, "differentDecisionCount": 2},
@@ -34,7 +38,11 @@ def test_compare_handoff_bundles_reports_blocker_and_sample_deltas(tmp_path: Pat
         handoff_allowed=True,
         blockers=[],
         missing=[],
-        decisions={"network_account": "Network", "home_region": "eu-central-1"},
+        decisions={
+            "network_account": "Network",
+            "home_region": "eu-central-1",
+            "new_decision": "new-value",
+        },
         samples=[
             {"name": "sample-b", "sameDecisionCount": 9, "differentDecisionCount": 0},
             {"name": "sample-a", "sameDecisionCount": 8, "differentDecisionCount": 1},
@@ -53,6 +61,8 @@ def test_compare_handoff_bundles_reports_blocker_and_sample_deltas(tmp_path: Pat
     assert report["decisionDelta"]["changed"] == [
         {"key": "network_account", "before": None, "after": "Network"}
     ]
+    assert report["decisionDelta"]["added"] == [{"key": "new_decision", "value": "new-value"}]
+    assert report["decisionDelta"]["removed"] == [{"key": "legacy_decision", "value": "old-value"}]
     assert "target.yaml" in report["artifactDelta"]["changed"]
     assert report["sampleRecommendationDelta"]["topBefore"] == "sample-a"
     assert report["sampleRecommendationDelta"]["topAfter"] == "sample-b"
@@ -63,10 +73,16 @@ def test_compare_handoff_bundles_reports_blocker_and_sample_deltas(tmp_path: Pat
     assert "OLD_BLOCKER" not in rendered
     assert "network_account" in rendered
     assert "  Added:" in rendered
+    assert "    - new_decision: new-value" in rendered
+    assert "  Removed:" in rendered
+    assert "    - legacy_decision: old-value" in rendered
+    assert "  Added:" in rendered
     assert "    - incremental-compile-report.yaml" in rendered
     assert "  Changed:" in rendered
     assert "    - target.yaml" in rendered
     html = render_bundle_comparison_html(report)
+    assert "Added: new_decision: new-value" in html
+    assert "Removed: legacy_decision: old-value" in html
     assert "Artifact Delta" in html
     assert "Added" in html
     assert "incremental-compile-report.yaml" in html

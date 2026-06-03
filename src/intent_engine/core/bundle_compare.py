@@ -164,13 +164,7 @@ def render_bundle_comparison_html(report: dict[str, Any]) -> str:
             _html_section(
                 "What Must Be Reviewed",
                 [
-                    _html_list(
-                        [
-                            f"{item.get('key')}: {item.get('before')} -> {item.get('after')}"
-                            for item in _coerce_list(decisions.get("changed"))
-                            if isinstance(item, dict)
-                        ]
-                    ),
+                    _html_list(_decision_review_lines(decisions)),
                     _html_table(
                         [
                             {
@@ -256,9 +250,9 @@ def render_bundle_comparison_text(report: dict[str, Any]) -> str:
             f"changed={len(_coerce_list(decision_delta.get('changed')))}",
         ]
     )
-    for item in _coerce_list(decision_delta.get("changed"))[:10]:
-        if isinstance(item, dict):
-            lines.append(f"  - {item.get('key')}: {item.get('before')} -> {item.get('after')}")
+    lines.extend(_text_decision_list("Added", _coerce_list(decision_delta.get("added"))))
+    lines.extend(_text_decision_list("Changed", _coerce_list(decision_delta.get("changed"))))
+    lines.extend(_text_decision_list("Removed", _coerce_list(decision_delta.get("removed"))))
 
     if input_delta.get("available"):
         lines.extend(
@@ -305,6 +299,16 @@ def _text_named_list(title: str, values: list[Any]) -> list[str]:
         return []
     lines = [f"  {title}:"]
     lines.extend(f"    - {value}" for value in values[:12])
+    if len(values) > 12:
+        lines.append(f"    ... {len(values) - 12} more")
+    return lines
+
+
+def _text_decision_list(title: str, values: list[Any]) -> list[str]:
+    if not values:
+        return []
+    lines = [f"  {title}:"]
+    lines.extend(f"    - {_decision_summary(value)}" for value in values[:12])
     if len(values) > 12:
         lines.append(f"    ... {len(values) - 12} more")
     return lines
@@ -743,6 +747,27 @@ def _to_builtin(value: Any) -> Any:
 
 def _values_match(before: Any, after: Any) -> bool:
     return bool(SampleConfig._canonical_value(before) == SampleConfig._canonical_value(after))
+
+
+def _decision_review_lines(decisions: dict[str, Any]) -> list[str]:
+    lines: list[str] = []
+    for title, key in (
+        ("Added", "added"),
+        ("Changed", "changed"),
+        ("Removed", "removed"),
+    ):
+        for item in _coerce_list(decisions.get(key)):
+            lines.append(f"{title}: {_decision_summary(item)}")
+    return lines
+
+
+def _decision_summary(item: Any) -> str:
+    if not isinstance(item, dict):
+        return str(item)
+    key = item.get("key", "unknown")
+    if "before" in item or "after" in item:
+        return f"{key}: {item.get('before')} -> {item.get('after')}"
+    return f"{key}: {item.get('value')}"
 
 
 def _html_section(title: str, body: list[str]) -> str:
