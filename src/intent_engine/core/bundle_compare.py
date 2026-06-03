@@ -196,8 +196,12 @@ def render_bundle_comparison_html(report: dict[str, Any]) -> str:
                 ],
             ),
             _html_section(
-                "Changed Artifacts",
-                [_html_list(_coerce_list(artifacts.get("changed")))],
+                "Artifact Delta",
+                [
+                    _html_named_list("Added", _coerce_list(artifacts.get("added"))),
+                    _html_named_list("Changed", _coerce_list(artifacts.get("changed"))),
+                    _html_named_list("Removed", _coerce_list(artifacts.get("removed"))),
+                ],
             ),
             "</main></body></html>",
             "",
@@ -742,6 +746,10 @@ def _html_list(items: list[Any]) -> str:
     if not items:
         return '<p class="muted">None</p>'
     return "<ul>" + "".join(f"<li>{escape(str(item))}</li>" for item in items) + "</ul>"
+
+
+def _html_named_list(title: str, items: list[Any]) -> str:
+    return f"<h3>{escape(title)}</h3>{_html_list(items)}"
 
 
 def _html_table(rows: list[dict[str, Any]]) -> str:

@@ -96,7 +96,7 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy, pyr
 
 ### Current Goal
 
-T44: Identify and fix real usability bugs
+T45: Follow-up usability bug sweep after target routing
 
 ### Status
 
@@ -105,7 +105,7 @@ T44: Identify and fix real usability bugs
 - **Format**: clean
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Ran a targeted usability bug sweep across ready AWS LZA, blocked AWS LZA, BYOM Terraform, blocked CloudFormation, static review pages, CLI help/blocked output, and target capability artifacts. Fixed real user-facing issues: target capability manual gates are now scoped to the selected route, blocked capabilities no longer render as available, blocked compile output substitutes the actual pattern in the template command, patterns without target capability graphs render as `not declared` instead of `unknown`, blocked review pages explain why `handoff-plan.yaml` may be absent, and review HTML displays omitted raw evidence as `not requested`. Full pytest, Ruff, Ruff format, mypy, Pyright, extraction/usability/golden journey checks, fixture drift, and pre-commit are green.
+- **Last session**: Committed and pushed target capability routing as `352fa52`. Then ran a fresh usability bug sweep across first-run discovery, ready/blocked AWS LZA, BYOM Terraform, blocked CloudFormation, and diff-aware review compare. Fixed two real follow-up issues: discovery clarifying questions now use graph-authored question text with readable `[key] question` spacing, and static comparison HTML now shows added/changed/removed artifact deltas so its visible artifact list matches the reported delta count. Full pytest, Ruff, Ruff format, mypy, Pyright, extraction/usability/golden journey checks, fixture drift, and pre-commit are green.
 
 ### Done
 
@@ -134,6 +134,7 @@ T44: Identify and fix real usability bugs
 - T42 target capability graph: the requirement graph remains the decision/readiness layer, and a second target capability graph now explains downstream routing and coverage. AWS LZA is the first reference target: accepted landing-zone decisions are covered by the LZA accelerator path, app/workload infrastructure language is flagged for separate module-composition or generator handling, and arbitrary Terraform/Terragrunt generation remains blocked unless a registered target owns it.
 - T43 battle test: Ran realistic ready AWS LZA, blocked AWS LZA, BYOM Terraform, incremental document update, review comparison, static delta HTML, and sample recommendation movement through the current CLI. No new harness or dashboard was added. The only blocking usability issue found was false unsupported target routing from negated generation language and short keyword substring matches; target capability detection now requires affirmative whole-token matches and ignores local negation.
 - T44 usability bug sweep: Fixed route-scoping and wording issues found in real generated outputs. Pure AWS LZA handoffs no longer show workload-module gates as active manual gates; blocked target capability rows show unavailable; blocked compile suggests `template --pattern <actual-pattern>`; BYOM patterns without target graphs show `not declared`; blocked reviews explain missing `handoff-plan.yaml`; raw evidence omission displays as `not requested`.
+- T45 follow-up usability sweep: After committing T42-T44, re-ran first-run and handoff paths from a clean baseline. Fixed discovery clarifying-question copy so it uses graph questions instead of generic fallback text, and fixed comparison HTML so added/removed artifacts are visible alongside changed artifacts.
 
 ### Next
 

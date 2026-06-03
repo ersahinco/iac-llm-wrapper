@@ -30,6 +30,8 @@ class TestCLIDiscover:
         assert "review html" in result.output
         assert "network_account" in result.output
         assert "Clarifying questions" in result.output
+        assert "[network_account] Which account owns shared networking?" in result.output
+        assert "[network_account]What" not in result.output
 
     def test_discover_with_path(self):
         result = runner.invoke(

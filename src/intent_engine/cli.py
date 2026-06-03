@@ -708,7 +708,7 @@ def discover(
                 if q.get("options"):
                     opt_str = f" | options: {', '.join(q['options'])}"
                 def_str = f" | default: {q.get('default', 'none')}" if q.get("default") else ""
-                typer.echo(f"  {i}. [{q['key']}]{q['question']}{opt_str}{def_str}")
+                typer.echo(f"  {i}. [{q['key']}] {q['question']}{opt_str}{def_str}")
                 if q.get("context"):
                     typer.echo(f"     context: {q['context']}")
 

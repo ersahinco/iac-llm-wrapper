@@ -348,6 +348,8 @@ def generate_clarifying_questions(
         # Enrich from graph metadata if available
         if graph is not None and gap.key in graph._requirements:
             req = graph._requirements[gap.key]
+            if req.question:
+                question["question"] = req.question
             if req.options:
                 question["options"] = req.options
                 question["type"] = "select"

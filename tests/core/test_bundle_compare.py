@@ -4,6 +4,7 @@ from pathlib import Path
 
 from intent_engine.core.bundle_compare import (
     compare_handoff_bundles,
+    render_bundle_comparison_html,
     render_bundle_comparison_text,
 )
 
@@ -40,6 +41,7 @@ def test_compare_handoff_bundles_reports_blocker_and_sample_deltas(tmp_path: Pat
         ],
         artifact_body="after",
     )
+    after.joinpath("incremental-compile-report.yaml").write_text("schemaVersion: test\n")
 
     report = compare_handoff_bundles(before, after)
 
@@ -60,6 +62,11 @@ def test_compare_handoff_bundles_reports_blocker_and_sample_deltas(tmp_path: Pat
     assert "Handoff Bundle Comparison" in rendered
     assert "OLD_BLOCKER" not in rendered
     assert "network_account" in rendered
+    html = render_bundle_comparison_html(report)
+    assert "Artifact Delta" in html
+    assert "Added" in html
+    assert "incremental-compile-report.yaml" in html
+    assert "target.yaml" in html
 
 
 def _write_bundle(
