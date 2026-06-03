@@ -8,7 +8,7 @@ import pytest
 import ruamel.yaml
 
 import intent_engine.patterns.aws_lza  # noqa: F401 — triggers pattern registration
-from intent_engine.core.compiler import CompileError, compile_from_interview
+from intent_engine.core.compiler import CompileError, compile_design, compile_from_interview
 from intent_engine.core.contracts import GLOBAL_CONTRACT_REGISTRY, ContractValidator
 from intent_engine.core.extractor import Extractor
 from intent_engine.core.generator import generate_all
@@ -32,6 +32,7 @@ class TestAwsLzaPattern:
         assert pattern.contracts == [AWS_LZA_SAMPLE_CONFIG_CONTRACT]
         assert "lineage-manifest.yaml" in pattern.expected_artifacts()
         assert "sample-recommendations.yaml" in pattern.expected_artifacts()
+        assert "target-capability-graph.yaml" in pattern.expected_artifacts()
         for artifact in AWS_LZA_SAMPLE_CONFIG_CONTRACT.required_artifacts:
             assert artifact in pattern.expected_artifacts()
 
@@ -208,6 +209,26 @@ class TestAwsLzaPattern:
         assert "aws-lza-standard-v1" in recommendation_names
         assert "aws-lza-regulated-v1" in recommendation_names
 
+        target = yaml.load((output / "target-capability-graph.yaml").read_text())
+        assert target["selectedTargetPath"] == ["accelerator"]
+        assert target["unsupportedGaps"] == []
+        assert target["coverage"]["unhandledAcceptedDecisions"] == []
+        accelerator = target["capabilities"][0]
+        assert accelerator["type"] == "accelerator"
+        assert "network-config.yaml" in accelerator["producedArtifacts"]
+        assert (
+            "Validate generated YAML with the AWS LZA toolchain before pipeline execution."
+            in (target["manualGates"])
+        )
+        assert (
+            "Select an approved workload module pattern before emitting module inputs."
+            not in (target["manualGates"])
+        )
+        blocked_capability = next(
+            item for item in target["capabilities"] if item["key"] == "arbitrary-iac-generation"
+        )
+        assert blocked_capability["available"] is False
+
         lineage = yaml.load((output / "lineage-manifest.yaml").read_text())
         assert lineage["sourceContract"]["kind"] == "aws-lza-sample-configuration"
         assert lineage["sourceContract"]["url"] == AWS_LZA_SAMPLE_CONFIG_CONTRACT.source_url
@@ -245,6 +266,92 @@ class TestAwsLzaPattern:
         assert "sample-recommendations.yaml" in runbook
         assert "Populate customer-specific Identity Center assignments" in runbook
         assert "parallel Terraform or Terragrunt" in runbook
+
+    def test_aws_lza_flags_workload_infrastructure_for_separate_target(
+        self,
+        tmp_path: Path,
+    ):
+        source = tmp_path / "packet.md"
+        source.write_text(
+            "\n".join(
+                [
+                    "# Customer packet",
+                    "",
+                    "baseline: standard",
+                    "topology: hub-spoke",
+                    "network_account: Network",
+                    "workload_accounts: CardsProd",
+                    "identity_center_permission_sets: ReadOnlyAccess, PowerUserAccess",
+                    "identity_center_assignments: PlatformAdmins:PowerUserAccess:Management",
+                    "",
+                    "The landing zone also needs an application stack with EKS, RDS,",
+                    "and workload infrastructure for the payments service.",
+                ]
+            )
+        )
+        output = tmp_path / "output"
+
+        compile_design(source, output, pattern="aws-lza")
+
+        yaml = ruamel.yaml.YAML(typ="safe")
+        target = yaml.load((output / "target-capability-graph.yaml").read_text())
+        assert target["selectedTargetPath"] == ["accelerator", "module-composition"]
+        assert target["unsupportedGaps"] == [
+            {
+                "key": "bespoke-workload-infrastructure",
+                "label": "Bespoke workload infrastructure",
+                "detectedBy": "aws-lza-sample-config",
+                "recommendedTarget": "module-composition",
+                "reason": (
+                    "AWS LZA establishes landing-zone foundations; workload resources need "
+                    "an approved module-composition or generator target."
+                ),
+            }
+        ]
+
+        report = yaml.load((output / "decision-report.yaml").read_text())
+        assert report["handoffReadiness"]["handoffAllowed"] is True
+        assert report["handoffReadiness"]["targetCapabilities"]["unsupportedGapCount"] == 1
+        assert "Route unsupported workload-specific requests" in " ".join(
+            report["handoffReadiness"]["safeHandoffPath"]
+        )
+        assert (
+            "Select an approved workload module pattern before emitting module inputs."
+            in (target["manualGates"])
+        )
+        assert not (output / "terraform.tfvars").exists()
+
+    def test_aws_lza_does_not_flag_negated_generation_requests(
+        self,
+        tmp_path: Path,
+    ):
+        source = tmp_path / "packet.md"
+        source.write_text(
+            "\n".join(
+                [
+                    "# Customer packet",
+                    "",
+                    "baseline: standard",
+                    "topology: hub-spoke",
+                    "network_account: Network",
+                    "workload_accounts: CardsProd",
+                    "identity_center_permission_sets: ReadOnlyAccess, PowerUserAccess",
+                    "identity_center_assignments: PlatformAdmins:PowerUserAccess:Management",
+                    "",
+                    "The requested downstream path is AWS LZA handoff only.",
+                    "Do not generate Terraform, Terragrunt, CloudFormation stacks,",
+                    "or deployment automation from this document.",
+                ]
+            )
+        )
+        output = tmp_path / "output"
+
+        compile_design(source, output, pattern="aws-lza")
+
+        yaml = ruamel.yaml.YAML(typ="safe")
+        target = yaml.load((output / "target-capability-graph.yaml").read_text())
+        assert target["selectedTargetPath"] == ["accelerator"]
+        assert target["unsupportedGaps"] == []
 
     def test_standard_defaults_match_golden_fixture(self, tmp_path: Path):
         output = tmp_path / "output"

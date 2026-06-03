@@ -103,6 +103,29 @@ def _write_review_bundle(
         },
     )
     _write_yaml(
+        input_dir / "target-capability-graph.yaml",
+        {
+            "selectedTargetPath": ["accelerator", "module-composition"],
+            "manualGates": ["Validate target output."],
+            "unsupportedGaps": [
+                {
+                    "key": "bespoke-workload-infrastructure",
+                    "recommendedTarget": "module-composition",
+                    "reason": "Needs separate module target.",
+                }
+            ],
+            "capabilities": [
+                {
+                    "key": "example-accelerator",
+                    "label": "Example accelerator",
+                    "type": "accelerator",
+                    "available": True,
+                    "producedArtifacts": ["present.yaml"],
+                }
+            ],
+        },
+    )
+    _write_yaml(
         input_dir / "lineage-manifest.yaml",
         {"artifacts": [{"name": "lineage-only.yaml", "required": True}]},
     )
@@ -170,6 +193,14 @@ def test_build_review_context_uses_report_readiness_and_artifact_rows(tmp_path: 
     assert context["contractValidation"][0]["name"] == "example-contract"
     assert context["contractStatus"] == "fail"
     assert context["reviewSummary"]["contractStatus"] == "fail"
+    assert context["reviewSummary"]["selectedTargetPath"] == [
+        "accelerator",
+        "module-composition",
+    ]
+    assert context["reviewSummary"]["unsupportedTargetGapCount"] == 1
+    assert context["targetCapabilities"]["unsupportedGaps"][0]["key"] == (
+        "bespoke-workload-infrastructure"
+    )
     assert context["reviewSummary"]["handoffAllowed"] is False
     assert context["reviewSummary"]["deploymentAllowed"] is False
     assert context["reviewSummary"]["blockerCount"] == 1
@@ -223,6 +254,10 @@ def test_render_review_html_uses_existing_graph_exports(tmp_path: Path):
     assert "Requirement key" in html
     assert "Which account owns shared networking?" in html
     assert "Contract status" in html
+    assert "Target Capability Graph" in html
+    assert "Selected target path" in html
+    assert "bespoke-workload-infrastructure" in html
+    assert "target-capability-graph.yaml" in html
     assert "Model conformance" in html
     assert "review" in html
     assert "Raw LLM coverage" in html
@@ -232,6 +267,32 @@ def test_render_review_html_uses_existing_graph_exports(tmp_path: Path):
     assert "requirement-graph.json" in html
     assert "requirement-graph.mmd" in html
     assert "raw-evidence.yaml" in html
+
+
+def test_render_review_html_marks_missing_target_capability_graph_as_not_declared(
+    tmp_path: Path,
+):
+    input_dir = tmp_path / "out"
+    _write_review_bundle(input_dir)
+    (input_dir / "target-capability-graph.yaml").unlink()
+
+    html = render_review_html(input_dir)
+
+    assert "Selected target path</span><strong>not declared</strong>" in html
+    assert "No target capability graph declared for this pattern." in html
+    assert "Selected target path</span><strong>unknown</strong>" not in html
+
+
+def test_render_review_html_explains_missing_handoff_plan_for_blocked_bundle(
+    tmp_path: Path,
+):
+    input_dir = tmp_path / "out"
+    _write_review_bundle(input_dir)
+    (input_dir / "handoff-plan.yaml").unlink()
+
+    html = render_review_html(input_dir)
+
+    assert "Blocked assessment bundles may omit handoff-plan.yaml" in html
 
 
 def test_review_context_does_not_report_llm_misses_for_deterministic_run(tmp_path: Path):
@@ -258,4 +319,5 @@ def test_review_html_labels_omitted_raw_evidence_as_not_requested(tmp_path: Path
 
     html = render_review_html(input_dir)
 
+    assert "Raw evidence</span><strong>not requested</strong>" in html
     assert "Raw evidence file</span><strong>not requested</strong>" in html

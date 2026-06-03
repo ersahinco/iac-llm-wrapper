@@ -48,4 +48,9 @@ handoffReadiness: &id001
     - Validate target contracts and artifact owner approvals before downstream
       use.
     - Pass only reviewed artifacts to the existing accelerator/module toolchain.
+  targetCapabilities:
+    selectedTargetPath:
+      - accelerator
+    unsupportedGapCount: 0
+    unsupportedGaps: []
 deploymentReadiness: *id001

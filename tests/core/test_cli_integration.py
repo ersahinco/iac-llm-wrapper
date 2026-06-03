@@ -203,6 +203,8 @@ class TestCLICompile:
         assert "handoff is blocked" in result.output
         assert "Generate the blocked review page" in result.output
         assert "Resolve the blocker questions" in result.output
+        assert "template --pattern aws-lza" in result.output
+        assert "template --pattern <pattern>" not in result.output
         assert "AWS_LZA_NETWORK_ACCOUNT_REQUIRED" in result.output
         report = (output_dir / "decision-report.yaml").read_text()
         assert "deploymentAllowed: false" in report

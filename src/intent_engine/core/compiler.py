@@ -23,6 +23,7 @@ from .markdown_extractor import (
 from .model_introspection import append_to_list_field, merge_into_list_field
 from .observability import build_model_benchmark
 from .patterns import GLOBAL_REGISTRY
+from .target_capabilities import build_target_capability_report
 from .validator import Violation, validate
 
 
@@ -51,6 +52,7 @@ def _build_payload(
     design_doc_data: dict[str, Any] | None = None,
     extraction_summary: dict[str, Any] | None = None,
     handoff_readiness: dict[str, Any] | None = None,
+    target_capability_report: dict[str, Any] | None = None,
 ) -> Any:
     """Wrap intent in IaCIntentPayload with design doc and module inputs."""
     from .module_mapping import DesignDocument, IaCIntentPayload, map_intent_to_modules
@@ -70,6 +72,7 @@ def _build_payload(
         pattern=pattern,
         decisions=decisions or {},
         extraction_summary=extraction_summary or {},
+        target_capability_report=target_capability_report or {},
         handoff_readiness=handoff_readiness or {},
     )
 
@@ -293,6 +296,7 @@ def _build_handoff_readiness(
     graph,
     violations: list[Violation],
     llm_result: LLMGraphResult,
+    target_capability_report: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     missing = _graph_missing_decisions(graph)
     conflicts = _violation_conflicts(violations)
@@ -300,11 +304,22 @@ def _build_handoff_readiness(
     llm_contradictions = _blocking_contradictions(graph, llm_result.contradictions)
     blockers = [{"code": v.code, "message": v.message} for v in violations]
     handoff_allowed = not blockers
+    unsupported_gaps: list[dict[str, Any]] = []
+    if target_capability_report:
+        unsupported_gaps = target_capability_report.get("unsupportedGaps", []) or []
     safe_handoff_path = (
         [
             "Review handoff-plan.yaml for owners, manual gates, and allowed next action.",
             "Validate target contracts and artifact owner approvals before downstream use.",
             "Pass only reviewed artifacts to the existing accelerator/module toolchain.",
+            *(
+                [
+                    "Route unsupported workload-specific requests through a separate "
+                    "approved target path."
+                ]
+                if unsupported_gaps
+                else []
+            ),
         ]
         if handoff_allowed
         else [
@@ -314,7 +329,7 @@ def _build_handoff_readiness(
             "Use the existing accelerator/module toolchain only after handoff readiness is ready.",
         ]
     )
-    return {
+    readiness: dict[str, Any] = {
         "handoffAllowed": handoff_allowed,
         # Backward-compatible alias for existing artifact consumers.
         "deploymentAllowed": handoff_allowed,
@@ -329,6 +344,13 @@ def _build_handoff_readiness(
         "conflictingDecisions": conflicts + llm_contradictions,
         "safeHandoffPath": safe_handoff_path,
     }
+    if target_capability_report:
+        readiness["targetCapabilities"] = {
+            "selectedTargetPath": target_capability_report.get("selectedTargetPath", []),
+            "unsupportedGapCount": len(unsupported_gaps),
+            "unsupportedGaps": unsupported_gaps,
+        }
+    return readiness
 
 
 def _build_extraction_summary(
@@ -343,6 +365,7 @@ def _build_extraction_summary(
     applied_decisions: dict[str, list[str]],
     accepted_decisions: dict[str, Any],
     graph,
+    target_capability_report: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     calls = []
     evidence_entries = evidence_store.entries if evidence_store is not None else []
@@ -363,7 +386,7 @@ def _build_extraction_summary(
     ]
     blocking_contradictions = _blocking_contradictions(graph, llm_result.contradictions)
     raw_evidence = _raw_evidence_status(raw_evidence_path, evidence_store)
-    return {
+    summary = {
         "pattern": pattern,
         "provider": first.get("provider", "none"),
         "model": first.get("model", "none") or "none",
@@ -404,6 +427,9 @@ def _build_extraction_summary(
         },
         "rawEvidence": raw_evidence,
     }
+    if target_capability_report:
+        summary["targetCapabilities"] = target_capability_report
+    return summary
 
 
 def _applied_decisions_from_audit(graph) -> dict[str, list[str]]:
@@ -454,19 +480,29 @@ def _write_failed_compile_artifacts(
     graph,
     readiness: dict[str, Any],
     extraction_summary: dict[str, Any],
+    target_capability_report: dict[str, Any] | None = None,
 ) -> None:
+    report = {
+        "pattern": pattern,
+        "decisions": _to_builtin(graph.typed_decisions()),
+        "handoffReadiness": readiness,
+        # Backward-compatible alias for existing artifact consumers.
+        "deploymentReadiness": readiness,
+    }
+    if target_capability_report:
+        report["targetCapabilities"] = target_capability_report
     _write_yaml_artifact(
         output_dir,
         "decision-report.yaml",
-        {
-            "pattern": pattern,
-            "decisions": _to_builtin(graph.typed_decisions()),
-            "handoffReadiness": readiness,
-            # Backward-compatible alias for existing artifact consumers.
-            "deploymentReadiness": readiness,
-        },
+        report,
     )
     _write_yaml_artifact(output_dir, "llm-trace-summary.yaml", extraction_summary)
+    if target_capability_report:
+        _write_yaml_artifact(
+            output_dir,
+            "target-capability-graph.yaml",
+            target_capability_report,
+        )
     _write_yaml_artifact(
         output_dir,
         "model-benchmark.yaml",
@@ -604,10 +640,20 @@ def compile_design(
     graph.apply_to_intent(intent)
 
     # 2e. Validate fail-closed (graph-driven when available)
+    target_capability_report = build_target_capability_report(
+        pattern_obj.target_capabilities,
+        graph.typed_decisions(),
+        text,
+    )
     violations = validate(intent, graph=graph, extra_validators=pattern_obj.validators)
     violations.extend(_markdown_contradiction_violations(markdown_result.contradictions))
     violations.extend(_llm_result_violations(graph, llm_result))
-    readiness = _build_handoff_readiness(graph, violations, llm_result)
+    readiness = _build_handoff_readiness(
+        graph,
+        violations,
+        llm_result,
+        target_capability_report,
+    )
     extraction_summary = _build_extraction_summary(
         pattern=pattern,
         evidence_store=evidence_store,
@@ -619,6 +665,7 @@ def compile_design(
         applied_decisions=applied_decisions,
         accepted_decisions=graph.typed_decisions(),
         graph=graph,
+        target_capability_report=target_capability_report,
     )
     if violations:
         if not dry_run:
@@ -628,6 +675,7 @@ def compile_design(
                 graph,
                 readiness,
                 extraction_summary,
+                target_capability_report,
             )
         raise CompileError(violations, readiness=readiness)
 
@@ -642,6 +690,7 @@ def compile_design(
         llm_result.design_doc,
         extraction_summary=extraction_summary,
         handoff_readiness=readiness,
+        target_capability_report=target_capability_report,
     )
     generate_all(payload, output_dir, pattern=pattern)
 
@@ -736,10 +785,20 @@ def compile_incremental_design(
     _merge_extracted_entities(intent, markdown_entities)
     graph.apply_to_intent(intent)
 
+    target_capability_report = build_target_capability_report(
+        pattern_obj.target_capabilities,
+        graph.typed_decisions(),
+        changed_text,
+    )
     violations = validate(intent, graph=graph, extra_validators=pattern_obj.validators)
     violations.extend(_markdown_contradiction_violations(markdown_result.contradictions))
     violations.extend(_llm_result_violations(graph, llm_result))
-    readiness = _build_handoff_readiness(graph, violations, llm_result)
+    readiness = _build_handoff_readiness(
+        graph,
+        violations,
+        llm_result,
+        target_capability_report,
+    )
     extraction_summary = _build_extraction_summary(
         pattern=pattern,
         evidence_store=evidence_store,
@@ -751,6 +810,7 @@ def compile_incremental_design(
         applied_decisions=applied_decisions,
         accepted_decisions=graph.typed_decisions(),
         graph=graph,
+        target_capability_report=target_capability_report,
     )
     incremental_report = incremental_decision_report(
         baseline_decisions=baseline_decisions,
@@ -778,6 +838,7 @@ def compile_incremental_design(
                 graph,
                 readiness,
                 extraction_summary,
+                target_capability_report,
             )
             _write_yaml_artifact(output_dir, "input-diff-report.yaml", input_diff)
             _write_yaml_artifact(
@@ -797,6 +858,7 @@ def compile_incremental_design(
         llm_result.design_doc,
         extraction_summary=extraction_summary,
         handoff_readiness=readiness,
+        target_capability_report=target_capability_report,
     )
     generate_all(payload, output_dir, pattern=pattern)
     _write_yaml_artifact(output_dir, "input-diff-report.yaml", input_diff)
@@ -825,7 +887,16 @@ def compile_from_graph(graph, output_dir: Path, pattern: str = "aws-lza") -> Non
     graph.apply_to_intent(intent)
     violations = validate(intent, graph=graph, extra_validators=pattern_obj.validators)
     llm_result = LLMGraphResult()
-    readiness = _build_handoff_readiness(graph, violations, llm_result)
+    target_capability_report = build_target_capability_report(
+        pattern_obj.target_capabilities,
+        graph.typed_decisions(),
+    )
+    readiness = _build_handoff_readiness(
+        graph,
+        violations,
+        llm_result,
+        target_capability_report,
+    )
     extraction_summary = _build_extraction_summary(
         pattern=pattern,
         evidence_store=None,
@@ -837,6 +908,7 @@ def compile_from_graph(graph, output_dir: Path, pattern: str = "aws-lza") -> Non
         applied_decisions=_applied_decisions_from_audit(graph),
         accepted_decisions=graph.typed_decisions(),
         graph=graph,
+        target_capability_report=target_capability_report,
     )
     if violations:
         _write_failed_compile_artifacts(
@@ -845,6 +917,7 @@ def compile_from_graph(graph, output_dir: Path, pattern: str = "aws-lza") -> Non
             graph,
             readiness,
             extraction_summary,
+            target_capability_report,
         )
         raise CompileError(violations, readiness=readiness)
     generate_all(
@@ -854,6 +927,7 @@ def compile_from_graph(graph, output_dir: Path, pattern: str = "aws-lza") -> Non
             graph.typed_decisions(),
             extraction_summary=extraction_summary,
             handoff_readiness=readiness,
+            target_capability_report=target_capability_report,
         ),
         output_dir,
         pattern=pattern,

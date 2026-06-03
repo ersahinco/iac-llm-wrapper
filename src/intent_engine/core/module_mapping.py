@@ -61,6 +61,7 @@ class IaCIntentPayload:
     pattern: str = ""
     decisions: dict[str, Any] = field(default_factory=dict)
     extraction_summary: dict[str, Any] = field(default_factory=dict)
+    target_capability_report: dict[str, Any] = field(default_factory=dict)
     _handoff_readiness: dict[str, Any] = field(default_factory=dict, repr=False)
 
     def __init__(
@@ -71,6 +72,7 @@ class IaCIntentPayload:
         pattern: str = "",
         decisions: dict[str, Any] | None = None,
         extraction_summary: dict[str, Any] | None = None,
+        target_capability_report: dict[str, Any] | None = None,
         handoff_readiness: dict[str, Any] | None = None,
         deployment_readiness: dict[str, Any] | None = None,
     ) -> None:
@@ -80,6 +82,7 @@ class IaCIntentPayload:
         self.pattern = pattern
         self.decisions = decisions or {}
         self.extraction_summary = extraction_summary or {}
+        self.target_capability_report = target_capability_report or {}
         self._handoff_readiness = (
             handoff_readiness if handoff_readiness is not None else deployment_readiness or {}
         )
@@ -115,6 +118,7 @@ class IaCIntentPayload:
             "pattern",
             "decisions",
             "extraction_summary",
+            "target_capability_report",
             "handoff_readiness",
             "deployment_readiness",
             "_handoff_readiness",

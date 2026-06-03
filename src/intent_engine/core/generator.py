@@ -257,6 +257,14 @@ def gen_model_benchmark(intent: Any, output_dir: Path) -> None:
     _write(output_dir, "model-benchmark.yaml", build_model_benchmark(summary))
 
 
+def gen_target_capability_graph(intent: Any, output_dir: Path) -> None:
+    """Write downstream target capability coverage and routing."""
+    report = getattr(intent, "target_capability_report", None)
+    if not report:
+        return
+    _write(output_dir, "target-capability-graph.yaml", report)
+
+
 def _artifact_owner(artifact_name: str) -> str:
     lowered = artifact_name.lower()
     if "security" in lowered or "iam" in lowered:
@@ -282,6 +290,7 @@ def gen_handoff_plan(intent: Any, output_dir: Path) -> None:
         readiness = getattr(intent, "deployment_readiness", {})
     readiness = readiness or {}
     allowed = bool(readiness.get("handoffAllowed", readiness.get("deploymentAllowed", True)))
+    target_capabilities = getattr(intent, "target_capability_report", {}) or {}
     contracts = pattern_obj.contracts
     required_artifacts = list(
         dict.fromkeys(
@@ -360,6 +369,7 @@ def gen_handoff_plan(intent: Any, output_dir: Path) -> None:
             "Target contract validation is clean.",
             "Artifact owners approve files in their domain.",
             "Rollback owner and previous known-good handoff are identified.",
+            *target_capabilities.get("manualGates", []),
         ],
         "rollback": [
             "Do not mutate downstream systems from this plan.",
@@ -367,6 +377,8 @@ def gen_handoff_plan(intent: Any, output_dir: Path) -> None:
             "Regenerate artifacts only from corrected intent.",
         ],
     }
+    if target_capabilities:
+        data["targetCapabilities"] = target_capabilities
     _write(output_dir, "handoff-plan.yaml", data)
 
 
@@ -374,6 +386,12 @@ register_generator("design-doc", gen_design_doc, priority=4, category="meta")
 register_generator("module-inputs", gen_module_inputs, priority=5, category="meta")
 register_generator("llm-trace-summary", gen_llm_trace_summary, priority=5, category="meta")
 register_generator("model-benchmark", gen_model_benchmark, priority=5, category="meta")
+register_generator(
+    "target-capability-graph",
+    gen_target_capability_graph,
+    priority=5,
+    category="meta",
+)
 register_generator("handoff-plan", gen_handoff_plan, priority=6, category="meta")
 register_generator(
     "sample-recommendations",

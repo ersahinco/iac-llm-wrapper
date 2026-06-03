@@ -91,3 +91,131 @@ deploymentReadiness:
 rawEvidence:
   path: not-requested
   status: not-requested
+targetCapabilities:
+  selectedTargetPath:
+    - accelerator
+  routingOrder:
+    - accelerator
+    - module-composition
+    - generator
+    - template-generation
+    - manual
+    - blocked
+  capabilities:
+    - key: aws-lza-sample-config
+      label: AWS LZA sample configuration
+      type: accelerator
+      available: true
+      description: AWS Landing Zone Accelerator owns the downstream deployment
+        engine; iac-llm-wrapper emits validated LZA YAML handoff artifacts only.
+      handledDecisions:
+        - baseline
+        - org_mode
+        - organization_name
+        - home_region
+        - enabled_regions
+        - organizational_units
+        - workload_accounts
+        - audit_account
+        - log_archive_account
+        - security_tooling_account
+        - network_account
+        - identity_center_delegated_admin_account
+        - identity_center_permission_sets
+        - identity_center_assignments
+        - topology
+        - network_cidr
+        - centralized_logging
+        - security_hub_enabled
+        - guardduty_enabled
+        - compliance_overlay
+      producedArtifacts:
+        - accounts-config.yaml
+        - global-config.yaml
+        - iam-config.yaml
+        - network-config.yaml
+        - organization-config.yaml
+        - security-config.yaml
+        - decision-report.yaml
+        - lineage-manifest.yaml
+        - deployment-runbook.md
+      requiredDecisions:
+        - baseline
+        - org_mode
+        - home_region
+        - enabled_regions
+        - identity_center_permission_sets
+        - identity_center_assignments
+      manualGates:
+        - Review AWS LZA configuration against the selected upstream sample
+          baseline.
+        - Validate generated YAML with the AWS LZA toolchain before pipeline
+          execution.
+        - Approve account emails, IAM Identity Center assignments, and
+          networking CIDRs.
+      dependsOn: []
+    - key: approved-workload-modules
+      label: Approved workload modules
+      type: module-composition
+      available: true
+      description: Separate approved modules can own workload-specific
+        infrastructure after landing-zone readiness is reviewed.
+      handledDecisions: []
+      producedArtifacts: []
+      requiredDecisions: []
+      manualGates:
+        - Select an approved workload module pattern before emitting module
+          inputs.
+        - Keep workload module handoff separate from the AWS LZA baseline
+          bundle.
+      dependsOn:
+        - aws-lza-sample-config
+    - key: arbitrary-iac-generation
+      label: Arbitrary IaC generation
+      type: blocked
+      available: false
+      description: Free-form prose must not produce raw deployable IaC unless a
+        registered target explicitly owns that generation path.
+      handledDecisions: []
+      producedArtifacts: []
+      requiredDecisions: []
+      manualGates: []
+      dependsOn:
+        - aws-lza-sample-config
+  coverage:
+    handledDecisionCount: 20
+    handledDecisions:
+      baseline: aws-lza-sample-config
+      org_mode: aws-lza-sample-config
+      organization_name: aws-lza-sample-config
+      home_region: aws-lza-sample-config
+      enabled_regions: aws-lza-sample-config
+      organizational_units: aws-lza-sample-config
+      workload_accounts: aws-lza-sample-config
+      audit_account: aws-lza-sample-config
+      log_archive_account: aws-lza-sample-config
+      security_tooling_account: aws-lza-sample-config
+      network_account: aws-lza-sample-config
+      identity_center_delegated_admin_account: aws-lza-sample-config
+      identity_center_permission_sets: aws-lza-sample-config
+      identity_center_assignments: aws-lza-sample-config
+      topology: aws-lza-sample-config
+      network_cidr: aws-lza-sample-config
+      centralized_logging: aws-lza-sample-config
+      security_hub_enabled: aws-lza-sample-config
+      guardduty_enabled: aws-lza-sample-config
+      compliance_overlay: aws-lza-sample-config
+    unhandledAcceptedDecisions: []
+  unsupportedGaps: []
+  manualGates:
+    - Review AWS LZA configuration against the selected upstream sample
+      baseline.
+    - Validate generated YAML with the AWS LZA toolchain before pipeline
+      execution.
+    - Approve account emails, IAM Identity Center assignments, and networking
+      CIDRs.
+  edges:
+    - from: aws-lza-sample-config
+      to: approved-workload-modules
+    - from: aws-lza-sample-config
+      to: arbitrary-iac-generation

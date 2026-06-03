@@ -500,7 +500,7 @@ def compile(
         _emit_blocked_next_steps(output)
         typer.echo(
             "Fix violations in your Markdown and re-run. "
-            f"Run '{APP_NAME} template --pattern <pattern>' to generate "
+            f"Run '{APP_NAME} template --pattern {pattern}' to generate "
             "a valid starting template.",
             err=True,
         )

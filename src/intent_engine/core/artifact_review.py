@@ -56,6 +56,13 @@ def build_review_context(
     benchmark = _read_yaml(input_dir / "model-benchmark.yaml")
     handoff = _read_yaml(input_dir / "handoff-plan.yaml")
     lineage = _read_yaml(input_dir / "lineage-manifest.yaml")
+    target_capabilities = _read_yaml(input_dir / "target-capability-graph.yaml")
+    if not target_capabilities:
+        target_capabilities = _dict(
+            report.get("targetCapabilities")
+            or trace.get("targetCapabilities")
+            or handoff.get("targetCapabilities")
+        )
     readiness = _readiness(report, handoff)
     contract_validation = (
         _read_yaml(contract_validation_path)
@@ -84,6 +91,10 @@ def build_review_context(
             "contractStatus": contract_status,
             "allowedNextAction": readiness.get("allowedNextAction", ""),
             "modelQuality": model_quality,
+            "selectedTargetPath": target_capabilities.get("selectedTargetPath", []),
+            "unsupportedTargetGapCount": len(
+                _coerce_list(target_capabilities.get("unsupportedGaps"))
+            ),
         },
         "modelQuality": model_quality,
         "graphExports": graph_exports,
@@ -96,6 +107,7 @@ def build_review_context(
         "contractValidation": _coerce_list(contract_validation.get("contracts")),
         "contractValidationArtifact": contract_validation,
         "contractStatus": contract_status,
+        "targetCapabilities": target_capabilities,
         "reviewerNextActions": _reviewer_next_actions(
             readiness=readiness,
             contract_status=contract_status,
@@ -114,6 +126,11 @@ def build_review_context(
             "contractValidation": _href(link_base_dir, contract_validation_path)
             if contract_validation_path is not None
             else None,
+            "targetCapabilities": _artifact_href(
+                input_dir,
+                link_base_dir,
+                "target-capability-graph.yaml",
+            ),
         },
     }
 

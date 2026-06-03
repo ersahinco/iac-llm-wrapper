@@ -88,6 +88,11 @@ def build_aws_lza_graph() -> RequirementGraph:
             question="Which workload accounts should be included? Use comma-separated values.",
             default="Prod",
             category="accounts",
+            signals=["workload-infrastructure"],
+            hint=(
+                "AWS LZA can vend workload accounts; application resources need a separate "
+                "approved module or generator target."
+            ),
         )
     )
     graph.add(

@@ -18,6 +18,16 @@ def render_review_html(context: dict[str, Any]) -> str:
     links = _dict(context.get("links"))
     review_summary = _dict(context.get("reviewSummary"))
     model_quality = _dict(context.get("modelQuality"))
+    target_capabilities = _dict(context.get("targetCapabilities"))
+    target_capabilities_declared = bool(target_capabilities)
+    summary_target_path = _target_path_label(
+        review_summary.get("selectedTargetPath"),
+        declared=target_capabilities_declared,
+    )
+    target_path = _target_path_label(
+        target_capabilities.get("selectedTargetPath"),
+        declared=target_capabilities_declared,
+    )
     raw_evidence = str(context.get("rawEvidence", "unknown"))
 
     return "\n".join(
@@ -71,6 +81,11 @@ def render_review_html(context: dict[str, Any]) -> str:
                         str(review_summary.get("blockingContradictionCount", 0)),
                     ),
                     _kv("Contract status", str(review_summary.get("contractStatus", "unknown"))),
+                    _kv("Selected target path", summary_target_path),
+                    _kv(
+                        "Unsupported target gaps",
+                        str(review_summary.get("unsupportedTargetGapCount", 0)),
+                    ),
                     _kv(
                         "Allowed next action",
                         str(review_summary.get("allowedNextAction", "")),
@@ -135,6 +150,14 @@ def render_review_html(context: dict[str, Any]) -> str:
                 ],
             ),
             _section(
+                "Target Capability Graph",
+                _target_capability_section(
+                    target_capabilities,
+                    selected_target_path=target_path,
+                    target_capabilities_link=links.get("targetCapabilities"),
+                ),
+            ),
+            _section(
                 "Accepted Decisions", [_mapping_table(_dict(context.get("acceptedDecisions")))]
             ),
             _section("Graph Decisions", [_mapping_table(_dict(context.get("graphDecisions")))]),
@@ -167,7 +190,7 @@ def render_review_html(context: dict[str, Any]) -> str:
                     _kv("Provider", str(trace.get("provider", "unknown"))),
                     _kv("Model", str(trace.get("model", "unknown"))),
                     _kv("Call count", str(trace.get("callCount", "0"))),
-                    _kv("Raw evidence", raw_evidence),
+                    _kv("Raw evidence", _raw_evidence_display(raw_evidence)),
                     _artifact_link_row("LLM trace summary", links.get("llmTrace")),
                     _raw_evidence_link_row(raw_evidence, links.get("rawEvidence")),
                     _details("Raw trace summary", _yaml_dump(trace)),
@@ -233,6 +256,39 @@ def _kv(label: str, value: str) -> str:
     return f'<div class="kv"><span>{escape(label)}</span><strong>{escape(value)}</strong></div>'
 
 
+def _target_path_label(value: Any, *, declared: bool) -> str:
+    if not declared:
+        return "not declared"
+    return ", ".join(_coerce_list(value)) or "none selected"
+
+
+def _target_capability_section(
+    target_capabilities: dict[str, Any],
+    *,
+    selected_target_path: str,
+    target_capabilities_link: str | None,
+) -> list[str]:
+    if not target_capabilities:
+        return ['<p class="muted">No target capability graph declared for this pattern.</p>']
+    return [
+        _kv("Selected target path", selected_target_path),
+        _list_block(
+            "Manual gates",
+            _coerce_list(target_capabilities.get("manualGates")),
+        ),
+        _list_block(
+            "Unsupported gaps",
+            _coerce_list(target_capabilities.get("unsupportedGaps")),
+        ),
+        _capability_table(_coerce_list(target_capabilities.get("capabilities"))),
+        _artifact_link_row(
+            "Target capability graph",
+            target_capabilities_link,
+        ),
+        _details("Raw target capability graph", _yaml_dump(target_capabilities)),
+    ]
+
+
 def _list_block(title: str, items: list[Any]) -> str:
     if not items:
         return f'<h3>{escape(title)}</h3><p class="muted">None</p>'
@@ -275,6 +331,27 @@ def _contract_table(results: list[Any]) -> str:
             "</tr>"
         )
     return "<table>" + "".join(rows) + "</table>"
+
+
+def _capability_table(capabilities: list[Any]) -> str:
+    if not capabilities:
+        return '<p class="muted">No target capabilities declared.</p>'
+    rows = []
+    for capability in capabilities:
+        if not isinstance(capability, dict):
+            continue
+        rows.append(
+            "<tr>"
+            f"<th>{escape(str(capability.get('label', capability.get('key', 'unknown'))))}</th>"
+            f"<td>{escape(str(capability.get('type', 'unknown')))}</td>"
+            f"<td>{escape(str(capability.get('available', False)))}</td>"
+            f"<td><pre>{escape(_summarize(capability.get('producedArtifacts', [])))}</pre></td>"
+            "</tr>"
+        )
+    if not rows:
+        return '<p class="muted">No target capabilities declared.</p>'
+    header = "<tr><th>Capability</th><th>Type</th><th>Available</th><th>Artifacts</th></tr>"
+    return "<table>" + header + "".join(rows) + "</table>"
 
 
 def _blocker_table(rows: list[Any]) -> str:
@@ -322,7 +399,10 @@ def _artifact_table(artifacts: list[Any]) -> str:
 def _handoff_steps(handoff: dict[str, Any]) -> str:
     steps = handoff.get("steps")
     if not isinstance(steps, list) or not steps:
-        return '<p class="muted">No handoff plan found.</p>'
+        return (
+            '<p class="muted">No handoff plan found. Blocked assessment bundles may '
+            "omit handoff-plan.yaml until blockers are resolved.</p>"
+        )
     items = []
     for step in steps:
         if not isinstance(step, dict):
@@ -361,6 +441,15 @@ def _raw_evidence_link_row(raw_evidence: str, href: Any) -> str:
     if status == "requested-empty":
         return _kv("Raw evidence file", "requested, no calls recorded")
     return _kv("Raw evidence file", "missing")
+
+
+def _raw_evidence_display(raw_evidence: str) -> str:
+    status = raw_evidence.split(" ", 1)[0].strip()
+    if status == "not-requested":
+        return "not requested"
+    if status == "requested-empty":
+        return "requested, no calls recorded"
+    return raw_evidence
 
 
 def _details(title: str, content: str) -> str:

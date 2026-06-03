@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from .contracts import ContractValidator, TargetContract
 from .requirements import RequirementGraph
+from .target_capabilities import TargetCapability
 
 
 @dataclass
@@ -34,6 +35,8 @@ class Pattern:
     validators: list[Callable[[Any], list[Any]]] = field(default_factory=list)
     # Target contracts that drive decisions, validation, and generated artifacts
     contracts: list[TargetContract] = field(default_factory=list)
+    # Downstream target capability graph declarations.
+    target_capabilities: list[TargetCapability] = field(default_factory=list)
 
     def create_graph(self) -> RequirementGraph:
         graph = self.graph_factory()
@@ -52,6 +55,8 @@ class Pattern:
             artifacts.append("handoff-plan.yaml")
         if GLOBAL_SAMPLE_REGISTRY.find_by_pattern(self.name):
             artifacts.append("sample-recommendations.yaml")
+        if self.target_capabilities:
+            artifacts.append("target-capability-graph.yaml")
         return list(dict.fromkeys(artifacts))
 
 

@@ -96,16 +96,16 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy, pyr
 
 ### Current Goal
 
-T41: Diff-aware compile for long packet updates
+T44: Identify and fix real usability bugs
 
 ### Status
 
-- **Tests**: 335 passing, 5 skipped
+- **Tests**: 339 passing, 5 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Implemented diff-aware compile for long packet updates. `compile --baseline-bundle --changed-doc` seeds the graph from previous accepted decisions, scopes optional LLM context to input deltas plus baseline summary, then re-runs full graph validation and artifact generation on the resulting decision state. It writes `input-diff-report.yaml` and `incremental-compile-report.yaml`; `review compare` now includes input deltas, impacted requirement maps, and optional static comparison HTML. Full pytest, Ruff, Ruff format, mypy, Pyright, fixture drift, golden journey, extraction, usability, and pre-commit are green.
+- **Last session**: Ran a targeted usability bug sweep across ready AWS LZA, blocked AWS LZA, BYOM Terraform, blocked CloudFormation, static review pages, CLI help/blocked output, and target capability artifacts. Fixed real user-facing issues: target capability manual gates are now scoped to the selected route, blocked capabilities no longer render as available, blocked compile output substitutes the actual pattern in the template command, patterns without target capability graphs render as `not declared` instead of `unknown`, blocked review pages explain why `handoff-plan.yaml` may be absent, and review HTML displays omitted raw evidence as `not requested`. Full pytest, Ruff, Ruff format, mypy, Pyright, extraction/usability/golden journey checks, fixture drift, and pre-commit are green.
 
 ### Done
 
@@ -131,19 +131,24 @@ T41: Diff-aware compile for long packet updates
 - T39 follow-up rhythm: Ran complex AWS LZA, standard AWS LZA, incomplete architect AWS LZA, BYOM CloudFormation, and BYOM Terraform packets through the same path. The previous discovery guidance fix held. No stuck, mistrust, or manual-translation point repeated or blocked handoff, so no engine change was made.
 - T40 incremental compare: `iac-llm-wrapper review compare --before <bundle> --after <bundle> --output handoff-comparison.yaml` compares existing generated bundles without rerunning extraction. The report surfaces readiness changes, requirement completeness changes, accepted decision additions/removals/changes, blocker additions/resolutions, changed artifact file hashes, model quality changes, and sample recommendation additions/removals/rank/score changes. Existing `review diff` remains for decision-report-only comparisons.
 - T41 diff-aware compile: `iac-llm-wrapper compile --baseline-bundle <bundle> --baseline-doc <before.md> --changed-doc <after.md> --output <bundle> --no-raw-evidence` supports incremental long-document updates. Baseline decisions are carried forward, changed structured decisions override them, optional LLM extraction sees only scoped delta context plus previous decisions/summary, and the full graph plus contracts still validate the complete resulting state. `input-diff-report.yaml` records changed headings, changed structured decision lines, hunks, and likely impacted requirements. `incremental-compile-report.yaml` records reused, changed, added, removed, carried-forward, and re-confirmation decisions. `review compare --html-output` emits a static delta page.
+- T42 target capability graph: the requirement graph remains the decision/readiness layer, and a second target capability graph now explains downstream routing and coverage. AWS LZA is the first reference target: accepted landing-zone decisions are covered by the LZA accelerator path, app/workload infrastructure language is flagged for separate module-composition or generator handling, and arbitrary Terraform/Terragrunt generation remains blocked unless a registered target owns it.
+- T43 battle test: Ran realistic ready AWS LZA, blocked AWS LZA, BYOM Terraform, incremental document update, review comparison, static delta HTML, and sample recommendation movement through the current CLI. No new harness or dashboard was added. The only blocking usability issue found was false unsupported target routing from negated generation language and short keyword substring matches; target capability detection now requires affirmative whole-token matches and ignores local negation.
+- T44 usability bug sweep: Fixed route-scoping and wording issues found in real generated outputs. Pure AWS LZA handoffs no longer show workload-module gates as active manual gates; blocked target capability rows show unavailable; blocked compile suggests `template --pattern <actual-pattern>`; BYOM patterns without target graphs show `not declared`; blocked reviews explain missing `handoff-plan.yaml`; raw evidence omission displays as `not requested`.
 
 ### Next
 
-1. Use diff-aware compile plus `review compare` during packet-based requirement harvesting whenever a long document or sample configuration changes incrementally; review only the delta first, then decide whether a repeated/blocking point deserves implementation.
-2. Continue packet-based requirement harvesting before adding product surface: run 3-5 real or realistic packets, record only stuck/mistrust/manual-translation moments, and implement only repeated or handoff-blocking requirements.
-3. Stop harness expansion unless real local/Bedrock model runs expose pain.
-4. Run `evaluate-extraction.py --llm`, `evaluate-usability.py --llm`, and `compare-model-benchmarks.py --require-conformant` with approved local/Bedrock models when broader model regression confidence is needed; use result artifacts to decide whether prompts or fixtures need tightening.
-5. If reviewers still struggle to resolve blockers, consider adding lightweight anchors from blocker rows to exported requirement graph nodes without adding JavaScript.
-6. Continue AWS LZA schema depth only where real customer inputs justify it.
+1. Continue packet-based requirement harvesting with real or realistic packets; implement only repeated or handoff-blocking stuck/mistrust/manual-translation points.
+2. Use diff-aware compile plus `review compare` whenever a long document or sample configuration changes incrementally; review only the delta first, then decide whether a repeated/blocking point deserves implementation.
+3. Continue packet-based requirement harvesting before adding product surface: run 3-5 real or realistic packets, record only stuck/mistrust/manual-translation moments, and implement only repeated or handoff-blocking requirements.
+4. Stop harness expansion unless real local/Bedrock model runs expose pain.
+5. Run `evaluate-extraction.py --llm`, `evaluate-usability.py --llm`, and `compare-model-benchmarks.py --require-conformant` with approved local/Bedrock models when broader model regression confidence is needed; use result artifacts to decide whether prompts or fixtures need tightening.
+6. If reviewers still struggle to resolve blockers, consider adding lightweight anchors from blocker rows to exported requirement graph nodes without adding JavaScript.
+7. Continue AWS LZA schema depth only where real customer inputs justify it.
 
 ### Durable Decisions
 
 - Core stays domain-agnostic; pattern packages own models, graphs, contracts, validators, samples, and generators.
+- Two-layer graph architecture is the product direction: requirement graphs own decisions, gaps, blockers, provenance, and readiness; target capability graphs own downstream route selection, target coverage, unsupported asks, manual gates, and blocked generation paths.
 - Graph and contracts own readiness. LLM output is evidence until accepted by graph requirements and artifact contracts.
 - Handoff artifacts are not deployments. `handoffReadiness` is the clearer term; legacy `deploymentReadiness` stays for backward compatibility.
 - Raw LLM evidence is local development/debug material. Service-style runs can disable raw prompt/response storage with `--no-raw-evidence` while preserving `llm-trace-summary.yaml`, `model-benchmark.yaml`, and `handoff-review.html` for interpretation review.
