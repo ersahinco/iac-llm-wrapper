@@ -8,6 +8,7 @@ from typing import Any
 import ruamel.yaml
 
 from intent_engine.core.artifact_review import build_review_context, render_review_html
+from intent_engine.patterns import load_builtin_patterns
 
 
 def _write_yaml(path: Path, data: dict[str, Any]) -> None:
@@ -228,6 +229,102 @@ def test_build_review_context_uses_report_readiness_and_artifact_rows(tmp_path: 
     assert {"name": "present.yaml", "status": "present"} in context["artifacts"]
     assert {"name": "missing.yaml", "status": "missing"} in context["artifacts"]
     assert {"name": "lineage-only.yaml", "status": "missing"} in context["artifacts"]
+
+
+def test_review_context_maps_pattern_validator_blockers_to_requirement_questions(
+    tmp_path: Path,
+):
+    load_builtin_patterns()
+    input_dir = tmp_path / "out"
+    input_dir.mkdir()
+    _write_yaml(
+        input_dir / "decision-report.yaml",
+        {
+            "pattern": "aws-lza",
+            "handoffReadiness": {
+                "status": "blocked",
+                "handoffAllowed": False,
+                "deploymentAllowed": False,
+                "blockers": [
+                    {
+                        "code": "AWS_LZA_INFRASTRUCTURE_OU_REQUIRED",
+                        "message": (
+                            "Hub-spoke topology requires an Infrastructure OU for the "
+                            "network account."
+                        ),
+                    },
+                    {
+                        "code": "AWS_LZA_IDENTITY_CENTER_ADMIN_UNKNOWN",
+                        "message": (
+                            "Identity Center delegated administrator must reference a "
+                            "known account."
+                        ),
+                    },
+                    {
+                        "code": "AWS_LZA_HOME_REGION_NOT_ENABLED",
+                        "message": "Home region must be present in enabled regions.",
+                    },
+                ],
+                "missingDecisions": [],
+                "conflictingDecisions": [
+                    {"code": "AWS_LZA_IDENTITY_CENTER_ADMIN_UNKNOWN"},
+                    {"code": "AWS_LZA_HOME_REGION_NOT_ENABLED"},
+                ],
+            },
+        },
+    )
+    _write_yaml(
+        input_dir / "llm-trace-summary.yaml",
+        {
+            "acceptedDecisions": {},
+            "gaps": {"blocking": [], "resolved": []},
+            "contradictions": {"blocking": []},
+            "rawEvidence": {"status": "not-requested", "path": "not-requested"},
+            "appliedDecisions": {"markdown": [], "llm": []},
+        },
+    )
+    _write_yaml(
+        input_dir / "model-benchmark.yaml",
+        {
+            "run": {"mode": "deterministic"},
+            "quality": {"acceptedDecisionCount": 0},
+            "conformance": {"status": "not-applicable"},
+        },
+    )
+    validation_path = input_dir / "contract-validation.yaml"
+    _write_yaml(
+        validation_path,
+        {"summary": {"status": "fail", "contractCount": 0, "violationCount": 0}},
+    )
+
+    context = build_review_context(
+        input_dir,
+        link_base_dir=input_dir,
+        graph_exports={},
+        contract_validation_path=validation_path,
+    )
+
+    rows = {row["code"]: row for row in context["blockerRows"]}
+    assert rows["AWS_LZA_INFRASTRUCTURE_OU_REQUIRED"] == {
+        "code": "AWS_LZA_INFRASTRUCTURE_OU_REQUIRED",
+        "message": "Hub-spoke topology requires an Infrastructure OU for the network account.",
+        "requirementKey": "organizational_units",
+        "label": "Organizational Units",
+        "question": "Which OUs are required? Use comma-separated values.",
+        "resolutionType": "missing",
+    }
+    assert rows["AWS_LZA_IDENTITY_CENTER_ADMIN_UNKNOWN"]["requirementKey"] == (
+        "identity_center_delegated_admin_account"
+    )
+    assert rows["AWS_LZA_IDENTITY_CENTER_ADMIN_UNKNOWN"]["question"] == (
+        "Which account is delegated administrator for IAM Identity Center?"
+    )
+    assert rows["AWS_LZA_IDENTITY_CENTER_ADMIN_UNKNOWN"]["resolutionType"] == "conflicting"
+    assert rows["AWS_LZA_HOME_REGION_NOT_ENABLED"]["requirementKey"] == "enabled_regions"
+    assert rows["AWS_LZA_HOME_REGION_NOT_ENABLED"]["question"] == (
+        "Which AWS regions should LZA enable? Use comma-separated values."
+    )
+    assert all(row["question"] != "unknown" for row in rows.values())
 
 
 def test_render_review_html_uses_existing_graph_exports(tmp_path: Path):

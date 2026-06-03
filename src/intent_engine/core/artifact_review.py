@@ -255,6 +255,8 @@ def _blocker_rows(pattern: str, readiness: dict[str, Any]) -> list[dict[str, str
             key = requirement.key
         if not key:
             key = _markdown_contradiction_key(code, message)
+        if not key:
+            key = _validator_code_key(pattern, code)
         if requirement is None and key:
             requirement = requirements_by_key.get(key)
         rows.append(
@@ -295,6 +297,27 @@ def _markdown_contradiction_key(code: str, message: str) -> str:
     if marker not in message:
         return ""
     return message.split(marker, 1)[1].split("'", 1)[0]
+
+
+def _validator_code_key(pattern: str, code: str) -> str:
+    pattern_codes = {
+        "aws-lza": {
+            "AWS_LZA_SECURITY_OU_REQUIRED": "organizational_units",
+            "AWS_LZA_INFRASTRUCTURE_OU_REQUIRED": "organizational_units",
+            "AWS_LZA_WORKLOADS_OU_REQUIRED": "organizational_units",
+            "AWS_LZA_LOG_ARCHIVE_ACCOUNT_REQUIRED": "log_archive_account",
+            "AWS_LZA_AUDIT_ACCOUNT_REQUIRED": "audit_account",
+            "AWS_LZA_SECURITY_TOOLING_ACCOUNT_REQUIRED": "security_tooling_account",
+            "AWS_LZA_IDENTITY_CENTER_ADMIN_UNKNOWN": ("identity_center_delegated_admin_account"),
+            "AWS_LZA_IDENTITY_CENTER_ASSIGNMENT_FORMAT_INVALID": ("identity_center_assignments"),
+            "AWS_LZA_IDENTITY_CENTER_ASSIGNMENT_PERMISSION_SET_UNKNOWN": (
+                "identity_center_assignments"
+            ),
+            "AWS_LZA_IDENTITY_CENTER_ASSIGNMENT_ACCOUNT_UNKNOWN": ("identity_center_assignments"),
+            "AWS_LZA_HOME_REGION_NOT_ENABLED": "enabled_regions",
+        }
+    }
+    return pattern_codes.get(pattern, {}).get(code, "")
 
 
 def _resolution_type(code: str, key: str, conflicting_codes: set[str]) -> str:
