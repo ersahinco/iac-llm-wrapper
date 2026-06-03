@@ -62,6 +62,10 @@ def test_compare_handoff_bundles_reports_blocker_and_sample_deltas(tmp_path: Pat
     assert "Handoff Bundle Comparison" in rendered
     assert "OLD_BLOCKER" not in rendered
     assert "network_account" in rendered
+    assert "  Added:" in rendered
+    assert "    - incremental-compile-report.yaml" in rendered
+    assert "  Changed:" in rendered
+    assert "    - target.yaml" in rendered
     html = render_bundle_comparison_html(report)
     assert "Artifact Delta" in html
     assert "Added" in html

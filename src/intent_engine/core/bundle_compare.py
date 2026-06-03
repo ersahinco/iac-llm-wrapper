@@ -281,8 +281,9 @@ def render_bundle_comparison_text(report: dict[str, Any]) -> str:
             f"changed={len(_coerce_list(artifact_delta.get('changed')))}",
         ]
     )
-    for name in _coerce_list(artifact_delta.get("changed"))[:12]:
-        lines.append(f"  - {name}")
+    lines.extend(_text_named_list("Added", _coerce_list(artifact_delta.get("added"))))
+    lines.extend(_text_named_list("Changed", _coerce_list(artifact_delta.get("changed"))))
+    lines.extend(_text_named_list("Removed", _coerce_list(artifact_delta.get("removed"))))
 
     lines.extend(
         [
@@ -297,6 +298,16 @@ def render_bundle_comparison_text(report: dict[str, Any]) -> str:
         ]
     )
     return "\n".join(lines) + "\n"
+
+
+def _text_named_list(title: str, values: list[Any]) -> list[str]:
+    if not values:
+        return []
+    lines = [f"  {title}:"]
+    lines.extend(f"    - {value}" for value in values[:12])
+    if len(values) > 12:
+        lines.append(f"    ... {len(values) - 12} more")
+    return lines
 
 
 def _load_bundle(path: Path) -> _BundleSnapshot:
