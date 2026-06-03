@@ -330,13 +330,23 @@ instead of re-reviewing everything from scratch or asking the model to reinterpr
 the full document again:
 
 ```bash
+iac-llm-wrapper compile --baseline-bundle out/before \
+  --baseline-doc design-before.md \
+  --changed-doc design-after.md \
+  --output out/after --pattern aws-lza --no-raw-evidence
+
 iac-llm-wrapper review compare --before out/before --after out/after \
-  --output out/handoff-comparison.yaml
+  --output out/handoff-comparison.yaml \
+  --html-output out/handoff-comparison.html
 ```
 
-The comparison report summarizes readiness, requirement completeness, accepted
-decision deltas, changed artifact files, blocker changes, model quality changes,
-and sample recommendation rank/score changes.
+The incremental compile seeds the graph from the previous accepted bundle, gives
+the LLM only changed hunks plus nearby document context when a model is used, and
+then re-runs full graph validation, pattern validators, and artifact contracts on
+the full resulting decision state. The comparison report summarizes readiness,
+requirement completeness, accepted decision deltas, changed artifact files,
+blocker changes, model quality changes, input-diff context, impacted
+requirements, and sample recommendation rank/score changes.
 
 ### 5. Engineer Handoff
 

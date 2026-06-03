@@ -133,6 +133,59 @@ class TestCLICompile:
         assert "Dry-run" in result.output
         assert not (output_dir / "decision-report.yaml").exists()
 
+    def test_compile_incremental_from_baseline_bundle(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setenv("INTENT_ENGINE_DISABLE_LLM", "1")
+        before_dir = tmp_path / "before"
+        after_dir = tmp_path / "after"
+        baseline_doc = tmp_path / "before.md"
+        changed_doc = tmp_path / "after.md"
+        source = Path("fixtures/eval/aws-lza-standard-handoff.md").read_text()
+        baseline_doc.write_text(source)
+        changed_doc.write_text(
+            source.replace(
+                "- workload_accounts: AppProd",
+                "- workload_accounts: AppProd, DataProd",
+            )
+        )
+
+        baseline = runner.invoke(
+            app,
+            [
+                "compile",
+                "--input",
+                str(baseline_doc),
+                "--output",
+                str(before_dir),
+                "--no-raw-evidence",
+            ],
+        )
+        assert baseline.exit_code == 0, baseline.output
+
+        result = runner.invoke(
+            app,
+            [
+                "compile",
+                "--baseline-bundle",
+                str(before_dir),
+                "--baseline-doc",
+                str(baseline_doc),
+                "--changed-doc",
+                str(changed_doc),
+                "--output",
+                str(after_dir),
+                "--no-raw-evidence",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Incremental Compile Summary" in result.output
+        assert "Changed decisions: 1" in result.output
+        assert (after_dir / "input-diff-report.yaml").exists()
+        assert (after_dir / "incremental-compile-report.yaml").exists()
+        incremental_report = (after_dir / "incremental-compile-report.yaml").read_text()
+        assert "workload_accounts" in incremental_report
+        assert "validationBoundary" in incremental_report
+
     def test_compile_blocked_design_writes_safe_assessment(self, tmp_path: Path, monkeypatch):
         monkeypatch.setenv("INTENT_ENGINE_DISABLE_LLM", "1")
         output_dir = tmp_path / "out"
@@ -332,6 +385,7 @@ class TestCLIReview:
         assert after_compile.exit_code == 0, after_compile.output
 
         report = tmp_path / "handoff-comparison.yaml"
+        html = tmp_path / "handoff-comparison.html"
         result = runner.invoke(
             app,
             [
@@ -343,6 +397,8 @@ class TestCLIReview:
                 str(after_dir),
                 "--output",
                 str(report),
+                "--html-output",
+                str(html),
             ],
         )
 
@@ -354,6 +410,8 @@ class TestCLIReview:
         report_text = report.read_text()
         assert "schemaVersion: intent-engine/handoff-comparison/v1" in report_text
         assert "workload_accounts" in report_text
+        assert html.exists()
+        assert "handoff comparison" in html.read_text()
 
     def test_review_html_from_complex_lza_handoff(self, tmp_path: Path, monkeypatch):
         monkeypatch.setenv("INTENT_ENGINE_DISABLE_LLM", "1")

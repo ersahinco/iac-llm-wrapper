@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
+from html import escape
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,8 @@ class _BundleSnapshot:
     artifacts: dict[str, str]
     samples: list[dict[str, Any]]
     model: dict[str, Any]
+    input_diff: dict[str, Any]
+    lineage: list[dict[str, Any]]
 
 
 def compare_handoff_bundles(before_dir: Path, after_dir: Path) -> dict[str, Any]:
@@ -34,6 +37,13 @@ def compare_handoff_bundles(before_dir: Path, after_dir: Path) -> dict[str, Any]
     sample_delta = _sample_delta(before.samples, after.samples)
     readiness_delta = _readiness_delta(before.readiness, after.readiness)
     model_delta = _model_delta(before.model, after.model)
+    impacted_map = _impacted_requirement_map(
+        decision_delta=decision_delta,
+        requirement_delta=requirement_delta,
+        artifact_delta=artifact_delta,
+        sample_delta=sample_delta,
+        after=after,
+    )
     review_focus = _review_focus(
         decision_delta=decision_delta,
         requirement_delta=requirement_delta,
@@ -86,6 +96,8 @@ def compare_handoff_bundles(before_dir: Path, after_dir: Path) -> dict[str, Any]
         "readinessDelta": readiness_delta,
         "requirementDelta": requirement_delta,
         "decisionDelta": decision_delta,
+        "inputDelta": _input_delta(before.input_diff, after.input_diff),
+        "impactedRequirementMap": impacted_map,
         "artifactDelta": artifact_delta,
         "sampleRecommendationDelta": sample_delta,
         "modelDelta": model_delta,
@@ -102,6 +114,97 @@ def write_bundle_comparison(report: dict[str, Any], output: Path) -> None:
         yaml.dump(report, file)
 
 
+def write_bundle_comparison_html(report: dict[str, Any], output: Path) -> None:
+    """Write a static HTML comparison page."""
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(render_bundle_comparison_html(report))
+
+
+def render_bundle_comparison_html(report: dict[str, Any]) -> str:
+    """Render a static HTML comparison page from a comparison report."""
+    summary = _dict(report.get("summary"))
+    readiness = _dict(report.get("readinessDelta"))
+    decisions = _dict(report.get("decisionDelta"))
+    artifacts = _dict(report.get("artifactDelta"))
+    samples = _dict(report.get("sampleRecommendationDelta"))
+    impacts = _coerce_list(report.get("impactedRequirementMap"))
+    focus = _coerce_list(summary.get("reviewFocus"))
+    return "\n".join(
+        [
+            "<!doctype html>",
+            '<html lang="en">',
+            "<head>",
+            '<meta charset="utf-8">',
+            '<meta name="viewport" content="width=device-width, initial-scale=1">',
+            "<title>handoff comparison</title>",
+            "<style>",
+            _COMPARISON_CSS,
+            "</style>",
+            "</head>",
+            "<body><main>",
+            "<header><p>iac-llm-wrapper delta review</p><h1>handoff comparison</h1>"
+            f"<strong>{escape(str(summary.get('status', 'unknown')))}</strong></header>",
+            _html_section(
+                "What Changed",
+                [
+                    _html_list(focus),
+                    _html_kv("Before", str(summary.get("before", ""))),
+                    _html_kv("After", str(summary.get("after", ""))),
+                    _html_kv(
+                        "Readiness",
+                        f"{readiness.get('statusBefore')} -> {readiness.get('statusAfter')}",
+                    ),
+                    _html_kv(
+                        "Handoff allowed",
+                        f"{readiness.get('handoffAllowedBefore')} -> "
+                        f"{readiness.get('handoffAllowedAfter')}",
+                    ),
+                ],
+            ),
+            _html_section(
+                "What Must Be Reviewed",
+                [
+                    _html_list(
+                        [
+                            f"{item.get('key')}: {item.get('before')} -> {item.get('after')}"
+                            for item in _coerce_list(decisions.get("changed"))
+                            if isinstance(item, dict)
+                        ]
+                    ),
+                    _html_table(
+                        [
+                            {
+                                "requirement": item.get("requirementKey", ""),
+                                "artifacts": ", ".join(
+                                    str(name)
+                                    for name in _coerce_list(item.get("changedDownstreamArtifacts"))
+                                ),
+                                "sampleImpact": str(item.get("sampleRecommendationImpact", "")),
+                            }
+                            for item in impacts
+                            if isinstance(item, dict)
+                        ]
+                    ),
+                ],
+            ),
+            _html_section(
+                "What Stayed Stable",
+                [
+                    _html_kv("Artifact unchanged count", str(artifacts.get("unchangedCount", 0))),
+                    _html_kv("Sample top before", str(samples.get("topBefore", "none"))),
+                    _html_kv("Sample top after", str(samples.get("topAfter", "none"))),
+                ],
+            ),
+            _html_section(
+                "Changed Artifacts",
+                [_html_list(_coerce_list(artifacts.get("changed")))],
+            ),
+            "</main></body></html>",
+            "",
+        ]
+    )
+
+
 def render_bundle_comparison_text(report: dict[str, Any]) -> str:
     """Render a terse terminal summary for a bundle comparison report."""
     summary = _dict(report.get("summary"))
@@ -110,6 +213,7 @@ def render_bundle_comparison_text(report: dict[str, Any]) -> str:
     artifact_delta = _dict(report.get("artifactDelta"))
     sample_delta = _dict(report.get("sampleRecommendationDelta"))
     readiness_delta = _dict(report.get("readinessDelta"))
+    input_delta = _dict(report.get("inputDelta"))
     lines = [
         "=== Handoff Bundle Comparison ===",
         "",
@@ -152,6 +256,18 @@ def render_bundle_comparison_text(report: dict[str, Any]) -> str:
         if isinstance(item, dict):
             lines.append(f"  - {item.get('key')}: {item.get('before')} -> {item.get('after')}")
 
+    if input_delta.get("available"):
+        lines.extend(
+            [
+                "",
+                "Input delta:",
+                f"  mode: {input_delta.get('mode', 'unknown')}",
+                f"  changed lines: {input_delta.get('changedLineCount', 0)}",
+                "  changed headings: "
+                + ", ".join(str(item) for item in _coerce_list(input_delta.get("changedHeadings"))),
+            ]
+        )
+
     lines.extend(
         [
             "",
@@ -185,6 +301,8 @@ def _load_bundle(path: Path) -> _BundleSnapshot:
     benchmark = _read_yaml(path / "model-benchmark.yaml")
     handoff = _read_yaml(path / "handoff-plan.yaml")
     contract = _read_yaml(path / "contract-validation.yaml")
+    input_diff = _read_yaml(path / "input-diff-report.yaml")
+    lineage = _coerce_list(_read_yaml(path / "lineage-manifest.yaml").get("lineage"))
     samples = _coerce_list(_read_yaml(path / "sample-recommendations.yaml").get("recommendations"))
     readiness = _readiness(report, handoff, contract)
     decisions = _decisions(report, trace, path)
@@ -200,6 +318,8 @@ def _load_bundle(path: Path) -> _BundleSnapshot:
         artifacts=_artifact_hashes(path),
         samples=[item for item in samples if isinstance(item, dict)],
         model=_model(benchmark),
+        input_diff=input_diff,
+        lineage=[item for item in lineage if isinstance(item, dict)],
     )
 
 
@@ -437,6 +557,81 @@ def _model_delta(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any
     return {"before": before, "after": after, "changed": changed}
 
 
+def _input_delta(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
+    if not before and not after:
+        return {
+            "available": False,
+            "changedHeadings": [],
+            "changedStructuredDecisionLines": [],
+            "likelyImpactedRequirements": [],
+        }
+    return {
+        "available": bool(after),
+        "changedHeadings": _coerce_list(after.get("changedHeadings")),
+        "changedStructuredDecisionLines": _coerce_list(after.get("changedStructuredDecisionLines")),
+        "likelyImpactedRequirements": _coerce_list(after.get("likelyImpactedRequirements")),
+        "changedLineCount": after.get("changedLineCount", 0),
+        "mode": _dict(after.get("source")).get("mode", "unknown"),
+    }
+
+
+def _impacted_requirement_map(
+    *,
+    decision_delta: dict[str, Any],
+    requirement_delta: dict[str, Any],
+    artifact_delta: dict[str, Any],
+    sample_delta: dict[str, Any],
+    after: _BundleSnapshot,
+) -> list[dict[str, Any]]:
+    lineage_by_decision: dict[str, list[dict[str, Any]]] = {}
+    for item in after.lineage:
+        decision = str(item.get("decision", ""))
+        if decision:
+            lineage_by_decision.setdefault(decision, []).append(item)
+    changed_artifacts = set(_coerce_list(artifact_delta.get("changed")))
+    sample_changed = bool(
+        sample_delta.get("rankChanges")
+        or sample_delta.get("scoreChanges")
+        or sample_delta.get("added")
+        or sample_delta.get("removed")
+    )
+    missing_added = set(_coerce_list(requirement_delta.get("missingDecisionsAdded")))
+    missing_resolved = set(_coerce_list(requirement_delta.get("missingDecisionsResolved")))
+    rows: list[dict[str, Any]] = []
+    for item in _coerce_list(decision_delta.get("changed")):
+        if not isinstance(item, dict):
+            continue
+        key = str(item.get("key", ""))
+        lineage = lineage_by_decision.get(key, [])
+        artifacts = sorted(
+            {str(entry.get("artifact", "")) for entry in lineage if entry.get("artifact")}
+        )
+        rows.append(
+            {
+                "requirementKey": key,
+                "decisionBefore": item.get("before"),
+                "decisionAfter": item.get("after"),
+                "downstreamArtifacts": artifacts,
+                "changedDownstreamArtifacts": [
+                    artifact for artifact in artifacts if artifact in changed_artifacts
+                ],
+                "lineagePaths": [
+                    {
+                        "artifact": entry.get("artifact"),
+                        "path": entry.get("path"),
+                    }
+                    for entry in lineage
+                ],
+                "sampleRecommendationImpact": sample_changed,
+                "blockerImpact": {
+                    "missingAdded": key in missing_added,
+                    "missingResolved": key in missing_resolved,
+                },
+            }
+        )
+    return rows
+
+
 def _review_focus(
     *,
     decision_delta: dict[str, Any],
@@ -533,3 +728,56 @@ def _to_builtin(value: Any) -> Any:
 
 def _values_match(before: Any, after: Any) -> bool:
     return bool(SampleConfig._canonical_value(before) == SampleConfig._canonical_value(after))
+
+
+def _html_section(title: str, body: list[str]) -> str:
+    return "\n".join(["<section>", f"<h2>{escape(title)}</h2>", *body, "</section>"])
+
+
+def _html_kv(label: str, value: str) -> str:
+    return f"<p><span>{escape(label)}</span><strong>{escape(value)}</strong></p>"
+
+
+def _html_list(items: list[Any]) -> str:
+    if not items:
+        return '<p class="muted">None</p>'
+    return "<ul>" + "".join(f"<li>{escape(str(item))}</li>" for item in items) + "</ul>"
+
+
+def _html_table(rows: list[dict[str, Any]]) -> str:
+    if not rows:
+        return '<p class="muted">None</p>'
+    rendered = [
+        "<table><tr><th>Requirement</th><th>Changed Artifacts</th><th>Sample Impact</th></tr>"
+    ]
+    for row in rows:
+        rendered.append(
+            "<tr>"
+            f"<td>{escape(str(row.get('requirement', '')))}</td>"
+            f"<td>{escape(str(row.get('artifacts', '')))}</td>"
+            f"<td>{escape(str(row.get('sampleImpact', '')))}</td>"
+            "</tr>"
+        )
+    rendered.append("</table>")
+    return "".join(rendered)
+
+
+_COMPARISON_CSS = """
+:root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+body { margin: 0; background: #f7f7f5; color: #171717; }
+main { max-width: 1040px; margin: 0 auto; padding: 32px 20px 56px; }
+header { border-bottom: 1px solid #d8d8d2; margin-bottom: 24px; padding-bottom: 18px; }
+header p { margin: 0 0 8px; color: #666; font-size: 13px; text-transform: uppercase; }
+h1 { margin: 0 0 10px; font-size: 34px; letter-spacing: 0; }
+h2 { margin: 0 0 14px; font-size: 20px; }
+section { border-top: 1px solid #d8d8d2; padding: 22px 0; }
+p { display: flex; gap: 16px; justify-content: space-between; margin: 8px 0; }
+p span { color: #666; }
+p strong { text-align: right; }
+ul { margin: 0; padding-left: 20px; }
+li { margin: 7px 0; }
+table { border-collapse: collapse; width: 100%; background: white; }
+th, td { border: 1px solid #d8d8d2; padding: 8px 10px; text-align: left; vertical-align: top; }
+th { background: #eeeeea; }
+.muted { display: block; color: #777; }
+"""

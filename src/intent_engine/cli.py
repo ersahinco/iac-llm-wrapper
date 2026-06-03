@@ -14,6 +14,7 @@ from .core.bundle_compare import (
     compare_handoff_bundles,
     render_bundle_comparison_text,
     write_bundle_comparison,
+    write_bundle_comparison_html,
 )
 from .core.cli_guidance import (
     blocked_next_step_lines,
@@ -25,6 +26,7 @@ from .core.compiler import (
     CompileError,
     compile_design,
     compile_from_graph,
+    compile_incremental_design,
     explain_report,
     generate_template,
     review_reports,
@@ -194,6 +196,38 @@ def _emit_compile_next_steps(
         typer.echo(line)
 
 
+def _emit_incremental_compile_summary(output: Path) -> None:
+    report_path = output / "incremental-compile-report.yaml"
+    diff_path = output / "input-diff-report.yaml"
+    if not report_path.exists():
+        return
+    import ruamel.yaml
+
+    yaml = ruamel.yaml.YAML(typ="safe")
+    data = yaml.load(report_path.read_text()) or {}
+    decisions = data.get("decisions", {}) if isinstance(data, dict) else {}
+    if not isinstance(decisions, dict):
+        return
+    changed = decisions.get("changed", []) or []
+    added = decisions.get("added", []) or []
+    removed = decisions.get("removed", []) or []
+    reconfirm = decisions.get("needingReconfirmation", []) or []
+    reused = decisions.get("reused", []) or []
+    typer.echo("")
+    typer.echo("=== Incremental Compile Summary ===")
+    typer.echo(f"  Reused decisions: {len(reused)}")
+    typer.echo(f"  Changed decisions: {len(changed)}")
+    typer.echo(f"  Added decisions: {len(added)}")
+    typer.echo(f"  Removed decisions: {len(removed)}")
+    typer.echo(f"  Needs re-confirmation: {len(reconfirm)}")
+    if changed:
+        typer.echo("  Changed keys:")
+        for item in changed:
+            if isinstance(item, dict):
+                typer.echo(f"    - {item.get('key')}: {item.get('before')} -> {item.get('after')}")
+    typer.echo(f"  Reports: {diff_path}, {report_path}")
+
+
 def _emit_blocked_next_steps(output: Path) -> None:
     for line in blocked_next_step_lines(APP_NAME, output):
         typer.echo(line, err=True)
@@ -297,10 +331,25 @@ def pattern_check(
 @app.command()
 def compile(
     input: Path = typer.Option(
-        ...,
+        None,
         "--input",
         "-i",
         help="Markdown design doc or directory with .md files",
+    ),
+    baseline_bundle: Path = typer.Option(
+        None,
+        "--baseline-bundle",
+        help="Previous generated handoff bundle for diff-aware incremental compile",
+    ),
+    changed_doc: Path = typer.Option(
+        None,
+        "--changed-doc",
+        help="Changed Markdown design doc for diff-aware incremental compile",
+    ),
+    baseline_doc: Path = typer.Option(
+        None,
+        "--baseline-doc",
+        help="Optional previous Markdown doc for precise document diff context",
     ),
     output: Path = typer.Option(
         ...,
@@ -363,7 +412,30 @@ def compile(
     requirement graph (data model). No regex, no rigid format — just
     describe your infrastructure requirements in whatever structure you prefer.
     """
-    if not input.exists():
+    incremental = baseline_bundle is not None or changed_doc is not None
+    if incremental:
+        if baseline_bundle is None or changed_doc is None:
+            typer.echo(
+                "Error: incremental compile requires --baseline-bundle and --changed-doc",
+                err=True,
+            )
+            raise typer.Exit(1)
+        if not baseline_bundle.is_dir():
+            typer.echo(f"Error: baseline bundle is not a directory: {baseline_bundle}", err=True)
+            raise typer.Exit(1)
+        if not changed_doc.exists():
+            typer.echo(f"Error: changed doc does not exist: {changed_doc}", err=True)
+            raise typer.Exit(1)
+        if baseline_doc is not None and not baseline_doc.exists():
+            typer.echo(f"Error: baseline doc does not exist: {baseline_doc}", err=True)
+            raise typer.Exit(1)
+    elif input is None:
+        typer.echo(
+            "Error: --input is required unless --baseline-bundle/--changed-doc are used",
+            err=True,
+        )
+        raise typer.Exit(1)
+    elif not input.exists():
         typer.echo(f"Error: input path does not exist: {input}", err=True)
         raise typer.Exit(1)
 
@@ -386,16 +458,33 @@ def compile(
     )
 
     try:
-        compile_design(
-            input,
-            output,
-            graph=graph,
-            llm_caller=llm_caller,
-            evidence_store=evidence_store,
-            raw_evidence_path=evidence_path,
-            dry_run=dry_run,
-            pattern=pattern,
-        )
+        if incremental:
+            assert baseline_bundle is not None
+            assert changed_doc is not None
+            compile_incremental_design(
+                baseline_bundle=baseline_bundle,
+                changed_doc=changed_doc,
+                output_dir=output,
+                baseline_doc=baseline_doc,
+                graph=graph,
+                llm_caller=llm_caller,
+                evidence_store=evidence_store,
+                raw_evidence_path=evidence_path,
+                dry_run=dry_run,
+                pattern=pattern,
+            )
+        else:
+            assert input is not None
+            compile_design(
+                input,
+                output,
+                graph=graph,
+                llm_caller=llm_caller,
+                evidence_store=evidence_store,
+                raw_evidence_path=evidence_path,
+                dry_run=dry_run,
+                pattern=pattern,
+            )
     except CompileError as e:
         typer.echo("Compilation failed: handoff is blocked.", err=True)
         typer.echo("Violations:", err=True)
@@ -423,6 +512,8 @@ def compile(
         return
 
     typer.echo(f"Compilation successful. Output written to: {output}")
+    if incremental:
+        _emit_incremental_compile_summary(output)
 
     _emit_sample_matches(pattern, graph.typed_decisions())
     _write_evidence_output(evidence_path, evidence_store)
@@ -992,6 +1083,11 @@ def review(
         "-o",
         help="Output path for html review",
     ),
+    html_output: Path = typer.Option(
+        None,
+        "--html-output",
+        help="Optional static HTML output path for review compare",
+    ),
 ) -> None:
     """Review generated artifacts: diff reports, compare bundles, or write static HTML."""
     if action == "html":
@@ -1020,6 +1116,9 @@ def review(
         if output is not None:
             write_bundle_comparison(comparison, output)
             typer.echo(f"Comparison report written to: {output}")
+        if html_output is not None:
+            write_bundle_comparison_html(comparison, html_output)
+            typer.echo(f"Comparison HTML written to: {html_output}")
         return
 
     if action != "diff":

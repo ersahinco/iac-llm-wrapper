@@ -7,6 +7,11 @@ from typing import Any
 
 import ruamel.yaml
 
+from .document_diff import (
+    build_incremental_llm_context,
+    build_input_diff_report,
+    incremental_decision_report,
+)
 from .extractor import Extractor, LLMGraphResult
 from .generator import generate_all
 from .interview import InterviewEngine
@@ -89,6 +94,14 @@ def _write_yaml_artifact(output_dir: Path, name: str, data: Any) -> None:
     (output_dir / name).write_text(header + _yaml_dump(data))
 
 
+def _read_yaml_artifact(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    yaml = ruamel.yaml.YAML(typ="safe")
+    data = yaml.load(path.read_text())
+    return data if isinstance(data, dict) else {}
+
+
 def _to_builtin(value: Any) -> Any:
     if hasattr(value, "value"):
         return _to_builtin(value.value)
@@ -104,6 +117,37 @@ def _without_locked_decisions(
     locked_keys: set[str],
 ) -> dict[str, Any]:
     return {key: value for key, value in decisions.items() if key not in locked_keys}
+
+
+def _baseline_decisions_from_bundle(bundle: Path) -> dict[str, Any]:
+    trace = _read_yaml_artifact(bundle / "llm-trace-summary.yaml")
+    accepted = trace.get("acceptedDecisions")
+    if isinstance(accepted, dict) and accepted:
+        return accepted
+    sample = _read_yaml_artifact(bundle / "sample-recommendations.yaml")
+    current = sample.get("currentDecisions")
+    if isinstance(current, dict) and current:
+        return current
+    report = _read_yaml_artifact(bundle / "decision-report.yaml")
+    decisions = report.get("decisions")
+    return decisions if isinstance(decisions, dict) else {}
+
+
+def _baseline_summary_from_bundle(bundle: Path) -> dict[str, Any]:
+    report = _read_yaml_artifact(bundle / "decision-report.yaml")
+    trace = _read_yaml_artifact(bundle / "llm-trace-summary.yaml")
+    benchmark = _read_yaml_artifact(bundle / "model-benchmark.yaml")
+    readiness = report.get("handoffReadiness") or report.get("deploymentReadiness") or {}
+    quality = benchmark.get("quality", {}) if isinstance(benchmark.get("quality"), dict) else {}
+    return {
+        "pattern": report.get("pattern", trace.get("pattern", benchmark.get("pattern", "unknown"))),
+        "readiness": readiness,
+        "acceptedDecisionCount": quality.get("acceptedDecisionCount"),
+        "rawLlmCoverage": {
+            "covered": quality.get("rawLlmAcceptedCoverageCount"),
+            "accepted": quality.get("acceptedDecisionCount"),
+        },
+    }
 
 
 def _gap_is_resolved(graph, gap: Any) -> bool:
@@ -600,6 +644,163 @@ def compile_design(
         handoff_readiness=readiness,
     )
     generate_all(payload, output_dir, pattern=pattern)
+
+
+def compile_incremental_design(
+    *,
+    baseline_bundle: Path,
+    changed_doc: Path,
+    output_dir: Path,
+    baseline_doc: Path | None = None,
+    graph=None,
+    llm_caller: LLMCaller | None = None,
+    evidence_store: LLMEvidenceStore | None = None,
+    raw_evidence_path: Path | None = None,
+    dry_run: bool = False,
+    pattern: str = "aws-lza",
+) -> None:
+    """Compile a changed document by seeding the graph from a previous bundle.
+
+    The LLM sees only scoped delta context. The final graph, validators, and
+    target contracts still run over the full resulting decision state.
+    """
+    if not baseline_bundle.is_dir():
+        raise FileNotFoundError(f"baseline bundle does not exist: {baseline_bundle}")
+    if not changed_doc.exists():
+        raise FileNotFoundError(f"changed document does not exist: {changed_doc}")
+
+    pattern_obj = GLOBAL_REGISTRY.get(pattern)
+    if graph is None:
+        graph = pattern_obj.create_graph()
+
+    changed_text = changed_doc.read_text()
+    baseline_text = baseline_doc.read_text() if baseline_doc is not None else None
+    baseline_decisions = _baseline_decisions_from_bundle(baseline_bundle)
+    baseline_summary = _baseline_summary_from_bundle(baseline_bundle)
+    input_diff = build_input_diff_report(
+        before_text=baseline_text,
+        after_text=changed_text,
+        graph=graph,
+        baseline_decisions=baseline_decisions,
+    )
+
+    markdown_result = extract_from_markdown_with_diagnostics(changed_text, graph)
+    markdown_decisions = markdown_result.decisions
+    markdown_entities = extract_entities_from_markdown(changed_text)
+    applied_decisions: dict[str, list[str]] = {
+        "baseline": [],
+        "markdown": [],
+        "llm": [],
+        "signals": [],
+        "defaults": [],
+    }
+    if baseline_decisions:
+        applied_decisions["baseline"] = graph.apply_decisions(baseline_decisions)
+    if markdown_decisions:
+        applied_decisions["markdown"] = graph.apply_decisions(markdown_decisions)
+
+    scoped_context = build_incremental_llm_context(
+        input_diff_report=input_diff,
+        baseline_decisions=baseline_decisions,
+        baseline_summary=baseline_summary,
+    )
+    llm_result = LLMContextProvider(
+        prose=scoped_context,
+        graph=graph,
+        llm_caller=llm_caller,
+        evidence_store=evidence_store,
+    ).run()
+
+    locked_decision_keys = set(applied_decisions["markdown"])
+    if llm_result.decisions:
+        llm_decisions = _without_locked_decisions(llm_result.decisions, locked_decision_keys)
+        applied_decisions["llm"] = graph.apply_decisions(llm_decisions)
+        locked_decision_keys.update(applied_decisions["llm"])
+    if llm_result.signal_decisions:
+        signal_decisions = _without_locked_decisions(
+            llm_result.signal_decisions,
+            locked_decision_keys,
+        )
+        applied_decisions["signals"] = graph.apply_decisions(signal_decisions)
+
+    graph.apply_defaults_for_remaining()
+    applied_decisions["defaults"] = [
+        str(entry["key"]) for entry in graph.audit_log() if entry.get("how") == "defaulted"
+    ]
+
+    if llm_result.decisions or llm_result.signal_decisions:
+        extractor = Extractor(graph=graph, pattern=pattern)
+        intent = llm_result.to_intent(extractor)
+    else:
+        intent = pattern_obj.intent_factory()
+    _merge_extracted_entities(intent, markdown_entities)
+    graph.apply_to_intent(intent)
+
+    violations = validate(intent, graph=graph, extra_validators=pattern_obj.validators)
+    violations.extend(_markdown_contradiction_violations(markdown_result.contradictions))
+    violations.extend(_llm_result_violations(graph, llm_result))
+    readiness = _build_handoff_readiness(graph, violations, llm_result)
+    extraction_summary = _build_extraction_summary(
+        pattern=pattern,
+        evidence_store=evidence_store,
+        raw_evidence_path=raw_evidence_path,
+        markdown_decisions=markdown_decisions,
+        markdown_contradictions=markdown_result.contradictions,
+        llm_result=llm_result,
+        readiness=readiness,
+        applied_decisions=applied_decisions,
+        accepted_decisions=graph.typed_decisions(),
+        graph=graph,
+    )
+    incremental_report = incremental_decision_report(
+        baseline_decisions=baseline_decisions,
+        final_decisions=graph.typed_decisions(),
+        input_diff_report=input_diff,
+    )
+    incremental_report.update(
+        {
+            "baselineBundle": str(baseline_bundle),
+            "baselineDocument": str(baseline_doc) if baseline_doc is not None else None,
+            "changedDocument": str(changed_doc),
+            "validationBoundary": (
+                "LLM context was scoped to the input delta, but graph validation, "
+                "pattern validators, and artifact contracts ran on the full "
+                "resulting decision state."
+            ),
+        }
+    )
+
+    if violations:
+        if not dry_run:
+            _write_failed_compile_artifacts(
+                output_dir,
+                pattern,
+                graph,
+                readiness,
+                extraction_summary,
+            )
+            _write_yaml_artifact(output_dir, "input-diff-report.yaml", input_diff)
+            _write_yaml_artifact(
+                output_dir,
+                "incremental-compile-report.yaml",
+                incremental_report,
+            )
+        raise CompileError(violations, readiness=readiness)
+
+    if dry_run:
+        return
+
+    payload = _build_payload(
+        intent,
+        pattern,
+        graph.typed_decisions(),
+        llm_result.design_doc,
+        extraction_summary=extraction_summary,
+        handoff_readiness=readiness,
+    )
+    generate_all(payload, output_dir, pattern=pattern)
+    _write_yaml_artifact(output_dir, "input-diff-report.yaml", input_diff)
+    _write_yaml_artifact(output_dir, "incremental-compile-report.yaml", incremental_report)
 
 
 def compile_from_interview(

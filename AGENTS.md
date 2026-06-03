@@ -96,16 +96,16 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy, pyr
 
 ### Current Goal
 
-T40: Incremental handoff comparison for long packet updates
+T41: Diff-aware compile for long packet updates
 
 ### Status
 
-- **Tests**: 334 passing, 5 skipped
+- **Tests**: 335 passing, 5 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Implemented `review compare` for incremental handoff-bundle comparison. It emits a compact YAML/text report covering readiness, requirement completeness, accepted decisions, blockers, artifact hashes, model quality, and sample recommendation rank/score deltas so long packet or sample updates can be reviewed without starting from scratch. Battle-tested small document and sample-alignment updates; full pytest, Ruff, Ruff format, mypy, Pyright, fixture drift, golden journey, extraction, usability, and pre-commit are green.
+- **Last session**: Implemented diff-aware compile for long packet updates. `compile --baseline-bundle --changed-doc` seeds the graph from previous accepted decisions, scopes optional LLM context to input deltas plus baseline summary, then re-runs full graph validation and artifact generation on the resulting decision state. It writes `input-diff-report.yaml` and `incremental-compile-report.yaml`; `review compare` now includes input deltas, impacted requirement maps, and optional static comparison HTML. Full pytest, Ruff, Ruff format, mypy, Pyright, fixture drift, golden journey, extraction, usability, and pre-commit are green.
 
 ### Done
 
@@ -130,10 +130,11 @@ T40: Incremental handoff comparison for long packet updates
 - T39 operating rhythm: Ran banking AWS LZA, retail board-note AWS LZA, blocked AWS LZA, BYOM Terraform VPC, and blocked BYOM CloudFormation packets through `discover -> compile --no-raw-evidence -> review html`. Ready packets were clear enough for reviewed handoff, blocked compile/review artifacts were safe, and the repeated first-success friction in blocked discovery next steps was fixed without adding harnesses or dashboard surface.
 - T39 follow-up rhythm: Ran complex AWS LZA, standard AWS LZA, incomplete architect AWS LZA, BYOM CloudFormation, and BYOM Terraform packets through the same path. The previous discovery guidance fix held. No stuck, mistrust, or manual-translation point repeated or blocked handoff, so no engine change was made.
 - T40 incremental compare: `iac-llm-wrapper review compare --before <bundle> --after <bundle> --output handoff-comparison.yaml` compares existing generated bundles without rerunning extraction. The report surfaces readiness changes, requirement completeness changes, accepted decision additions/removals/changes, blocker additions/resolutions, changed artifact file hashes, model quality changes, and sample recommendation additions/removals/rank/score changes. Existing `review diff` remains for decision-report-only comparisons.
+- T41 diff-aware compile: `iac-llm-wrapper compile --baseline-bundle <bundle> --baseline-doc <before.md> --changed-doc <after.md> --output <bundle> --no-raw-evidence` supports incremental long-document updates. Baseline decisions are carried forward, changed structured decisions override them, optional LLM extraction sees only scoped delta context plus previous decisions/summary, and the full graph plus contracts still validate the complete resulting state. `input-diff-report.yaml` records changed headings, changed structured decision lines, hunks, and likely impacted requirements. `incremental-compile-report.yaml` records reused, changed, added, removed, carried-forward, and re-confirmation decisions. `review compare --html-output` emits a static delta page.
 
 ### Next
 
-1. Use `review compare` during packet-based requirement harvesting whenever a long document or sample configuration changes incrementally; review only the delta first, then decide whether a repeated/blocking point deserves implementation.
+1. Use diff-aware compile plus `review compare` during packet-based requirement harvesting whenever a long document or sample configuration changes incrementally; review only the delta first, then decide whether a repeated/blocking point deserves implementation.
 2. Continue packet-based requirement harvesting before adding product surface: run 3-5 real or realistic packets, record only stuck/mistrust/manual-translation moments, and implement only repeated or handoff-blocking requirements.
 3. Stop harness expansion unless real local/Bedrock model runs expose pain.
 4. Run `evaluate-extraction.py --llm`, `evaluate-usability.py --llm`, and `compare-model-benchmarks.py --require-conformant` with approved local/Bedrock models when broader model regression confidence is needed; use result artifacts to decide whether prompts or fixtures need tightening.
