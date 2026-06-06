@@ -225,9 +225,19 @@ class DiscoveryEngine:
                             reason=f"{condition_key}={cond_val} blocks {key}.",
                         )
                     )
+            if req.blocked_when and self.graph.is_blocked(key):
+                result.inconsistent.append(
+                    Inconsistency(
+                        key_a="expression",
+                        key_b=key,
+                        reason=self.graph.is_blocked_reason(key)
+                        or f"Expression gate blocks {key}.",
+                    )
+                )
 
-        # Check applies_if requirements that were EXPLICITLY DECIDED but their condition is not met
-        # (Skip defaulted values — defaults may not satisfy applies_if gates)
+        # Check applicable-gate requirements that were EXPLICITLY DECIDED but
+        # their condition is not met. Skip defaulted values because defaults may
+        # not satisfy applies_if/applies_when gates.
         for key, req in self.graph._requirements.items():
             st = self.graph.status(key)
             if st != RequirementStatus.DECIDED:
@@ -248,6 +258,15 @@ class DiscoveryEngine:
                             ),
                         )
                     )
+            if req.applies_when and not self.graph.is_applicable(key):
+                result.inconsistent.append(
+                    Inconsistency(
+                        key_a="expression",
+                        key_b=key,
+                        reason=self.graph.is_applicable_reason(key)
+                        or f"{key} is explicitly set but applies_when is not satisfied.",
+                    )
+                )
 
     def _detect_signals(self, intent: Any, text: str, result: DiscoveryResult) -> None:
         """Detect migration/compliance signals in design doc text.

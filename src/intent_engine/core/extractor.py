@@ -15,7 +15,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from .model_introspection import coerce_value, resolve_field_info
-from .requirements import RequirementGraph
+from .requirements import RequirementGraph, describe_expression
 
 
 def _str(v: Any) -> str | None:
@@ -124,7 +124,7 @@ class Extractor:
     without code changes. The data model guides extraction — no regex needed.
 
     The LLM is prompted to *traverse the graph*: read prose, skip nodes that
-    don't apply based on applies_if gates, flag contradictions, detect
+    don't apply based on applies_if/applies_when gates, flag contradictions, detect
     signals. It returns structured JSON with decisions, signals, gaps, and
     contradictions.
     """
@@ -183,11 +183,15 @@ class Extractor:
                     lines.append(
                         f"  Applies only when {cond_key} is one of: {', '.join(cond_vals)}"
                     )
+            if req.applies_when:
+                lines.append(f"  Applies when: {describe_expression(req.applies_when)}")
             if req.depends_on:
                 lines.append(f"  Depends on: {', '.join(req.depends_on)}")
             if req.blocked_if:
                 for cond_key, cond_vals in req.blocked_if.items():
                     lines.append(f"  Blocked when {cond_key} is one of: {', '.join(cond_vals)}")
+            if req.blocked_when:
+                lines.append(f"  Blocked when: {describe_expression(req.blocked_when)}")
             if req.signals:
                 lines.append(f"  Migration/compliance signals: {', '.join(req.signals)}")
             if req.tradeoffs:
@@ -252,7 +256,8 @@ class Extractor:
             f"{graph_context}\n\n"
             "=== EXTRACTION RULES ===\n"
             "1. Map each sentence in the document to relevant graph nodes.\n"
-            "2. Skip nodes whose 'applies_if' gate is NOT satisfied by earlier decisions.\n"
+            "2. Skip nodes whose applies_if or applies_when gate is NOT satisfied by "
+            "earlier decisions.\n"
             f"{signal_context}\n"
             "4. Flag CONTRADICTIONS between prose and graph constraints.\n"
             "5. Identify GAPS: applicable requirements that are not mentioned.\n"

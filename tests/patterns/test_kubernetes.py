@@ -124,6 +124,45 @@ class TestKubernetesPattern:
             "  instanceType: t3.large\n"
         )
         (output / "sample-recommendations.yaml").write_text("recommendations: []\n")
+        (output / "context-manifest.yaml").write_text(
+            """schemaVersion: intent-engine/context-manifest/v1
+pattern: kubernetes-cluster
+boundary: Context is code-owned.
+contextInventory:
+  pattern:
+    name: kubernetes-cluster
+    description: Kubernetes cluster handoff
+    intentModel: K8sIntent
+  promptContext:
+    present: true
+    sha256: abc123
+    wordCount: 20
+    text: This pattern captures approved Kubernetes cluster handoff inputs only.
+  requirementGraph:
+    nodeCount: 1
+    edgeCount: 0
+    requirements:
+      - key: cluster_name
+        category: general
+        targetField: cluster_name
+  targetContracts: []
+  samples: []
+  targetCapabilities: []
+runtimeContext:
+  acceptedDecisionCount: 1
+  moduleInputCount: 0
+  unsupportedAskFactCount: 0
+  llm:
+    provider: none
+    model: none
+    callCount: 0
+outputs:
+  expectedArtifacts:
+    - context-manifest.yaml
+guardrails:
+  - LLM output is not authoritative.
+"""
+        )
         (output / "handoff-plan.yaml").write_text(
             """pattern: kubernetes-cluster
 boundary: Handoff only.

@@ -11,11 +11,18 @@ Prose / Markdown / Interview
   -> requirement graph
      - accepts known decisions
      - orders dependencies
-     - applies defaults and cascades
+     - applies defaults, cascades, applies_if/applies_when gates
      - identifies gaps, blockers, and contradictions
+  -> semantic model
+     - derives typed entities such as accounts, OUs, permission sets, assignments,
+       controls, artifacts, and target capabilities where a pattern owns them
+     - evaluates predicate constraints over real relationships
   -> target contracts
      - define required artifacts, paths, decisions, assertions, and lineage
      - fail closed when required handoff shape is missing
+  -> target capability facts
+     - extract explicit unsupported asks with evidence spans
+     - route downstream target coverage from semantic facts and accepted decisions
   -> artifact generators
      - emit decision reports, handoff plans, trace summaries, benchmark files,
        review files, and pattern-specific handoff files
@@ -28,9 +35,10 @@ Prose / Markdown / Interview
 ## Ownership
 
 - Core owns extraction orchestration, graph sync, validation, contracts, generic
-  artifacts, review pages, and evaluation harnesses.
+  semantic graph primitives, artifacts, review pages, and evaluation harnesses.
 - Patterns own domain models, requirement graphs, validators, contracts, sample
-  configs, and pattern-specific handoff files.
+  configs, semantic model derivation, predicate constraints, and pattern-specific
+  handoff files.
 - External IaC tools own deployment. Current built-ins do not call cloud APIs.
 
 ## Boundary

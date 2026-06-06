@@ -6,13 +6,15 @@ execution path and passes graph, contract, gate, evidence, and rollback checks.
 
 | Artifact | Purpose | Owner | Emitted When | Deployable |
 | --- | --- | --- | --- | --- |
-| `decision-report.yaml` | Accepted decisions, handoff readiness, blockers, and safe handoff path. | Core + pattern | Every compile, including blocked compiles. | No |
+| `decision-report.yaml` | Accepted decisions, handoff readiness, blockers, safe handoff path, and pattern-owned semantic model details when available. | Core + pattern | Every compile, including blocked compiles. | No |
+| `context-manifest.yaml` | Code-owned context inventory: pattern metadata, prompt context digest/text, requirement graph, target contracts, samples, target capabilities, runtime extraction summary, expected artifacts, and guardrails. | Core | Pattern-backed successful handoffs. | No |
 | `handoff-plan.yaml` | Ordered review/handoff steps, owners, dependencies, manual gates, rollback, boundary, `handoffAllowed`, compatibility `deploymentAllowed`, and allowed next action. | Core | Contract-backed successful handoffs. | No |
 | `llm-trace-summary.yaml` | Provider/model, latency, raw and accepted decisions, applied decisions, gaps, contradictions, and raw evidence status. | Core | Every compile. | No |
 | `model-benchmark.yaml` | Mode, provider/model, latency, token availability, raw LLM coverage, conformance, quality counts, readiness, cost status, and external-observability boundary. | Core | Every compile. | No |
 | `input-diff-report.yaml` | Changed headings, changed structured decision lines, likely impacted requirements, and scoped hunks for an incremental document update. | Core incremental compile | `compile --baseline-bundle --changed-doc`. | No |
 | `incremental-compile-report.yaml` | Reused, changed, added, removed, carried-forward, and re-confirmation decision summary for diff-aware compile. | Core incremental compile | `compile --baseline-bundle --changed-doc`. | No |
 | `contract-validation.yaml` | Standalone pass/fail validation of emitted artifacts against target contracts. | Core review tooling | `iac-llm-wrapper review html`. | No |
+| `target-capability-graph.yaml` | Downstream target coverage, selected target path, manual gates, and unsupported asks represented as semantic facts with evidence spans. | Core + pattern | Patterns with target capability declarations. | No |
 | `handoff-comparison.yaml` | Compact before/after bundle delta for incremental packet or sample updates: readiness, requirement completeness, decisions, blockers, artifacts, model quality, and sample recommendations. | Core review tooling | `iac-llm-wrapper review compare --output`. | No |
 | `handoff-comparison.html` | Static delta review page for what changed, what stayed stable, and what must be reviewed. | Core review tooling | `iac-llm-wrapper review compare --html-output`. | No |
 | `battle-summary.yaml` | Battle-test verdict, confidence categories, findings, and improvement items. | Battle harness | `scripts/battle-test.py`. | No |
@@ -23,13 +25,15 @@ execution path and passes graph, contract, gate, evidence, and rollback checks.
 
 ## Consumers
 
-- Architects use `decision-report.yaml`, `handoff-plan.yaml`, and
+- Architects use `decision-report.yaml`, `context-manifest.yaml`, `handoff-plan.yaml`, and
   `handoff-review.html` to understand readiness and blockers.
+- AWS LZA reviewers can inspect `decision-report.yaml.semanticModel` for typed
+  entities, relationships, and predicate constraint results.
 - Platform engineers use pattern-specific handoff files, target contracts,
   lineage, and the allowed next action.
 - Reviewers use `handoff-comparison.yaml` to inspect only the deltas from an
   incremental document or sample-configuration update.
-- Contributors use `llm-trace-summary.yaml`, `model-benchmark.yaml`,
+- Contributors use `context-manifest.yaml`, `llm-trace-summary.yaml`, `model-benchmark.yaml`,
   `battle-summary.yaml`, and eval results to improve extraction and model value.
 - LLM reviewers may keep `raw-evidence.yaml` in local development/debug bundles,
   but it is not a required service artifact. Use `--no-raw-evidence` when raw

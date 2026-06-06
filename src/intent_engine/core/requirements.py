@@ -9,6 +9,114 @@ from typing import Any
 
 import networkx as nx
 
+RequirementExpression = dict[str, Any]
+
+
+def expression_dependencies(expression: RequirementExpression | None) -> list[str]:
+    """Return decision keys referenced by a small requirement expression."""
+
+    if not expression:
+        return []
+    deps: list[str] = []
+    for key in ("all", "any"):
+        items = expression.get(key)
+        if isinstance(items, list):
+            for item in items:
+                if isinstance(item, dict):
+                    deps.extend(expression_dependencies(item))
+    negated = expression.get("not")
+    if isinstance(negated, dict):
+        deps.extend(expression_dependencies(negated))
+    for key in ("equals", "contains", "present"):
+        predicate = expression.get(key)
+        if isinstance(predicate, dict):
+            decision = predicate.get("decision")
+            if isinstance(decision, str) and decision:
+                deps.append(decision)
+    return list(dict.fromkeys(deps))
+
+
+def evaluate_expression(
+    expression: RequirementExpression | None,
+    decisions: dict[str, str],
+) -> bool:
+    """Evaluate a lightweight decision expression against graph decisions."""
+
+    if not expression:
+        return True
+    if "all" in expression:
+        items = expression.get("all")
+        return isinstance(items, list) and all(
+            evaluate_expression(item, decisions) for item in items if isinstance(item, dict)
+        )
+    if "any" in expression:
+        items = expression.get("any")
+        return isinstance(items, list) and any(
+            evaluate_expression(item, decisions) for item in items if isinstance(item, dict)
+        )
+    if "not" in expression:
+        item = expression.get("not")
+        return isinstance(item, dict) and not evaluate_expression(item, decisions)
+    if "equals" in expression:
+        predicate = expression.get("equals")
+        if not isinstance(predicate, dict):
+            return False
+        decision = predicate.get("decision")
+        expected = predicate.get("value")
+        return str(decisions.get(str(decision), "")) == str(expected)
+    if "contains" in expression:
+        predicate = expression.get("contains")
+        if not isinstance(predicate, dict):
+            return False
+        decision = str(predicate.get("decision", ""))
+        expected = str(predicate.get("value", ""))
+        values = _decision_values(decisions.get(decision, ""))
+        return expected in values
+    if "present" in expression:
+        predicate = expression.get("present")
+        if not isinstance(predicate, dict):
+            return False
+        decision = str(predicate.get("decision", ""))
+        return bool(str(decisions.get(decision, "")).strip())
+    return False
+
+
+def describe_expression(expression: RequirementExpression | None) -> str:
+    """Render a small expression in reviewer-friendly text."""
+
+    if not expression:
+        return ""
+    if "all" in expression:
+        items = expression.get("all")
+        if not isinstance(items, list):
+            return "all(<invalid>)"
+        return " and ".join(part for part in (describe_expression(item) for item in items) if part)
+    if "any" in expression:
+        items = expression.get("any")
+        if not isinstance(items, list):
+            return "any(<invalid>)"
+        return " or ".join(part for part in (describe_expression(item) for item in items) if part)
+    if "not" in expression:
+        item = expression.get("not")
+        return f"not ({describe_expression(item)})" if isinstance(item, dict) else "not <invalid>"
+    if "equals" in expression:
+        predicate = expression.get("equals")
+        if isinstance(predicate, dict):
+            return f"{predicate.get('decision')} == {predicate.get('value')}"
+    if "contains" in expression:
+        predicate = expression.get("contains")
+        if isinstance(predicate, dict):
+            return f"{predicate.get('decision')} contains {predicate.get('value')}"
+    if "present" in expression:
+        predicate = expression.get("present")
+        if isinstance(predicate, dict):
+            return f"{predicate.get('decision')} is present"
+    return "<unsupported expression>"
+
+
+def _decision_values(value: str) -> list[str]:
+    return [part.strip() for part in str(value).split(",") if part.strip()]
+
 
 class RequirementStatus(StrEnum):
     PENDING = "pending"
@@ -30,6 +138,8 @@ class Requirement:
     depends_on: list[str] = field(default_factory=list)
     blocked_if: dict[str, list[str]] = field(default_factory=dict)
     applies_if: dict[str, list[str]] = field(default_factory=dict)
+    applies_when: RequirementExpression | None = None
+    blocked_when: RequirementExpression | None = None
     cascade: dict[str, str] = field(default_factory=dict)
     category: str = "general"
     hint: str | None = None
@@ -82,6 +192,8 @@ class RequirementGraph:
         deps = list(req.depends_on)
         deps.extend(req.applies_if)
         deps.extend(req.blocked_if)
+        deps.extend(expression_dependencies(req.applies_when))
+        deps.extend(expression_dependencies(req.blocked_when))
         return list(dict.fromkeys(dep for dep in deps if dep != req.key))
 
     def _auto_derive_requirement(self, req: Requirement) -> None:
@@ -188,17 +300,21 @@ class RequirementGraph:
         for condition_key, blocking_values in req.blocked_if.items():
             if self._decisions.get(condition_key) in blocking_values:
                 return True
+        if req.blocked_when is not None:
+            return evaluate_expression(req.blocked_when, self._decisions)
         return False
 
     def is_applicable(self, key: str) -> bool:
         req = self._requirements.get(key)
         if not req:
             return False
-        if not req.applies_if:
+        if not req.applies_if and req.applies_when is None:
             return True
         for condition_key, triggering_values in req.applies_if.items():
             if self._decisions.get(condition_key) not in triggering_values:
                 return False
+        if req.applies_when is not None:
+            return evaluate_expression(req.applies_when, self._decisions)
         return True
 
     def is_blocked_reason(self, key: str) -> str | None:
@@ -209,13 +325,15 @@ class RequirementGraph:
             if self._decisions.get(condition_key) in blocking_values:
                 cond_val = self._decisions.get(condition_key, "(undecided)")
                 return req.why_blocked or f"Blocked when {condition_key}={cond_val}"
+        if req.blocked_when is not None and evaluate_expression(req.blocked_when, self._decisions):
+            return req.why_blocked or f"Blocked when {describe_expression(req.blocked_when)}"
         return None
 
     def is_applicable_reason(self, key: str) -> str | None:
         req = self._requirements.get(key)
         if not req:
             return None
-        if not req.applies_if:
+        if not req.applies_if and req.applies_when is None:
             return None
         for condition_key, triggering_values in req.applies_if.items():
             actual = self._decisions.get(condition_key)
@@ -223,6 +341,13 @@ class RequirementGraph:
                 return None
             if actual not in triggering_values:
                 return req.why_applies or f"Not applicable when {condition_key}={actual}"
+        if req.applies_when is not None and not evaluate_expression(
+            req.applies_when,
+            self._decisions,
+        ):
+            return req.why_applies or (
+                f"Not applicable unless {describe_expression(req.applies_when)}"
+            )
         return None
 
     def pending(self) -> list[str]:

@@ -8,7 +8,11 @@ from typing import Any
 
 import networkx as nx
 
-from .requirements import RequirementGraph
+from .requirements import (
+    RequirementGraph,
+    describe_expression,
+    expression_dependencies,
+)
 
 
 def graph_to_dict(graph: RequirementGraph, pattern: str) -> dict[str, Any]:
@@ -34,7 +38,9 @@ def graph_to_dict(graph: RequirementGraph, pattern: str) -> dict[str, Any]:
                 "options": req.options or [],
                 "dependsOn": list(req.depends_on),
                 "appliesIf": req.applies_if,
+                "appliesWhen": req.applies_when,
                 "blockedIf": req.blocked_if,
+                "blockedWhen": req.blocked_when,
                 "cascade": req.cascade,
                 "hint": req.hint,
                 "signals": list(req.signals),
@@ -97,8 +103,12 @@ def _edge_kind(graph: RequirementGraph, source: str, target: str) -> str:
         kinds.append("depends_on")
     if source in req.applies_if:
         kinds.append("applies_if")
+    if source in expression_dependencies(req.applies_when):
+        kinds.append("applies_when")
     if source in req.blocked_if:
         kinds.append("blocked_if")
+    if source in expression_dependencies(req.blocked_when):
+        kinds.append("blocked_when")
     return "+".join(kinds) if kinds else "orders"
 
 
@@ -106,8 +116,12 @@ def _edge_condition(graph: RequirementGraph, source: str, target: str) -> str:
     req = graph._requirements[target]
     if source in req.applies_if:
         return ",".join(req.applies_if[source])
+    if source in expression_dependencies(req.applies_when):
+        return describe_expression(req.applies_when)
     if source in req.blocked_if:
         return ",".join(req.blocked_if[source])
+    if source in expression_dependencies(req.blocked_when):
+        return describe_expression(req.blocked_when)
     return ""
 
 

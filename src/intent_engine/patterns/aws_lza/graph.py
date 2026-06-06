@@ -136,7 +136,7 @@ def build_aws_lza_graph() -> RequirementGraph:
             label="Network Account",
             question="Which account owns shared networking?",
             category="network",
-            applies_if={"topology": ["hub-spoke"]},
+            applies_when={"equals": {"decision": "topology", "value": "hub-spoke"}},
             violation_code="AWS_LZA_NETWORK_ACCOUNT_REQUIRED",
             violation_message="Hub-spoke topology requires a network account.",
         )

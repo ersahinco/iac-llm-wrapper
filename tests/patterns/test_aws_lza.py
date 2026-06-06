@@ -14,7 +14,8 @@ from intent_engine.core.extractor import Extractor
 from intent_engine.core.generator import generate_all
 from intent_engine.core.patterns import GLOBAL_REGISTRY
 from intent_engine.patterns.aws_lza.contracts import AWS_LZA_SAMPLE_CONFIG_CONTRACT
-from intent_engine.patterns.aws_lza.models import AwsLzaIntent
+from intent_engine.patterns.aws_lza.models import AwsLzaIntent, LzaAccount
+from intent_engine.patterns.aws_lza.semantic import build_aws_lza_semantic_model
 
 FIXTURES = Path(__file__).parent.parent.parent / "fixtures"
 STANDARD_HUB_SPOKE_DECISIONS = {
@@ -52,6 +53,44 @@ class TestAwsLzaPattern:
         intent = Extractor(graph=graph).extract("")
 
         assert isinstance(intent, AwsLzaIntent)
+
+    def test_aws_lza_semantic_model_derives_entities_relationships_and_constraints(self):
+        intent = AwsLzaIntent(
+            network_account="Network",
+            identity_center_permission_sets=["ReadOnlyAccess"],
+            identity_center_assignments=["Admins:ReadOnlyAccess:Management"],
+        )
+
+        model = build_aws_lza_semantic_model(intent).to_dict()
+
+        assert model["schemaVersion"] == "intent-engine/aws-lza-semantic-model/v1"
+        assert any(
+            entity["kind"] == "Account" and entity["key"] == "account:securitytooling"
+            for entity in model["entities"]
+        )
+        assert any(
+            edge["relationship"] == "references_entity"
+            and edge["target"] == "permission-set:readonlyaccess"
+            for edge in model["relationships"]
+        )
+        assert model["summary"]["failedConstraintCount"] == 0
+
+    def test_aws_lza_semantic_constraint_blocks_delegated_admin_outside_security_ou(self):
+        intent = AwsLzaIntent(
+            network_account="Network",
+            identity_center_delegated_admin_account="IdentityShared",
+            identity_center_permission_sets=["ReadOnlyAccess"],
+            identity_center_assignments=["Admins:ReadOnlyAccess:Management"],
+            accounts=[LzaAccount(name="IdentityShared", ou="Infrastructure")],
+        )
+
+        failed = [
+            item.to_dict() for item in build_aws_lza_semantic_model(intent).failed_constraints()
+        ]
+
+        assert {
+            "AWS_LZA_IDENTITY_CENTER_ADMIN_SECURITY_OU_REQUIRED",
+        } <= {item["violationCode"] for item in failed}
 
     def test_compile_from_interview_creates_handoff_artifacts(self, tmp_path: Path):
         decisions = {
@@ -112,6 +151,12 @@ class TestAwsLzaPattern:
         ]
         assert iam["identityCenter"]["identityCenterAssignments"][0]["permissionSetName"] == (
             "PowerUserAccess"
+        )
+        report = yaml.load((output / "decision-report.yaml").read_text())
+        assert report["semanticModel"]["summary"]["failedConstraintCount"] == 0
+        assert any(
+            constraint["key"] == "identity-admin-security-ou"
+            for constraint in report["semanticModel"]["constraints"]
         )
 
         global_config = yaml.load((output / "global-config.yaml").read_text())
@@ -308,6 +353,24 @@ class TestAwsLzaPattern:
                     "AWS LZA establishes landing-zone foundations; workload resources need "
                     "an approved module-composition or generator target."
                 ),
+                "evidenceSpan": ("The landing zone also needs an application stack with EKS, RDS,"),
+                "ownedByPattern": False,
+                "source": "deterministic-text",
+            }
+        ]
+        assert target["semanticFacts"]["unsupportedAsks"] == [
+            {
+                "kind": "bespoke-workload-infrastructure",
+                "label": "Bespoke workload infrastructure",
+                "evidenceSpan": ("The landing zone also needs an application stack with EKS, RDS,"),
+                "recommendedTarget": "module-composition",
+                "ownedByPattern": False,
+                "detectedBy": "aws-lza-sample-config",
+                "reason": (
+                    "AWS LZA establishes landing-zone foundations; workload resources need "
+                    "an approved module-composition or generator target."
+                ),
+                "source": "deterministic-text",
             }
         ]
 

@@ -326,6 +326,7 @@ def pattern_check(
     typer.echo(f"  Contracts: {result.contracts}")
     typer.echo(f"  Expected artifacts: {result.expected_artifacts}")
     typer.echo(f"  Samples: {result.samples}")
+    typer.echo(f"  Context rules: {result.context_rules}")
 
 
 @app.command()

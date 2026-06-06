@@ -10,6 +10,7 @@ function(intent, output_dir) that writes its own files.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -265,6 +266,134 @@ def gen_target_capability_graph(intent: Any, output_dir: Path) -> None:
     _write(output_dir, "target-capability-graph.yaml", report)
 
 
+def _sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _model_name(model: Any) -> str:
+    if isinstance(model, type):
+        return f"{model.__module__}.{model.__name__}"
+    return type(model).__name__
+
+
+def gen_context_manifest(intent: Any, output_dir: Path) -> None:
+    """Write the code-owned context inventory used to build this handoff bundle."""
+    pattern = getattr(intent, "pattern", "")
+    if not pattern:
+        return
+
+    from .patterns import GLOBAL_REGISTRY as PATTERN_REGISTRY
+    from .sample_config import GLOBAL_SAMPLE_REGISTRY
+
+    pattern_obj = PATTERN_REGISTRY.get(pattern)
+    graph = pattern_obj.create_graph()
+    prompt_context = " ".join(pattern_obj.prompt_context.split())
+    decisions = getattr(intent, "decisions", {}) or {}
+    extraction_summary = getattr(intent, "extraction_summary", {}) or {}
+    target_capability_report = getattr(intent, "target_capability_report", {}) or {}
+    module_inputs = getattr(intent, "module_inputs", []) or []
+    samples = GLOBAL_SAMPLE_REGISTRY.find_by_pattern(pattern)
+
+    data = {
+        "pattern": pattern,
+        "boundary": (
+            "LLM context is advisory input. Requirement graphs, target contracts, "
+            "validators, samples, and review gates own acceptance and handoff."
+        ),
+        "contextInventory": {
+            "pattern": {
+                "name": pattern_obj.name,
+                "description": pattern_obj.description,
+                "intentModel": _model_name(pattern_obj.intent_factory),
+            },
+            "promptContext": {
+                "present": bool(prompt_context),
+                "sha256": _sha256_text(prompt_context),
+                "wordCount": len(prompt_context.split()),
+                "text": prompt_context,
+            },
+            "requirementGraph": {
+                "nodeCount": len(graph._requirements),
+                "edgeCount": graph._graph.number_of_edges(),
+                "requirements": [
+                    {
+                        "key": key,
+                        "category": req.category,
+                        "targetField": req.target_field,
+                        "targetType": req.target_type,
+                        "requiredWhenApplicable": req.required_when_applicable,
+                        "hasDefault": req.default is not None,
+                        "dependsOn": list(req.depends_on),
+                        "appliesIf": req.applies_if,
+                        "appliesWhen": req.applies_when,
+                        "blockedIf": req.blocked_if,
+                        "blockedWhen": req.blocked_when,
+                    }
+                    for key, req in graph._requirements.items()
+                ],
+            },
+            "targetContracts": [
+                {
+                    "name": contract.name,
+                    "kind": contract.kind,
+                    "sourceUrl": contract.source_url,
+                    "requiredDecisions": list(contract.required_decisions),
+                    "requiredArtifacts": contract.required_artifacts,
+                    "lineageCount": len(contract.lineage),
+                }
+                for contract in pattern_obj.contracts
+            ],
+            "samples": [
+                {
+                    "name": sample.name,
+                    "version": sample.version,
+                    "sourceUrl": sample.source_url,
+                    "sourceContract": sample.source_contract,
+                    "tags": sample.tags,
+                }
+                for sample in samples
+            ],
+            "targetCapabilities": [
+                {
+                    "key": capability.key,
+                    "type": capability.capability_type.value,
+                    "handledDecisions": list(capability.handled_decisions),
+                    "requiredDecisions": list(capability.required_decisions),
+                    "producedArtifacts": list(capability.produced_artifacts),
+                }
+                for capability in pattern_obj.target_capabilities
+            ],
+        },
+        "runtimeContext": {
+            "acceptedDecisionCount": len(decisions),
+            "moduleInputCount": len(module_inputs),
+            "llm": {
+                "provider": extraction_summary.get("provider", "not-run"),
+                "model": extraction_summary.get("model", "not-run"),
+                "callCount": extraction_summary.get("callCount", 0),
+                "rawEvidence": extraction_summary.get(
+                    "rawEvidence",
+                    {"path": "", "status": "not-run"},
+                ),
+            },
+            "targetCapabilityPath": target_capability_report.get("selectedTargetPath", []),
+            "unsupportedAskFactCount": len(
+                target_capability_report.get("semanticFacts", {}).get("unsupportedAsks", [])
+            ),
+        },
+        "outputs": {
+            "expectedArtifacts": pattern_obj.expected_artifacts(),
+        },
+        "guardrails": [
+            "Prompt context must stay bounded and reviewable.",
+            "LLM output is never authoritative without graph acceptance.",
+            "Target artifacts must satisfy registered contracts before handoff.",
+            "Generation outside a registered target remains blocked.",
+        ],
+    }
+    _write(output_dir, "context-manifest.yaml", data, "intent-engine/context-manifest/v1")
+
+
 def _artifact_owner(artifact_name: str) -> str:
     lowered = artifact_name.lower()
     if "security" in lowered or "iam" in lowered:
@@ -383,6 +512,7 @@ def gen_handoff_plan(intent: Any, output_dir: Path) -> None:
 
 
 register_generator("design-doc", gen_design_doc, priority=4, category="meta")
+register_generator("context-manifest", gen_context_manifest, priority=4, category="meta")
 register_generator("module-inputs", gen_module_inputs, priority=5, category="meta")
 register_generator("llm-trace-summary", gen_llm_trace_summary, priority=5, category="meta")
 register_generator("model-benchmark", gen_model_benchmark, priority=5, category="meta")

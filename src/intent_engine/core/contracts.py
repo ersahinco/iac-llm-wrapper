@@ -579,5 +579,58 @@ HANDOFF_PLAN_CONTRACT = TargetContract(
     ],
 )
 
+CONTEXT_MANIFEST_CONTRACT = TargetContract(
+    name="generic-context-manifest",
+    kind="intent-engine-context-manifest",
+    source_url="intent-engine://contracts/generic-context-manifest/v1",
+    required_decisions=["contextManifest"],
+    artifacts=[
+        ArtifactContract(
+            name="context-manifest.yaml",
+            description="Code-owned context inventory used to build the handoff bundle.",
+            required_paths=[
+                "schemaVersion",
+                "pattern",
+                "boundary",
+                "contextInventory.pattern.name",
+                "contextInventory.pattern.description",
+                "contextInventory.pattern.intentModel",
+                "contextInventory.promptContext.present",
+                "contextInventory.promptContext.sha256",
+                "contextInventory.promptContext.wordCount",
+                "contextInventory.promptContext.text",
+                "contextInventory.requirementGraph.nodeCount",
+                "contextInventory.requirementGraph.edgeCount",
+                "contextInventory.requirementGraph.requirements[]",
+                "contextInventory.requirementGraph.requirements[].key",
+                "contextInventory.requirementGraph.requirements[].category",
+                "contextInventory.requirementGraph.requirements[].targetField",
+                "contextInventory.targetContracts",
+                "contextInventory.samples",
+                "contextInventory.targetCapabilities",
+                "runtimeContext.acceptedDecisionCount",
+                "runtimeContext.moduleInputCount",
+                "runtimeContext.unsupportedAskFactCount",
+                "runtimeContext.llm.provider",
+                "runtimeContext.llm.model",
+                "runtimeContext.llm.callCount",
+                "outputs.expectedArtifacts[]",
+                "guardrails[]",
+            ],
+            value_assertions=[
+                ArtifactValueAssertion(
+                    path="schemaVersion",
+                    equals="intent-engine/context-manifest/v1",
+                ),
+                ArtifactValueAssertion(
+                    path="contextInventory.promptContext.present",
+                    equals=True,
+                ),
+            ],
+        )
+    ],
+)
+
 GLOBAL_CONTRACT_REGISTRY.register(BLOCKED_ASSESSMENT_CONTRACT)
 GLOBAL_CONTRACT_REGISTRY.register(HANDOFF_PLAN_CONTRACT)
+GLOBAL_CONTRACT_REGISTRY.register(CONTEXT_MANIFEST_CONTRACT)

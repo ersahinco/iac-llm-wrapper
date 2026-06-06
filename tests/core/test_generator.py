@@ -11,6 +11,7 @@ from intent_engine.core.contracts import ArtifactContract, TargetContract
 from intent_engine.core.generator import (
     GeneratorRegistry,
     _hcl_value,
+    gen_context_manifest,
     gen_handoff_plan,
     gen_sample_recommendations,
     gen_tfvars,
@@ -49,6 +50,10 @@ def _register_handoff_pattern() -> dict[str, Pattern]:
             name="handoff-semantic-test",
             description="Handoff semantic test",
             graph_factory=_handoff_graph,
+            prompt_context=(
+                "This pattern captures approved region handoff context only. "
+                "Extract the region decision for an existing target contract."
+            ),
             contracts=[
                 TargetContract(
                     name="handoff-test-contract",
@@ -307,6 +312,48 @@ class TestGenHandoffPlan:
                 {"code": "REGION_REQUIRED", "message": "Region required."}
             ]
             assert "Do not mutate downstream systems from this plan." in plan["rollback"]
+        finally:
+            GLOBAL_REGISTRY._patterns = original
+
+
+class TestGenContextManifest:
+    def test_writes_code_owned_context_inventory(self, tmp_path: Path):
+        original = _register_handoff_pattern()
+        try:
+            payload = IaCIntentPayload(
+                design_doc=DesignDocument(),
+                module_inputs=[ModuleInputs(module_name="example", variables={"region": "eu"})],
+                intent=None,
+                pattern="handoff-semantic-test",
+                decisions={"region": "eu-central-1"},
+                extraction_summary={
+                    "provider": "ollama",
+                    "model": "qwen2.5:7b",
+                    "callCount": 1,
+                    "rawEvidence": {"path": "not-requested", "status": "not-requested"},
+                },
+            )
+
+            gen_context_manifest(payload, tmp_path)
+
+            manifest = _yaml_load(tmp_path / "context-manifest.yaml")
+            assert manifest["schemaVersion"] == "intent-engine/context-manifest/v1"
+            assert manifest["pattern"] == "handoff-semantic-test"
+            assert manifest["contextInventory"]["promptContext"]["present"] is True
+            assert manifest["contextInventory"]["promptContext"]["wordCount"] >= 12
+            assert manifest["contextInventory"]["requirementGraph"]["nodeCount"] == 1
+            assert manifest["contextInventory"]["targetContracts"][0]["name"] == (
+                "handoff-test-contract"
+            )
+            assert manifest["runtimeContext"]["acceptedDecisionCount"] == 1
+            assert manifest["runtimeContext"]["moduleInputCount"] == 1
+            assert manifest["runtimeContext"]["unsupportedAskFactCount"] == 0
+            assert manifest["runtimeContext"]["llm"]["provider"] == "ollama"
+            assert "context-manifest.yaml" in manifest["outputs"]["expectedArtifacts"]
+            assert (
+                "LLM output is never authoritative without graph acceptance."
+                in (manifest["guardrails"])
+            )
         finally:
             GLOBAL_REGISTRY._patterns = original
 

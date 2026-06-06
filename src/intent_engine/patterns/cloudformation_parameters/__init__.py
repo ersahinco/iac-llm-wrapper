@@ -269,8 +269,10 @@ GLOBAL_REGISTRY.register(
             "Parameters": ["parameter_overrides: Environment=prod, InstanceType=t3.small"],
         },
         prompt_context=(
-            "This pattern captures parameter values for an existing CloudFormation "
-            "template. Do not generate a deployable stack or template."
+            "This pattern captures parameter values for an existing approved "
+            "CloudFormation template handoff. Extract stack name, template URL, region, "
+            "capabilities, and explicit parameter overrides only. Do not generate a "
+            "deployable stack or template."
         ),
         validators=[_validate_intent],
         contracts=[_CONTRACT],

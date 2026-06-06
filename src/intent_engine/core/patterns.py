@@ -48,7 +48,7 @@ class Pattern:
     def expected_artifacts(self) -> list[str]:
         from .sample_config import GLOBAL_SAMPLE_REGISTRY
 
-        artifacts: list[str] = []
+        artifacts: list[str] = ["context-manifest.yaml"]
         for contract in self.contracts:
             artifacts.extend(contract.required_artifacts)
         if self.contracts:

@@ -203,7 +203,7 @@ class TestGraphCommand:
         assert data["pattern"] == "aws-lza"
         assert data["nodeCount"] >= 1
         assert any(node["key"] == "network_account" for node in data["nodes"])
-        assert any(edge["kind"] == "applies_if" for edge in data["edges"])
+        assert any(edge["kind"] == "applies_when" for edge in data["edges"])
 
     def test_graph_export_mermaid(self):
         result = runner.invoke(
@@ -214,7 +214,7 @@ class TestGraphCommand:
         assert result.exit_code == 0, result.output
         assert "flowchart TD" in result.stdout
         assert "Network Account" in result.stdout
-        assert "applies_if" in result.stdout
+        assert "applies_when" in result.stdout
 
     def test_graph_export_unknown_format_fails(self):
         result = runner.invoke(app, ["graph", "export", "--format", "dot"])
@@ -232,6 +232,7 @@ class TestPatternCommand:
         assert "Requirements:" in result.stdout
         assert "Contracts:" in result.stdout
         assert "Samples:" in result.stdout
+        assert "Context rules:" in result.stdout
 
 
 class TestSampleCommand:

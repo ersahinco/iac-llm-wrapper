@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from intent_engine.core.contracts import (
     BLOCKED_ASSESSMENT_CONTRACT,
+    CONTEXT_MANIFEST_CONTRACT,
     HANDOFF_PLAN_CONTRACT,
     ArtifactContract,
     ArtifactValueAssertion,
@@ -418,6 +419,96 @@ rollback:
 
         assert [violation.message for violation in violations] == [
             "handoff-plan.yaml missing required path: steps[].owner"
+        ]
+
+    def test_context_manifest_contract_validates_manifest_shape(self, tmp_path: Path):
+        (tmp_path / "context-manifest.yaml").write_text(
+            """schemaVersion: intent-engine/context-manifest/v1
+pattern: cloudformation-parameters
+boundary: Context is code-owned.
+contextInventory:
+  pattern:
+    name: cloudformation-parameters
+    description: Parameter handoff
+    intentModel: CloudFormationParametersIntent
+  promptContext:
+    present: true
+    sha256: abc123
+    wordCount: 20
+    text: This pattern captures approved parameter handoff context.
+  requirementGraph:
+    nodeCount: 1
+    edgeCount: 0
+    requirements:
+      - key: region
+        category: cloudformation
+        targetField: region
+  targetContracts: []
+  samples: []
+  targetCapabilities: []
+runtimeContext:
+  acceptedDecisionCount: 1
+  moduleInputCount: 0
+  unsupportedAskFactCount: 0
+  llm:
+    provider: none
+    model: none
+    callCount: 0
+outputs:
+  expectedArtifacts:
+    - context-manifest.yaml
+guardrails:
+  - LLM output is not authoritative.
+"""
+        )
+
+        assert ContractValidator(CONTEXT_MANIFEST_CONTRACT).validate_artifacts(tmp_path) == []
+
+    def test_context_manifest_contract_requires_present_prompt_context(self, tmp_path: Path):
+        (tmp_path / "context-manifest.yaml").write_text(
+            """schemaVersion: intent-engine/context-manifest/v1
+pattern: cloudformation-parameters
+boundary: Context is code-owned.
+contextInventory:
+  pattern:
+    name: cloudformation-parameters
+    description: Parameter handoff
+    intentModel: CloudFormationParametersIntent
+  promptContext:
+    present: false
+    sha256: abc123
+    wordCount: 0
+    text: missing prompt context
+  requirementGraph:
+    nodeCount: 1
+    edgeCount: 0
+    requirements:
+      - key: region
+        category: cloudformation
+        targetField: region
+  targetContracts: []
+  samples: []
+  targetCapabilities: []
+runtimeContext:
+  acceptedDecisionCount: 1
+  moduleInputCount: 0
+  unsupportedAskFactCount: 0
+  llm:
+    provider: none
+    model: none
+    callCount: 0
+outputs:
+  expectedArtifacts:
+    - context-manifest.yaml
+guardrails:
+  - LLM output is not authoritative.
+"""
+        )
+
+        violations = ContractValidator(CONTEXT_MANIFEST_CONTRACT).validate_artifacts(tmp_path)
+
+        assert [violation.message for violation in violations] == [
+            "context-manifest.yaml expected contextInventory.promptContext.present == True"
         ]
 
 

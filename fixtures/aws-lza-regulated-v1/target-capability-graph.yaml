@@ -114,6 +114,8 @@ coverage:
     compliance_overlay: aws-lza-sample-config
   unhandledAcceptedDecisions: []
 unsupportedGaps: []
+semanticFacts:
+  unsupportedAsks: []
 manualGates:
   - Review AWS LZA configuration against the selected upstream sample baseline.
   - Validate generated YAML with the AWS LZA toolchain before pipeline

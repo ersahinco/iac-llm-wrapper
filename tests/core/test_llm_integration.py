@@ -49,7 +49,7 @@ class TestRealLLMExtract:
         prompt = Extractor(graph=graph, pattern="aws-lza").build_prompt("Design doc text here")
 
         assert "TRAVERSE the requirement graph" in prompt
-        assert "applies_if" in prompt or "Applies only when" in prompt
+        assert "applies_when" in prompt or "Applies when" in prompt
         assert "SIGNALS" in prompt
         assert "decisions" in prompt
         assert "signal_decisions" in prompt

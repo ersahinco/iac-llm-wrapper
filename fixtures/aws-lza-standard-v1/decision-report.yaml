@@ -33,6 +33,354 @@ security:
   securityHubEnabled: true
   guardDutyEnabled: true
   complianceOverlay: none
+semanticModel:
+  schemaVersion: intent-engine/aws-lza-semantic-model/v1
+  summary:
+    entityCount: 23
+    relationshipCount: 12
+    constraintCount: 13
+    failedConstraintCount: 0
+  entities:
+    - kind: OU
+      key: ou:root
+      label: Root
+      properties:
+        description: AWS Organizations root
+    - kind: OU
+      key: ou:security
+      label: Security
+      properties:
+        description: ''
+    - kind: OU
+      key: ou:infrastructure
+      label: Infrastructure
+      properties:
+        description: ''
+    - kind: OU
+      key: ou:workloads
+      label: Workloads
+      properties:
+        description: ''
+    - kind: Account
+      key: account:management
+      label: Management
+      properties:
+        ou: Root
+        description: ''
+        accountType: management
+    - kind: Account
+      key: account:logarchive
+      label: LogArchive
+      properties:
+        ou: Security
+        description: ''
+        accountType: log-archive
+    - kind: Account
+      key: account:audit
+      label: Audit
+      properties:
+        ou: Security
+        description: ''
+        accountType: audit
+    - kind: Account
+      key: account:securitytooling
+      label: SecurityTooling
+      properties:
+        ou: Security
+        description: ''
+        accountType: security-tooling
+    - kind: Account
+      key: account:network
+      label: Network
+      properties:
+        ou: Infrastructure
+        description: ''
+        accountType: network
+    - kind: Account
+      key: account:prod
+      label: Prod
+      properties:
+        ou: Workloads
+        description: ''
+        accountType: workload
+    - kind: PermissionSet
+      key: permission-set:readonlyaccess
+      label: ReadOnlyAccess
+      properties:
+        description: ''
+    - kind: PermissionSet
+      key: permission-set:poweruseraccess
+      label: PowerUserAccess
+      properties:
+        description: ''
+    - kind: Assignment
+      key: assignment:platformadmins:poweruseraccess:management
+      label: PlatformAdmins:PowerUserAccess:Management
+      properties:
+        principal: PlatformAdmins
+        principalType: GROUP
+        permissionSet: PowerUserAccess
+        targetAccount: Management
+    - kind: Control
+      key: control:centralized-logging
+      label: centralized-logging
+      properties:
+        enabled: true
+        category: security
+    - kind: Control
+      key: control:security-hub
+      label: security-hub
+      properties:
+        enabled: true
+        category: security
+    - kind: Control
+      key: control:guardduty
+      label: guardduty
+      properties:
+        enabled: true
+        category: security
+    - kind: Control
+      key: control:compliance-overlay:none
+      label: compliance-overlay:none
+      properties:
+        enabled: false
+        category: compliance
+    - kind: Artifact
+      key: artifact:accounts-config.yaml
+      label: accounts-config.yaml
+      properties:
+        contract: aws-lza-sample-config
+    - kind: Artifact
+      key: artifact:global-config.yaml
+      label: global-config.yaml
+      properties:
+        contract: aws-lza-sample-config
+    - kind: Artifact
+      key: artifact:iam-config.yaml
+      label: iam-config.yaml
+      properties:
+        contract: aws-lza-sample-config
+    - kind: Artifact
+      key: artifact:network-config.yaml
+      label: network-config.yaml
+      properties:
+        contract: aws-lza-sample-config
+    - kind: Artifact
+      key: artifact:organization-config.yaml
+      label: organization-config.yaml
+      properties:
+        contract: aws-lza-sample-config
+    - kind: Artifact
+      key: artifact:security-config.yaml
+      label: security-config.yaml
+      properties:
+        contract: aws-lza-sample-config
+  relationships:
+    - source: account:management
+      relationship: belongs_to
+      target: ou:root
+      properties: {}
+    - source: account:logarchive
+      relationship: belongs_to
+      target: ou:security
+      properties: {}
+    - source: account:audit
+      relationship: belongs_to
+      target: ou:security
+      properties: {}
+    - source: account:securitytooling
+      relationship: belongs_to
+      target: ou:security
+      properties: {}
+    - source: account:network
+      relationship: belongs_to
+      target: ou:infrastructure
+      properties: {}
+    - source: account:prod
+      relationship: belongs_to
+      target: ou:workloads
+      properties: {}
+    - source: assignment:platformadmins:poweruseraccess:management
+      relationship: references_entity
+      target: permission-set:poweruseraccess
+      properties: {}
+    - source: assignment:platformadmins:poweruseraccess:management
+      relationship: requires_entity
+      target: account:management
+      properties: {}
+    - source: control:centralized-logging
+      relationship: produces_artifact
+      target: artifact:global-config.yaml
+      properties: {}
+    - source: control:security-hub
+      relationship: produces_artifact
+      target: artifact:security-config.yaml
+      properties: {}
+    - source: control:guardduty
+      relationship: produces_artifact
+      target: artifact:security-config.yaml
+      properties: {}
+    - source: control:compliance-overlay:none
+      relationship: produces_artifact
+      target: artifact:security-config.yaml
+      properties: {}
+  constraints:
+    - key: security-ou-present
+      label: Security OU exists
+      expression:
+        requires_entity:
+          kind: OU
+          name: Security
+      status: pass
+      evidence: organizational_units=['Infrastructure', 'Root', 'Security',
+        'Workloads']
+      violationCode: AWS_LZA_SECURITY_OU_REQUIRED
+      violationMessage: AWS LZA baseline requires a Security OU for audit and
+        log accounts.
+    - key: hub-spoke-infrastructure-ou
+      label: Hub-spoke has Infrastructure OU
+      expression:
+        applies_when:
+          equals:
+            decision: topology
+            value: hub-spoke
+        requires_entity:
+          kind: OU
+          name: Infrastructure
+      status: pass
+      evidence: topology=hub-spoke; organizational_units=['Infrastructure',
+        'Root', 'Security', 'Workloads']
+      violationCode: AWS_LZA_INFRASTRUCTURE_OU_REQUIRED
+      violationMessage: Hub-spoke topology requires an Infrastructure OU for the
+        network account.
+    - key: workload-accounts-workloads-ou
+      label: Workload accounts have Workloads OU
+      expression:
+        applies_when:
+          present:
+            decision: workload_accounts
+        requires_entity:
+          kind: OU
+          name: Workloads
+      status: pass
+      evidence: workload_accounts=['Prod']; ous=['Infrastructure', 'Root',
+        'Security', 'Workloads']
+      violationCode: AWS_LZA_WORKLOADS_OU_REQUIRED
+      violationMessage: Workload accounts require a Workloads OU in
+        organization-config.yaml.
+    - key: centralized-logging-log-archive-account
+      label: Centralized logging has log archive account
+      expression:
+        applies_when:
+          equals:
+            decision: centralized_logging
+            value: true
+        present:
+          decision: log_archive_account
+      status: pass
+      evidence: centralized_logging=True; log_archive_account=LogArchive
+      violationCode: AWS_LZA_LOG_ARCHIVE_ACCOUNT_REQUIRED
+      violationMessage: Centralized logging requires a log archive account.
+    - key: centralized-logging-audit-account
+      label: Centralized logging has audit account
+      expression:
+        applies_when:
+          equals:
+            decision: centralized_logging
+            value: true
+        present:
+          decision: audit_account
+      status: pass
+      evidence: centralized_logging=True; audit_account=Audit
+      violationCode: AWS_LZA_AUDIT_ACCOUNT_REQUIRED
+      violationMessage: Centralized logging requires an audit account.
+    - key: security-tooling-account-present
+      label: Security tooling account exists
+      expression:
+        present:
+          decision: security_tooling_account
+      status: pass
+      evidence: security_tooling_account=SecurityTooling
+      violationCode: AWS_LZA_SECURITY_TOOLING_ACCOUNT_REQUIRED
+      violationMessage: AWS LZA handoff requires a security tooling account.
+    - key: identity-admin-known-account
+      label: Identity Center delegated admin is known
+      expression:
+        references_known:
+          source: identity_center_delegated_admin_account
+          target: accounts.name
+      status: pass
+      evidence: delegated_admin=SecurityTooling; accounts=['Audit',
+        'LogArchive', 'Management', 'Network', 'Prod', 'SecurityTooling']
+      violationCode: AWS_LZA_IDENTITY_CENTER_ADMIN_UNKNOWN
+      violationMessage: Identity Center delegated administrator must reference a
+        known account.
+    - key: identity-admin-security-ou
+      label: Identity Center delegated admin belongs to Security OU
+      expression:
+        references_entity:
+          source: identity_center_delegated_admin_account
+          relationship: belongs_to
+          target:
+            kind: OU
+            name: Security
+      status: pass
+      evidence: delegated_admin=SecurityTooling; ou=Security
+      violationCode: AWS_LZA_IDENTITY_CENTER_ADMIN_SECURITY_OU_REQUIRED
+      violationMessage: Identity Center delegated administrator must belong to
+        the Security OU.
+    - key: home-region-enabled
+      label: Home region is enabled
+      expression:
+        contains:
+          decision: enabled_regions
+          value_from: home_region
+      status: pass
+      evidence: home_region=eu-central-1; enabled_regions=['eu-central-1']
+      violationCode: AWS_LZA_HOME_REGION_NOT_ENABLED
+      violationMessage: Home region must be present in enabled regions.
+    - key: network-cidr-valid
+      label: Network CIDR is valid
+      expression:
+        cidr_valid:
+          decision: network_cidr
+      status: pass
+      evidence: network_cidr=10.0.0.0/16
+      violationCode: AWS_LZA_NETWORK_CIDR_INVALID
+      violationMessage: Network CIDR must be a valid IPv4 or IPv6 network.
+    - key: identity-assignment-format-1
+      label: Identity Center assignment has Principal:PermissionSet:Account
+        shape
+      expression:
+        shape:
+          decision: identity_center_assignments
+          format: Principal:PermissionSet:Account
+      status: pass
+      evidence: PlatformAdmins:PowerUserAccess:Management
+      violationCode: AWS_LZA_IDENTITY_CENTER_ASSIGNMENT_FORMAT_INVALID
+      violationMessage: Identity Center assignments must use
+        Principal:PermissionSet:Account format.
+    - key: identity-assignment-permission-set-1
+      label: Identity Center assignment references approved permission set
+      expression:
+        references_known:
+          source: identity_center_assignments.permission_set
+          target: identity_center_permission_sets.name
+      status: pass
+      evidence: PlatformAdmins:PowerUserAccess:Management
+      violationCode: AWS_LZA_IDENTITY_CENTER_ASSIGNMENT_PERMISSION_SET_UNKNOWN
+      violationMessage: Identity Center assignments must reference approved
+        permission sets.
+    - key: identity-assignment-account-1
+      label: Identity Center assignment targets known account
+      expression:
+        references_known:
+          source: identity_center_assignments.target_account
+          target: accounts.name
+      status: pass
+      evidence: PlatformAdmins:PowerUserAccess:Management
+      violationCode: AWS_LZA_IDENTITY_CENTER_ASSIGNMENT_ACCOUNT_UNKNOWN
+      violationMessage: Identity Center assignments must target known accounts.
 handoffReadiness: &id001
   handoffAllowed: true
   deploymentAllowed: true

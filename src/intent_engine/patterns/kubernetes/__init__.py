@@ -76,13 +76,14 @@ def _register_pattern() -> None:
             section_order=list(K8S_SECTION_ORDER),
             free_form_examples=dict(K8S_FREE_FORM_EXAMPLES),
             prompt_context=(
-                "This pattern designs Kubernetes cluster configurations. "
-                "The design document uses Markdown sections. Extract values as follows:\n"
+                "This pattern captures Kubernetes cluster handoff configuration for an "
+                "existing approved cluster or module workflow. Extract values as follows:\n"
                 "- Cluster Configuration section -> cluster_name, cluster_version\n"
                 "- Network section -> pod_cidr, service_cidr, network_policy_enabled\n"
                 "- Node Pool section -> node_pool_name, node_pool_instance_type, "
                 "node_pool_min_size, node_pool_max_size\n"
-                "- Namespace section -> namespace_name"
+                "- Namespace section -> namespace_name\n"
+                "Do not generate deployable cluster scaffolding from prose."
             ),
             contracts=[K8S_CONTRACT],
         )

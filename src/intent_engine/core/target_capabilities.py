@@ -99,6 +99,32 @@ class UnsupportedRequest:
 
 
 @dataclass(frozen=True)
+class UnsupportedAskFact:
+    """Extracted semantic fact for a request the current pattern does not own."""
+
+    kind: str
+    label: str
+    evidence_span: str
+    recommended_target: TargetCapabilityType
+    owned_by_pattern: bool
+    detected_by: str
+    reason: str
+    source: str = "deterministic-text"
+
+    def to_dict(self) -> dict[str, str | bool]:
+        return {
+            "kind": self.kind,
+            "label": self.label,
+            "evidenceSpan": self.evidence_span,
+            "recommendedTarget": self.recommended_target.value,
+            "ownedByPattern": self.owned_by_pattern,
+            "detectedBy": self.detected_by,
+            "reason": self.reason,
+            "source": self.source,
+        }
+
+
+@dataclass(frozen=True)
 class TargetCapability:
     """A capability exposed by a downstream target path."""
 
@@ -125,12 +151,16 @@ class TargetCapabilityGraph:
             for dep in capability.depends_on:
                 self._graph.add_edge(dep, capability.key)
 
-    def evaluate(self, decisions: dict[str, Any], source_text: str = "") -> dict[str, Any]:
-        text_lower = source_text.lower()
+    def evaluate(
+        self,
+        decisions: dict[str, Any],
+        unsupported_ask_facts: list[UnsupportedAskFact] | None = None,
+    ) -> dict[str, Any]:
+        unsupported_ask_facts = unsupported_ask_facts or []
         nodes = []
         coverage: dict[str, str] = {}
         manual_gates: list[str] = []
-        unsupported_gaps: list[dict[str, str]] = []
+        unsupported_gaps: list[dict[str, str | bool]] = []
         selected_types: set[TargetCapabilityType] = set()
         selected_capability_keys: set[str] = set()
 
@@ -148,26 +178,6 @@ class TargetCapabilityGraph:
                 selected_capability_keys.add(capability.key)
             for key in capability.handled_decisions:
                 coverage[key] = capability.key
-            for unsupported in capability.unsupported_requests:
-                if any(
-                    _has_affirmative_keyword_match(text_lower, keyword)
-                    for keyword in unsupported.keywords
-                ):
-                    selected_types.add(unsupported.recommended_target)
-                    selected_capability_keys.update(
-                        item.key
-                        for item in self.capabilities
-                        if item.capability_type == unsupported.recommended_target
-                    )
-                    unsupported_gaps.append(
-                        {
-                            "key": unsupported.key,
-                            "label": unsupported.label,
-                            "detectedBy": capability.key,
-                            "recommendedTarget": unsupported.recommended_target.value,
-                            "reason": unsupported.reason,
-                        }
-                    )
             nodes.append(
                 {
                     "key": capability.key,
@@ -180,6 +190,26 @@ class TargetCapabilityGraph:
                     "requiredDecisions": list(capability.required_decisions),
                     "manualGates": list(capability.manual_gates),
                     "dependsOn": list(capability.depends_on),
+                }
+            )
+
+        for fact in unsupported_ask_facts:
+            selected_types.add(fact.recommended_target)
+            selected_capability_keys.update(
+                item.key
+                for item in self.capabilities
+                if item.capability_type == fact.recommended_target
+            )
+            unsupported_gaps.append(
+                {
+                    "key": fact.kind,
+                    "label": fact.label,
+                    "detectedBy": fact.detected_by,
+                    "recommendedTarget": fact.recommended_target.value,
+                    "reason": fact.reason,
+                    "evidenceSpan": fact.evidence_span,
+                    "ownedByPattern": fact.owned_by_pattern,
+                    "source": fact.source,
                 }
             )
 
@@ -202,16 +232,84 @@ class TargetCapabilityGraph:
                 ),
             },
             "unsupportedGaps": unsupported_gaps,
+            "semanticFacts": {
+                "unsupportedAsks": [fact.to_dict() for fact in unsupported_ask_facts],
+            },
             "manualGates": list(dict.fromkeys(manual_gates)),
             "edges": [{"from": source, "to": target} for source, target in self._graph.edges()],
         }
+
+
+def extract_unsupported_ask_facts(
+    capabilities: list[TargetCapability],
+    source_text: str,
+) -> list[UnsupportedAskFact]:
+    """Extract unsupported target asks as semantic facts before routing."""
+
+    if not source_text:
+        return []
+
+    text_lower = source_text.lower()
+    facts: list[UnsupportedAskFact] = []
+    seen: set[str] = set()
+    for capability in capabilities:
+        for unsupported in capability.unsupported_requests:
+            for keyword in unsupported.keywords:
+                index = _affirmative_keyword_match_index(text_lower, keyword)
+                if index is None:
+                    continue
+                fact_key = f"{capability.key}:{unsupported.key}"
+                if fact_key in seen:
+                    break
+                seen.add(fact_key)
+                facts.append(
+                    UnsupportedAskFact(
+                        kind=unsupported.key,
+                        label=unsupported.label,
+                        evidence_span=_evidence_span(source_text, index, len(keyword)),
+                        recommended_target=unsupported.recommended_target,
+                        owned_by_pattern=False,
+                        detected_by=capability.key,
+                        reason=unsupported.reason,
+                    )
+                )
+                break
+    return facts
+
+
+def _affirmative_keyword_match_index(text: str, keyword: str) -> int | None:
+    keyword = keyword.lower()
+    start = 0
+    while True:
+        index = text.find(keyword, start)
+        if index == -1:
+            return None
+        if _is_keyword_boundary(text, index, len(keyword)) and not _is_negated_keyword_match(
+            text, index, len(keyword)
+        ):
+            return index
+        start = index + len(keyword)
+
+
+def _evidence_span(text: str, index: int, keyword_length: int) -> str:
+    line_start = text.rfind("\n", 0, index) + 1
+    line_end = text.find("\n", index + keyword_length)
+    if line_end == -1:
+        line_end = len(text)
+    return " ".join(text[line_start:line_end].strip().split())
 
 
 def build_target_capability_report(
     capabilities: list[TargetCapability],
     decisions: dict[str, Any],
     source_text: str = "",
+    unsupported_ask_facts: list[UnsupportedAskFact] | None = None,
 ) -> dict[str, Any]:
     if not capabilities:
         return {}
-    return TargetCapabilityGraph(capabilities).evaluate(decisions, source_text)
+    facts = (
+        unsupported_ask_facts
+        if unsupported_ask_facts is not None
+        else extract_unsupported_ask_facts(capabilities, source_text)
+    )
+    return TargetCapabilityGraph(capabilities).evaluate(decisions, facts)

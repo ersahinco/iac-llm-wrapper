@@ -9,6 +9,7 @@ import networkx as nx
 
 from .contracts import ContractValidator
 from .patterns import Pattern
+from .requirements import expression_dependencies
 from .sample_config import GLOBAL_SAMPLE_REGISTRY
 
 
@@ -19,6 +20,7 @@ class PatternCheckResult:
     contracts: int
     expected_artifacts: int
     samples: int
+    context_rules: int
     violations: list[str]
 
     @property
@@ -44,10 +46,15 @@ def check_pattern(
             contracts=len(pattern.contracts),
             expected_artifacts=len(pattern.expected_artifacts()),
             samples=len(GLOBAL_SAMPLE_REGISTRY.find_by_pattern(pattern.name)),
+            context_rules=0,
             violations=[f"graph factory failed: {exc}"],
         )
 
     requirements = len(graph._requirements)
+    context_rules = 0
+    if not pattern.description.strip():
+        violations.append("pattern description is missing")
+    context_rules += _check_prompt_context(pattern, violations)
     if not graph._requirements:
         violations.append("graph has no requirements")
     try:
@@ -62,12 +69,29 @@ def check_pattern(
             violations.append(f"{key}: missing label")
         if not req.question:
             violations.append(f"{key}: missing question")
+        if not req.category:
+            violations.append(f"{key}: missing category")
         if not req.target_field:
             violations.append(f"{key}: missing target field")
+        if (
+            req.required_when_applicable
+            and req.default is None
+            and not req.options
+            and (not req.violation_code or not req.violation_message)
+        ):
+            violations.append(
+                f"{key}: required open requirement must define violation code and message"
+            )
         for dep in req.depends_on:
             if dep not in graph._requirements:
                 violations.append(f"{key}: unknown dependency {dep}")
-        for dep in set(req.applies_if) | set(req.blocked_if):
+        condition_dependencies = (
+            set(req.applies_if)
+            | set(req.blocked_if)
+            | set(expression_dependencies(req.applies_when))
+            | set(expression_dependencies(req.blocked_when))
+        )
+        for dep in condition_dependencies:
             if dep not in graph._requirements:
                 violations.append(f"{key}: unknown condition dependency {dep}")
 
@@ -98,5 +122,43 @@ def check_pattern(
         contracts=len(pattern.contracts),
         expected_artifacts=len(expected_artifacts),
         samples=len(samples),
+        context_rules=context_rules,
         violations=violations,
     )
+
+
+def _check_prompt_context(pattern: Pattern, violations: list[str]) -> int:
+    """Validate bounded LLM context so pattern behavior stays reviewable."""
+
+    rules = 0
+    prompt_context = " ".join(pattern.prompt_context.split())
+    if not prompt_context:
+        violations.append("prompt context is missing")
+        return rules
+
+    words = prompt_context.split()
+    rules += 1
+    if len(words) < 12:
+        violations.append("prompt context is too short to define extraction scope")
+    if len(words) > 140:
+        violations.append("prompt context is too long; move details into graph/contracts")
+
+    lowered = prompt_context.lower()
+    extraction_terms = ("extract", "capture", "captures", "gather", "gathers")
+    boundary_terms = (
+        "approved",
+        "contract",
+        "do not",
+        "existing",
+        "handoff",
+        "no ",
+        "only",
+    )
+    rules += 1
+    if not any(term in lowered for term in extraction_terms):
+        violations.append("prompt context must say what the LLM extracts or captures")
+    rules += 1
+    if not any(term in lowered for term in boundary_terms):
+        violations.append("prompt context must state a handoff, contract, or target boundary")
+
+    return rules

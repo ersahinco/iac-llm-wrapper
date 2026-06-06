@@ -175,9 +175,10 @@ returned, and why graph acceptance behaved the way it did.
 Treat raw evidence like temporary customer design material. It may contain
 account names, network topology, control requirements, document excerpts, and
 model responses. It is a development/debug artifact, not a required service
-artifact. A service deployment can use `llm-trace-summary.yaml`,
-`model-benchmark.yaml`, and `handoff-review.html` to show how the LLM interpreted
-the provided documents without storing raw prompts and responses. Use a
+artifact. A service deployment can use `context-manifest.yaml`,
+`llm-trace-summary.yaml`, `model-benchmark.yaml`, and `handoff-review.html` to
+show which code-owned context and LLM interpretation shaped the bundle without
+storing raw prompts and responses. Use a
 restricted output directory, avoid secrets in design docs, provide API keys
 through environment variables or `--api-key`, and redact evidence before sharing
 outside the project team. The repo ignores common raw-evidence file names to

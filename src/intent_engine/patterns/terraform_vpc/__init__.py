@@ -325,8 +325,10 @@ GLOBAL_REGISTRY.register(
         section_map=SECTION_MAP,
         section_order=["VPC Module", "Subnets", "Egress", "DNS"],
         prompt_context=(
-            "This pattern gathers inputs for a Terraform AWS VPC module. "
-            "Extract exact module variables such as CIDR, subnets, NAT settings, and DNS flags."
+            "This pattern gathers handoff inputs for an existing approved Terraform AWS "
+            "VPC module. Extract exact module variables such as CIDR, subnets, NAT "
+            "settings, and DNS flags only. Do not generate root Terraform scaffolding "
+            "from prose."
         ),
         validators=[_validate_intent],
         contracts=[_CONTRACT],

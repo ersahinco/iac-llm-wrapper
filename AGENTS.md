@@ -28,10 +28,11 @@ uv run pre-commit run --all-files
 
 ## Architecture
 
-- **Models** (`models.py`): Pydantic v2 intent data models. Pattern-specific models drive extraction, graph sync, validation, and artifact emission.
+- **Models** (`src/intent_engine/patterns/*/models.py`): Pydantic v2 intent data models. Pattern-specific models drive extraction, graph sync, validation, semantic model derivation, and artifact emission.
 - **Extract** (`extractor.py`): Single graph-driven `Extractor`. Prompts come from requirement nodes, not regex or fixed document layout. Without LLM, deterministic fallback applies graph defaults and structured Markdown entity recovery.
 - **Patterns** (`patterns.py`): Lean registry for pluggable product paths. Current built-ins: `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, `terraform-vpc`.
-- **Requirements** (`requirements.py`): Decision graph with `applies_if`, `blocked_if`, `depends_on`, cascade rules, tradeoffs, compliance controls, signals, and audit trail.
+- **Requirements** (`requirements.py`): Decision graph with `applies_if`/`blocked_if`, richer `applies_when`/`blocked_when` expressions, `depends_on`, cascade rules, tradeoffs, compliance controls, signals, and audit trail.
+- **Semantic model** (`semantic_model.py` + pattern `semantic.py`): Lightweight typed entities, relationships, and predicate constraint results for real-world dependencies without RDF/OWL, Datalog, or a graph database.
 - **Interview** (`interview.py`): Graph-ordered requirement capture. Shows context, asks only applicable gaps, supports save/resume, and records rationale.
 - **Validate** (`validator.py`): Fail-closed graph and pattern validation. Missing required applicable decisions become compile errors.
 - **Generate** (`generator.py`): Registry-driven emitter for decision report, generic handoff plan, contract handoff files, lineage, runbook, module inputs when pattern owns module mapping, sample recommendations, and static review artifacts.
@@ -96,16 +97,16 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy, pyr
 
 ### Current Goal
 
-T45: Follow-up usability bug sweep after target routing
+T49: Lightweight typed semantic model and predicate constraints
 
 ### Status
 
-- **Tests**: 340 passing, 5 skipped
+- **Tests**: 351 passing, 5 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Ran another remaining real-bug sweep against diff-aware review compare rendering. Fixed the CLI/static comparison bug where added and removed accepted-decision deltas were counted in the report but only changed decisions were named in terminal/HTML review output. Comparison rendering now shows added, changed, and removed decision groups consistently. No extraction correctness issue surfaced. Full pytest, Ruff, Ruff format, mypy, Pyright, fixture drift, golden journey, extraction, usability, and pre-commit are green.
+- **Last session**: Filled the next data-modeling gap without adding heavy infrastructure. Core `Requirement` now supports lightweight `applies_when`/`blocked_when` expressions (`equals`, `contains`, `present`, `all`, `any`, `not`) alongside legacy `applies_if`/`blocked_if`; graph export, prompt rendering, discovery, pattern checks, templates, and context manifests expose those gates. Added reusable `semantic_model.py` dataclasses and AWS LZA `semantic.py` to derive typed entities (`Account`, `OU`, `PermissionSet`, `Assignment`, `Control`, `Artifact`), typed relationships, and predicate constraints from accepted intent. AWS LZA validation now runs through the semantic constraints, and `decision-report.yaml.semanticModel` gives reviewers the entity/relationship/constraint view. AGENTS architecture housekeeping now points to pattern-owned models instead of a non-existent core `models.py`. Full pytest, Ruff, Ruff format, mypy, Pyright, fixture drift check, golden journey, extraction eval, usability eval, and built-in pattern checks are green.
 
 ### Done
 
@@ -135,6 +136,10 @@ T45: Follow-up usability bug sweep after target routing
 - T43 battle test: Ran realistic ready AWS LZA, blocked AWS LZA, BYOM Terraform, incremental document update, review comparison, static delta HTML, and sample recommendation movement through the current CLI. No new harness or dashboard was added. The only blocking usability issue found was false unsupported target routing from negated generation language and short keyword substring matches; target capability detection now requires affirmative whole-token matches and ignores local negation.
 - T44 usability bug sweep: Fixed route-scoping and wording issues found in real generated outputs. Pure AWS LZA handoffs no longer show workload-module gates as active manual gates; blocked target capability rows show unavailable; blocked compile suggests `template --pattern <actual-pattern>`; BYOM patterns without target graphs show `not declared`; blocked reviews explain missing `handoff-plan.yaml`; raw evidence omission displays as `not requested`.
 - T45 follow-up usability sweep: After committing T42-T44, re-ran first-run and handoff paths from a clean baseline. Fixed discovery clarifying-question copy so it uses graph questions instead of generic fallback text, fixed comparison HTML so added/removed artifacts are visible alongside changed artifacts, fixed blocked-review traceability so AWS LZA cross-field validator blockers point to concrete requirement questions instead of `unknown`, fixed repeated discovery gap numbering, replaced AWS-shaped safe handoff wording with pattern-neutral target-toolchain language, made ready review next actions owner-neutral for BYOM paths, normalized input diff report values so list decision deltas do not mix list and scalar forms, fixed terminal `review compare` artifact delta output so added/changed/removed artifact groups are visible without opening YAML or HTML, aligned runbook/review/harness wording on `Handoff allowed` instead of `Handoff ready`, and fixed comparison decision-delta rendering so added/changed/removed accepted decisions are all named in terminal and static HTML review output.
+- T46 context-as-code guardrails: `pattern check` now validates bounded `Pattern.prompt_context`, rejects missing/vague context, surfaces context rule counts in CLI output, and requires explicit violation code/message for required open decisions without defaults. CloudFormation, Kubernetes, and Terraform VPC prompt contexts now state handoff boundaries and forbid deployable scaffolding generation from prose. Added `docs/CONTEXT_AS_CODE.md` and linked it from README and pattern authoring guidance.
+- T47 complete lightweight context-as-code adoption: Successful pattern-backed bundles now emit and validate `context-manifest.yaml`. The manifest records the active pattern, prompt context digest/text, requirement graph inventory, target contracts, samples, target capabilities, runtime LLM/extraction summary, expected artifacts, and guardrails. `Pattern.expected_artifacts()`, `validate_generated`, ready-bundle contract validation, docs, tests, and registered sample fixtures now treat the manifest as a first-class non-deployable artifact.
+- T48 semantic facts for target routing: Target capability routing now consumes explicit `UnsupportedAskFact` entities instead of scanning source text inside graph evaluation. Deterministic source-text matching extracts facts with evidence spans first; the graph then selects module-composition/generator/manual/blocked paths from facts and accepted decisions. `target-capability-graph.yaml`, `handoff-plan.yaml`, `llm-trace-summary.yaml`, and `context-manifest.yaml` expose the semantic fact state for review.
+- T49 lightweight typed semantic model: Added expression gates to requirement graphs and a no-infrastructure semantic model layer. AWS LZA now derives typed entities, relationships, and predicate constraints for account/OU placement, Identity Center permission-set and assignment references, home-region containment, valid network CIDR, control/artifact relationships, and delegated-admin Security OU placement. Validation and generated decision reports use that model, while existing flat decision fields and artifacts remain backward compatible.
 
 ### Next
 
@@ -145,11 +150,15 @@ T45: Follow-up usability bug sweep after target routing
 5. Run `evaluate-extraction.py --llm`, `evaluate-usability.py --llm`, and `compare-model-benchmarks.py --require-conformant` with approved local/Bedrock models when broader model regression confidence is needed; use result artifacts to decide whether prompts or fixtures need tightening.
 6. If reviewers still struggle to resolve blockers, consider adding lightweight anchors from blocker rows to exported requirement graph nodes without adding JavaScript.
 7. Continue AWS LZA schema depth only where real customer inputs justify it.
+8. Next data-modeling increments should add typed entities only where a real
+   packet exposes a missed relationship; defer Datalog until constraints become
+   deeply inferential or platform-team policy preferences need rule composition.
 
 ### Durable Decisions
 
 - Core stays domain-agnostic; pattern packages own models, graphs, contracts, validators, samples, and generators.
 - Two-layer graph architecture is the product direction: requirement graphs own decisions, gaps, blockers, provenance, and readiness; target capability graphs own downstream route selection, target coverage, unsupported asks, manual gates, and blocked generation paths.
+- Typed property graph plus predicate constraints is the current data-modeling direction. Keep Pydantic as the serialized handoff model and NetworkX/dataclasses for traversal/evaluation; do not introduce RDF/OWL, Datalog, or graph databases until real policy inference needs justify them.
 - Graph and contracts own readiness. LLM output is evidence until accepted by graph requirements and artifact contracts.
 - Handoff artifacts are not deployments. `handoffReadiness` is the clearer term; legacy `deploymentReadiness` stays for backward compatibility.
 - Raw LLM evidence is local development/debug material. Service-style runs can disable raw prompt/response storage with `--no-raw-evidence` while preserving `llm-trace-summary.yaml`, `model-benchmark.yaml`, and `handoff-review.html` for interpretation review.

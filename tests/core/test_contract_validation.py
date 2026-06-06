@@ -50,6 +50,10 @@ def _register_example_pattern() -> dict[str, Pattern]:
             name="contract-validation-example",
             description="Contract validation example",
             graph_factory=_graph,
+            prompt_context=(
+                "This pattern captures approved region handoff context only. "
+                "Extract the region decision for an existing target contract."
+            ),
             contracts=[
                 TargetContract(
                     name="example-config",
@@ -114,6 +118,49 @@ def _write_ready_bundle(output_dir: Path, *, include_config: bool = True) -> Non
     )
     if include_config:
         _write_yaml(output_dir / "config.yaml", {"region": "eu-central-1"})
+    _write_yaml(
+        output_dir / "context-manifest.yaml",
+        {
+            "schemaVersion": "intent-engine/context-manifest/v1",
+            "pattern": "contract-validation-example",
+            "boundary": "context is code-owned",
+            "contextInventory": {
+                "pattern": {
+                    "name": "contract-validation-example",
+                    "description": "Contract validation example",
+                    "intentModel": "ExampleIntent",
+                },
+                "promptContext": {
+                    "present": True,
+                    "sha256": "abc123",
+                    "wordCount": 16,
+                    "text": "This pattern captures approved region handoff context only.",
+                },
+                "requirementGraph": {
+                    "nodeCount": 1,
+                    "edgeCount": 0,
+                    "requirements": [
+                        {
+                            "key": "region",
+                            "category": "general",
+                            "targetField": "region",
+                        }
+                    ],
+                },
+                "targetContracts": [],
+                "samples": [],
+                "targetCapabilities": [],
+            },
+            "runtimeContext": {
+                "acceptedDecisionCount": 1,
+                "moduleInputCount": 0,
+                "unsupportedAskFactCount": 0,
+                "llm": {"provider": "none", "model": "none", "callCount": 0},
+            },
+            "outputs": {"expectedArtifacts": ["context-manifest.yaml"]},
+            "guardrails": ["LLM output is not authoritative."],
+        },
+    )
 
 
 def _write_blocked_bundle(output_dir: Path) -> None:
@@ -218,12 +265,13 @@ def test_ready_bundle_validates_pattern_contracts_and_handoff_plan(tmp_path: Pat
 
         assert result["summary"] == {
             "status": "pass",
-            "contractCount": 2,
+            "contractCount": 3,
             "violationCount": 0,
         }
         assert [item["name"] for item in result["contracts"]] == [
             "example-config",
             "generic-handoff-plan",
+            "generic-context-manifest",
         ]
     finally:
         GLOBAL_REGISTRY._patterns = original

@@ -50,6 +50,65 @@ class TestRequirementGraph:
         assert not g.is_applicable("network_acct")
         assert "network_acct" not in g.pending()
 
+    def test_expression_applies_when_supports_equals_and_contains(self):
+        g = RequirementGraph()
+        g.add(
+            Requirement(
+                key="topology",
+                label="Topology",
+                question="Topology?",
+                default="hub-spoke",
+            )
+        )
+        g.add(
+            Requirement(
+                key="organizational_units",
+                label="OUs",
+                question="OUs?",
+                target_type="string_list",
+                default="Security, Infrastructure",
+            )
+        )
+        g.add(
+            Requirement(
+                key="network_account",
+                label="Network Account",
+                question="Network account?",
+                applies_when={
+                    "all": [
+                        {"equals": {"decision": "topology", "value": "hub-spoke"}},
+                        {
+                            "contains": {
+                                "decision": "organizational_units",
+                                "value": "Infrastructure",
+                            }
+                        },
+                    ]
+                },
+            )
+        )
+
+        g.apply_defaults_for_remaining()
+
+        assert g.is_applicable("network_account")
+
+    def test_expression_blocked_when_sets_status(self):
+        g = RequirementGraph()
+        g.add(Requirement(key="mode", label="Mode", question="Mode?"))
+        g.add(
+            Requirement(
+                key="unsafe_action",
+                label="Unsafe Action",
+                question="Unsafe?",
+                blocked_when={"equals": {"decision": "mode", "value": "blocked"}},
+            )
+        )
+
+        g.decide("mode", "blocked")
+
+        assert g.status("unsafe_action") == RequirementStatus.BLOCKED
+        assert "mode == blocked" in (g.is_blocked_reason("unsafe_action") or "")
+
     def test_dependency_readiness(self):
         g = RequirementGraph()
         g.add(Requirement(key="a", label="A", question="A?"))

@@ -947,7 +947,7 @@ def compile_from_graph(graph, output_dir: Path, pattern: str = "aws-lza") -> Non
 
 def validate_generated_violations(input_dir: Path, pattern: str = "aws-lza") -> list[Violation]:
     violations: list[Violation] = []
-    from .contracts import HANDOFF_PLAN_CONTRACT, ContractValidator
+    from .contracts import CONTEXT_MANIFEST_CONTRACT, HANDOFF_PLAN_CONTRACT, ContractValidator
     from .patterns import GLOBAL_REGISTRY
 
     pattern_obj = GLOBAL_REGISTRY.get(pattern)
@@ -965,6 +965,7 @@ def validate_generated_violations(input_dir: Path, pattern: str = "aws-lza") -> 
         violations.extend(ContractValidator(contract).validate_artifacts(input_dir))
     if pattern_obj.contracts:
         violations.extend(ContractValidator(HANDOFF_PLAN_CONTRACT).validate_artifacts(input_dir))
+    violations.extend(ContractValidator(CONTEXT_MANIFEST_CONTRACT).validate_artifacts(input_dir))
 
     deduped: list[Violation] = []
     seen_messages: set[str] = set()
@@ -1126,6 +1127,10 @@ def generate_template(pattern: str = "aws-lza") -> str:
             if req.applies_if:
                 for cond_key, cond_vals in req.applies_if.items():
                     lines.append(f"# Only when {cond_key} is one of: {', '.join(cond_vals)}")
+            if req.applies_when:
+                from .requirements import describe_expression
+
+                lines.append(f"# Only when {describe_expression(req.applies_when)}")
 
             lines.append(f"# {req.question}")
             if req.options:

@@ -63,6 +63,7 @@ readiness, allowed next action, pattern, battle test, and evidence.
 | Understand emitted files | [docs/ARTIFACTS.md](docs/ARTIFACTS.md) |
 | Visualize graphs and results | [docs/DEVELOPER_VISUALS.md](docs/DEVELOPER_VISUALS.md) |
 | Add or change a pattern | [docs/PATTERN_AUTHORING.md](docs/PATTERN_AUTHORING.md) |
+| Keep LLM context reviewable | [docs/CONTEXT_AS_CODE.md](docs/CONTEXT_AS_CODE.md) |
 | Tune or compare LLMs | [docs/LLM_SETUP.md](docs/LLM_SETUP.md) |
 | Contribute safely | [CONTRIBUTING.md](CONTRIBUTING.md) |
 
@@ -119,9 +120,9 @@ iac-llm-wrapper compile -i customer-packet.md -o out/customer-packet \
 If compile is blocked, the CLI still writes safe assessment artifacts. Generate
 the same review page, answer the blocker traceability questions in the source
 Markdown, and re-run compile. If compile is ready, reviewers use
-`handoff-review.html`, `handoff-plan.yaml`, `deployment-runbook.md`, target
-artifact files, and `sample-recommendations.yaml` before passing anything to the
-existing provisioning toolchain.
+`handoff-review.html`, `context-manifest.yaml`, `handoff-plan.yaml`,
+`deployment-runbook.md`, target artifact files, and `sample-recommendations.yaml`
+before passing anything to the existing provisioning toolchain.
 
 ### Alternative: Cloud LLM
 
@@ -275,7 +276,7 @@ iac-llm-wrapper graph export --pattern aws-lza --format json
 # See required AWS LZA handoff files, decisions, and lineage paths
 iac-llm-wrapper contract show --pattern aws-lza
 
-# Check a pattern's graph, contracts, samples, and expected artifact surface
+# Check graph, contracts, bounded context, samples, and expected artifact surface
 iac-llm-wrapper pattern check --pattern aws-lza
 
 # See pinned reference bundles for engineer handoff
@@ -292,9 +293,13 @@ iac-llm-wrapper compile -i design.md -o out/ --pattern aws-lza
 ```
 
 For `aws-lza`, successful output includes:
-- `decision-report.yaml` — decisions, handoff readiness, blockers, and safe handoff path
+- `decision-report.yaml` — decisions, handoff readiness, blockers, safe handoff path,
+  and pattern-owned semantic model details when available
 - `accounts-config.yaml`, `global-config.yaml`, `iam-config.yaml`, `network-config.yaml`, `organization-config.yaml`, `security-config.yaml` — AWS LZA handoff config files
 - `lineage-manifest.yaml` — decision-to-artifact path map
+- `context-manifest.yaml` — code-owned context inventory: pattern, prompt
+  context, requirement graph, contracts, samples, target capabilities, and
+  expected artifacts
 - `handoff-plan.yaml` — ordered owners, dependencies, gates, rollback, boundary, and allowed next action
 - `deployment-runbook.md` — prerequisites and handoff sequence
 - `sample-recommendations.yaml` — closest pinned reference bundles for handoff

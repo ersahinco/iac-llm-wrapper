@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .contracts import AWS_LZA_CONFIG_ARTIFACTS
+from .semantic import build_aws_lza_semantic_model
 from .utils import (
     _INFRASTRUCTURE_OU,
     _LZA_CONTRACT,
@@ -329,6 +330,7 @@ def gen_lza_decision_report(intent: Any, output_dir: Path) -> None:
             "guardDutyEnabled": intent.guardduty_enabled,
             "complianceOverlay": str(intent.compliance_overlay),
         },
+        "semanticModel": build_aws_lza_semantic_model(intent).to_dict(),
     }
     if readiness:
         data["handoffReadiness"] = readiness

@@ -24,14 +24,20 @@ def _requirement(
     label: str = "Region",
     question: str = "Which region?",
     target_field: str | None = "region",
+    default: str | None = None,
     depends_on: list[str] | None = None,
+    violation_code: str | None = "REGION_REQUIRED",
+    violation_message: str | None = "Region is required.",
 ) -> Requirement:
     return Requirement(
         key=key,
         label=label,
         question=question,
         target_field=target_field,
+        default=default,
         depends_on=depends_on or [],
+        violation_code=violation_code,
+        violation_message=violation_message,
     )
 
 
@@ -40,6 +46,10 @@ def test_check_pattern_passes_for_minimal_valid_pattern(tmp_path: Path):
         name="valid-pattern",
         description="Valid pattern",
         graph_factory=lambda: _graph(_requirement()),
+        prompt_context=(
+            "This pattern captures approved region handoff context only. "
+            "Extract the region decision for an existing target contract."
+        ),
         contracts=[
             TargetContract(
                 name="valid-contract",
@@ -56,8 +66,9 @@ def test_check_pattern_passes_for_minimal_valid_pattern(tmp_path: Path):
     assert result.passed
     assert result.requirements == 1
     assert result.contracts == 1
-    assert result.expected_artifacts == 2
+    assert result.expected_artifacts == 3
     assert result.samples == 0
+    assert result.context_rules == 3
 
 
 def test_check_pattern_reports_graph_factory_failure(tmp_path: Path):
@@ -83,6 +94,8 @@ def test_check_pattern_reports_requirement_metadata_and_dependency_failures(tmp_
                 question="",
                 target_field=None,
                 depends_on=["missing"],
+                violation_code=None,
+                violation_message=None,
             )
         ),
     )
@@ -91,8 +104,42 @@ def test_check_pattern_reports_requirement_metadata_and_dependency_failures(tmp_
 
     assert "network: missing label" in result.violations
     assert "network: missing question" in result.violations
+    assert "network: missing category" not in result.violations
     assert "network: missing target field" in result.violations
+    assert (
+        "network: required open requirement must define violation code and message"
+        in result.violations
+    )
     assert "network: unknown dependency missing" in result.violations
+
+
+def test_check_pattern_reports_missing_or_vague_context(tmp_path: Path):
+    missing_context = Pattern(
+        name="missing-context",
+        description="Missing context",
+        graph_factory=lambda: _graph(_requirement()),
+    )
+
+    missing_result = check_pattern(missing_context, fixtures_root=tmp_path)
+
+    assert "prompt context is missing" in missing_result.violations
+    assert missing_result.context_rules == 0
+
+    vague_context = Pattern(
+        name="vague-context",
+        description="Vague context",
+        graph_factory=lambda: _graph(_requirement()),
+        prompt_context="Use the document intelligently and make a good architecture plan.",
+    )
+
+    vague_result = check_pattern(vague_context, fixtures_root=tmp_path)
+
+    assert "prompt context is too short to define extraction scope" in vague_result.violations
+    assert "prompt context must say what the LLM extracts or captures" in vague_result.violations
+    assert "prompt context must state a handoff, contract, or target boundary" in (
+        vague_result.violations
+    )
+    assert vague_result.context_rules == 3
 
 
 def test_check_pattern_reports_contract_and_empty_artifact_failures(tmp_path: Path):

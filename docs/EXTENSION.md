@@ -86,7 +86,13 @@ Rules:
 - `target_field` maps to your Pydantic model attribute (dotted paths supported)
 - `target_type` controls type coercion: `string`, `int`, `bool`, `float`,
   `string_list`, `cidr_list`, or any enum name
-- Use `applies_if`, `blocked_if`, `depends_on`, and `cascade` for logic gates
+- Use `depends_on` and `cascade` for ordering/default propagation.
+- Use `applies_if`/`blocked_if` for simple key/value gates.
+- Use `applies_when`/`blocked_when` expressions for richer gates such as
+  `equals`, `contains`, `present`, `all`, `any`, and `not`.
+- Use a pattern-owned semantic model when requirements depend on real
+  relationships between entities such as accounts, OUs, permission sets,
+  assignments, controls, artifacts, or target capabilities.
 
 ### 3. Register Generators
 
@@ -159,7 +165,11 @@ GLOBAL_REGISTRY.register(Pattern(
     intent_factory=K8sIntent,
     section_map={"cluster_name": ("Cluster", "name")},
     section_order=["Cluster"],
-    prompt_context="This pattern designs Kubernetes clusters.",
+    prompt_context=(
+        "This pattern captures approved Kubernetes cluster handoff inputs only. "
+        "Extract cluster, network, node pool, and namespace values for an existing "
+        "target contract."
+    ),
     contracts=[contract],
 ))
 ```
@@ -173,6 +183,8 @@ Pattern metadata fields:
 - `validators` — List of extra validator functions `intent -> list[Violation]`
 - `contracts` — Target contracts for required files, required paths, value assertions,
   decisions, and lineage
+- `context-manifest.yaml` — Generic context-as-code inventory emitted automatically for
+  pattern-backed successful handoffs
 - `sample-recommendations.yaml` — Generic artifact emitted automatically when sample configs
   exist for the pattern
 

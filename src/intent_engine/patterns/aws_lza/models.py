@@ -41,6 +41,46 @@ class ComplianceOverlay(StrEnum):
     EDUCATION = "education"
 
 
+class LzaOrganizationalUnit(BaseModel):
+    """Typed organization unit entity extracted from customer packets."""
+
+    name: str
+    description: str = ""
+
+
+class LzaAccount(BaseModel):
+    """Typed AWS account entity and its organizational placement."""
+
+    name: str
+    ou: str = ""
+    description: str = ""
+    account_type: str = "workload"
+
+
+class LzaPermissionSet(BaseModel):
+    """Typed IAM Identity Center permission set entity."""
+
+    name: str
+    description: str = ""
+
+
+class LzaIdentityCenterAssignment(BaseModel):
+    """Typed IAM Identity Center principal-to-target relationship."""
+
+    principal: str
+    permission_set: str
+    target_account: str
+    principal_type: str = "GROUP"
+
+
+class LzaControl(BaseModel):
+    """Typed control/security capability represented in the handoff."""
+
+    name: str
+    enabled: bool = True
+    category: str = "security"
+
+
 class AwsLzaIntent(BaseModel):
     """AWS LZA handoff intent.
 
@@ -70,3 +110,8 @@ class AwsLzaIntent(BaseModel):
     security_hub_enabled: bool = True
     guardduty_enabled: bool = True
     compliance_overlay: ComplianceOverlay = ComplianceOverlay.NONE
+    ous: list[LzaOrganizationalUnit] = Field(default_factory=list)
+    accounts: list[LzaAccount] = Field(default_factory=list)
+    permission_sets: list[LzaPermissionSet] = Field(default_factory=list)
+    assignments: list[LzaIdentityCenterAssignment] = Field(default_factory=list)
+    controls: list[LzaControl] = Field(default_factory=list)
