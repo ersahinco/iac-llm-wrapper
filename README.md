@@ -1,58 +1,63 @@
 # iac-llm-wrapper
 
-**Intent-to-IaC orchestration framework.**
+**Architect exchange to registered target configuration.**
 
 Architects write messy design docs. The tool extracts structured decisions,
 checks them against requirement graphs and target contracts, and emits traceable
-handoff artifacts for engineers.
+target configuration artifacts for engineers and existing deployment mechanisms.
 
 The repository and package are named `iac-llm-wrapper`. The core is
 **intent-engine**. Today it wraps LLM extraction with deterministic decision
-validation and emits handoff artifacts. Generation, execution, dashboards, and
-cloud changes stay downstream unless a registered pattern explicitly owns them
-and passes graph, contract, and gate checks.
+validation and emits registered-target configuration artifacts. Direct
+deployment, dashboards, and cloud changes stay downstream; the tool can say when
+a bundle is ready for an existing deployment mechanism, but it does not invoke
+that mechanism.
 The primary CLI is `iac-llm-wrapper`; `intent-engine` is kept as an optional
 alias for the core engine.
 
 LLMs help read intent. Human-owned models, requirement graphs, contracts,
 validators, lineage, runbooks, and evals decide what is acceptable. Existing
 accelerators, modules, and provisioning pipelines remain the delivery layer.
+AWS Landing Zone Accelerator is the reference path: collected and validated
+inputs become LZA YAML/config files consumed by the downstream LZA deployment
+process.
 
 ## The Core Idea
 
 Infrastructure delivery often starts with prose, then loses decisions during
 handoff. That creates rework, compliance gaps, and unsafe defaults.
 
-This project replaces that with a **model-driven flow**:
+This project replaces that with a **registered-target flow**:
 
 ```
-Prose / Markdown
+Architect packet / Markdown / Interview
      │
      ▼
 Extraction ──── LLM extracts graph decisions from prose
      │
      ▼
-Interview ───── Guided questions fill remaining gaps (via CLI or API)
+Requirement graph ─ Accept known decisions, find gaps, ask for missing inputs
      │
      ▼
-Validation ──── Fail-closed checks against graph, model, and target contracts
+Target contracts ─ Fail-closed validation of required files, paths, and lineage
      │
      ▼
-Output ──────── Target handoff artifacts for the downstream IaC toolchain
+Output ──────── Deterministic target configuration artifacts and handoff plan
 ```
 
 Every decision is recorded with provenance. Architects get a living decision
-record. Compliance gets traceability. Engineers get a validated handoff bundle
-for their IaC toolchain.
+record. Compliance gets traceability. Engineers get a validated configuration
+bundle for an existing deployment mechanism.
 
 Goal: reduce ambiguity before provisioning and create a controlled path toward
 IaC delivery. LLMs read human intent and surface missing or conflicting decisions.
 Deterministic models, graphs, contracts, validators, lineage, runbooks, and evals
-decide when handoff, generation, or execution is allowed.
+decide when a registered-target configuration bundle is ready to hand off.
 
 Use [docs/GLOSSARY.md](docs/GLOSSARY.md) for the shared project language:
-intent, decision, requirement graph, target contract, handoff artifact,
-readiness, allowed next action, pattern, battle test, and evidence.
+intent, decision, requirement graph, registered target, target configuration
+artifact, deployment target contract, existing deployment mechanism, readiness,
+allowed next action, pattern, battle test, and evidence.
 
 ## Where To Look
 
@@ -121,8 +126,9 @@ If compile is blocked, the CLI still writes safe assessment artifacts. Generate
 the same review page, answer the blocker traceability questions in the source
 Markdown, and re-run compile. If compile is ready, reviewers use
 `handoff-review.html`, `context-manifest.yaml`, `handoff-plan.yaml`,
-`deployment-runbook.md`, target artifact files, and `sample-recommendations.yaml`
-before passing anything to the existing provisioning toolchain.
+`deployment-runbook.md`, target configuration files, and
+`sample-recommendations.yaml` before passing anything to the existing deployment
+mechanism.
 
 ### Alternative: Cloud LLM
 
@@ -181,7 +187,7 @@ allowed next action, contracts, manual gates, target artifacts, trace summary,
 model benchmark conformance, and raw evidence omission. `--scenario blocked`
 proves messy blocked input stays safe: compile fails closed, only assessment and
 review artifacts are emitted, blocker ownership/questions are visible, and no
-deployable or target handoff artifacts appear. Use `--require-conformant` when
+deployable or target configuration artifacts appear. Use `--require-conformant` when
 an LLM run must prove `conformance=pass`; use `--benchmark-output` to keep the
 compact model summary without opening the full artifact bundle. Use `--output`
 to write a compact ready/blocked result artifact for CI archives or model-run
@@ -295,7 +301,7 @@ iac-llm-wrapper compile -i design.md -o out/ --pattern aws-lza
 For `aws-lza`, successful output includes:
 - `decision-report.yaml` — decisions, handoff readiness, blockers, safe handoff path,
   and pattern-owned semantic model details when available
-- `accounts-config.yaml`, `global-config.yaml`, `iam-config.yaml`, `network-config.yaml`, `organization-config.yaml`, `security-config.yaml` — AWS LZA handoff config files
+- `accounts-config.yaml`, `global-config.yaml`, `iam-config.yaml`, `network-config.yaml`, `organization-config.yaml`, `security-config.yaml` — AWS LZA target configuration artifacts
 - `lineage-manifest.yaml` — decision-to-artifact path map
 - `context-manifest.yaml` — code-owned context inventory: pattern, prompt
   context, requirement graph, contracts, samples, target capabilities, and
@@ -419,7 +425,7 @@ Recommended product paths stay thin and contract-backed:
 
 | Pattern | Description |
 |---------|-------------|
-| `aws-lza` | Contract-backed AWS Landing Zone Accelerator handoff using official-style LZA config artifacts |
+| `aws-lza` | Contract-backed AWS Landing Zone Accelerator registered-target configuration using official-style LZA YAML artifacts |
 | `cloudformation-parameters` | BYOM CloudFormation parameter handoff for an existing template |
 | `kubernetes-cluster` | K8s cluster handoff with optional Terraform EKS module input references |
 | `terraform-vpc` | BYOM Terraform AWS VPC module input capture |
@@ -455,6 +461,7 @@ uv run pre-commit run --all-files
 Security posture:
 
 - Current built-in paths make no cloud API calls and do not deploy infrastructure from prose.
+- Ready bundles are inputs to an existing deployment mechanism, not an execution request from this tool.
 - Decision artifacts are auditable (timestamps, rationale, compliance context).
 - CI runs lint, format, tests, dependency audit, Bandit, and SBOM generation across supported Python versions.
 
@@ -527,11 +534,12 @@ iac-llm-wrapper/
 ## Why Not Terraform, CDK, or CloudFormation?
 
 Those tools provision infrastructure. This tool captures and validates the
-decisions that must be made before provisioning. Today it emits handoff artifacts
-engineers use with existing accelerators, sample configurations, and IaC modules.
-Generation or execution stays downstream unless a registered pattern owns that
-behavior and passes graph, contract, and gate checks. It does not generate
-arbitrary deployable infrastructure from prose.
+decisions that must be made before provisioning. Today it emits deterministic
+target configuration artifacts engineers use with existing accelerators, sample
+configurations, and IaC modules. AWS LZA YAML is the canonical example: the tool
+can assemble validated config files for the registered target, but the LZA
+deployment process remains downstream. It does not generate whole IaC from
+scratch or arbitrary deployable infrastructure from prose.
 
 ## LLM Testing
 

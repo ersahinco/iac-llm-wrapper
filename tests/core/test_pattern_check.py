@@ -26,6 +26,8 @@ def _requirement(
     target_field: str | None = "region",
     default: str | None = None,
     depends_on: list[str] | None = None,
+    applies_when: dict[str, object] | None = None,
+    blocked_when: dict[str, object] | None = None,
     violation_code: str | None = "REGION_REQUIRED",
     violation_message: str | None = "Region is required.",
 ) -> Requirement:
@@ -36,6 +38,8 @@ def _requirement(
         target_field=target_field,
         default=default,
         depends_on=depends_on or [],
+        applies_when=applies_when,
+        blocked_when=blocked_when,
         violation_code=violation_code,
         violation_message=violation_message,
     )
@@ -111,6 +115,34 @@ def test_check_pattern_reports_requirement_metadata_and_dependency_failures(tmp_
         in result.violations
     )
     assert "network: unknown dependency missing" in result.violations
+
+
+def test_check_pattern_reports_invalid_requirement_expressions(tmp_path: Path):
+    pattern = Pattern(
+        name="bad-expression",
+        description="Bad expression",
+        graph_factory=lambda: _graph(
+            _requirement(key="mode"),
+            _requirement(
+                key="network",
+                applies_when={"all": []},
+                blocked_when={"bogus": {"decision": "mode"}},
+            ),
+        ),
+        prompt_context=(
+            "This pattern captures approved region handoff context only. "
+            "Extract the region decision for an existing target contract."
+        ),
+    )
+
+    result = check_pattern(pattern, fixtures_root=tmp_path)
+
+    assert "network: network.applies_when.all: must be a non-empty list" in result.violations
+    assert "network: network.blocked_when: unsupported operator bogus" in result.violations
+    assert (
+        "network: network.blocked_when: expression must define exactly one operator"
+        in result.violations
+    )
 
 
 def test_check_pattern_reports_missing_or_vague_context(tmp_path: Path):

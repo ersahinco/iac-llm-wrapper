@@ -95,25 +95,52 @@ def _readiness(report: dict[str, Any], handoff: dict[str, Any]) -> dict[str, Any
     handoff_readiness = handoff.get("readiness")
     if not isinstance(handoff_readiness, dict):
         handoff_readiness = {}
-    allowed = bool(
-        report_readiness.get(
-            "handoffAllowed",
-            report_readiness.get(
-                "deploymentAllowed",
-                handoff_readiness.get(
-                    "handoffAllowed",
-                    handoff_readiness.get("deploymentAllowed", True),
+    if not report_readiness and not handoff_readiness:
+        return {
+            "status": "blocked",
+            "handoffAllowed": False,
+            "deploymentAllowed": False,
+            "blockers": [
+                {
+                    "code": "READINESS_METADATA_MISSING",
+                    "message": "Bundle is missing handoff readiness metadata.",
+                }
+            ],
+        }
+    allowed: bool | None = None
+    for source in (report_readiness, handoff_readiness):
+        for key in ("handoffAllowed", "deploymentAllowed"):
+            if key in source:
+                allowed = bool(source[key])
+                break
+        if allowed is not None:
+            break
+    blockers = report_readiness.get("blockers", handoff_readiness.get("blockers", []))
+    if not isinstance(blockers, list):
+        blockers = []
+    status = str(report_readiness.get("status", handoff_readiness.get("status", ""))).lower()
+    if allowed is None or not status:
+        blockers = [
+            *blockers,
+            {
+                "code": "READINESS_METADATA_INCOMPLETE",
+                "message": (
+                    "Bundle readiness metadata must explicitly include status and "
+                    "handoffAllowed or deploymentAllowed."
                 ),
-            ),
-        )
-    )
+            },
+        ]
+        return {
+            "status": "blocked",
+            "handoffAllowed": False,
+            "deploymentAllowed": False,
+            "blockers": blockers,
+        }
     return {
-        "status": str(
-            report_readiness.get("status", handoff_readiness.get("status", "ready"))
-        ).lower(),
+        "status": status,
         "handoffAllowed": allowed,
         "deploymentAllowed": allowed,
-        "blockers": report_readiness.get("blockers", handoff_readiness.get("blockers", [])),
+        "blockers": blockers,
     }
 
 

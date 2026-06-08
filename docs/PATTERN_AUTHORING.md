@@ -1,19 +1,22 @@
 # Pattern Authoring
 
-Use this checklist when adding or changing a target pattern. The detailed API
-contract lives in [EXTENSION.md](EXTENSION.md).
+Use this checklist when adding or changing a registered target pattern. A pattern
+turns accepted decisions into deterministic target configuration artifacts for
+an existing deployment mechanism. The detailed API contract lives in
+[EXTENSION.md](EXTENSION.md).
 
 ## Checklist
 
 1. Define the Pydantic intent model.
 2. Define the requirement graph.
-3. Define target contracts for required files, paths, decisions, and lineage.
+3. Define deployment target contracts for required files, paths, decisions, and
+   lineage.
 4. Add a pattern-owned semantic model when customer requirements depend on
    real-world relationships such as account placement, assignments, controls, or
    artifact ownership.
 5. Define bounded `Pattern.prompt_context` using
    [context-as-code rules](CONTEXT_AS_CODE.md).
-6. Register scoped artifact generators with `applies_to={"your-pattern"}`.
+6. Register scoped target configuration emitters with `applies_to={"your-pattern"}`.
 7. Add sample configs only when they represent a reusable reference bundle.
 8. Add extraction fixtures for ready and blocked cases.
 9. Add usability or battle tests when the change affects handoff quality.
@@ -27,8 +30,11 @@ contract lives in [EXTENSION.md](EXTENSION.md).
   validator, interview, or generator modules.
 - Keep private/customer-specific pattern code in the pattern package that owns
   those contracts, controls, samples, and generators.
-- Do not emit deployable scaffolding unless a target contract explicitly owns
-  that artifact type.
+- Do not emit deployable scaffolding or raw IaC unless the registered target
+  explicitly owns that artifact type through a deployment target contract.
+- Do not invoke cloud APIs, Terraform, CloudFormation, AWS LZA, or deployment
+  pipelines from the pattern. Emit reviewed configuration for the existing
+  deployment mechanism instead.
 - Do not make LLM output authoritative. Raw model output must pass through the
   requirement graph and target contracts.
 - Do not leave target boundaries only in prose prompts. Pattern context must be
@@ -46,6 +52,7 @@ A healthy pattern has:
 - typed entities and predicate constraints for important relationship rules
 - clear blocked reasons for missing enterprise values
 - required artifacts checked by contracts
+- target configuration artifacts that match the registered deployment target
 - `context-manifest.yaml` with graph, prompt context, contract, sample, target,
   runtime, and expected-artifact context
 - `handoff-plan.yaml` with an allowed next action

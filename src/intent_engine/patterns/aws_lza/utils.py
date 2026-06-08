@@ -88,10 +88,18 @@ def _mandatory_accounts(intent: AwsLzaIntent) -> list[dict[str, str]]:
 
 
 def _workload_accounts(intent: AwsLzaIntent) -> list[dict[str, str]]:
+    explicit_account_ous = {
+        account.name: account.ou
+        for account in intent.accounts
+        if account.name.strip() and account.ou.strip()
+    }
     accounts = [_account_record(intent.security_tooling_account, _SECURITY_OU)]
     if intent.topology == "hub-spoke":
         accounts.append(_account_record(intent.network_account, _INFRASTRUCTURE_OU))
-    accounts.extend(_account_record(name, _WORKLOADS_OU) for name in intent.workload_accounts)
+    accounts.extend(
+        _account_record(name, explicit_account_ous.get(name, _WORKLOADS_OU))
+        for name in intent.workload_accounts
+    )
     return accounts
 
 

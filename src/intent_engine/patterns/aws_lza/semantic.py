@@ -289,6 +289,7 @@ def _constraints(
             message="Network CIDR must be a valid IPv4 or IPv6 network.",
         ),
     ]
+    constraints.extend(_account_conflict_constraints(intent))
     for index, raw_assignment in enumerate(intent.identity_center_assignments, 1):
         parts = _assignment_parts(raw_assignment)
         constraints.append(
@@ -356,7 +357,16 @@ def _organizational_units(intent: AwsLzaIntent) -> list[LzaOrganizationalUnit]:
 
 
 def _accounts(intent: AwsLzaIntent) -> list[LzaAccount]:
-    items = [
+    return _dedupe_accounts(item for item in _account_items(intent) if item.name.strip())
+
+
+def _account_items(intent: AwsLzaIntent) -> list[LzaAccount]:
+    explicit_account_ous = {
+        account.name: account.ou
+        for account in intent.accounts
+        if account.name.strip() and account.ou.strip()
+    }
+    return [
         LzaAccount(name=_MANAGEMENT_ACCOUNT, ou=_ROOT_OU, account_type="management"),
         LzaAccount(name=intent.log_archive_account, ou=_SECURITY_OU, account_type="log-archive"),
         LzaAccount(name=intent.audit_account, ou=_SECURITY_OU, account_type="audit"),
@@ -377,12 +387,65 @@ def _accounts(intent: AwsLzaIntent) -> list[LzaAccount]:
             else []
         ),
         *(
-            LzaAccount(name=name, ou=_WORKLOADS_OU, account_type="workload")
+            LzaAccount(
+                name=name,
+                ou=explicit_account_ous.get(name, _WORKLOADS_OU),
+                account_type="workload",
+            )
             for name in intent.workload_accounts
         ),
         *intent.accounts,
     ]
-    return _dedupe_accounts(item for item in items if item.name.strip())
+
+
+def _account_conflict_constraints(intent: AwsLzaIntent) -> list[PredicateConstraint]:
+    by_name: dict[str, list[LzaAccount]] = {}
+    for account in _account_items(intent):
+        name = account.name.strip()
+        if not name:
+            continue
+        by_name.setdefault(name, []).append(account)
+
+    constraints: list[PredicateConstraint] = []
+    for name, accounts in sorted(by_name.items()):
+        if len(accounts) < 2:
+            continue
+        ous = sorted({account.ou for account in accounts if account.ou.strip()})
+        account_types = sorted(
+            {
+                account.account_type
+                for account in accounts
+                if account.account_type.strip() and account.account_type != "workload"
+            }
+        )
+        ou_conflict = len(ous) > 1
+        type_conflict = len(account_types) > 1
+        if not ou_conflict and not type_conflict:
+            continue
+        constraints.append(
+            _constraint(
+                key=f"account-conflict-{_key('account', name).split(':', 1)[1]}",
+                label="Account entity has one placement and type",
+                expression={
+                    "unique_entity_properties": {
+                        "kind": "Account",
+                        "name": name,
+                        "properties": ["ou", "accountType"],
+                    }
+                },
+                passed=False,
+                evidence=(
+                    f"account={name}; ous={ous or ['<empty>']}; "
+                    f"account_types={account_types or ['workload']}"
+                ),
+                code="AWS_LZA_ACCOUNT_ENTITY_CONFLICT",
+                message=(
+                    "Account entities with the same name must not declare conflicting "
+                    "OU placement or account type."
+                ),
+            )
+        )
+    return constraints
 
 
 def _permission_sets(intent: AwsLzaIntent) -> list[LzaPermissionSet]:

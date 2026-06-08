@@ -49,8 +49,12 @@ expect:
     security.securityHubEnabled: true
     security.guardDutyEnabled: true
     security.complianceOverlay: financial-services
+    semanticModel.summary.failedConstraintCount: 0
     handoffReadiness.status: ready
     handoffReadiness.deploymentAllowed: true
+    handoffReadiness.targetCapabilities.selectedTargetPath:
+      - accelerator
+    handoffReadiness.targetCapabilities.unsupportedGapCount: 0
   counts:
     enabledRegions: 2
     organizationalUnits: 4
@@ -77,6 +81,8 @@ expect:
     - lineage-manifest.yaml
     - deployment-runbook.md
     - sample-recommendations.yaml
+    - context-manifest.yaml
+    - target-capability-graph.yaml
   forbiddenArtifacts:
     - main.tf
     - terraform.tfvars

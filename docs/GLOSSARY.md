@@ -28,6 +28,32 @@ defaults, blocking gaps, cascades, and contradiction handling.
 The contract for a target handoff shape: required artifacts, required paths,
 required decisions, value assertions, and lineage checks.
 
+## Registered Target
+
+A downstream accelerator, module family, parameter surface, or configuration
+schema that a pattern explicitly owns through a model, requirement graph,
+deployment target contract, validators, and artifact emitters. Registered
+targets can receive deterministic configuration artifacts. Unregistered targets
+must not receive generated IaC from prose.
+
+## Target Configuration Artifact
+
+A deterministic file emitted for a registered target, such as AWS LZA YAML,
+CloudFormation parameter values, Kubernetes cluster/namespace config, or
+Terraform module input variables. These files are not executed by this tool.
+
+## Deployment Target Contract
+
+The contract that defines the required shape for target configuration artifacts:
+files, paths, decisions, value assertions, and lineage. It gates whether a
+bundle can move to an existing deployment mechanism.
+
+## Existing Deployment Mechanism
+
+The downstream system that applies reviewed target configuration artifacts, such
+as AWS LZA, a provisioning pipeline, CloudFormation, Terraform, or a platform
+workflow. Current built-ins do not invoke these mechanisms.
+
 ## Handoff Artifact
 
 A file emitted for humans or downstream IaC toolchains. Current handoff artifacts

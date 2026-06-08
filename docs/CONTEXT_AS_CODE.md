@@ -12,8 +12,8 @@ what can be accepted, what must be asked, and what may be handed off.
   `applies_if` / `blocked_if` is too shallow.
 - Put important real-world relationships in pattern-owned semantic models with
   typed entities, typed relationships, and predicate constraints.
-- Put downstream artifact shape, required decisions, and lineage in target
-  contracts.
+- Put downstream target configuration shape, required decisions, and lineage in
+  deployment target contracts.
 - Put LLM extraction boundaries in `Pattern.prompt_context`.
 - Put reusable examples in sample configs and fixtures, not only in prompts.
 - Put confidence checks in tests, fixture drift checks, golden journeys, and
@@ -26,7 +26,7 @@ what can be accepted, what must be asked, and what may be handed off.
 `Pattern.prompt_context` is intentionally small. It should:
 
 - say what the LLM extracts or captures
-- name the target or handoff boundary
+- name the registered target or handoff boundary
 - forbid generation outside the registered target
 - stay short enough to review in code review
 
@@ -34,9 +34,10 @@ Avoid context like "make a good architecture plan" or "infer the best setup".
 That asks the model to become the product. Instead, encode the product contract:
 
 ```text
-This pattern captures handoff inputs for an existing approved Terraform AWS VPC
-module. Extract exact module variables such as CIDR, subnets, NAT settings, and
-DNS flags only. Do not generate root Terraform scaffolding from prose.
+This pattern captures configuration inputs for an existing approved Terraform AWS
+VPC module. Extract exact module variables such as CIDR, subnets, NAT settings,
+and DNS flags only. Do not generate root Terraform scaffolding or invoke
+deployment from prose.
 ```
 
 ## Guardrail

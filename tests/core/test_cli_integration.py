@@ -199,6 +199,117 @@ class TestCLICompile:
         assert "workload_accounts" in incremental_report
         assert "validationBoundary" in incremental_report
 
+    def test_compile_incremental_blocks_unconfirmed_high_risk_prose_change(
+        self,
+        tmp_path: Path,
+        monkeypatch,
+    ):
+        monkeypatch.setenv("INTENT_ENGINE_DISABLE_LLM", "1")
+        before_dir = tmp_path / "before"
+        after_dir = tmp_path / "after"
+        baseline_doc = tmp_path / "before.md"
+        changed_doc = tmp_path / "after.md"
+        source = Path("fixtures/eval/aws-lza-standard-handoff.md").read_text()
+        baseline_doc.write_text(source)
+        changed_doc.write_text(
+            source.replace(
+                "- home_region: eu-central-1",
+                "The home region is now eu-west-1 and requires architect re-confirmation.",
+            )
+        )
+
+        baseline = runner.invoke(
+            app,
+            [
+                "compile",
+                "--input",
+                str(baseline_doc),
+                "--output",
+                str(before_dir),
+                "--no-raw-evidence",
+            ],
+        )
+        assert baseline.exit_code == 0, baseline.output
+
+        result = runner.invoke(
+            app,
+            [
+                "compile",
+                "--baseline-bundle",
+                str(before_dir),
+                "--baseline-doc",
+                str(baseline_doc),
+                "--changed-doc",
+                str(changed_doc),
+                "--output",
+                str(after_dir),
+                "--no-raw-evidence",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "INCREMENTAL_RECONFIRMATION_REQUIRED_HOME_REGION" in result.output
+        assert (after_dir / "input-diff-report.yaml").exists()
+        assert (after_dir / "incremental-compile-report.yaml").exists()
+        report = (after_dir / "decision-report.yaml").read_text()
+        assert "INCREMENTAL_RECONFIRMATION_REQUIRED_HOME_REGION" in report
+
+    def test_compile_blocks_artifact_contract_failure(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setenv("INTENT_ENGINE_DISABLE_LLM", "1")
+        design = tmp_path / "design.md"
+        design.write_text(
+            Path("fixtures/eval/aws-lza-standard-handoff.md")
+            .read_text()
+            .replace("- centralized_logging: true", "- centralized_logging: false")
+        )
+        output_dir = tmp_path / "out"
+        output_dir.mkdir()
+        (output_dir / "network-config.yaml").write_text("stale target artifact")
+
+        result = runner.invoke(
+            app,
+            [
+                "compile",
+                "--input",
+                str(design),
+                "--output",
+                str(output_dir),
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "ARTIFACT_CONTRACT_CONTRACT_ARTIFACT_ASSERTION_FAILED" in result.output
+        report = (output_dir / "decision-report.yaml").read_text()
+        assert "handoffAllowed: false" in report
+        assert not (output_dir / "accounts-config.yaml").exists()
+        assert not (output_dir / "network-config.yaml").exists()
+        assert not (output_dir / "security-config.yaml").exists()
+
+    def test_compile_blocks_explicit_terraform_generation_ask(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setenv("INTENT_ENGINE_DISABLE_LLM", "1")
+        design = tmp_path / "design.md"
+        design.write_text(
+            Path("fixtures/eval/aws-lza-standard-handoff.md").read_text()
+            + "\n\nThe team also asks: please generate terraform for the landing zone.\n"
+        )
+        output_dir = tmp_path / "out"
+
+        result = runner.invoke(
+            app,
+            [
+                "compile",
+                "--input",
+                str(design),
+                "--output",
+                str(output_dir),
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "TARGET_CAPABILITY_BLOCKED_CUSTOM_TERRAFORM_GENERATION" in result.output
+        target = (output_dir / "target-capability-graph.yaml").read_text()
+        assert "recommendedTarget: blocked" in target
+
     def test_compile_blocked_design_writes_safe_assessment(self, tmp_path: Path, monkeypatch):
         monkeypatch.setenv("INTENT_ENGINE_DISABLE_LLM", "1")
         output_dir = tmp_path / "out"

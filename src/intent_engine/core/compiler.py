@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import shutil
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -292,6 +294,166 @@ def _violation_conflicts(violations: list[Violation]) -> list[dict[str, str]]:
     return conflicts
 
 
+def _code_suffix(value: str) -> str:
+    return (
+        "".join(char if char.isalnum() else "_" for char in value.upper()).strip("_") or "UNKNOWN"
+    )
+
+
+def _target_capability_violations(
+    target_capability_report: dict[str, Any] | None,
+) -> list[Violation]:
+    if not target_capability_report:
+        return []
+    violations: list[Violation] = []
+    for gap in target_capability_report.get("unsupportedGaps", []) or []:
+        if not isinstance(gap, dict):
+            continue
+        if str(gap.get("recommendedTarget", "")) != "blocked":
+            continue
+        key = str(gap.get("key") or "unsupported-target-ask")
+        reason = str(gap.get("reason") or "Unsupported target request is blocked.")
+        evidence = str(gap.get("evidenceSpan") or "")
+        suffix = f" Evidence: {evidence}" if evidence else ""
+        violations.append(
+            Violation(
+                code=f"TARGET_CAPABILITY_BLOCKED_{_code_suffix(key)}",
+                message=f"{reason}{suffix}",
+            )
+        )
+    return violations
+
+
+_HIGH_RISK_RECONFIRMATION_CATEGORIES = {
+    "accelerator",
+    "accounts",
+    "identity",
+    "network",
+    "organization",
+    "security",
+}
+_HIGH_RISK_RECONFIRMATION_KEYS = {
+    "baseline",
+    "home_region",
+    "enabled_regions",
+    "identity_center_delegated_admin_account",
+    "identity_center_permission_sets",
+    "identity_center_assignments",
+    "network_account",
+    "network_cidr",
+    "topology",
+}
+
+
+def _incremental_reconfirmation_violations(
+    graph,
+    incremental_report: dict[str, Any],
+    input_diff: dict[str, Any],
+) -> list[Violation]:
+    source = input_diff.get("source", {}) if isinstance(input_diff.get("source"), dict) else {}
+    if not source.get("baselineDocumentAvailable"):
+        return []
+    decisions = (
+        incremental_report.get("decisions", {})
+        if isinstance(incremental_report.get("decisions"), dict)
+        else {}
+    )
+    reconfirm = decisions.get("needingReconfirmation", [])
+    if not isinstance(reconfirm, list):
+        return []
+    violations: list[Violation] = []
+    requirements = getattr(graph, "_requirements", {})
+    for key_value in reconfirm:
+        key = str(key_value)
+        req = requirements.get(key)
+        category = getattr(req, "category", "")
+        if key not in _HIGH_RISK_RECONFIRMATION_KEYS and category not in (
+            _HIGH_RISK_RECONFIRMATION_CATEGORIES
+        ):
+            continue
+        label = getattr(req, "label", key)
+        violations.append(
+            Violation(
+                code=f"INCREMENTAL_RECONFIRMATION_REQUIRED_{_code_suffix(key)}",
+                message=(
+                    f"Changed input mentions '{label}' but carried forward prior decision "
+                    f"'{key}'. Add an explicit structured decision or re-confirm it before handoff."
+                ),
+            )
+        )
+    return violations
+
+
+def _artifact_contract_violations(output_dir: Path, pattern: str) -> list[Violation]:
+    return [
+        Violation(
+            code=f"ARTIFACT_CONTRACT_{violation.code}",
+            message=violation.message,
+        )
+        for violation in validate_generated_violations(output_dir, pattern)
+    ]
+
+
+def _generated_artifact_names(pattern: str) -> set[str]:
+    pattern_obj = GLOBAL_REGISTRY.get(pattern)
+    return {
+        *pattern_obj.expected_artifacts(),
+        "decision-report.yaml",
+        "llm-trace-summary.yaml",
+        "model-benchmark.yaml",
+        "contract-validation.yaml",
+        "handoff-review.html",
+        "input-diff-report.yaml",
+        "incremental-compile-report.yaml",
+    }
+
+
+def _remove_generated_artifacts(output_dir: Path, pattern: str) -> None:
+    if not output_dir.exists():
+        return
+    for name in _generated_artifact_names(pattern):
+        path = output_dir / name
+        if path.is_dir():
+            shutil.rmtree(path)
+        elif path.exists():
+            path.unlink()
+
+
+def _promote_generated_artifacts(staging_dir: Path, output_dir: Path, pattern: str) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    _remove_generated_artifacts(output_dir, pattern)
+    for source in staging_dir.iterdir():
+        destination = output_dir / source.name
+        if source.is_dir():
+            shutil.copytree(source, destination, dirs_exist_ok=True)
+        else:
+            shutil.copy2(source, destination)
+
+
+def _generate_validated_artifacts(
+    payload: Any,
+    output_dir: Path,
+    pattern: str,
+    *,
+    extra_artifacts: dict[str, Any] | None = None,
+) -> list[Violation]:
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(
+        prefix=".intent-engine-generate-",
+        dir=output_dir.parent,
+    ) as staging:
+        staging_dir = Path(staging)
+        generate_all(payload, staging_dir, pattern=pattern)
+        for name, data in (extra_artifacts or {}).items():
+            _write_yaml_artifact(staging_dir, name, data)
+        violations = _artifact_contract_violations(staging_dir, pattern)
+        if violations:
+            _remove_generated_artifacts(output_dir, pattern)
+            return violations
+        _promote_generated_artifacts(staging_dir, output_dir, pattern)
+    return []
+
+
 def _build_handoff_readiness(
     graph,
     violations: list[Violation],
@@ -491,6 +653,7 @@ def _write_failed_compile_artifacts(
     }
     if target_capability_report:
         report["targetCapabilities"] = target_capability_report
+    _remove_generated_artifacts(output_dir, pattern)
     _write_yaml_artifact(
         output_dir,
         "decision-report.yaml",
@@ -508,6 +671,55 @@ def _write_failed_compile_artifacts(
         "model-benchmark.yaml",
         build_model_benchmark(extraction_summary),
     )
+
+
+def _build_failure_artifacts_and_raise(
+    *,
+    output_dir: Path,
+    pattern: str,
+    graph,
+    violations: list[Violation],
+    llm_result: LLMGraphResult,
+    evidence_store: LLMEvidenceStore | None,
+    raw_evidence_path: Path | None,
+    markdown_decisions: dict[str, Any],
+    markdown_contradictions: list[dict[str, Any]],
+    applied_decisions: dict[str, list[str]],
+    target_capability_report: dict[str, Any] | None,
+    dry_run: bool,
+    extra_artifacts: dict[str, Any] | None = None,
+) -> None:
+    readiness = _build_handoff_readiness(
+        graph,
+        violations,
+        llm_result,
+        target_capability_report,
+    )
+    extraction_summary = _build_extraction_summary(
+        pattern=pattern,
+        evidence_store=evidence_store,
+        raw_evidence_path=raw_evidence_path,
+        markdown_decisions=markdown_decisions,
+        markdown_contradictions=markdown_contradictions,
+        llm_result=llm_result,
+        readiness=readiness,
+        applied_decisions=applied_decisions,
+        accepted_decisions=graph.typed_decisions(),
+        graph=graph,
+        target_capability_report=target_capability_report,
+    )
+    if not dry_run:
+        _write_failed_compile_artifacts(
+            output_dir,
+            pattern,
+            graph,
+            readiness,
+            extraction_summary,
+            target_capability_report,
+        )
+        for name, data in (extra_artifacts or {}).items():
+            _write_yaml_artifact(output_dir, name, data)
+    raise CompileError(violations, readiness=readiness)
 
 
 class LLMContextProvider:
@@ -648,6 +860,7 @@ def compile_design(
     violations = validate(intent, graph=graph, extra_validators=pattern_obj.validators)
     violations.extend(_markdown_contradiction_violations(markdown_result.contradictions))
     violations.extend(_llm_result_violations(graph, llm_result))
+    violations.extend(_target_capability_violations(target_capability_report))
     readiness = _build_handoff_readiness(
         graph,
         violations,
@@ -668,16 +881,20 @@ def compile_design(
         target_capability_report=target_capability_report,
     )
     if violations:
-        if not dry_run:
-            _write_failed_compile_artifacts(
-                output_dir,
-                pattern,
-                graph,
-                readiness,
-                extraction_summary,
-                target_capability_report,
-            )
-        raise CompileError(violations, readiness=readiness)
+        _build_failure_artifacts_and_raise(
+            output_dir=output_dir,
+            pattern=pattern,
+            graph=graph,
+            violations=violations,
+            llm_result=llm_result,
+            evidence_store=evidence_store,
+            raw_evidence_path=raw_evidence_path,
+            markdown_decisions=markdown_decisions,
+            markdown_contradictions=markdown_result.contradictions,
+            applied_decisions=applied_decisions,
+            target_capability_report=target_capability_report,
+            dry_run=dry_run,
+        )
 
     if dry_run:
         return
@@ -692,7 +909,22 @@ def compile_design(
         handoff_readiness=readiness,
         target_capability_report=target_capability_report,
     )
-    generate_all(payload, output_dir, pattern=pattern)
+    artifact_violations = _generate_validated_artifacts(payload, output_dir, pattern)
+    if artifact_violations:
+        _build_failure_artifacts_and_raise(
+            output_dir=output_dir,
+            pattern=pattern,
+            graph=graph,
+            violations=artifact_violations,
+            llm_result=llm_result,
+            evidence_store=evidence_store,
+            raw_evidence_path=raw_evidence_path,
+            markdown_decisions=markdown_decisions,
+            markdown_contradictions=markdown_result.contradictions,
+            applied_decisions=applied_decisions,
+            target_capability_report=target_capability_report,
+            dry_run=False,
+        )
 
 
 def compile_incremental_design(
@@ -793,6 +1025,25 @@ def compile_incremental_design(
     violations = validate(intent, graph=graph, extra_validators=pattern_obj.validators)
     violations.extend(_markdown_contradiction_violations(markdown_result.contradictions))
     violations.extend(_llm_result_violations(graph, llm_result))
+    violations.extend(_target_capability_violations(target_capability_report))
+    incremental_report = incremental_decision_report(
+        baseline_decisions=baseline_decisions,
+        final_decisions=graph.typed_decisions(),
+        input_diff_report=input_diff,
+    )
+    incremental_report.update(
+        {
+            "baselineBundle": str(baseline_bundle),
+            "baselineDocument": str(baseline_doc) if baseline_doc is not None else None,
+            "changedDocument": str(changed_doc),
+            "validationBoundary": (
+                "LLM context was scoped to the input delta, but graph validation, "
+                "pattern validators, and artifact contracts ran on the full "
+                "resulting decision state."
+            ),
+        }
+    )
+    violations.extend(_incremental_reconfirmation_violations(graph, incremental_report, input_diff))
     readiness = _build_handoff_readiness(
         graph,
         violations,
@@ -812,41 +1063,26 @@ def compile_incremental_design(
         graph=graph,
         target_capability_report=target_capability_report,
     )
-    incremental_report = incremental_decision_report(
-        baseline_decisions=baseline_decisions,
-        final_decisions=graph.typed_decisions(),
-        input_diff_report=input_diff,
-    )
-    incremental_report.update(
-        {
-            "baselineBundle": str(baseline_bundle),
-            "baselineDocument": str(baseline_doc) if baseline_doc is not None else None,
-            "changedDocument": str(changed_doc),
-            "validationBoundary": (
-                "LLM context was scoped to the input delta, but graph validation, "
-                "pattern validators, and artifact contracts ran on the full "
-                "resulting decision state."
-            ),
-        }
-    )
 
     if violations:
-        if not dry_run:
-            _write_failed_compile_artifacts(
-                output_dir,
-                pattern,
-                graph,
-                readiness,
-                extraction_summary,
-                target_capability_report,
-            )
-            _write_yaml_artifact(output_dir, "input-diff-report.yaml", input_diff)
-            _write_yaml_artifact(
-                output_dir,
-                "incremental-compile-report.yaml",
-                incremental_report,
-            )
-        raise CompileError(violations, readiness=readiness)
+        _build_failure_artifacts_and_raise(
+            output_dir=output_dir,
+            pattern=pattern,
+            graph=graph,
+            violations=violations,
+            llm_result=llm_result,
+            evidence_store=evidence_store,
+            raw_evidence_path=raw_evidence_path,
+            markdown_decisions=markdown_decisions,
+            markdown_contradictions=markdown_result.contradictions,
+            applied_decisions=applied_decisions,
+            target_capability_report=target_capability_report,
+            dry_run=dry_run,
+            extra_artifacts={
+                "input-diff-report.yaml": input_diff,
+                "incremental-compile-report.yaml": incremental_report,
+            },
+        )
 
     if dry_run:
         return
@@ -860,9 +1096,34 @@ def compile_incremental_design(
         handoff_readiness=readiness,
         target_capability_report=target_capability_report,
     )
-    generate_all(payload, output_dir, pattern=pattern)
-    _write_yaml_artifact(output_dir, "input-diff-report.yaml", input_diff)
-    _write_yaml_artifact(output_dir, "incremental-compile-report.yaml", incremental_report)
+    artifact_violations = _generate_validated_artifacts(
+        payload,
+        output_dir,
+        pattern,
+        extra_artifacts={
+            "input-diff-report.yaml": input_diff,
+            "incremental-compile-report.yaml": incremental_report,
+        },
+    )
+    if artifact_violations:
+        _build_failure_artifacts_and_raise(
+            output_dir=output_dir,
+            pattern=pattern,
+            graph=graph,
+            violations=artifact_violations,
+            llm_result=llm_result,
+            evidence_store=evidence_store,
+            raw_evidence_path=raw_evidence_path,
+            markdown_decisions=markdown_decisions,
+            markdown_contradictions=markdown_result.contradictions,
+            applied_decisions=applied_decisions,
+            target_capability_report=target_capability_report,
+            dry_run=False,
+            extra_artifacts={
+                "input-diff-report.yaml": input_diff,
+                "incremental-compile-report.yaml": incremental_report,
+            },
+        )
 
 
 def compile_from_interview(
@@ -891,6 +1152,7 @@ def compile_from_graph(graph, output_dir: Path, pattern: str = "aws-lza") -> Non
         pattern_obj.target_capabilities,
         graph.typed_decisions(),
     )
+    violations.extend(_target_capability_violations(target_capability_report))
     readiness = _build_handoff_readiness(
         graph,
         violations,
@@ -911,16 +1173,21 @@ def compile_from_graph(graph, output_dir: Path, pattern: str = "aws-lza") -> Non
         target_capability_report=target_capability_report,
     )
     if violations:
-        _write_failed_compile_artifacts(
-            output_dir,
-            pattern,
-            graph,
-            readiness,
-            extraction_summary,
-            target_capability_report,
+        _build_failure_artifacts_and_raise(
+            output_dir=output_dir,
+            pattern=pattern,
+            graph=graph,
+            violations=violations,
+            llm_result=llm_result,
+            evidence_store=None,
+            raw_evidence_path=None,
+            markdown_decisions={},
+            markdown_contradictions=[],
+            applied_decisions=_applied_decisions_from_audit(graph),
+            target_capability_report=target_capability_report,
+            dry_run=False,
         )
-        raise CompileError(violations, readiness=readiness)
-    generate_all(
+    artifact_violations = _generate_validated_artifacts(
         _build_payload(
             intent,
             pattern,
@@ -930,8 +1197,23 @@ def compile_from_graph(graph, output_dir: Path, pattern: str = "aws-lza") -> Non
             target_capability_report=target_capability_report,
         ),
         output_dir,
-        pattern=pattern,
+        pattern,
     )
+    if artifact_violations:
+        _build_failure_artifacts_and_raise(
+            output_dir=output_dir,
+            pattern=pattern,
+            graph=graph,
+            violations=artifact_violations,
+            llm_result=llm_result,
+            evidence_store=None,
+            raw_evidence_path=None,
+            markdown_decisions={},
+            markdown_contradictions=[],
+            applied_decisions=_applied_decisions_from_audit(graph),
+            target_capability_report=target_capability_report,
+            dry_run=False,
+        )
 
     # Write decision audit trail for traceability
     audit = graph.audit_log()

@@ -2,14 +2,17 @@
 
 ## Project: iac-llm-wrapper / intent-engine core
 
-Core engine for `iac-llm-wrapper`, an intent-to-IaC orchestration framework. It
-captures architecture intent from prose, validates decisions through requirement
-graphs and target contracts, and emits traceable handoff artifacts that engineers
-use with their IaC toolchain. Generation or controlled IaC execution stays
-downstream unless a registered pattern owns it and passes graph, contract, and
-gate checks.
+Core engine for `iac-llm-wrapper`, an architect-exchange-to-registered-target
+configuration framework. It captures architecture intent from prose, validates
+decisions through requirement graphs and target contracts, and emits traceable
+target configuration artifacts that engineers use with existing deployment
+mechanisms. Direct deployment and whole-IaC-from-scratch generation stay out of
+runtime scope.
 
-AWS Landing Zone Accelerator is the first product path, but the core must stay generic: patterns own domain models, contracts, validators, samples, and generators.
+AWS Landing Zone Accelerator is the first product path: collected inputs become
+validated LZA YAML/config files for the downstream LZA deployment process. The
+core must stay generic: patterns own domain models, contracts, validators,
+samples, and target configuration emitters.
 
 ## Commands
 
@@ -35,7 +38,7 @@ uv run pre-commit run --all-files
 - **Semantic model** (`semantic_model.py` + pattern `semantic.py`): Lightweight typed entities, relationships, and predicate constraint results for real-world dependencies without RDF/OWL, Datalog, or a graph database.
 - **Interview** (`interview.py`): Graph-ordered requirement capture. Shows context, asks only applicable gaps, supports save/resume, and records rationale.
 - **Validate** (`validator.py`): Fail-closed graph and pattern validation. Missing required applicable decisions become compile errors.
-- **Generate** (`generator.py`): Registry-driven emitter for decision report, generic handoff plan, contract handoff files, lineage, runbook, module inputs when pattern owns module mapping, sample recommendations, and static review artifacts.
+- **Generate** (`generator.py`): Registry-driven emitter for decision report, generic handoff plan, target configuration artifacts, lineage, runbook, module inputs when pattern owns module mapping, sample recommendations, and static review artifacts.
 - **Contracts** (`contracts.py`): Target artifact contracts define required files, paths, decisions, lineage, and stable value assertions.
 - **Samples** (`sample_config.py`): Registered reference bundles with pinned source metadata, module refs, tags, fixture dirs, and match recommendations.
 - **LLM** (`llm_caller.py`): Pluggable OpenAI-compatible and Ollama backends with retry/backoff and evidence capture.
@@ -43,18 +46,18 @@ uv run pre-commit run --all-files
 
 ## Current Pattern Surface
 
-- `aws-lza`: Contract-backed AWS LZA handoff path. Emits official-style LZA YAML artifacts, decision report, lineage manifest, deployment runbook, and sample recommendations. Does not emit deployable Terraform/Terragrunt landing-zone stacks.
-- `cloudformation-parameters`: BYOM CloudFormation parameter handoff for an approved existing template. Emits parameters and decision report, not a stack.
+- `aws-lza`: Contract-backed AWS LZA registered target path. Emits official-style LZA YAML target configuration artifacts, decision report, lineage manifest, deployment runbook, and sample recommendations. Does not emit deployable Terraform/Terragrunt landing-zone stacks.
+- `cloudformation-parameters`: BYOM CloudFormation parameter handoff for an approved existing template. Emits parameters and decision report, not a stack or deployment.
 - `kubernetes-cluster`: Contract-backed K8s handoff for cluster/namespace config with optional Terraform EKS module input references.
 - `terraform-vpc`: BYOM Terraform AWS VPC module input capture. Emits module variables/tfvars handoff for an existing module, not root deployment scaffolding.
 
 ## Key Decisions
 
 - Core stays domain-agnostic. Use-case logic lives in pattern packages.
-- Graph owns decision order, branching, blocked paths, cascades, gaps, provenance, and deployment sequencing.
-- Existing accelerators/modules are contracts/data models before they are generation or execution targets.
+- Graph owns decision order, branching, blocked paths, cascades, gaps, provenance, and handoff sequencing.
+- Existing accelerators/modules are registered targets with contracts and data models before they are emitted configuration artifacts.
 - Current built-ins make no AWS API calls and do not deploy. No arbitrary Terraform from prose.
-- "Wrapper" means intent-to-IaC workflow orchestration, not bypassing IaC tools or gates.
+- "Wrapper" means architect exchange to registered target configuration, not bypassing IaC tools, accelerators, or gates.
 - Sample recommendations must persist as artifacts, not terminal-only hints.
 - `src/intent_engine/patterns/aws_lza` is the only AWS LZA path. Old research path was removed to avoid two-source confusion.
 
@@ -73,7 +76,7 @@ uv run pre-commit run --all-files
 3. Graph applies decisions in dependency order and records provenance.
 4. Discovery reports applicable gaps and detected signals.
 5. Interview fills only missing applicable decisions.
-6. Validate and emit handoff artifacts for engineers.
+6. Validate and emit deterministic target configuration artifacts for engineers.
 
 ## Extension Contract
 
@@ -81,9 +84,9 @@ Add new target path by registering a pattern with:
 
 - Pydantic intent model.
 - Requirement graph.
-- Optional target contract.
+- Optional deployment target contract.
 - Optional sample configs.
-- Optional validators/generators/module mapping.
+- Optional validators/target configuration emitters/module mapping.
 
 Do not add provider-specific branches to core CLI/compiler/extractor/generator.
 
@@ -97,16 +100,16 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy, pyr
 
 ### Current Goal
 
-T49: Lightweight typed semantic model and predicate constraints
+T52: Clarify architect exchange to registered target configuration product boundary
 
 ### Status
 
-- **Tests**: 351 passing, 5 skipped
+- **Tests**: 363 passing, 5 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Filled the next data-modeling gap without adding heavy infrastructure. Core `Requirement` now supports lightweight `applies_when`/`blocked_when` expressions (`equals`, `contains`, `present`, `all`, `any`, `not`) alongside legacy `applies_if`/`blocked_if`; graph export, prompt rendering, discovery, pattern checks, templates, and context manifests expose those gates. Added reusable `semantic_model.py` dataclasses and AWS LZA `semantic.py` to derive typed entities (`Account`, `OU`, `PermissionSet`, `Assignment`, `Control`, `Artifact`), typed relationships, and predicate constraints from accepted intent. AWS LZA validation now runs through the semantic constraints, and `decision-report.yaml.semanticModel` gives reviewers the entity/relationship/constraint view. AGENTS architecture housekeeping now points to pattern-owned models instead of a non-existent core `models.py`. Full pytest, Ruff, Ruff format, mypy, Pyright, fixture drift check, golden journey, extraction eval, usability eval, and built-in pattern checks are green.
+- **Last session**: Reframed the product language around architect/client exchange to validated registered target configuration. README, AGENTS, architecture, artifacts, glossary, context-as-code, extension, and pattern authoring docs now make AWS LZA the reference path: accepted inputs become deterministic LZA YAML/config artifacts for the downstream LZA deployment process, while direct deployment and whole-IaC-from-scratch generation remain out of runtime scope. Added product-language guardrail tests for README, AGENTS, and pattern authoring docs. Full pytest, Ruff, Ruff format, mypy, Pyright, fixture drift check, extraction eval, and golden journey are green.
 
 ### Done
 
@@ -140,6 +143,9 @@ T49: Lightweight typed semantic model and predicate constraints
 - T47 complete lightweight context-as-code adoption: Successful pattern-backed bundles now emit and validate `context-manifest.yaml`. The manifest records the active pattern, prompt context digest/text, requirement graph inventory, target contracts, samples, target capabilities, runtime LLM/extraction summary, expected artifacts, and guardrails. `Pattern.expected_artifacts()`, `validate_generated`, ready-bundle contract validation, docs, tests, and registered sample fixtures now treat the manifest as a first-class non-deployable artifact.
 - T48 semantic facts for target routing: Target capability routing now consumes explicit `UnsupportedAskFact` entities instead of scanning source text inside graph evaluation. Deterministic source-text matching extracts facts with evidence spans first; the graph then selects module-composition/generator/manual/blocked paths from facts and accepted decisions. `target-capability-graph.yaml`, `handoff-plan.yaml`, `llm-trace-summary.yaml`, and `context-manifest.yaml` expose the semantic fact state for review.
 - T49 lightweight typed semantic model: Added expression gates to requirement graphs and a no-infrastructure semantic model layer. AWS LZA now derives typed entities, relationships, and predicate constraints for account/OU placement, Identity Center permission-set and assignment references, home-region containment, valid network CIDR, control/artifact relationships, and delegated-admin Security OU placement. Validation and generated decision reports use that model, while existing flat decision fields and artifacts remain backward compatible.
+- T50 fail-closed hardening: Compile success now depends on graph/pattern validation, blocked target capability routing, incremental reconfirmation for high-risk changed prose, and post-generation artifact contracts. Contract validation fails closed when readiness metadata is absent. Requirement expression shape is checked by `pattern check`. AWS LZA duplicate account conflicts are semantic blockers, and explicit workload-account OU placement is preserved in generated handoff artifacts.
+- T51 residual hardening: Generated target artifacts are staged and promoted only after contract validation passes; failed compiles remove known generated/stale artifact files before writing safe blocked assessment artifacts. Partial readiness metadata in standalone `contract-validation.yaml` is blocked, and runtime expression evaluation fails closed on invalid expression shapes.
+- T52 product boundary: Public docs now prefer registered target configuration language over broad IaC generation claims. AWS LZA is documented as the canonical target where validated inputs become LZA YAML/config artifacts for an existing deployment mechanism. Docs guardrail tests prevent accidental claims of direct deployment or whole-IaC-from-scratch generation.
 
 ### Next
 

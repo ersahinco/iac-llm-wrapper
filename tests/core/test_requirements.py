@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from intent_engine.core.requirements import Requirement, RequirementGraph, RequirementStatus
+from intent_engine.core.requirements import (
+    Requirement,
+    RequirementGraph,
+    RequirementStatus,
+    evaluate_expression,
+    validate_expression,
+)
 
 
 class TestRequirementGraph:
@@ -108,6 +114,25 @@ class TestRequirementGraph:
 
         assert g.status("unsafe_action") == RequirementStatus.BLOCKED
         assert "mode == blocked" in (g.is_blocked_reason("unsafe_action") or "")
+
+    def test_expression_malformed_compounds_fail_closed(self):
+        assert evaluate_expression({"all": []}, {}) is False
+        assert evaluate_expression({"all": ["bad"]}, {}) is False
+        assert (
+            evaluate_expression(
+                {
+                    "equals": {"decision": "mode", "value": "ready"},
+                    "bogus": {"decision": "mode"},
+                },
+                {"mode": "ready"},
+            )
+            is False
+        )
+        assert validate_expression({"all": []}) == ["expression.all: must be a non-empty list"]
+        assert validate_expression({"bogus": {"decision": "x"}}) == [
+            "expression: unsupported operator bogus",
+            "expression: expression must define exactly one operator",
+        ]
 
     def test_dependency_readiness(self):
         g = RequirementGraph()

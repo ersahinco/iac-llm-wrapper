@@ -10,6 +10,7 @@ from typing import Any
 import networkx as nx
 
 RequirementExpression = dict[str, Any]
+_EXPRESSION_OPERATORS = {"all", "any", "not", "equals", "contains", "present"}
 
 
 def expression_dependencies(expression: RequirementExpression | None) -> list[str]:
@@ -36,6 +37,57 @@ def expression_dependencies(expression: RequirementExpression | None) -> list[st
     return list(dict.fromkeys(deps))
 
 
+def validate_expression(
+    expression: RequirementExpression | None,
+    *,
+    path: str = "expression",
+) -> list[str]:
+    """Return shape errors for a lightweight requirement expression."""
+
+    if expression is None:
+        return []
+    if not isinstance(expression, dict) or not expression:
+        return [f"{path}: expression must be a non-empty mapping"]
+
+    operators = [key for key in expression if key in _EXPRESSION_OPERATORS]
+    unknown = [key for key in expression if key not in _EXPRESSION_OPERATORS]
+    errors = [f"{path}: unsupported operator {key}" for key in unknown]
+    if len(operators) != 1:
+        errors.append(f"{path}: expression must define exactly one operator")
+        return errors
+
+    operator = operators[0]
+    value = expression[operator]
+    if operator in {"all", "any"}:
+        if not isinstance(value, list) or not value:
+            return errors + [f"{path}.{operator}: must be a non-empty list"]
+        for index, item in enumerate(value):
+            if not isinstance(item, dict):
+                errors.append(f"{path}.{operator}[{index}]: item must be an expression mapping")
+                continue
+            errors.extend(validate_expression(item, path=f"{path}.{operator}[{index}]"))
+        return errors
+    if operator == "not":
+        if not isinstance(value, dict):
+            return errors + [f"{path}.not: must be an expression mapping"]
+        return errors + validate_expression(value, path=f"{path}.not")
+    if operator in {"equals", "contains"}:
+        if not isinstance(value, dict):
+            return errors + [f"{path}.{operator}: must be a predicate mapping"]
+        if not isinstance(value.get("decision"), str) or not value.get("decision"):
+            errors.append(f"{path}.{operator}: decision is required")
+        if "value" not in value:
+            errors.append(f"{path}.{operator}: value is required")
+        return errors
+    if operator == "present":
+        if not isinstance(value, dict):
+            return errors + [f"{path}.present: must be a predicate mapping"]
+        if not isinstance(value.get("decision"), str) or not value.get("decision"):
+            errors.append(f"{path}.present: decision is required")
+        return errors
+    return errors
+
+
 def evaluate_expression(
     expression: RequirementExpression | None,
     decisions: dict[str, str],
@@ -44,15 +96,25 @@ def evaluate_expression(
 
     if not expression:
         return True
+    if validate_expression(expression):
+        return False
     if "all" in expression:
         items = expression.get("all")
-        return isinstance(items, list) and all(
-            evaluate_expression(item, decisions) for item in items if isinstance(item, dict)
+        return (
+            isinstance(items, list)
+            and bool(items)
+            and all(
+                isinstance(item, dict) and evaluate_expression(item, decisions) for item in items
+            )
         )
     if "any" in expression:
         items = expression.get("any")
-        return isinstance(items, list) and any(
-            evaluate_expression(item, decisions) for item in items if isinstance(item, dict)
+        return (
+            isinstance(items, list)
+            and bool(items)
+            and any(
+                isinstance(item, dict) and evaluate_expression(item, decisions) for item in items
+            )
         )
     if "not" in expression:
         item = expression.get("not")

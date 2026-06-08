@@ -1,8 +1,8 @@
 # Handoff Artifacts
 
-`iac-llm-wrapper` emits portable files for review and downstream IaC toolchains.
-These artifacts are not deployments unless a future pattern explicitly owns that
-execution path and passes graph, contract, gate, evidence, and rollback checks.
+`iac-llm-wrapper` emits portable files for review and registered deployment
+targets. These artifacts are target configuration artifacts, not deployments.
+Existing deployment mechanisms remain downstream.
 
 | Artifact | Purpose | Owner | Emitted When | Deployable |
 | --- | --- | --- | --- | --- |
@@ -21,7 +21,7 @@ execution path and passes graph, contract, gate, evidence, and rollback checks.
 | `handoff-review.html` | Static human review page summarizing readiness, contract status, allowed next action, reviewer next actions, blocker traceability, raw LLM coverage, expected weaknesses, graph, evidence, benchmark, contract validation, handoff plan, and target artifacts. | Core review tooling | `iac-llm-wrapper review html`. | No |
 | `requirement-graph.json` | Machine-readable graph export for external viewers and tools. | Core review tooling | `iac-llm-wrapper review html` or `graph export`. | No |
 | `requirement-graph.mmd` | Mermaid graph export for lightweight visual inspection. | Core review tooling | `iac-llm-wrapper review html` or `graph export`. | No |
-| Pattern-specific handoff files | Target-shaped config or parameter handoff, such as AWS LZA YAML or CloudFormation parameters. | Pattern | Successful contract-backed handoffs. | No by default |
+| Pattern-specific target configuration files | Target-shaped config or parameter handoff, such as AWS LZA YAML or CloudFormation parameters. | Pattern | Successful contract-backed handoffs. | No |
 
 ## Consumers
 
@@ -29,8 +29,8 @@ execution path and passes graph, contract, gate, evidence, and rollback checks.
   `handoff-review.html` to understand readiness and blockers.
 - AWS LZA reviewers can inspect `decision-report.yaml.semanticModel` for typed
   entities, relationships, and predicate constraint results.
-- Platform engineers use pattern-specific handoff files, target contracts,
-  lineage, and the allowed next action.
+- Platform engineers use pattern-specific target configuration files, deployment
+  target contracts, lineage, and the allowed next action.
 - Reviewers use `handoff-comparison.yaml` to inspect only the deltas from an
   incremental document or sample-configuration update.
 - Contributors use `context-manifest.yaml`, `llm-trace-summary.yaml`, `model-benchmark.yaml`,
@@ -46,5 +46,7 @@ execution path and passes graph, contract, gate, evidence, and rollback checks.
 ## Boundary
 
 Artifacts may describe a downstream delivery path, but they do not run Terraform,
-CloudFormation, AWS LZA, Kubernetes, or cloud APIs. A blocked bundle must remain
-review-only until graph and contract blockers are resolved.
+CloudFormation, AWS LZA, Kubernetes, pipelines, or cloud APIs. AWS LZA YAML is a
+target configuration artifact consumed by the downstream LZA deployment process.
+A blocked bundle must remain review-only until graph and contract blockers are
+resolved.

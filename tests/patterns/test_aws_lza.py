@@ -92,6 +92,20 @@ class TestAwsLzaPattern:
             "AWS_LZA_IDENTITY_CENTER_ADMIN_SECURITY_OU_REQUIRED",
         } <= {item["violationCode"] for item in failed}
 
+    def test_aws_lza_semantic_constraint_blocks_conflicting_account_entities(self):
+        intent = AwsLzaIntent(
+            network_account="Network",
+            identity_center_permission_sets=["ReadOnlyAccess"],
+            identity_center_assignments=["Admins:ReadOnlyAccess:Management"],
+            accounts=[LzaAccount(name="SecurityTooling", ou="Infrastructure")],
+        )
+
+        failed = [
+            item.to_dict() for item in build_aws_lza_semantic_model(intent).failed_constraints()
+        ]
+
+        assert "AWS_LZA_ACCOUNT_ENTITY_CONFLICT" in {item["violationCode"] for item in failed}
+
     def test_compile_from_interview_creates_handoff_artifacts(self, tmp_path: Path):
         decisions = {
             "baseline": "standard",

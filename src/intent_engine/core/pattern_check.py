@@ -9,7 +9,7 @@ import networkx as nx
 
 from .contracts import ContractValidator
 from .patterns import Pattern
-from .requirements import expression_dependencies
+from .requirements import expression_dependencies, validate_expression
 from .sample_config import GLOBAL_SAMPLE_REGISTRY
 
 
@@ -91,6 +91,10 @@ def check_pattern(
             | set(expression_dependencies(req.applies_when))
             | set(expression_dependencies(req.blocked_when))
         )
+        for error in validate_expression(req.applies_when, path=f"{key}.applies_when"):
+            violations.append(f"{key}: {error}")
+        for error in validate_expression(req.blocked_when, path=f"{key}.blocked_when"):
+            violations.append(f"{key}: {error}")
         for dep in condition_dependencies:
             if dep not in graph._requirements:
                 violations.append(f"{key}: unknown condition dependency {dep}")

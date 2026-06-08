@@ -316,6 +316,47 @@ def test_unknown_ready_pattern_fails_without_guessing_contracts(tmp_path: Path):
     assert result["contracts"] == []
 
 
+def test_missing_readiness_metadata_fails_closed(tmp_path: Path):
+    _write_yaml(tmp_path / "decision-report.yaml", {"pattern": "contract-validation-example"})
+
+    result = build_contract_validation(tmp_path)
+
+    assert result["readiness"]["status"] == "blocked"
+    assert result["readiness"]["handoffAllowed"] is False
+    assert result["readiness"]["deploymentAllowed"] is False
+    assert result["readiness"]["blockers"] == [
+        {
+            "code": "READINESS_METADATA_MISSING",
+            "message": "Bundle is missing handoff readiness metadata.",
+        }
+    ]
+
+
+def test_incomplete_readiness_metadata_fails_closed(tmp_path: Path):
+    _write_yaml(
+        tmp_path / "decision-report.yaml",
+        {
+            "pattern": "contract-validation-example",
+            "handoffReadiness": {"status": "ready"},
+        },
+    )
+
+    result = build_contract_validation(tmp_path)
+
+    assert result["readiness"]["status"] == "blocked"
+    assert result["readiness"]["handoffAllowed"] is False
+    assert result["readiness"]["deploymentAllowed"] is False
+    assert result["readiness"]["blockers"] == [
+        {
+            "code": "READINESS_METADATA_INCOMPLETE",
+            "message": (
+                "Bundle readiness metadata must explicitly include status and "
+                "handoffAllowed or deploymentAllowed."
+            ),
+        }
+    ]
+
+
 def test_missing_required_artifact_produces_clear_violation(tmp_path: Path):
     original = _register_example_pattern()
     try:

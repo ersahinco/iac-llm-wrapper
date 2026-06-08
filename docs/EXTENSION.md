@@ -1,9 +1,11 @@
 # Extension Contract
 
-This framework is a **general-purpose intent-driven decision system**. AWS LZA
-is one target pattern, not a special core mode. You can add new target patterns
-(for example `kubernetes-cluster`, `gcp-org`, or `saas-tenant`) without modifying
-core framework files.
+This framework is a **general-purpose intent-driven decision system** for
+registered target configuration. AWS LZA is one target pattern, not a special
+core mode: accepted decisions become validated LZA YAML/config files for the
+downstream LZA deployment process. You can add new target patterns (for example
+`kubernetes-cluster`, `gcp-org`, or `saas-tenant`) without modifying core
+framework files.
 
 ## What Is the Core Framework?
 
@@ -24,7 +26,7 @@ Everything target-specific lives here:
 
 - **Pydantic models** — Define the intent shape for one target pattern
 - **Pattern graph factories** — Define decisions as `Requirement` nodes
-- **Registered generators** — Emit target handoff files
+- **Registered generators** — Emit deterministic target configuration files
 - **Model and graph defaults** — Define deterministic defaults close to the fields they affect
 - **Sample configs** — Define versioned, known-good decision sets
 - **CLI `--pattern` flag** — Selects which target pattern to run
@@ -96,7 +98,7 @@ Rules:
 
 ### 3. Register Generators
 
-Register output generators that emit handoff files:
+Register output generators that emit target configuration files:
 
 ```python
 from io import StringIO
@@ -160,15 +162,16 @@ contract = TargetContract(
 
 GLOBAL_REGISTRY.register(Pattern(
     name="kubernetes-cluster",
-    description="Kubernetes cluster handoff",
+    description="Kubernetes cluster registered-target configuration",
     graph_factory=build_k8s_graph,
     intent_factory=K8sIntent,
     section_map={"cluster_name": ("Cluster", "name")},
     section_order=["Cluster"],
     prompt_context=(
-        "This pattern captures approved Kubernetes cluster handoff inputs only. "
-        "Extract cluster, network, node pool, and namespace values for an existing "
-        "target contract."
+        "This pattern captures approved Kubernetes cluster configuration inputs "
+        "for an existing deployment mechanism only. Extract cluster, network, "
+        "node pool, and namespace values for the registered target contract. "
+        "Do not generate raw IaC or invoke deployment."
     ),
     contracts=[contract],
 ))
@@ -181,8 +184,8 @@ Pattern metadata fields:
 - `section_map` — Maps requirement keys to template sections
 - `free_form_examples` — Free-form Markdown examples for templates
 - `validators` — List of extra validator functions `intent -> list[Violation]`
-- `contracts` — Target contracts for required files, required paths, value assertions,
-  decisions, and lineage
+- `contracts` — Deployment target contracts for required files, required paths,
+  value assertions, decisions, and lineage
 - `context-manifest.yaml` — Generic context-as-code inventory emitted automatically for
   pattern-backed successful handoffs
 - `sample-recommendations.yaml` — Generic artifact emitted automatically when sample configs
