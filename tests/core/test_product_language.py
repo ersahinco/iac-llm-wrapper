@@ -35,7 +35,8 @@ def test_pattern_authoring_keeps_deployment_invocation_out_of_scope():
     assert "registered target pattern" in text
     assert "deterministic target configuration artifacts" in text
     assert "deployment target contracts" in text
-    assert "Do not invoke cloud APIs, Terraform, CloudFormation, AWS LZA" in text
+    assert "Do not invoke cloud APIs, Terraform, CloudFormation, AWS LZA, apply commands" in text
+    assert "plan invocation must be registered, plan-only, contract-backed" in text
 
 
 def test_docs_do_not_claim_direct_deployment_from_prose():
@@ -56,7 +57,8 @@ def test_docs_do_not_claim_direct_deployment_from_prose():
         "generates whole iac from scratch",
         "generates arbitrary deployable infrastructure from prose",
         "invokes cloud apis",
-        "invokes deployment pipelines",
+        "invokes apply",
+        "invokes unregistered deployment pipelines",
     ]
     for claim in forbidden_claims:
         assert claim not in docs

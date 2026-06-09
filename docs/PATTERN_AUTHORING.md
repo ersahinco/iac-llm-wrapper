@@ -32,9 +32,11 @@ an existing deployment mechanism. The detailed API contract lives in
   those contracts, controls, samples, and generators.
 - Do not emit deployable scaffolding or raw IaC unless the registered target
   explicitly owns that artifact type through a deployment target contract.
-- Do not invoke cloud APIs, Terraform, CloudFormation, AWS LZA, or deployment
-  pipelines from the pattern. Emit reviewed configuration for the existing
-  deployment mechanism instead.
+- Do not invoke cloud APIs, Terraform, CloudFormation, AWS LZA, apply commands,
+  or deployment pipelines from the pattern. Emit reviewed configuration and
+  plan-only metadata for the existing deployment mechanism instead. A future
+  plan invocation must be registered, plan-only, contract-backed, and separate
+  from apply.
 - Do not make LLM output authoritative. Raw model output must pass through the
   requirement graph and target contracts.
 - Do not leave target boundaries only in prose prompts. Pattern context must be

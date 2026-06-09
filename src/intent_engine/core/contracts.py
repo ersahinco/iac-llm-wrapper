@@ -542,6 +542,24 @@ BLOCKED_ASSESSMENT_CONTRACT = TargetContract(
                 ArtifactValueAssertion(path="readiness.status", equals="blocked"),
             ],
         ),
+        ArtifactContract(
+            name="missing-inputs.yaml",
+            description="Durable architect/client questions for blocked compile resolution.",
+            required_paths=[
+                "schemaVersion",
+                "pattern",
+                "status",
+                "questionCount",
+                "questions",
+            ],
+            value_assertions=[
+                ArtifactValueAssertion(
+                    path="schemaVersion",
+                    equals="intent-engine/missing-inputs/v1",
+                ),
+                ArtifactValueAssertion(path="status", equals="blocked"),
+            ],
+        ),
     ],
 )
 
@@ -631,6 +649,74 @@ CONTEXT_MANIFEST_CONTRACT = TargetContract(
     ],
 )
 
+PLAN_READY_BUNDLE_CONTRACT = TargetContract(
+    name="generic-plan-ready-bundle",
+    kind="intent-engine-plan-ready-bundle",
+    source_url="intent-engine://contracts/generic-plan-ready-bundle/v1",
+    required_decisions=["planManifest", "replayManifest"],
+    artifacts=[
+        ArtifactContract(
+            name="plan-manifest.yaml",
+            description=(
+                "Registered target plan metadata. This artifact never invokes a plan or apply."
+            ),
+            required_paths=[
+                "schemaVersion",
+                "target.name",
+                "target.type",
+                "target.contract",
+                "maturity.configReady.status",
+                "maturity.configReady.allowed",
+                "maturity.planReady.status",
+                "maturity.planReady.planAllowed",
+                "maturity.planReady.summary",
+                "immutableInputs[]",
+                "immutableInputs[].artifact",
+                "immutableInputs[].sha256",
+                "planInvocation.mode",
+                "planInvocation.approvedCommand",
+                "planInvocation.applyAllowed",
+                "expectedPlanOutputs[]",
+                "manualGates[]",
+                "blockers",
+                "boundary",
+            ],
+            value_assertions=[
+                ArtifactValueAssertion(
+                    path="schemaVersion",
+                    equals="intent-engine/plan-manifest/v1",
+                ),
+                ArtifactValueAssertion(path="planInvocation.mode", equals="metadata-only"),
+                ArtifactValueAssertion(path="planInvocation.applyAllowed", equals=False),
+            ],
+        ),
+        ArtifactContract(
+            name="replay-manifest.yaml",
+            description="Source, contract, context, and artifact digest inventory for replay.",
+            required_paths=[
+                "schemaVersion",
+                "pattern",
+                "source.mode",
+                "source.sha256",
+                "contracts[]",
+                "contracts[].name",
+                "contracts[].sha256",
+                "artifacts.files[]",
+                "artifacts.files[].name",
+                "artifacts.files[].sha256",
+                "boundary",
+            ],
+            value_assertions=[
+                ArtifactValueAssertion(
+                    path="schemaVersion",
+                    equals="intent-engine/replay-manifest/v1",
+                ),
+            ],
+        ),
+    ],
+)
+
 GLOBAL_CONTRACT_REGISTRY.register(BLOCKED_ASSESSMENT_CONTRACT)
 GLOBAL_CONTRACT_REGISTRY.register(HANDOFF_PLAN_CONTRACT)
 GLOBAL_CONTRACT_REGISTRY.register(CONTEXT_MANIFEST_CONTRACT)
+GLOBAL_CONTRACT_REGISTRY.register(PLAN_READY_BUNDLE_CONTRACT)

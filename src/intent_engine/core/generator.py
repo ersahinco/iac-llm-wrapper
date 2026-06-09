@@ -270,6 +270,19 @@ def _sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def _sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _contract_digest(contract: Any) -> str:
+    if hasattr(contract, "model_dump"):
+        payload = contract.model_dump(by_alias=True)
+    else:
+        payload = contract
+    rendered = json.dumps(payload, sort_keys=True, default=str)
+    return _sha256_text(rendered)
+
+
 def _model_name(model: Any) -> str:
     if isinstance(model, type):
         return f"{model.__module__}.{model.__name__}"
@@ -363,10 +376,17 @@ def gen_context_manifest(intent: Any, output_dir: Path) -> None:
                 }
                 for capability in pattern_obj.target_capabilities
             ],
+            "planReady": {
+                "declared": pattern_obj.plan_ready,
+                "expectedArtifacts": ["plan-manifest.yaml", "replay-manifest.yaml"]
+                if pattern_obj.plan_ready
+                else [],
+            },
         },
         "runtimeContext": {
             "acceptedDecisionCount": len(decisions),
             "moduleInputCount": len(module_inputs),
+            "source": getattr(intent, "source_context", {}) or {},
             "llm": {
                 "provider": extraction_summary.get("provider", "not-run"),
                 "model": extraction_summary.get("model", "not-run"),
@@ -419,6 +439,14 @@ def gen_handoff_plan(intent: Any, output_dir: Path) -> None:
         readiness = getattr(intent, "deployment_readiness", {})
     readiness = readiness or {}
     allowed = bool(readiness.get("handoffAllowed", readiness.get("deploymentAllowed", True)))
+    allowed_next_action = readiness.get(
+        "allowedNextAction",
+        (
+            "Resolve blockers and re-run compile before any downstream handoff."
+            if not allowed
+            else "Pass the reviewed artifacts to the existing target toolchain after manual gates."
+        ),
+    )
     target_capabilities = getattr(intent, "target_capability_report", {}) or {}
     contracts = pattern_obj.contracts
     required_artifacts = list(
@@ -445,17 +473,15 @@ def gen_handoff_plan(intent: Any, output_dir: Path) -> None:
             "iac-llm-wrapper emits validated handoff artifacts only; downstream "
             "generation, execution, dashboards, and cloud changes remain outside this artifact."
         ),
-        "allowedNextAction": (
-            "Resolve blockers and re-run compile before any downstream handoff."
-            if not allowed
-            else "Pass the reviewed artifacts to the existing target toolchain after manual gates."
-        ),
+        "allowedNextAction": allowed_next_action,
         "readiness": {
             "status": readiness.get("status", "ready" if allowed else "blocked"),
             "handoffAllowed": allowed,
             # Backward-compatible alias for existing artifact consumers.
             "deploymentAllowed": allowed,
             "blockers": readiness.get("blockers", []),
+            "configReady": readiness.get("configReady", {}),
+            "planReady": readiness.get("planReady", {}),
         },
         "targetContracts": [
             {
@@ -511,6 +537,51 @@ def gen_handoff_plan(intent: Any, output_dir: Path) -> None:
     _write(output_dir, "handoff-plan.yaml", data)
 
 
+def gen_replay_manifest(intent: Any, output_dir: Path) -> None:
+    """Write digest inventory for plan-ready registered target replay."""
+    pattern = getattr(intent, "pattern", "")
+    if not pattern:
+        return
+
+    from .contracts import PLAN_READY_BUNDLE_CONTRACT
+    from .patterns import GLOBAL_REGISTRY as PATTERN_REGISTRY
+
+    pattern_obj = PATTERN_REGISTRY.get(pattern)
+    if not pattern_obj.plan_ready:
+        return
+
+    contracts = [*pattern_obj.contracts, PLAN_READY_BUNDLE_CONTRACT]
+    files = [
+        {
+            "name": item.name,
+            "sha256": _sha256_file(item),
+        }
+        for item in sorted(output_dir.iterdir())
+        if item.is_file() and not item.name.startswith(".") and item.name != "replay-manifest.yaml"
+    ]
+    data = {
+        "pattern": pattern,
+        "source": getattr(intent, "source_context", {}) or {"mode": "unknown", "sha256": ""},
+        "contracts": [
+            {
+                "name": contract.name,
+                "kind": contract.kind,
+                "sourceUrl": contract.source_url,
+                "sha256": _contract_digest(contract),
+            }
+            for contract in contracts
+        ],
+        "artifacts": {
+            "files": files,
+        },
+        "boundary": (
+            "Replay metadata pins source, contracts, and artifacts only. It does not "
+            "invoke plan, apply, cloud APIs, or deployment pipelines."
+        ),
+    }
+    _write(output_dir, "replay-manifest.yaml", data, "intent-engine/replay-manifest/v1")
+
+
 register_generator("design-doc", gen_design_doc, priority=4, category="meta")
 register_generator("context-manifest", gen_context_manifest, priority=4, category="meta")
 register_generator("module-inputs", gen_module_inputs, priority=5, category="meta")
@@ -536,3 +607,4 @@ register_generator(
     category="meta",
     applies_to={"terraform-vpc", "kubernetes-cluster"},
 )
+register_generator("replay-manifest", gen_replay_manifest, priority=100, category="meta")

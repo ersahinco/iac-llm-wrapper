@@ -11,12 +11,25 @@ nodePool:
   minSize: 2
   maxSize: 5
 namespace: production
-handoffReadiness: &id001
+handoffReadiness: &id002
   handoffAllowed: true
   deploymentAllowed: true
   status: ready
+  allowedNextAction: Pass the reviewed artifacts to the existing target
+    toolchain after manual gates.
   summary: Ready for handoff.
-  blockers: []
+  configReady:
+    status: ready
+    allowed: true
+    summary: Validated target configuration artifacts are ready for owner
+      review.
+    blockers: &id001 []
+  planReady:
+    status: not-declared
+    planAllowed: false
+    summary: No registered plan-ready bundle is declared for this target.
+    blockers: []
+  blockers: *id001
   missingDecisions: []
   conflictingDecisions: []
   safeHandoffPath:
@@ -25,4 +38,4 @@ handoffReadiness: &id001
     - Validate target contracts and artifact owner approvals before downstream
       use.
     - Pass only reviewed artifacts to the existing target toolchain.
-deploymentReadiness: *id001
+deploymentReadiness: *id002

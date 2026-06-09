@@ -433,12 +433,46 @@ semanticModel:
       evidence: PlatformAdmins:ReadOnlyAccess:Management
       violationCode: AWS_LZA_IDENTITY_CENTER_ASSIGNMENT_ACCOUNT_UNKNOWN
       violationMessage: Identity Center assignments must target known accounts.
-handoffReadiness: &id001
+handoffReadiness: &id002
   handoffAllowed: true
   deploymentAllowed: true
   status: ready
+  allowedNextAction: Pass the reviewed artifacts to the existing target
+    toolchain after manual gates.
   summary: Ready for handoff.
-  blockers: []
+  configReady:
+    status: ready
+    allowed: true
+    summary: Validated target configuration artifacts are ready for owner
+      review.
+    blockers: &id001 []
+  planReady:
+    status: blocked
+    planAllowed: false
+    summary: AWS LZA configuration is ready for review, but plan/diff still
+      needs explicit inputs.
+    blockers:
+      - code: AWS_LZA_PLAN_ACCOUNT_EMAILS_REQUIRED
+        message: Generated account emails use placeholder example.com addresses;
+          replace them with owned account vending emails before a
+          no-interpretation LZA plan.
+        affectedArtifacts:
+          - accounts-config.yaml
+        owner: release-owner
+      - code: AWS_LZA_PLAN_NETWORK_DETAILS_REQUIRED
+        message: Generated network config still contains empty route tables,
+          subnets, NAT gateways, or TGW attachment details that require
+          network-owner review before plan.
+        affectedArtifacts:
+          - network-config.yaml
+        owner: network-owner
+      - code: AWS_LZA_PLAN_TGW_ROUTES_REQUIRED
+        message: Hub-spoke topology has a transit gateway shell but no route
+          entries or attachment intent suitable for an interpretation-free plan.
+        affectedArtifacts:
+          - network-config.yaml
+        owner: network-owner
+  blockers: *id001
   missingDecisions: []
   conflictingDecisions: []
   safeHandoffPath:
@@ -452,4 +486,4 @@ handoffReadiness: &id001
       - accelerator
     unsupportedGapCount: 0
     unsupportedGaps: []
-deploymentReadiness: *id001
+deploymentReadiness: *id002

@@ -10,7 +10,18 @@ readiness:
   status: ready
   handoffAllowed: true
   deploymentAllowed: true
-  blockers: []
+  blockers: &id001 []
+  configReady:
+    status: ready
+    allowed: true
+    summary: Validated target configuration artifacts are ready for owner
+      review.
+    blockers: *id001
+  planReady:
+    status: not-declared
+    planAllowed: false
+    summary: No registered plan-ready bundle is declared for this target.
+    blockers: []
 targetContracts:
   - name: kubernetes-cluster-config
     kind: kubernetes-cluster-config

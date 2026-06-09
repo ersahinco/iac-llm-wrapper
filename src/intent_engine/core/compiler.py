@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import shutil
 import tempfile
 from pathlib import Path
@@ -55,6 +56,7 @@ def _build_payload(
     extraction_summary: dict[str, Any] | None = None,
     handoff_readiness: dict[str, Any] | None = None,
     target_capability_report: dict[str, Any] | None = None,
+    source_context: dict[str, Any] | None = None,
 ) -> Any:
     """Wrap intent in IaCIntentPayload with design doc and module inputs."""
     from .module_mapping import DesignDocument, IaCIntentPayload, map_intent_to_modules
@@ -75,6 +77,7 @@ def _build_payload(
         decisions=decisions or {},
         extraction_summary=extraction_summary or {},
         target_capability_report=target_capability_report or {},
+        source_context=source_context or {},
         handoff_readiness=handoff_readiness or {},
     )
 
@@ -115,6 +118,31 @@ def _to_builtin(value: Any) -> Any:
     if isinstance(value, list):
         return [_to_builtin(item) for item in value]
     return value
+
+
+def _sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _source_context(
+    *,
+    mode: str,
+    text: str = "",
+    input_path: Path | None = None,
+    paths: list[Path] | None = None,
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    context: dict[str, Any] = {
+        "mode": mode,
+        "sha256": _sha256_text(text),
+    }
+    if input_path is not None:
+        context["path"] = str(input_path)
+    if paths:
+        context["paths"] = [str(path) for path in paths]
+    if extra:
+        context.update(extra)
+    return context
 
 
 def _without_locked_decisions(
@@ -324,6 +352,36 @@ def _target_capability_violations(
     return violations
 
 
+def _plan_ready_capability_violations(
+    pattern: str,
+    target_capability_report: dict[str, Any] | None,
+) -> list[Violation]:
+    pattern_obj = GLOBAL_REGISTRY.get(pattern)
+    if not pattern_obj.plan_ready:
+        return []
+    violations: list[Violation] = []
+    if not pattern_obj.target_capabilities:
+        return [
+            Violation(
+                code="PLAN_READY_TARGET_CAPABILITIES_REQUIRED",
+                message="Plan-ready targets must declare target capabilities.",
+            )
+        ]
+    coverage = target_capability_report.get("coverage", {}) if target_capability_report else {}
+    unhandled = coverage.get("unhandledAcceptedDecisions", [])
+    if isinstance(unhandled, list) and unhandled:
+        violations.append(
+            Violation(
+                code="PLAN_READY_UNHANDLED_DECISIONS",
+                message=(
+                    "Plan-ready target capability coverage is missing accepted decisions: "
+                    + ", ".join(str(item) for item in unhandled)
+                ),
+            )
+        )
+    return violations
+
+
 _HIGH_RISK_RECONFIRMATION_CATEGORIES = {
     "accelerator",
     "accounts",
@@ -403,6 +461,7 @@ def _generated_artifact_names(pattern: str) -> set[str]:
         "model-benchmark.yaml",
         "contract-validation.yaml",
         "handoff-review.html",
+        "missing-inputs.yaml",
         "input-diff-report.yaml",
         "incremental-compile-report.yaml",
     }
@@ -466,6 +525,13 @@ def _build_handoff_readiness(
     llm_contradictions = _blocking_contradictions(graph, llm_result.contradictions)
     blockers = [{"code": v.code, "message": v.message} for v in violations]
     handoff_allowed = not blockers
+    config_ready_status = "ready" if handoff_allowed else "blocked"
+    plan_ready_status = "not-declared" if handoff_allowed else "blocked"
+    allowed_next_action = (
+        "Pass the reviewed artifacts to the existing target toolchain after manual gates."
+        if handoff_allowed
+        else "Resolve blockers and re-run compile before any downstream handoff."
+    )
     unsupported_gaps: list[dict[str, Any]] = []
     if target_capability_report:
         unsupported_gaps = target_capability_report.get("unsupportedGaps", []) or []
@@ -496,11 +562,32 @@ def _build_handoff_readiness(
         # Backward-compatible alias for existing artifact consumers.
         "deploymentAllowed": handoff_allowed,
         "status": "ready" if handoff_allowed else "blocked",
+        "allowedNextAction": allowed_next_action,
         "summary": (
             "Ready for handoff."
             if handoff_allowed
             else "Cannot hand off yet; missing or conflicting decisions must be resolved."
         ),
+        "configReady": {
+            "status": config_ready_status,
+            "allowed": handoff_allowed,
+            "summary": (
+                "Validated target configuration artifacts are ready for owner review."
+                if handoff_allowed
+                else "Target configuration artifacts are blocked until required decisions pass."
+            ),
+            "blockers": blockers,
+        },
+        "planReady": {
+            "status": plan_ready_status,
+            "planAllowed": False,
+            "summary": (
+                "No registered plan-ready bundle is declared for this target."
+                if handoff_allowed
+                else "Plan readiness is blocked until configuration readiness is clean."
+            ),
+            "blockers": [] if handoff_allowed else blockers,
+        },
         "blockers": blockers,
         "missingDecisions": missing + llm_gaps,
         "conflictingDecisions": conflicts + llm_contradictions,
@@ -671,6 +758,45 @@ def _write_failed_compile_artifacts(
         "model-benchmark.yaml",
         build_model_benchmark(extraction_summary),
     )
+    _write_yaml_artifact(
+        output_dir,
+        "missing-inputs.yaml",
+        _missing_inputs_artifact(pattern, graph, readiness),
+    )
+
+
+def _missing_inputs_artifact(pattern: str, graph, readiness: dict[str, Any]) -> dict[str, Any]:
+    questions: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in readiness.get("missingDecisions", []) or []:
+        key = item.get("key") if isinstance(item, dict) else str(item)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        req = getattr(graph, "_requirements", {}).get(key)
+        item_dict = item if isinstance(item, dict) else {}
+        questions.append(
+            {
+                "key": key,
+                "label": item_dict.get("label", getattr(req, "label", key)),
+                "question": item_dict.get("question", getattr(req, "question", "")),
+                "reason": item_dict.get(
+                    "reason",
+                    getattr(req, "violation_message", "") or "Required decision is missing.",
+                ),
+                "default": getattr(req, "default", None),
+                "options": list(getattr(req, "options", []) or []),
+                "dependsOn": list(getattr(req, "depends_on", []) or []),
+                "category": getattr(req, "category", ""),
+            }
+        )
+    return {
+        "schemaVersion": "intent-engine/missing-inputs/v1",
+        "pattern": pattern,
+        "status": "blocked",
+        "questionCount": len(questions),
+        "questions": questions,
+    }
 
 
 def _build_failure_artifacts_and_raise(
@@ -780,11 +906,20 @@ def compile_design(
     """
     if input_path.is_dir():
         texts = []
+        source_paths = []
         for f in sorted(input_path.glob("*.md")):
+            source_paths.append(f)
             texts.append(f.read_text())
         text = "\n---\n".join(texts)
+        source_context = _source_context(
+            mode="directory",
+            text=text,
+            input_path=input_path,
+            paths=source_paths,
+        )
     else:
         text = input_path.read_text()
+        source_context = _source_context(mode="file", text=text, input_path=input_path)
 
     pattern_obj = GLOBAL_REGISTRY.get(pattern)
     if graph is None:
@@ -861,6 +996,7 @@ def compile_design(
     violations.extend(_markdown_contradiction_violations(markdown_result.contradictions))
     violations.extend(_llm_result_violations(graph, llm_result))
     violations.extend(_target_capability_violations(target_capability_report))
+    violations.extend(_plan_ready_capability_violations(pattern, target_capability_report))
     readiness = _build_handoff_readiness(
         graph,
         violations,
@@ -908,6 +1044,7 @@ def compile_design(
         extraction_summary=extraction_summary,
         handoff_readiness=readiness,
         target_capability_report=target_capability_report,
+        source_context=source_context,
     )
     artifact_violations = _generate_validated_artifacts(payload, output_dir, pattern)
     if artifact_violations:
@@ -956,6 +1093,15 @@ def compile_incremental_design(
 
     changed_text = changed_doc.read_text()
     baseline_text = baseline_doc.read_text() if baseline_doc is not None else None
+    source_context = _source_context(
+        mode="incremental",
+        text=changed_text,
+        input_path=changed_doc,
+        extra={
+            "baselineBundle": str(baseline_bundle),
+            "baselineDocument": str(baseline_doc) if baseline_doc is not None else "",
+        },
+    )
     baseline_decisions = _baseline_decisions_from_bundle(baseline_bundle)
     baseline_summary = _baseline_summary_from_bundle(baseline_bundle)
     input_diff = build_input_diff_report(
@@ -1026,6 +1172,7 @@ def compile_incremental_design(
     violations.extend(_markdown_contradiction_violations(markdown_result.contradictions))
     violations.extend(_llm_result_violations(graph, llm_result))
     violations.extend(_target_capability_violations(target_capability_report))
+    violations.extend(_plan_ready_capability_violations(pattern, target_capability_report))
     incremental_report = incremental_decision_report(
         baseline_decisions=baseline_decisions,
         final_decisions=graph.typed_decisions(),
@@ -1095,6 +1242,7 @@ def compile_incremental_design(
         extraction_summary=extraction_summary,
         handoff_readiness=readiness,
         target_capability_report=target_capability_report,
+        source_context=source_context,
     )
     artifact_violations = _generate_validated_artifacts(
         payload,
@@ -1153,6 +1301,7 @@ def compile_from_graph(graph, output_dir: Path, pattern: str = "aws-lza") -> Non
         graph.typed_decisions(),
     )
     violations.extend(_target_capability_violations(target_capability_report))
+    violations.extend(_plan_ready_capability_violations(pattern, target_capability_report))
     readiness = _build_handoff_readiness(
         graph,
         violations,
@@ -1195,6 +1344,7 @@ def compile_from_graph(graph, output_dir: Path, pattern: str = "aws-lza") -> Non
             extraction_summary=extraction_summary,
             handoff_readiness=readiness,
             target_capability_report=target_capability_report,
+            source_context=_source_context(mode="interview", text=""),
         ),
         output_dir,
         pattern,
@@ -1229,7 +1379,12 @@ def compile_from_graph(graph, output_dir: Path, pattern: str = "aws-lza") -> Non
 
 def validate_generated_violations(input_dir: Path, pattern: str = "aws-lza") -> list[Violation]:
     violations: list[Violation] = []
-    from .contracts import CONTEXT_MANIFEST_CONTRACT, HANDOFF_PLAN_CONTRACT, ContractValidator
+    from .contracts import (
+        CONTEXT_MANIFEST_CONTRACT,
+        HANDOFF_PLAN_CONTRACT,
+        PLAN_READY_BUNDLE_CONTRACT,
+        ContractValidator,
+    )
     from .patterns import GLOBAL_REGISTRY
 
     pattern_obj = GLOBAL_REGISTRY.get(pattern)
@@ -1248,6 +1403,10 @@ def validate_generated_violations(input_dir: Path, pattern: str = "aws-lza") -> 
     if pattern_obj.contracts:
         violations.extend(ContractValidator(HANDOFF_PLAN_CONTRACT).validate_artifacts(input_dir))
     violations.extend(ContractValidator(CONTEXT_MANIFEST_CONTRACT).validate_artifacts(input_dir))
+    if pattern_obj.plan_ready:
+        violations.extend(
+            ContractValidator(PLAN_READY_BUNDLE_CONTRACT).validate_artifacts(input_dir)
+        )
 
     deduped: list[Violation] = []
     seen_messages: set[str] = set()

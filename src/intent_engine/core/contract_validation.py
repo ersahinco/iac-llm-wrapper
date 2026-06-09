@@ -11,6 +11,7 @@ from .contracts import (
     BLOCKED_ASSESSMENT_CONTRACT,
     CONTEXT_MANIFEST_CONTRACT,
     HANDOFF_PLAN_CONTRACT,
+    PLAN_READY_BUNDLE_CONTRACT,
     ContractValidator,
 )
 from .patterns import GLOBAL_REGISTRY
@@ -34,6 +35,8 @@ def build_contract_validation(input_dir: Path) -> dict[str, Any]:
             if pattern_obj.contracts:
                 contracts.append(HANDOFF_PLAN_CONTRACT)
             contracts.append(CONTEXT_MANIFEST_CONTRACT)
+            if pattern_obj.plan_ready:
+                contracts.append(PLAN_READY_BUNDLE_CONTRACT)
     else:
         contracts.append(BLOCKED_ASSESSMENT_CONTRACT)
 

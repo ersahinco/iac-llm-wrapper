@@ -355,6 +355,14 @@ boundary: Trace artifact only.
 calls: []
 """
         )
+        (tmp_path / "missing-inputs.yaml").write_text(
+            """schemaVersion: intent-engine/missing-inputs/v1
+pattern: aws-lza
+status: blocked
+questionCount: 0
+questions: []
+"""
+        )
 
         assert ContractValidator(BLOCKED_ASSESSMENT_CONTRACT).validate_artifacts(tmp_path) == []
 

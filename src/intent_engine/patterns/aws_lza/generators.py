@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 from typing import Any
 
@@ -293,6 +295,150 @@ def gen_lza_deployment_runbook(intent: Any, output_dir: Path) -> None:
     (output_dir / "deployment-runbook.md").write_text("\n".join(lines) + "\n")
 
 
+def _sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _contract_digest() -> str:
+    rendered = json.dumps(_LZA_CONTRACT.model_dump(by_alias=True), sort_keys=True, default=str)
+    return hashlib.sha256(rendered.encode("utf-8")).hexdigest()
+
+
+def _plan_input_blockers(intent: Any) -> list[dict[str, Any]]:
+    blockers = [
+        {
+            "code": "AWS_LZA_PLAN_ACCOUNT_EMAILS_REQUIRED",
+            "message": (
+                "Generated account emails use placeholder example.com addresses; replace "
+                "them with owned account vending emails before a no-interpretation LZA plan."
+            ),
+            "affectedArtifacts": ["accounts-config.yaml"],
+            "owner": "release-owner",
+        },
+        {
+            "code": "AWS_LZA_PLAN_NETWORK_DETAILS_REQUIRED",
+            "message": (
+                "Generated network config still contains empty route tables, subnets, NAT "
+                "gateways, or TGW attachment details that require network-owner review before plan."
+            ),
+            "affectedArtifacts": ["network-config.yaml"],
+            "owner": "network-owner",
+        },
+    ]
+    if intent.topology == "hub-spoke":
+        blockers.append(
+            {
+                "code": "AWS_LZA_PLAN_TGW_ROUTES_REQUIRED",
+                "message": (
+                    "Hub-spoke topology has a transit gateway shell but no route entries "
+                    "or attachment intent suitable for an interpretation-free plan."
+                ),
+                "affectedArtifacts": ["network-config.yaml"],
+                "owner": "network-owner",
+            }
+        )
+    return blockers
+
+
+def _lza_plan_readiness(intent: Any) -> dict[str, Any]:
+    blockers = _plan_input_blockers(intent)
+    plan_allowed = not blockers
+    return {
+        "status": "ready" if plan_allowed else "blocked",
+        "planAllowed": plan_allowed,
+        "summary": (
+            "All registered AWS LZA plan inputs are present."
+            if plan_allowed
+            else (
+                "AWS LZA configuration is ready for review, but plan/diff still needs "
+                "explicit inputs."
+            )
+        ),
+        "blockers": blockers,
+    }
+
+
+def gen_lza_plan_manifest(payload: Any, output_dir: Path) -> None:
+    readiness = getattr(payload, "handoff_readiness", None)
+    if readiness is None:
+        readiness = getattr(payload, "deployment_readiness", {})
+    intent = _aws_lza_intent(payload)
+    if intent is None:
+        return
+    immutable_inputs = [
+        {
+            "artifact": name,
+            "sha256": _sha256_file(output_dir / name),
+        }
+        for name in AWS_LZA_CONFIG_ARTIFACTS
+        if (output_dir / name).exists()
+    ]
+    plan_readiness = _lza_plan_readiness(intent)
+    data = {
+        "target": {
+            "name": "aws-lza",
+            "type": "accelerator",
+            "contract": _LZA_CONTRACT.name,
+            "sourceUrl": _LZA_CONTRACT.source_url,
+            "contractSha256": _contract_digest(),
+        },
+        "maturity": {
+            "configReady": {
+                "status": (readiness or {}).get("status", "unknown"),
+                "allowed": bool(
+                    (readiness or {}).get(
+                        "handoffAllowed",
+                        (readiness or {}).get("deploymentAllowed", False),
+                    )
+                ),
+                "summary": (readiness or {}).get("summary", ""),
+            },
+            "planReady": plan_readiness,
+        },
+        "immutableInputs": immutable_inputs,
+        "sampleRecommendations": {
+            "artifact": "sample-recommendations.yaml",
+            "sha256": _sha256_file(output_dir / "sample-recommendations.yaml")
+            if (output_dir / "sample-recommendations.yaml").exists()
+            else "",
+        },
+        "prerequisites": [
+            "AWS LZA repository and pipeline are owned by the downstream platform team.",
+            "Generated configuration files are copied as an immutable bundle into that pipeline.",
+            "Manual gates in handoff-plan.yaml and plan-manifest.yaml are approved.",
+        ],
+        "planInvocation": {
+            "mode": "metadata-only",
+            "approvedCommand": (
+                "Run the owner-managed AWS LZA validation/diff command or pipeline against "
+                "the immutableInputs listed in this manifest."
+            ),
+            "applyAllowed": False,
+        },
+        "expectedPlanOutputs": [
+            "aws-lza-validation-result",
+            "aws-lza-diff-or-plan-result",
+            "owner approval record",
+        ],
+        "manualGates": [
+            "Replace placeholder account emails with owned addresses.",
+            "Network owner approves route tables, subnets, TGW attachments, and CIDR boundaries.",
+            "Security owner approves IAM Identity Center and security service scope.",
+            "Release owner confirms plan command/pipeline and rollback owner.",
+        ],
+        "blockers": plan_readiness["blockers"],
+        "boundary": (
+            "This manifest is plan metadata only. iac-llm-wrapper does not invoke AWS LZA, "
+            "Terraform, cloud APIs, apply commands, or deployment pipelines."
+        ),
+    }
+    _write_yaml(
+        output_dir,
+        "plan-manifest.yaml",
+        {"schemaVersion": "intent-engine/plan-manifest/v1", **data},
+    )
+
+
 def gen_lza_decision_report(intent: Any, output_dir: Path) -> None:
     readiness = getattr(intent, "handoff_readiness", None)
     if readiness is None:
@@ -333,6 +479,8 @@ def gen_lza_decision_report(intent: Any, output_dir: Path) -> None:
         "semanticModel": build_aws_lza_semantic_model(intent).to_dict(),
     }
     if readiness:
+        readiness = dict(readiness)
+        readiness["planReady"] = _lza_plan_readiness(intent)
         data["handoffReadiness"] = readiness
         # Backward-compatible alias for existing artifact consumers.
         data["deploymentReadiness"] = readiness

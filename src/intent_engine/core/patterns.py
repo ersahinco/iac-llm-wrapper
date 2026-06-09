@@ -37,6 +37,8 @@ class Pattern:
     contracts: list[TargetContract] = field(default_factory=list)
     # Downstream target capability graph declarations.
     target_capabilities: list[TargetCapability] = field(default_factory=list)
+    # Whether this pattern emits a registered target plan-ready metadata bundle.
+    plan_ready: bool = False
 
     def create_graph(self) -> RequirementGraph:
         graph = self.graph_factory()
@@ -57,6 +59,8 @@ class Pattern:
             artifacts.append("sample-recommendations.yaml")
         if self.target_capabilities:
             artifacts.append("target-capability-graph.yaml")
+        if self.plan_ready:
+            artifacts.extend(["plan-manifest.yaml", "replay-manifest.yaml"])
         return list(dict.fromkeys(artifacts))
 
 

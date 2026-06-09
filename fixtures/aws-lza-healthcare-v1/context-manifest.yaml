@@ -357,9 +357,17 @@ contextInventory:
       handledDecisions: []
       requiredDecisions: []
       producedArtifacts: []
+  planReady:
+    declared: true
+    expectedArtifacts:
+      - plan-manifest.yaml
+      - replay-manifest.yaml
 runtimeContext:
   acceptedDecisionCount: 20
   moduleInputCount: 0
+  source:
+    mode: interview
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
   llm:
     provider: none
     model: none
@@ -385,6 +393,8 @@ outputs:
     - handoff-plan.yaml
     - sample-recommendations.yaml
     - target-capability-graph.yaml
+    - plan-manifest.yaml
+    - replay-manifest.yaml
 guardrails:
   - Prompt context must stay bounded and reviewable.
   - LLM output is never authoritative without graph acceptance.

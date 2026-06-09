@@ -34,6 +34,8 @@ class TestAwsLzaPattern:
         assert "lineage-manifest.yaml" in pattern.expected_artifacts()
         assert "sample-recommendations.yaml" in pattern.expected_artifacts()
         assert "target-capability-graph.yaml" in pattern.expected_artifacts()
+        assert "plan-manifest.yaml" in pattern.expected_artifacts()
+        assert "replay-manifest.yaml" in pattern.expected_artifacts()
         for artifact in AWS_LZA_SAMPLE_CONFIG_CONTRACT.required_artifacts:
             assert artifact in pattern.expected_artifacts()
 
@@ -317,6 +319,36 @@ class TestAwsLzaPattern:
         assert any(item["decision"] == "network_cidr" for item in lineage["lineage"])
         assert len(lineage["lineage"]) == len(AWS_LZA_SAMPLE_CONFIG_CONTRACT.lineage)
 
+        plan = yaml.load((output / "plan-manifest.yaml").read_text())
+        assert plan["schemaVersion"] == "intent-engine/plan-manifest/v1"
+        assert plan["target"]["name"] == "aws-lza"
+        assert plan["planInvocation"]["mode"] == "metadata-only"
+        assert plan["planInvocation"]["applyAllowed"] is False
+        assert plan["maturity"]["configReady"]["allowed"] is True
+        assert plan["maturity"]["planReady"]["status"] == "blocked"
+        assert plan["maturity"]["planReady"]["planAllowed"] is False
+        assert {
+            "AWS_LZA_PLAN_ACCOUNT_EMAILS_REQUIRED",
+            "AWS_LZA_PLAN_NETWORK_DETAILS_REQUIRED",
+            "AWS_LZA_PLAN_TGW_ROUTES_REQUIRED",
+        } <= {item["code"] for item in plan["blockers"]}
+        assert {item["artifact"] for item in plan["immutableInputs"]} == {
+            "accounts-config.yaml",
+            "global-config.yaml",
+            "iam-config.yaml",
+            "network-config.yaml",
+            "organization-config.yaml",
+            "security-config.yaml",
+        }
+
+        replay = yaml.load((output / "replay-manifest.yaml").read_text())
+        assert replay["schemaVersion"] == "intent-engine/replay-manifest/v1"
+        assert replay["pattern"] == "aws-lza"
+        assert replay["source"]["mode"] == "interview"
+        assert "generic-plan-ready-bundle" in {item["name"] for item in replay["contracts"]}
+        assert "plan-manifest.yaml" in {item["name"] for item in replay["artifacts"]["files"]}
+        assert "replay-manifest.yaml" not in {item["name"] for item in replay["artifacts"]["files"]}
+
         runbook = (output / "deployment-runbook.md").read_text()
         assert "AWS LZA Deployment Runbook" in runbook
         assert "Mandatory configuration files" in runbook
@@ -474,6 +506,13 @@ class TestAwsLzaPattern:
         codes = [violation.code for violation in exc_info.value.violations]
         assert codes.count("AWS_LZA_IDENTITY_CENTER_PERMISSION_SETS_REQUIRED") == 1
         assert codes.count("AWS_LZA_IDENTITY_CENTER_ASSIGNMENTS_REQUIRED") == 1
+        yaml = ruamel.yaml.YAML(typ="safe")
+        missing = yaml.load((tmp_path / "missing-inputs.yaml").read_text())
+        assert missing["schemaVersion"] == "intent-engine/missing-inputs/v1"
+        assert {
+            "identity_center_permission_sets",
+            "identity_center_assignments",
+        } <= {item["key"] for item in missing["questions"]}
 
     def test_malformed_identity_center_assignment_blocks(self, tmp_path: Path):
         decisions = {

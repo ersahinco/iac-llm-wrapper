@@ -9,6 +9,9 @@ Existing deployment mechanisms remain downstream.
 | `decision-report.yaml` | Accepted decisions, handoff readiness, blockers, safe handoff path, and pattern-owned semantic model details when available. | Core + pattern | Every compile, including blocked compiles. | No |
 | `context-manifest.yaml` | Code-owned context inventory: pattern metadata, prompt context digest/text, requirement graph, target contracts, samples, target capabilities, runtime extraction summary, expected artifacts, and guardrails. | Core | Pattern-backed successful handoffs. | No |
 | `handoff-plan.yaml` | Ordered review/handoff steps, owners, dependencies, manual gates, rollback, boundary, `handoffAllowed`, compatibility `deploymentAllowed`, and allowed next action. | Core | Contract-backed successful handoffs. | No |
+| `plan-manifest.yaml` | Registered target plan metadata: immutable input artifacts, plan readiness, plan-only command text, expected plan outputs, blockers, and no-apply boundary. | Pattern + core contract | Plan-ready registered targets such as AWS LZA. | No |
+| `replay-manifest.yaml` | Source, target contract, and artifact digests for deterministic replay and bundle comparison. | Core | Plan-ready registered targets. | No |
+| `missing-inputs.yaml` | Durable architect/client question packet for blocked compiles, keyed by requirement graph nodes. | Core | Blocked compiles. | No |
 | `llm-trace-summary.yaml` | Provider/model, latency, raw and accepted decisions, applied decisions, gaps, contradictions, and raw evidence status. | Core | Every compile. | No |
 | `model-benchmark.yaml` | Mode, provider/model, latency, token availability, raw LLM coverage, conformance, quality counts, readiness, cost status, and external-observability boundary. | Core | Every compile. | No |
 | `input-diff-report.yaml` | Changed headings, changed structured decision lines, likely impacted requirements, and scoped hunks for an incremental document update. | Core incremental compile | `compile --baseline-bundle --changed-doc`. | No |
@@ -31,6 +34,9 @@ Existing deployment mechanisms remain downstream.
   entities, relationships, and predicate constraint results.
 - Platform engineers use pattern-specific target configuration files, deployment
   target contracts, lineage, and the allowed next action.
+- Plan reviewers use `plan-manifest.yaml` and `replay-manifest.yaml` to see
+  whether a registered target has enough immutable input for a downstream
+  plan/diff without interpretation. These files do not invoke the plan.
 - Reviewers use `handoff-comparison.yaml` to inspect only the deltas from an
   incremental document or sample-configuration update.
 - Contributors use `context-manifest.yaml`, `llm-trace-summary.yaml`, `model-benchmark.yaml`,

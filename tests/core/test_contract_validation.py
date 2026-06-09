@@ -254,6 +254,24 @@ def _write_blocked_bundle(output_dir: Path) -> None:
             "calls": [],
         },
     )
+    _write_yaml(
+        output_dir / "missing-inputs.yaml",
+        {
+            "schemaVersion": "intent-engine/missing-inputs/v1",
+            "pattern": "contract-validation-example",
+            "status": "blocked",
+            "questionCount": 1,
+            "questions": [
+                {
+                    "key": "region",
+                    "label": "Region",
+                    "question": "Which region?",
+                    "reason": "Region required.",
+                    "dependsOn": [],
+                }
+            ],
+        },
+    )
 
 
 def test_ready_bundle_validates_pattern_contracts_and_handoff_plan(tmp_path: Path):

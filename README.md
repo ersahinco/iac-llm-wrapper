@@ -307,6 +307,10 @@ For `aws-lza`, successful output includes:
   context, requirement graph, contracts, samples, target capabilities, and
   expected artifacts
 - `handoff-plan.yaml` — ordered owners, dependencies, gates, rollback, boundary, and allowed next action
+- `plan-manifest.yaml` — AWS LZA plan-ready metadata: immutable input files,
+  plan blockers, plan-only command text, expected plan outputs, and no-apply
+  boundary
+- `replay-manifest.yaml` — source, contract, and artifact digests for replay
 - `deployment-runbook.md` — prerequisites and handoff sequence
 - `sample-recommendations.yaml` — closest pinned reference bundles for handoff
 - `llm-trace-summary.yaml` — provider/model, calls, raw and accepted decisions,
@@ -316,7 +320,8 @@ For `aws-lza`, successful output includes:
   embedding an observability platform
 
 When compile is blocked, only safe assessment artifacts are written:
-`decision-report.yaml`, `llm-trace-summary.yaml`, and `model-benchmark.yaml`.
+`decision-report.yaml`, `llm-trace-summary.yaml`, `model-benchmark.yaml`, and
+`missing-inputs.yaml`.
 They must satisfy the built-in `blocked-assessment-artifacts` contract.
 
 Generate a portable static review page when humans need one file to inspect.

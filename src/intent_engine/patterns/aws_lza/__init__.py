@@ -20,6 +20,7 @@ from .generators import (
     gen_lza_lineage_manifest,
     gen_lza_network_config,
     gen_lza_organization_config,
+    gen_lza_plan_manifest,
     gen_lza_security_config,
 )
 from .graph import build_aws_lza_graph
@@ -224,6 +225,12 @@ def _register_generators() -> None:
         priority=28,
         applies_to=_AWS_LZA_GENERATOR_SCOPE,
     )
+    register_generator(
+        "aws-lza-plan-manifest",
+        gen_lza_plan_manifest,
+        priority=29,
+        applies_to=_AWS_LZA_GENERATOR_SCOPE,
+    )
 
 
 def _register_pattern() -> None:
@@ -245,6 +252,7 @@ def _register_pattern() -> None:
                 "infer custom Terraform unless explicitly requested."
             ),
             contracts=[AWS_LZA_SAMPLE_CONFIG_CONTRACT],
+            plan_ready=True,
         )
     )
 
