@@ -64,8 +64,29 @@ def _placeholder_email(account_name: str) -> str:
     return f"{_slug(account_name)}@{_PLACEHOLDER_EMAIL_DOMAIN}"
 
 
-def _account_record(name: str, organizational_unit: str | None = None) -> dict[str, str]:
-    account = {"name": name, "email": _placeholder_email(name)}
+def _kv_items(values: list[str]) -> dict[str, str]:
+    items: dict[str, str] = {}
+    for value in values:
+        if "=" not in value:
+            continue
+        key, raw = value.split("=", 1)
+        key = key.strip()
+        raw = raw.strip()
+        if key and raw:
+            items[key] = raw
+    return items
+
+
+def _account_email_map(intent: AwsLzaIntent) -> dict[str, str]:
+    return _kv_items(intent.account_emails)
+
+
+def _account_record(
+    name: str,
+    organizational_unit: str | None = None,
+    account_emails: dict[str, str] | None = None,
+) -> dict[str, str]:
+    account = {"name": name, "email": (account_emails or {}).get(name, _placeholder_email(name))}
     if organizational_unit:
         account["organizationalUnit"] = organizational_unit
     return account
@@ -80,24 +101,26 @@ def _primary_vpc_account(intent: AwsLzaIntent) -> str:
 
 
 def _mandatory_accounts(intent: AwsLzaIntent) -> list[dict[str, str]]:
+    account_emails = _account_email_map(intent)
     return [
-        _account_record(_MANAGEMENT_ACCOUNT),
-        _account_record(intent.log_archive_account, _SECURITY_OU),
-        _account_record(intent.audit_account, _SECURITY_OU),
+        _account_record(_MANAGEMENT_ACCOUNT, account_emails=account_emails),
+        _account_record(intent.log_archive_account, _SECURITY_OU, account_emails),
+        _account_record(intent.audit_account, _SECURITY_OU, account_emails),
     ]
 
 
 def _workload_accounts(intent: AwsLzaIntent) -> list[dict[str, str]]:
+    account_emails = _account_email_map(intent)
     explicit_account_ous = {
         account.name: account.ou
         for account in intent.accounts
         if account.name.strip() and account.ou.strip()
     }
-    accounts = [_account_record(intent.security_tooling_account, _SECURITY_OU)]
+    accounts = [_account_record(intent.security_tooling_account, _SECURITY_OU, account_emails)]
     if intent.topology == "hub-spoke":
-        accounts.append(_account_record(intent.network_account, _INFRASTRUCTURE_OU))
+        accounts.append(_account_record(intent.network_account, _INFRASTRUCTURE_OU, account_emails))
     accounts.extend(
-        _account_record(name, explicit_account_ous.get(name, _WORKLOADS_OU))
+        _account_record(name, explicit_account_ous.get(name, _WORKLOADS_OU), account_emails)
         for name in intent.workload_accounts
     )
     return accounts
@@ -239,12 +262,78 @@ def _core_vpc_config(intent: AwsLzaIntent) -> dict[str, Any]:
         "enableDnsHostnames": True,
         "enableDnsSupport": True,
         "instanceTenancy": "default",
-        "routeTables": [],
-        "subnets": [],
-        "natGateways": [],
-        "transitGatewayAttachments": [],
+        "routeTables": _core_route_tables(intent),
+        "subnets": _core_subnets(intent),
+        "natGateways": _core_nat_gateways(intent),
+        "transitGatewayAttachments": _core_tgw_attachments(intent),
         "tags": [],
     }
+
+
+def _core_route_tables(intent: AwsLzaIntent) -> list[dict[str, Any]]:
+    return [{"name": name, "routes": []} for name in intent.core_route_tables if name.strip()]
+
+
+def _core_subnets(intent: AwsLzaIntent) -> list[dict[str, Any]]:
+    route_table = next((name for name in intent.core_route_tables if name.strip()), "")
+    subnets: list[dict[str, Any]] = []
+    for value in intent.core_subnets:
+        if "=" not in value:
+            continue
+        name, raw = value.split("=", 1)
+        cidr, _, az = raw.partition(":")
+        item = {
+            "name": name.strip(),
+            "ipv4CidrBlock": cidr.strip(),
+        }
+        if az.strip():
+            item["availabilityZone"] = az.strip()
+        if route_table:
+            item["routeTable"] = route_table
+        if item["name"] and item["ipv4CidrBlock"]:
+            subnets.append(item)
+    return subnets
+
+
+def _core_nat_gateways(intent: AwsLzaIntent) -> list[dict[str, Any]]:
+    gateways: list[dict[str, Any]] = []
+    for name, subnet in _kv_items(intent.core_nat_gateways).items():
+        gateways.append({"name": name, "subnet": subnet})
+    return gateways
+
+
+def _core_tgw_attachments(intent: AwsLzaIntent) -> list[dict[str, Any]]:
+    if intent.topology != "hub-spoke":
+        return []
+    attachments: list[dict[str, Any]] = []
+    for name, route_table in _kv_items(intent.tgw_attachments).items():
+        attachment = {
+            "name": name,
+            "transitGateway": {
+                "name": "Core",
+                "account": intent.network_account,
+            },
+        }
+        if route_table:
+            attachment["routeTableAssociations"] = [route_table]
+            attachment["routeTablePropagations"] = [route_table]
+        attachments.append(attachment)
+    return attachments
+
+
+def _tgw_route_tables(intent: AwsLzaIntent) -> list[dict[str, Any]]:
+    routes_by_table: dict[str, list[dict[str, Any]]] = {
+        name: [] for name in intent.tgw_route_tables if name.strip()
+    }
+    attachment = next((value.split("=", 1)[0].strip() for value in intent.tgw_attachments), "")
+    for table, cidr in _kv_items(intent.tgw_routes).items():
+        route = {"destinationCidrBlock": cidr}
+        if attachment:
+            route["attachment"] = attachment
+        routes_by_table.setdefault(table, []).append(route)
+    return [
+        {"name": name, "routes": routes} for name, routes in routes_by_table.items() if name.strip()
+    ]
 
 
 def _central_network_services_config(intent: AwsLzaIntent) -> dict[str, Any]:

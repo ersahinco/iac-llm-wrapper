@@ -32,7 +32,7 @@ Ranked recommendations are also persisted in `sample-recommendations.yaml`.
 2. Network owner reviews generated LZA network config against approved CIDR plan.
 3. Security owner reviews logging, Security Hub, GuardDuty, and delegated admin decisions.
 4. Populate customer-specific Identity Center assignments and permission sets; identity owner approves delegated admin.
-5. Release owner replaces placeholder account emails before deployment.
+5. Release owner confirms account emails match the account vending process.
 6. Platform owner populates customer-specific VPC route tables/subnets, TGW attachments, and optional security exports.
 7. Manual gate: approve `decision-report.yaml`, `lineage-manifest.yaml`, and LZA diff.
 8. Run AWS LZA deployment using its documented installer and pipeline.
@@ -49,7 +49,7 @@ Ranked recommendations are also persisted in `sample-recommendations.yaml`.
 ## Dependencies
 
 - AWS Organizations or Control Tower baseline exists before LZA deploy.
-- Account vending/email ownership complete before accounts config deploy.
+- Account vending/email ownership complete before accounts config handoff.
 - Identity Center delegated admin exists before IAM config deploy.
 - Network CIDR/IPAM plan approved before network config deploy.
 

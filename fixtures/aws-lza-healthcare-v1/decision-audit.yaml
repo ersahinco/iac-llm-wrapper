@@ -1,86 +1,118 @@
 auditTrail:
-- timestamp: '2026-05-28T18:09:51.162770+00:00'
+- timestamp: '2026-06-09T12:39:29.377608+00:00'
   key: baseline
   value: healthcare
   how: decided
-- timestamp: '2026-05-28T18:09:51.163122+00:00'
+- timestamp: '2026-06-09T12:39:29.377893+00:00'
   key: org_mode
   value: control-tower
   how: decided
-- timestamp: '2026-05-28T18:09:51.163144+00:00'
+- timestamp: '2026-06-09T12:39:29.377913+00:00'
   key: home_region
   value: eu-central-1
   how: decided
-- timestamp: '2026-05-28T18:09:51.163162+00:00'
+- timestamp: '2026-06-09T12:39:29.377930+00:00'
   key: enabled_regions
   value: eu-central-1
   how: decided
-- timestamp: '2026-05-28T18:09:51.163174+00:00'
+- timestamp: '2026-06-09T12:39:29.377946+00:00'
   key: organizational_units
   value: Security,Infrastructure,Workloads
   how: decided
-- timestamp: '2026-05-28T18:09:51.163184+00:00'
+- timestamp: '2026-06-09T12:39:29.377962+00:00'
   key: workload_accounts
   value: ClinicalProd
   how: decided
-- timestamp: '2026-05-28T18:09:51.163193+00:00'
+- timestamp: '2026-06-09T12:39:29.377976+00:00'
   key: security_tooling_account
   value: SecurityTooling
   how: decided
-- timestamp: '2026-05-28T18:09:51.163202+00:00'
+- timestamp: '2026-06-09T12:39:29.377990+00:00'
   key: network_account
   value: Network
   how: decided
-- timestamp: '2026-05-28T18:09:51.163209+00:00'
+- timestamp: '2026-06-09T12:39:29.378003+00:00'
   key: identity_center_delegated_admin_account
   value: SecurityTooling
   how: decided
-- timestamp: '2026-05-28T18:09:51.163218+00:00'
+- timestamp: '2026-06-09T12:39:29.378016+00:00'
   key: identity_center_permission_sets
   value: ClinicalReadOnly,SecurityAudit
   how: decided
-- timestamp: '2026-05-28T18:09:51.163226+00:00'
+- timestamp: '2026-06-09T12:39:29.378030+00:00'
   key: identity_center_assignments
-  value:
+  value: 
     ClinicalPlatform:ClinicalReadOnly:ClinicalProd,SecurityAuditors:SecurityAudit:Audit
   how: decided
-- timestamp: '2026-05-28T18:09:51.163236+00:00'
+- timestamp: '2026-06-09T12:39:29.378045+00:00'
   key: topology
   value: hub-spoke
   how: decided
-- timestamp: '2026-05-28T18:09:51.163244+00:00'
+- timestamp: '2026-06-09T12:39:29.378057+00:00'
   key: centralized_logging
   value: 'true'
   how: decided
-- timestamp: '2026-05-28T18:09:51.163251+00:00'
+- timestamp: '2026-06-09T12:39:29.378069+00:00'
   key: security_hub_enabled
   value: 'true'
   how: decided
-- timestamp: '2026-05-28T18:09:51.163258+00:00'
+- timestamp: '2026-06-09T12:39:29.378081+00:00'
   key: guardduty_enabled
   value: 'true'
   how: decided
-- timestamp: '2026-05-28T18:09:51.163264+00:00'
+- timestamp: '2026-06-09T12:39:29.378092+00:00'
   key: compliance_overlay
   value: healthcare
   how: decided
-- timestamp: '2026-05-28T18:09:51.163283+00:00'
+- timestamp: '2026-06-09T12:39:29.378127+00:00'
   key: organization_name
   value: ExampleCorp
   how: defaulted
   reason: default value
-- timestamp: '2026-05-28T18:09:51.163296+00:00'
+- timestamp: '2026-06-09T12:39:29.378157+00:00'
   key: audit_account
   value: Audit
   how: defaulted
   reason: default value
-- timestamp: '2026-05-28T18:09:51.163307+00:00'
+- timestamp: '2026-06-09T12:39:29.378185+00:00'
   key: log_archive_account
   value: LogArchive
   how: defaulted
   reason: default value
-- timestamp: '2026-05-28T18:09:51.163315+00:00'
+- timestamp: '2026-06-09T12:39:29.378210+00:00'
+  key: account_emails
+  value: (skipped)
+  how: skipped
+- timestamp: '2026-06-09T12:39:29.378227+00:00'
   key: network_cidr
   value: 10.0.0.0/16
   how: defaulted
   reason: default value
+- timestamp: '2026-06-09T12:39:29.378250+00:00'
+  key: account_emails
+  value: (skipped)
+  how: skipped
+- timestamp: '2026-06-09T12:39:29.378265+00:00'
+  key: core_route_tables
+  value: (skipped)
+  how: skipped
+- timestamp: '2026-06-09T12:39:29.378278+00:00'
+  key: core_subnets
+  value: (skipped)
+  how: skipped
+- timestamp: '2026-06-09T12:39:29.378290+00:00'
+  key: core_nat_gateways
+  value: (skipped)
+  how: skipped
+- timestamp: '2026-06-09T12:39:29.378301+00:00'
+  key: tgw_route_tables
+  value: (skipped)
+  how: skipped
+- timestamp: '2026-06-09T12:39:29.378311+00:00'
+  key: tgw_routes
+  value: (skipped)
+  how: skipped
+- timestamp: '2026-06-09T12:39:29.378318+00:00'
+  key: tgw_attachments
+  value: (skipped)
+  how: skipped

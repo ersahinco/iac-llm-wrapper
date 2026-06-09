@@ -100,16 +100,16 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy, pyr
 
 ### Current Goal
 
-T53: Add plan-ready registered target bundle metadata for AWS LZA
+T54: Prove and tighten AWS LZA plan-ready inputs
 
 ### Status
 
-- **Tests**: 363 passing, 5 skipped
+- **Tests**: 364 passing, 5 skipped
 - **Lint**: clean
 - **Format**: clean
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added a plan-ready vocabulary without execution: successful bundles now distinguish config readiness from plan readiness, AWS LZA emits contract-backed `plan-manifest.yaml` and `replay-manifest.yaml` metadata, blocked compiles persist `missing-inputs.yaml`, and plan-ready targets fail closed on unhandled accepted capability decisions. AWS LZA remains config-ready but plan-blocked when placeholder account emails or unresolved network plan inputs remain. Full pytest, Ruff, Ruff format, mypy, Pyright, and fixture drift check are green in this desktop shell.
+- **Last session**: Committed and pushed the plan-ready metadata baseline, then ran a focused proving pass against realistic AWS LZA packets. Banking and complex enterprise packets are still correctly config-ready but plan-blocked on placeholder emails and unresolved network/TGW inputs. An intentionally almost-plan-ready packet exposed one negated Terragrunt routing false positive and the lack of representable plan inputs; both are fixed. AWS LZA now accepts optional account email, core route table/subnet/NAT, and TGW route/attachment decisions, emits those into LZA config artifacts, and marks `planReady` only when those explicit inputs are present. Full pytest, Ruff, Ruff format, mypy, Pyright, and fixture drift check are green in this desktop shell.
 
 ### Done
 
@@ -147,17 +147,18 @@ T53: Add plan-ready registered target bundle metadata for AWS LZA
 - T51 residual hardening: Generated target artifacts are staged and promoted only after contract validation passes; failed compiles remove known generated/stale artifact files before writing safe blocked assessment artifacts. Partial readiness metadata in standalone `contract-validation.yaml` is blocked, and runtime expression evaluation fails closed on invalid expression shapes.
 - T52 product boundary: Public docs now prefer registered target configuration language over broad IaC generation claims. AWS LZA is documented as the canonical target where validated inputs become LZA YAML/config artifacts for an existing deployment mechanism. Docs guardrail tests prevent accidental claims of direct deployment or whole-IaC-from-scratch generation.
 - T53 plan-ready registered target bundle: AWS LZA now declares plan-ready bundle support as metadata only, emits `plan-manifest.yaml` with immutable inputs, prerequisites, expected plan outputs, manual gates, no-apply boundaries, and unresolved plan blockers, and emits `replay-manifest.yaml` with source, contract, and artifact digests. The generic plan-ready contract validates these artifacts only for registered plan-ready patterns; non-AWS patterns are not forced into premature capability machinery.
+- T54 AWS LZA plan-ready proof: Realistic AWS LZA packets were compiled and their plan manifests inspected; blocker text is useful for config-ready-but-plan-blocked packets. The almost-plan-ready packet now reaches `planReady: ready` with explicit account emails, core VPC route tables/subnets/NAT gateways, TGW route tables/routes, and TGW attachments, while still emitting metadata only and no invocation. Negated "No Terraform root modules, Terragrunt..." boundary language no longer triggers unsupported Terraform generation routing.
 
 ### Next
 
-1. Run real or realistic AWS LZA packets through the new plan manifest and only promote `planReady` once the packet has non-placeholder account emails and enough network detail to support a downstream LZA diff without interpretation.
+1. Run one owner-reviewed AWS LZA packet through the new plan input fields and compare the generated `network-config.yaml` shape against the downstream team's actual LZA validation expectations.
 2. Use diff-aware compile plus `review compare` whenever a long document or sample configuration changes incrementally; review only the delta first, then decide whether a repeated/blocking point deserves implementation.
 3. Continue packet-based requirement harvesting before adding product surface: record only stuck/mistrust/manual-translation moments, and implement only repeated or handoff-blocking requirements.
 4. Stop harness expansion unless real local/Bedrock model runs expose pain.
 5. Run `evaluate-extraction.py --llm`, `evaluate-usability.py --llm`, and `compare-model-benchmarks.py --require-conformant` with approved local/Bedrock models when broader model regression confidence is needed; use result artifacts to decide whether prompts or fixtures need tightening.
 6. If reviewers still struggle to resolve blockers, consider adding lightweight anchors from blocker rows to exported requirement graph nodes without adding JavaScript.
 7. Continue AWS LZA schema depth only where real customer inputs justify it.
-8. Bring Terraform module-composition toward plan-ready only after AWS LZA proves the contract shape with one realistic plan-ready packet.
+8. Bring Terraform module-composition toward plan-ready only after AWS LZA's plan-ready network/account fields survive one owner-reviewed packet.
 9. Next data-modeling increments should add typed entities only where a real
    packet exposes a missed relationship; defer Datalog until constraints become
    deeply inferential or platform-team policy preferences need rule composition.

@@ -118,11 +118,18 @@ targetCapabilities:
         - log_archive_account
         - security_tooling_account
         - network_account
+        - account_emails
         - identity_center_delegated_admin_account
         - identity_center_permission_sets
         - identity_center_assignments
         - topology
         - network_cidr
+        - core_route_tables
+        - core_subnets
+        - core_nat_gateways
+        - tgw_route_tables
+        - tgw_routes
+        - tgw_attachments
         - centralized_logging
         - security_hub_enabled
         - guardduty_enabled
@@ -181,7 +188,7 @@ targetCapabilities:
       dependsOn:
         - aws-lza-sample-config
   coverage:
-    handledDecisionCount: 20
+    handledDecisionCount: 27
     handledDecisions:
       baseline: aws-lza-sample-config
       org_mode: aws-lza-sample-config
@@ -194,11 +201,18 @@ targetCapabilities:
       log_archive_account: aws-lza-sample-config
       security_tooling_account: aws-lza-sample-config
       network_account: aws-lza-sample-config
+      account_emails: aws-lza-sample-config
       identity_center_delegated_admin_account: aws-lza-sample-config
       identity_center_permission_sets: aws-lza-sample-config
       identity_center_assignments: aws-lza-sample-config
       topology: aws-lza-sample-config
       network_cidr: aws-lza-sample-config
+      core_route_tables: aws-lza-sample-config
+      core_subnets: aws-lza-sample-config
+      core_nat_gateways: aws-lza-sample-config
+      tgw_route_tables: aws-lza-sample-config
+      tgw_routes: aws-lza-sample-config
+      tgw_attachments: aws-lza-sample-config
       centralized_logging: aws-lza-sample-config
       security_hub_enabled: aws-lza-sample-config
       guardduty_enabled: aws-lza-sample-config

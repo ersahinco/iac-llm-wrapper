@@ -18,8 +18,8 @@ contextInventory:
       Extract only decisions needed for LZA configuration and handoff; do not
       infer custom Terraform unless explicitly requested.
   requirementGraph:
-    nodeCount: 20
-    edgeCount: 2
+    nodeCount: 27
+    edgeCount: 5
     requirements:
       - key: baseline
         category: accelerator
@@ -145,6 +145,17 @@ contextInventory:
             value: hub-spoke
         blockedIf: {}
         blockedWhen:
+      - key: account_emails
+        category: accounts
+        targetField: account_emails
+        targetType: string_list
+        requiredWhenApplicable: false
+        hasDefault: false
+        dependsOn: []
+        appliesIf: {}
+        appliesWhen:
+        blockedIf: {}
+        blockedWhen:
       - key: identity_center_delegated_admin_account
         category: identity
         targetField: identity_center_delegated_admin_account
@@ -199,6 +210,81 @@ contextInventory:
         dependsOn: []
         appliesIf: {}
         appliesWhen:
+        blockedIf: {}
+        blockedWhen:
+      - key: core_route_tables
+        category: network
+        targetField: core_route_tables
+        targetType: string_list
+        requiredWhenApplicable: false
+        hasDefault: false
+        dependsOn: []
+        appliesIf: {}
+        appliesWhen:
+        blockedIf: {}
+        blockedWhen:
+      - key: core_subnets
+        category: network
+        targetField: core_subnets
+        targetType: string_list
+        requiredWhenApplicable: false
+        hasDefault: false
+        dependsOn: []
+        appliesIf: {}
+        appliesWhen:
+        blockedIf: {}
+        blockedWhen:
+      - key: core_nat_gateways
+        category: network
+        targetField: core_nat_gateways
+        targetType: string_list
+        requiredWhenApplicable: false
+        hasDefault: false
+        dependsOn: []
+        appliesIf: {}
+        appliesWhen:
+        blockedIf: {}
+        blockedWhen:
+      - key: tgw_route_tables
+        category: network
+        targetField: tgw_route_tables
+        targetType: string_list
+        requiredWhenApplicable: false
+        hasDefault: false
+        dependsOn: []
+        appliesIf: {}
+        appliesWhen:
+          equals:
+            decision: topology
+            value: hub-spoke
+        blockedIf: {}
+        blockedWhen:
+      - key: tgw_routes
+        category: network
+        targetField: tgw_routes
+        targetType: string_list
+        requiredWhenApplicable: false
+        hasDefault: false
+        dependsOn: []
+        appliesIf: {}
+        appliesWhen:
+          equals:
+            decision: topology
+            value: hub-spoke
+        blockedIf: {}
+        blockedWhen:
+      - key: tgw_attachments
+        category: network
+        targetField: tgw_attachments
+        targetType: string_list
+        requiredWhenApplicable: false
+        hasDefault: false
+        dependsOn: []
+        appliesIf: {}
+        appliesWhen:
+          equals:
+            decision: topology
+            value: hub-spoke
         blockedIf: {}
         blockedWhen:
       - key: centralized_logging
@@ -321,11 +407,18 @@ contextInventory:
         - log_archive_account
         - security_tooling_account
         - network_account
+        - account_emails
         - identity_center_delegated_admin_account
         - identity_center_permission_sets
         - identity_center_assignments
         - topology
         - network_cidr
+        - core_route_tables
+        - core_subnets
+        - core_nat_gateways
+        - tgw_route_tables
+        - tgw_routes
+        - tgw_attachments
         - centralized_logging
         - security_hub_enabled
         - guardduty_enabled

@@ -360,6 +360,62 @@ class TestAwsLzaPattern:
         assert "- Handoff allowed: `True`" in runbook
         assert "- Handoff ready:" not in runbook
 
+    def test_explicit_plan_inputs_make_lza_bundle_plan_ready(self, tmp_path: Path):
+        decisions = {
+            **STANDARD_HUB_SPOKE_DECISIONS,
+            "organization_name": "PlanReadyBank",
+            "workload_accounts": "PaymentsProd",
+            "network_cidr": "10.90.0.0/16",
+            "compliance_overlay": "financial-services",
+            "account_emails": (
+                "Management=aws-management@planreadybank.example, "
+                "Audit=aws-audit@planreadybank.example, "
+                "LogArchive=aws-log-archive@planreadybank.example, "
+                "SecurityTooling=aws-security@planreadybank.example, "
+                "Network=aws-network@planreadybank.example, "
+                "PaymentsProd=aws-payments-prod@planreadybank.example"
+            ),
+            "core_route_tables": "Core",
+            "core_subnets": (
+                "InspectionA=10.90.0.0/24:eu-central-1a, InspectionB=10.90.1.0/24:eu-central-1b"
+            ),
+            "core_nat_gateways": "NatA=InspectionA, NatB=InspectionB",
+            "tgw_route_tables": "Core",
+            "tgw_routes": "Core=10.90.0.0/16",
+            "tgw_attachments": "CoreVpc=Core",
+        }
+        output = tmp_path / "output"
+        compile_from_interview(decisions, output, pattern="aws-lza")
+
+        yaml = ruamel.yaml.YAML(typ="safe")
+        plan = yaml.load((output / "plan-manifest.yaml").read_text())
+        assert plan["maturity"]["planReady"]["status"] == "ready"
+        assert plan["maturity"]["planReady"]["planAllowed"] is True
+        assert plan["blockers"] == []
+        assert plan["planInvocation"]["mode"] == "metadata-only"
+        assert plan["planInvocation"]["applyAllowed"] is False
+        assert "Release owner confirms account emails" in " ".join(plan["manualGates"])
+
+        accounts = yaml.load((output / "accounts-config.yaml").read_text())
+        account_emails = {
+            account["name"]: account["email"]
+            for group in ("mandatoryAccounts", "workloadAccounts")
+            for account in accounts[group]
+        }
+        assert account_emails["PaymentsProd"] == "aws-payments-prod@planreadybank.example"
+        assert not any(email.endswith("@example.com") for email in account_emails.values())
+
+        network = yaml.load((output / "network-config.yaml").read_text())
+        core_vpc = network["vpcs"][0]
+        assert core_vpc["routeTables"][0]["name"] == "Core"
+        assert core_vpc["subnets"][0]["name"] == "InspectionA"
+        assert core_vpc["natGateways"][0]["subnet"] == "InspectionA"
+        assert core_vpc["transitGatewayAttachments"][0]["name"] == "CoreVpc"
+        assert (
+            network["transitGateways"][0]["routeTables"][0]["routes"][0]["destinationCidrBlock"]
+            == "10.90.0.0/16"
+        )
+
     def test_aws_lza_flags_workload_infrastructure_for_separate_target(
         self,
         tmp_path: Path,
@@ -450,7 +506,7 @@ class TestAwsLzaPattern:
                     "identity_center_assignments: PlatformAdmins:PowerUserAccess:Management",
                     "",
                     "The requested downstream path is AWS LZA handoff only.",
-                    "Do not generate Terraform, Terragrunt, CloudFormation stacks,",
+                    "No Terraform root modules, Terragrunt, CloudFormation stacks,",
                     "or deployment automation from this document.",
                 ]
             )

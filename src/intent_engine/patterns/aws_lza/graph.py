@@ -143,6 +143,20 @@ def build_aws_lza_graph() -> RequirementGraph:
     )
     graph.add(
         Requirement(
+            key="account_emails",
+            target_field="account_emails",
+            target_type="string_list",
+            label="Account Emails",
+            question=(
+                "Which account vending emails are approved? Use Account=email entries "
+                "separated by commas."
+            ),
+            category="accounts",
+            required_when_applicable=False,
+        )
+    )
+    graph.add(
+        Requirement(
             key="identity_center_delegated_admin_account",
             target_field="identity_center_delegated_admin_account",
             target_type="string",
@@ -203,6 +217,84 @@ def build_aws_lza_graph() -> RequirementGraph:
             question="What private CIDR should the landing zone reserve for networking?",
             default="10.0.0.0/16",
             category="network",
+        )
+    )
+    graph.add(
+        Requirement(
+            key="core_route_tables",
+            target_field="core_route_tables",
+            target_type="string_list",
+            label="Core VPC Route Tables",
+            question="Which core VPC route tables are approved? Use comma-separated names.",
+            category="network",
+            required_when_applicable=False,
+        )
+    )
+    graph.add(
+        Requirement(
+            key="core_subnets",
+            target_field="core_subnets",
+            target_type="string_list",
+            label="Core VPC Subnets",
+            question=(
+                "Which core VPC subnets are approved? Use Name=CIDR:AZ entries separated by commas."
+            ),
+            category="network",
+            required_when_applicable=False,
+        )
+    )
+    graph.add(
+        Requirement(
+            key="core_nat_gateways",
+            target_field="core_nat_gateways",
+            target_type="string_list",
+            label="Core NAT Gateways",
+            question=(
+                "Which NAT gateways are approved? Use Name=Subnet entries separated by commas."
+            ),
+            category="network",
+            required_when_applicable=False,
+        )
+    )
+    graph.add(
+        Requirement(
+            key="tgw_route_tables",
+            target_field="tgw_route_tables",
+            target_type="string_list",
+            label="Transit Gateway Route Tables",
+            question="Which TGW route tables are approved? Use comma-separated names.",
+            category="network",
+            applies_when={"equals": {"decision": "topology", "value": "hub-spoke"}},
+            required_when_applicable=False,
+        )
+    )
+    graph.add(
+        Requirement(
+            key="tgw_routes",
+            target_field="tgw_routes",
+            target_type="string_list",
+            label="Transit Gateway Routes",
+            question=(
+                "Which TGW routes are approved? Use RouteTable=CIDR entries separated by commas."
+            ),
+            category="network",
+            applies_when={"equals": {"decision": "topology", "value": "hub-spoke"}},
+            required_when_applicable=False,
+        )
+    )
+    graph.add(
+        Requirement(
+            key="tgw_attachments",
+            target_field="tgw_attachments",
+            target_type="string_list",
+            label="Transit Gateway Attachments",
+            question=(
+                "Which TGW attachments are approved? Use Name=RouteTable entries separated "
+                "by commas."
+            ),
+            category="network",
+            applies_when={"equals": {"decision": "topology", "value": "hub-spoke"}},
+            required_when_applicable=False,
         )
     )
     graph.add(

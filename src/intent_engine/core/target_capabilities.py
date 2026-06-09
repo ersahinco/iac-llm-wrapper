@@ -32,6 +32,7 @@ _ROUTING_ORDER = {
 }
 
 _NEGATED_BEFORE_MARKERS = (
+    "no ",
     "do not",
     "don't",
     "dont",

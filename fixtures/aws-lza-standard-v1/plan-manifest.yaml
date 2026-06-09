@@ -48,7 +48,7 @@ immutableInputs:
   - artifact: iam-config.yaml
     sha256: 4a2d7692e3c6650f02f389ff25f98ca32ebbb1f4b34d799f8f8d4df1fd69f739
   - artifact: network-config.yaml
-    sha256: a5933d60f57fd3a7f1a58093ab5614584cd1b49782595747ad332f1a67e27aa3
+    sha256: 000755dbf0416044054eb1f0862c90b5838086f78b86fb5d1a5d9ea620a7fee0
   - artifact: organization-config.yaml
     sha256: 984a78c1f9c988ceaf24ac68c3de6ec2caed28e336329a37a922b2f8f2d06adc
   - artifact: security-config.yaml

@@ -22,6 +22,7 @@ from .utils import (
     _mandatory_accounts,
     _sample_recommendation_runbook_lines,
     _security_hub_config,
+    _tgw_route_tables,
     _workload_accounts,
     _write_yaml,
 )
@@ -169,7 +170,7 @@ def gen_lza_network_config(intent: Any, output_dir: Path) -> None:
                 "defaultRouteTableAssociation": "disable",
                 "defaultRouteTablePropagation": "disable",
                 "autoAcceptSharingAttachments": "enable",
-                "routeTables": [{"name": "Core", "routes": []}],
+                "routeTables": _tgw_route_tables(intent),
                 "shareTargets": {"organizationalUnits": [_INFRASTRUCTURE_OU, _WORKLOADS_OU]},
                 "tags": [],
             }
@@ -237,7 +238,7 @@ def gen_lza_deployment_runbook(intent: Any, output_dir: Path) -> None:
             "4. Populate customer-specific Identity Center assignments and permission "
             "sets; identity owner approves delegated admin."
         ),
-        "5. Release owner replaces placeholder account emails before deployment.",
+        "5. Release owner confirms account emails match the account vending process.",
         (
             "6. Platform owner populates customer-specific VPC route tables/subnets, "
             "TGW attachments, and optional security exports."
@@ -263,7 +264,7 @@ def gen_lza_deployment_runbook(intent: Any, output_dir: Path) -> None:
         "## Dependencies",
         "",
         "- AWS Organizations or Control Tower baseline exists before LZA deploy.",
-        "- Account vending/email ownership complete before accounts config deploy.",
+        "- Account vending/email ownership complete before accounts config handoff.",
         "- Identity Center delegated admin exists before IAM config deploy.",
         "- Network CIDR/IPAM plan approved before network config deploy.",
         "",
@@ -305,27 +306,54 @@ def _contract_digest() -> str:
 
 
 def _plan_input_blockers(intent: Any) -> list[dict[str, Any]]:
-    blockers = [
-        {
-            "code": "AWS_LZA_PLAN_ACCOUNT_EMAILS_REQUIRED",
-            "message": (
-                "Generated account emails use placeholder example.com addresses; replace "
-                "them with owned account vending emails before a no-interpretation LZA plan."
-            ),
-            "affectedArtifacts": ["accounts-config.yaml"],
-            "owner": "release-owner",
-        },
-        {
-            "code": "AWS_LZA_PLAN_NETWORK_DETAILS_REQUIRED",
-            "message": (
-                "Generated network config still contains empty route tables, subnets, NAT "
-                "gateways, or TGW attachment details that require network-owner review before plan."
-            ),
-            "affectedArtifacts": ["network-config.yaml"],
-            "owner": "network-owner",
-        },
-    ]
+    blockers = []
+    account_names = {
+        "Management",
+        intent.log_archive_account,
+        intent.audit_account,
+        intent.security_tooling_account,
+        *intent.workload_accounts,
+    }
     if intent.topology == "hub-spoke":
+        account_names.add(intent.network_account)
+    email_names = {
+        value.split("=", 1)[0].strip()
+        for value in intent.account_emails
+        if "=" in value and value.split("=", 1)[1].strip()
+    }
+    if not account_names.issubset(email_names):
+        blockers.append(
+            {
+                "code": "AWS_LZA_PLAN_ACCOUNT_EMAILS_REQUIRED",
+                "message": (
+                    "Generated account emails use placeholder example.com addresses; replace "
+                    "them with owned account vending emails before a no-interpretation LZA plan."
+                ),
+                "affectedArtifacts": ["accounts-config.yaml"],
+                "owner": "release-owner",
+            }
+        )
+    if not (
+        intent.core_route_tables
+        and intent.core_subnets
+        and intent.core_nat_gateways
+        and (intent.topology != "hub-spoke" or intent.tgw_attachments)
+    ):
+        blockers.append(
+            {
+                "code": "AWS_LZA_PLAN_NETWORK_DETAILS_REQUIRED",
+                "message": (
+                    "Generated network config still contains empty route tables, subnets, NAT "
+                    "gateways, or TGW attachment details that require network-owner review "
+                    "before plan."
+                ),
+                "affectedArtifacts": ["network-config.yaml"],
+                "owner": "network-owner",
+            }
+        )
+    if intent.topology == "hub-spoke" and not (
+        intent.tgw_route_tables and intent.tgw_routes and intent.tgw_attachments
+    ):
         blockers.append(
             {
                 "code": "AWS_LZA_PLAN_TGW_ROUTES_REQUIRED",
@@ -374,6 +402,12 @@ def gen_lza_plan_manifest(payload: Any, output_dir: Path) -> None:
         if (output_dir / name).exists()
     ]
     plan_readiness = _lza_plan_readiness(intent)
+    blockers = plan_readiness["blockers"]
+    account_gate = (
+        "Replace placeholder account emails with owned addresses."
+        if any(blocker["code"] == "AWS_LZA_PLAN_ACCOUNT_EMAILS_REQUIRED" for blocker in blockers)
+        else "Release owner confirms account emails are owned and ready for account vending."
+    )
     data = {
         "target": {
             "name": "aws-lza",
@@ -421,7 +455,7 @@ def gen_lza_plan_manifest(payload: Any, output_dir: Path) -> None:
             "owner approval record",
         ],
         "manualGates": [
-            "Replace placeholder account emails with owned addresses.",
+            account_gate,
             "Network owner approves route tables, subnets, TGW attachments, and CIDR boundaries.",
             "Security owner approves IAM Identity Center and security service scope.",
             "Release owner confirms plan command/pipeline and rollback owner.",

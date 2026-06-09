@@ -101,11 +101,18 @@ class AwsLzaIntent(BaseModel):
     log_archive_account: str = "LogArchive"
     security_tooling_account: str = "SecurityTooling"
     network_account: str = ""
+    account_emails: list[str] = Field(default_factory=list)
     identity_center_delegated_admin_account: str = "SecurityTooling"
     identity_center_permission_sets: list[str] = Field(default_factory=list)
     identity_center_assignments: list[str] = Field(default_factory=list)
     topology: LzaTopology = LzaTopology.HUB_SPOKE
     network_cidr: str = "10.0.0.0/16"
+    core_route_tables: list[str] = Field(default_factory=list)
+    core_subnets: list[str] = Field(default_factory=list)
+    core_nat_gateways: list[str] = Field(default_factory=list)
+    tgw_route_tables: list[str] = Field(default_factory=list)
+    tgw_routes: list[str] = Field(default_factory=list)
+    tgw_attachments: list[str] = Field(default_factory=list)
     centralized_logging: bool = True
     security_hub_enabled: bool = True
     guardduty_enabled: bool = True

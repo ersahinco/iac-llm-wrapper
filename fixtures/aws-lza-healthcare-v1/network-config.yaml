@@ -15,9 +15,7 @@ transitGateways:
     defaultRouteTableAssociation: disable
     defaultRouteTablePropagation: disable
     autoAcceptSharingAttachments: enable
-    routeTables:
-      - name: Core
-        routes: []
+    routeTables: []
     shareTargets:
       organizationalUnits:
         - Infrastructure
