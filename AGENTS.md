@@ -100,7 +100,7 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy, pyr
 
 ### Current Goal
 
-T54: Prove and tighten AWS LZA plan-ready inputs
+T55: Compare AWS LZA plan-ready network config against downstream expectations
 
 ### Status
 
@@ -109,7 +109,7 @@ T54: Prove and tighten AWS LZA plan-ready inputs
 - **Format**: clean
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Committed and pushed the plan-ready metadata baseline, then ran a focused proving pass against realistic AWS LZA packets. Banking and complex enterprise packets are still correctly config-ready but plan-blocked on placeholder emails and unresolved network/TGW inputs. An intentionally almost-plan-ready packet exposed one negated Terragrunt routing false positive and the lack of representable plan inputs; both are fixed. AWS LZA now accepts optional account email, core route table/subnet/NAT, and TGW route/attachment decisions, emits those into LZA config artifacts, and marks `planReady` only when those explicit inputs are present. Full pytest, Ruff, Ruff format, mypy, Pyright, and fixture drift check are green in this desktop shell.
+- **Last session**: Ran the almost-plan-ready AWS LZA packet through the new plan input fields and compared the generated `network-config.yaml` against the public AWS LZA `network-config.json` schema plus the explicit packet intent. No private owner-reviewed downstream expectation file was present in the repo, so the comparison artifact records that limitation. The comparison exposed two schema-shape issues: TGW VPC attachments need a `subnets` list, and TGW route entries need an attachment target object (`account` + `vpcName`) instead of a plain attachment name. Both generator shapes are fixed; the comparison now passes. Full pytest, Ruff, Ruff format, and fixture drift check are green in this desktop shell.
 
 ### Done
 
@@ -148,10 +148,11 @@ T54: Prove and tighten AWS LZA plan-ready inputs
 - T52 product boundary: Public docs now prefer registered target configuration language over broad IaC generation claims. AWS LZA is documented as the canonical target where validated inputs become LZA YAML/config artifacts for an existing deployment mechanism. Docs guardrail tests prevent accidental claims of direct deployment or whole-IaC-from-scratch generation.
 - T53 plan-ready registered target bundle: AWS LZA now declares plan-ready bundle support as metadata only, emits `plan-manifest.yaml` with immutable inputs, prerequisites, expected plan outputs, manual gates, no-apply boundaries, and unresolved plan blockers, and emits `replay-manifest.yaml` with source, contract, and artifact digests. The generic plan-ready contract validates these artifacts only for registered plan-ready patterns; non-AWS patterns are not forced into premature capability machinery.
 - T54 AWS LZA plan-ready proof: Realistic AWS LZA packets were compiled and their plan manifests inspected; blocker text is useful for config-ready-but-plan-blocked packets. The almost-plan-ready packet now reaches `planReady: ready` with explicit account emails, core VPC route tables/subnets/NAT gateways, TGW route tables/routes, and TGW attachments, while still emitting metadata only and no invocation. Negated "No Terraform root modules, Terragrunt..." boundary language no longer triggers unsupported Terraform generation routing.
+- T55 AWS LZA network schema comparison: The plan-ready trial bundle now passes a local comparison against the public AWS LZA network schema for required top-level keys and generated VPC/TGW plan-input shape. TGW attachments include subnet names, and TGW routes target the Core VPC with an object shape accepted by the LZA schema. The comparison artifact is local under `tests/results/owner-reviewed-lza-plan-check/` and notes that private downstream owner expectations were not available in-repo.
 
 ### Next
 
-1. Run one owner-reviewed AWS LZA packet through the new plan input fields and compare the generated `network-config.yaml` shape against the downstream team's actual LZA validation expectations.
+1. Get one actual downstream-owner expectation file or pipeline validation output and compare it with `tests/results/owner-reviewed-lza-plan-check/network-config-validation-comparison.yaml`; replace the public-schema-only comparison once private expectations are available.
 2. Use diff-aware compile plus `review compare` whenever a long document or sample configuration changes incrementally; review only the delta first, then decide whether a repeated/blocking point deserves implementation.
 3. Continue packet-based requirement harvesting before adding product surface: record only stuck/mistrust/manual-translation moments, and implement only repeated or handoff-blocking requirements.
 4. Stop harness expansion unless real local/Bedrock model runs expose pain.

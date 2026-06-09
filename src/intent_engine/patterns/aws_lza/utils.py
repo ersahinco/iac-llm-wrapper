@@ -305,6 +305,11 @@ def _core_nat_gateways(intent: AwsLzaIntent) -> list[dict[str, Any]]:
 def _core_tgw_attachments(intent: AwsLzaIntent) -> list[dict[str, Any]]:
     if intent.topology != "hub-spoke":
         return []
+    subnet_names = [
+        value.split("=", 1)[0].strip()
+        for value in intent.core_subnets
+        if "=" in value and value.split("=", 1)[0].strip()
+    ]
     attachments: list[dict[str, Any]] = []
     for name, route_table in _kv_items(intent.tgw_attachments).items():
         attachment = {
@@ -313,6 +318,7 @@ def _core_tgw_attachments(intent: AwsLzaIntent) -> list[dict[str, Any]]:
                 "name": "Core",
                 "account": intent.network_account,
             },
+            "subnets": subnet_names,
         }
         if route_table:
             attachment["routeTableAssociations"] = [route_table]
@@ -325,11 +331,13 @@ def _tgw_route_tables(intent: AwsLzaIntent) -> list[dict[str, Any]]:
     routes_by_table: dict[str, list[dict[str, Any]]] = {
         name: [] for name in intent.tgw_route_tables if name.strip()
     }
-    attachment = next((value.split("=", 1)[0].strip() for value in intent.tgw_attachments), "")
     for table, cidr in _kv_items(intent.tgw_routes).items():
         route = {"destinationCidrBlock": cidr}
-        if attachment:
-            route["attachment"] = attachment
+        if intent.tgw_attachments:
+            route["attachment"] = {
+                "account": _primary_vpc_account(intent),
+                "vpcName": "Core",
+            }
         routes_by_table.setdefault(table, []).append(route)
     return [
         {"name": name, "routes": routes} for name, routes in routes_by_table.items() if name.strip()

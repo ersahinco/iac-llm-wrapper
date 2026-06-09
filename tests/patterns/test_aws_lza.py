@@ -411,10 +411,9 @@ class TestAwsLzaPattern:
         assert core_vpc["subnets"][0]["name"] == "InspectionA"
         assert core_vpc["natGateways"][0]["subnet"] == "InspectionA"
         assert core_vpc["transitGatewayAttachments"][0]["name"] == "CoreVpc"
-        assert (
-            network["transitGateways"][0]["routeTables"][0]["routes"][0]["destinationCidrBlock"]
-            == "10.90.0.0/16"
-        )
+        route = network["transitGateways"][0]["routeTables"][0]["routes"][0]
+        assert route["destinationCidrBlock"] == "10.90.0.0/16"
+        assert route["attachment"] == {"account": "Network", "vpcName": "Core"}
 
     def test_aws_lza_flags_workload_infrastructure_for_separate_target(
         self,
