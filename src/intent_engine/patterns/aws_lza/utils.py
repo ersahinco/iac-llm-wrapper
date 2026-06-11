@@ -332,7 +332,7 @@ def _tgw_route_tables(intent: AwsLzaIntent) -> list[dict[str, Any]]:
         name: [] for name in intent.tgw_route_tables if name.strip()
     }
     for table, cidr in _kv_items(intent.tgw_routes).items():
-        route = {"destinationCidrBlock": cidr}
+        route: dict[str, Any] = {"destinationCidrBlock": cidr}
         if intent.tgw_attachments:
             route["attachment"] = {
                 "account": _primary_vpc_account(intent),
