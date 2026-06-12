@@ -53,7 +53,7 @@ def validate_lza_config_bundle(
         for name in AWS_LZA_CONFIG_ARTIFACTS:
             shutil.copy2(bundle_dir / name, staged_config / name)
 
-        command = ["yarn", "validate-config", str(staged_config)]
+        command = _validator_command(staged_config)
         started = datetime.now(UTC)
         start_time = time.monotonic()
         try:
@@ -106,6 +106,14 @@ def _resolve_lza_source_dir(lza_source: Path) -> Path:
     )
 
 
+def _validator_command(staged_config: Path) -> list[str]:
+    if shutil.which("yarn"):
+        return ["yarn", "validate-config", str(staged_config)]
+    if shutil.which("corepack"):
+        return ["corepack", "yarn", "validate-config", str(staged_config)]
+    return ["yarn", "validate-config", str(staged_config)]
+
+
 def _build_evidence(
     *,
     bundle_dir: Path,
@@ -130,6 +138,7 @@ def _build_evidence(
             "noInstall": True,
             "noAwsMutation": True,
             "allowedCommand": "yarn validate-config <staged-config-dir>",
+            "fallbackCommand": "corepack yarn validate-config <staged-config-dir>",
         },
         "input": {
             "bundlePath": str(bundle_dir),

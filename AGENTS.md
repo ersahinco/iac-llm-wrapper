@@ -104,12 +104,12 @@ T62: AWS LZA validation-only evidence adapter
 
 ### Status
 
-- **Tests**: 371 passing, 1 skipped; golden journey passed; fixture drift check passed
+- **Tests**: 372 passing, 1 skipped; golden journey passed; fixture drift check passed
 - **Lint**: clean (`ruff check .`)
 - **Format**: clean (`ruff format --check .`)
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added `iac-llm-wrapper lza validate`, a validation-only AWS LZA config-validator adapter that stages generated LZA config files, runs `yarn validate-config` from a user-supplied local LZA source checkout, and writes `lza-validation-evidence.yaml`. It does not clone, install, synth, deploy, run pipelines, or mutate AWS. Owner validation still requires owner review or downstream acceptance of the evidence.
+- **Last session**: Added `iac-llm-wrapper lza validate`, a validation-only AWS LZA config-validator adapter that stages generated LZA config files, runs `yarn validate-config` or `corepack yarn validate-config` from a user-supplied local LZA source checkout, and writes `lza-validation-evidence.yaml`. It does not clone, install, synth, deploy, run pipelines, or mutate AWS. Owner validation still requires owner review or downstream acceptance of the evidence.
 
 ### Done
 
@@ -155,7 +155,7 @@ T62: AWS LZA validation-only evidence adapter
 - T59 implementation reduction: Added a small shared YAML artifact writer in `core/yaml_utils.py` and removed duplicated YAML dump/write helpers from core generator, compiler artifact writes, AWS LZA helpers, and Kubernetes generators without changing CLI/runtime interfaces or artifact intent.
 - T60 compiler slimming: Extracted incremental baseline parsing to `core/baseline.py`, readiness shaping to `core/readiness.py`, and artifact staging/promotion/contract validation to `core/compile_artifacts.py`. `compiler.py` remains the orchestrator and still exposes the existing public validation helpers for compatibility.
 - T61 LZA ecosystem positioning: Added `docs/LZA_RELATED_WORK_STRATEGY.md` to synthesize AWS LZA Universal Configuration, Luminarlz, Nuvibit NTC, and daily LZA operations into product principles and an ordered backlog. README now frames the tool as pre-flight decision capture and handoff readiness before AWS LZA runs, and CONTRIBUTING rejects related-work-inspired runners, dashboards, plugin loaders, or schema expansion without repeated evidence.
-- T62 LZA validation-only evidence: `iac-llm-wrapper lza validate --bundle <bundle> --lza-source <local-lza-repo-or-source>` runs the official local AWS LZA config validator against staged generated config files and writes `lza-validation-evidence.yaml` with command, exit code, stdout/stderr, package version, optional git commit, and explicit no-deploy/no-synth/no-clone/no-install/no-AWS-mutation guardrails.
+- T62 LZA validation-only evidence: `iac-llm-wrapper lza validate --bundle <bundle> --lza-source <local-lza-repo-or-source>` runs the official local AWS LZA config validator against staged generated config files and writes `lza-validation-evidence.yaml` with command, exit code, stdout/stderr, package version, optional git commit, and explicit no-deploy/no-synth/no-clone/no-install/no-AWS-mutation guardrails. It falls back to Corepack when a direct `yarn` executable is not on PATH.
 
 ### Next
 

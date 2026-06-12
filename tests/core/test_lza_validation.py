@@ -44,6 +44,24 @@ def _fake_yarn(path: Path, *, exit_code: int = 0) -> Path:
     return bin_dir
 
 
+def _fake_corepack(path: Path) -> Path:
+    bin_dir = path / "corepack-bin"
+    bin_dir.mkdir()
+    executable = bin_dir / "corepack"
+    executable.write_text(
+        "#!/bin/sh\n"
+        'test "$1" = "yarn" || exit 9\n'
+        "shift\n"
+        'echo "fake corepack yarn: $@"\n'
+        'case "$*" in\n'
+        "  validate-config*) ;;\n"
+        '  *) echo "unexpected command" >&2; exit 9 ;;\n'
+        "esac\n"
+    )
+    executable.chmod(0o755)
+    return bin_dir
+
+
 def _read_yaml(path: Path) -> dict:
     yaml = ruamel.yaml.YAML(typ="safe")
     return yaml.load(path.read_text())
@@ -70,6 +88,22 @@ def test_validate_lza_config_bundle_writes_validation_only_evidence(
     assert evidence["command"]["exitCode"] == 0
     assert evidence["lzaSource"]["packageVersion"] == "1.2.3"
     assert _read_yaml(evidence_path)["schemaVersion"].endswith("aws-lza-validation-evidence/v1")
+
+
+def test_validate_lza_config_bundle_uses_corepack_when_yarn_is_missing(
+    tmp_path: Path,
+    monkeypatch,
+):
+    bundle = _bundle(tmp_path / "bundle")
+    source = _lza_source(tmp_path / "lza")
+    bin_dir = _fake_corepack(tmp_path)
+    monkeypatch.setenv("PATH", str(bin_dir))
+
+    evidence = validate_lza_config_bundle(bundle_dir=bundle, lza_source=source)
+
+    assert evidence["status"] == "pass"
+    assert evidence["command"]["argv"][0:3] == ["corepack", "yarn", "validate-config"]
+    assert "fake corepack yarn" in evidence["command"]["stdout"]
 
 
 def test_validate_lza_config_bundle_records_failed_validator(
