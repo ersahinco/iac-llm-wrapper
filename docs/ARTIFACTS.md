@@ -20,6 +20,7 @@ Existing deployment mechanisms remain downstream.
 | `target-capability-graph.yaml` | Downstream target coverage, selected target path, manual gates, and unsupported asks represented as semantic facts with evidence spans. | Core + pattern | Patterns with target capability declarations. | No |
 | `handoff-comparison.yaml` | Compact before/after bundle delta for incremental packet or sample updates: readiness, requirement completeness, decisions, blockers, artifacts, model quality, and sample recommendations. | Core review tooling | `iac-llm-wrapper review compare --output`. | No |
 | `handoff-comparison.html` | Static delta review page for what changed, what stayed stable, and what must be reviewed. | Core review tooling | `iac-llm-wrapper review compare --html-output`. | No |
+| `lza-validation-evidence.yaml` | Validation-only AWS LZA config-validator command, source metadata, exit code, and captured stdout/stderr. | AWS LZA validation adapter | `iac-llm-wrapper lza validate`. | No |
 | `battle-summary.yaml` | Battle-test verdict, confidence categories, findings, and improvement items. | Battle harness | `scripts/battle-test.py`. | No |
 | `handoff-review.html` | Static human review page summarizing readiness, contract status, allowed next action, reviewer next actions, blocker traceability, raw LLM coverage, expected weaknesses, graph, evidence, benchmark, contract validation, handoff plan, and target artifacts. | Core review tooling | `iac-llm-wrapper review html`. | No |
 | `requirement-graph.json` | Machine-readable graph export for external viewers and tools. | Core review tooling | `iac-llm-wrapper review html` or `graph export`. | No |
@@ -52,7 +53,9 @@ Existing deployment mechanisms remain downstream.
 ## Boundary
 
 Artifacts may describe a downstream delivery path, but they do not run Terraform,
-CloudFormation, AWS LZA, Kubernetes, pipelines, or cloud APIs. AWS LZA YAML is a
-target configuration artifact consumed by the downstream LZA deployment process.
-A blocked bundle must remain review-only until graph and contract blockers are
-resolved.
+CloudFormation, AWS LZA deploy/synth commands, Kubernetes, pipelines, or cloud
+APIs. The AWS LZA validation adapter may run the official local config validator
+against generated config files and record evidence, but it must not clone,
+install, synth, deploy, or mutate AWS. AWS LZA YAML is a target configuration
+artifact consumed by the downstream LZA deployment process. A blocked bundle must
+remain review-only until graph and contract blockers are resolved.

@@ -17,8 +17,8 @@ graphs, target contracts, validation, and handoff artifacts.
   [docs/LZA_DOWNSTREAM_VALIDATION.md](docs/LZA_DOWNSTREAM_VALIDATION.md).
 - Related-work inspired features must map to owner evidence, decision
   validation, sample alignment, review clarity, or registered-target contract
-  depth. Do not add runners, dashboards, plugin loaders, or broad schema
-  expansion without repeated evidence.
+  depth. Do not add synth/deploy runners, dashboards, plugin loaders, or broad
+  schema expansion without repeated evidence.
 
 ## Repo Map
 

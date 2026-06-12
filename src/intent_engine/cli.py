@@ -38,6 +38,10 @@ from .core.extractor import Extractor
 from .core.graph_export import graph_to_json, graph_to_mermaid
 from .core.interview import InterviewEngine
 from .core.llm_caller import LLMEvidenceStore, auto_detect_llm
+from .core.lza_validation import (
+    LzaValidationError,
+    validate_lza_config_bundle,
+)
 from .core.markdown_extractor import extract_from_markdown
 from .core.pattern_check import check_pattern
 from .core.patterns import GLOBAL_REGISTRY, Pattern
@@ -58,6 +62,8 @@ graph_app = typer.Typer(help="Inspect and export requirement graphs")
 app.add_typer(graph_app, name="graph")
 pattern_app = typer.Typer(help="Inspect and validate registered patterns")
 app.add_typer(pattern_app, name="pattern")
+lza_app = typer.Typer(help="AWS LZA validation-only evidence helpers")
+app.add_typer(lza_app, name="lza")
 
 DEFAULT_PATTERN = "aws-lza"
 
@@ -327,6 +333,53 @@ def pattern_check(
     typer.echo(f"  Expected artifacts: {result.expected_artifacts}")
     typer.echo(f"  Samples: {result.samples}")
     typer.echo(f"  Context rules: {result.context_rules}")
+
+
+@lza_app.command("validate")
+def lza_validate(
+    bundle: Path = typer.Option(
+        ...,
+        "--bundle",
+        "-b",
+        help="Generated AWS LZA handoff bundle containing LZA config YAML files",
+    ),
+    lza_source: Path = typer.Option(
+        ...,
+        "--lza-source",
+        help=(
+            "Local AWS LZA repository root or source directory. The command does not "
+            "clone, install, synth, deploy, or mutate AWS."
+        ),
+    ),
+    output: Path = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Evidence YAML path. Defaults to <bundle>/lza-validation-evidence.yaml",
+    ),
+) -> None:
+    """Run the official AWS LZA config validator and write evidence only."""
+    try:
+        evidence = validate_lza_config_bundle(
+            bundle_dir=bundle,
+            lza_source=lza_source,
+            output=output,
+        )
+    except LzaValidationError as exc:
+        typer.echo(str(exc), err=True)
+        if exc.evidence:
+            evidence_path = output or bundle / "lza-validation-evidence.yaml"
+            typer.echo(f"Validation evidence written to: {evidence_path}", err=True)
+            typer.echo(
+                f"Exit code: {exc.evidence['command']['exitCode']}",
+                err=True,
+            )
+        raise typer.Exit(1) from None
+
+    evidence_path = output or bundle / "lza-validation-evidence.yaml"
+    typer.echo("AWS LZA config validation passed.")
+    typer.echo(f"Validation evidence written to: {evidence_path}")
+    typer.echo(f"Command: {' '.join(evidence['command']['argv'])}")
 
 
 @app.command()

@@ -2,7 +2,8 @@
 
 Owner-facing packet for generated AWS LZA `network-config.yaml`. Do not claim
 owner validation until this checklist, exact validation command output, pipeline
-output, or schema/error output exists.
+output, schema/error output, or `lza-validation-evidence.yaml` reviewed by the
+downstream owner exists.
 
 ## Packet To Send
 
@@ -11,6 +12,7 @@ output, or schema/error output exists.
 - `lineage-manifest.yaml`
 - `handoff-plan.yaml`
 - `plan-manifest.yaml` when present
+- `lza-validation-evidence.yaml` when local validation has been run
 - this checklist
 
 Ask only whether `network-config.yaml` can enter the current AWS LZA validation
@@ -100,9 +102,11 @@ Answer:
 ## What Not To Do
 
 - Do not infer owner validation from local YAML shape inspection.
-- Do not mark plan readiness as owner-validated without the completed checklist
-  or real command/schema/pipeline output.
-- Do not add an LZA command runner until the owner provides the exact command and
-  running it here becomes a deliberate product decision.
+- Do not mark plan readiness as owner-validated without the completed checklist,
+  real command/schema/pipeline output, or owner-reviewed
+  `lza-validation-evidence.yaml`.
+- Do not run LZA synth, deploy, pipeline stages, cloud APIs, clone, or install
+  steps from this project. `iac-llm-wrapper lza validate` is validation-only and
+  requires an already-prepared local AWS LZA source checkout.
 - Do not broaden AWS LZA schema depth unless the checklist exposes a real
   handoff blocker.

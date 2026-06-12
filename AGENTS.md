@@ -100,16 +100,16 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy, pyr
 
 ### Current Goal
 
-T61: LZA ecosystem positioning without new product surface
+T62: AWS LZA validation-only evidence adapter
 
 ### Status
 
-- **Tests**: 368 passing, 1 skipped; golden journey passed; fixture drift check passed
+- **Tests**: 371 passing, 1 skipped; golden journey passed; fixture drift check passed
 - **Lint**: clean (`ruff check .`)
 - **Format**: clean (`ruff format --check .`)
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added compact LZA related-work strategy and backlog, tightened README positioning around pre-flight decision capture before AWS LZA runs, and added a contributor guardrail for related-work-inspired features. No CLI, artifact contract, schema, or runtime behavior changed. Owner validation still requires a completed checklist, real downstream command output, pipeline output, or schema/error output.
+- **Last session**: Added `iac-llm-wrapper lza validate`, a validation-only AWS LZA config-validator adapter that stages generated LZA config files, runs `yarn validate-config` from a user-supplied local LZA source checkout, and writes `lza-validation-evidence.yaml`. It does not clone, install, synth, deploy, run pipelines, or mutate AWS. Owner validation still requires owner review or downstream acceptance of the evidence.
 
 ### Done
 
@@ -155,10 +155,11 @@ T61: LZA ecosystem positioning without new product surface
 - T59 implementation reduction: Added a small shared YAML artifact writer in `core/yaml_utils.py` and removed duplicated YAML dump/write helpers from core generator, compiler artifact writes, AWS LZA helpers, and Kubernetes generators without changing CLI/runtime interfaces or artifact intent.
 - T60 compiler slimming: Extracted incremental baseline parsing to `core/baseline.py`, readiness shaping to `core/readiness.py`, and artifact staging/promotion/contract validation to `core/compile_artifacts.py`. `compiler.py` remains the orchestrator and still exposes the existing public validation helpers for compatibility.
 - T61 LZA ecosystem positioning: Added `docs/LZA_RELATED_WORK_STRATEGY.md` to synthesize AWS LZA Universal Configuration, Luminarlz, Nuvibit NTC, and daily LZA operations into product principles and an ordered backlog. README now frames the tool as pre-flight decision capture and handoff readiness before AWS LZA runs, and CONTRIBUTING rejects related-work-inspired runners, dashboards, plugin loaders, or schema expansion without repeated evidence.
+- T62 LZA validation-only evidence: `iac-llm-wrapper lza validate --bundle <bundle> --lza-source <local-lza-repo-or-source>` runs the official local AWS LZA config validator against staged generated config files and writes `lza-validation-evidence.yaml` with command, exit code, stdout/stderr, package version, optional git commit, and explicit no-deploy/no-synth/no-clone/no-install/no-AWS-mutation guardrails.
 
 ### Next
 
-1. Send `docs/LZA_DOWNSTREAM_VALIDATION.md` with a generated `network-config.yaml` packet to the downstream owner and capture the completed checklist before claiming owner validation.
+1. Run `iac-llm-wrapper lza validate` against a real local AWS LZA source checkout when available, include `lza-validation-evidence.yaml` with the owner packet, and capture owner acceptance before claiming downstream validation.
 2. Use diff-aware compile plus `review compare` whenever a long document or sample configuration changes incrementally; review only the delta first, then decide whether a repeated/blocking point deserves implementation.
 3. Continue packet-based requirement harvesting before adding product surface: record only stuck/mistrust/manual-translation moments, and implement only repeated or handoff-blocking requirements.
 4. Stop harness expansion unless real local/Bedrock model runs expose pain.

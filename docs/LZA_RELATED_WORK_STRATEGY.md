@@ -30,9 +30,9 @@ NTC, or deployment pipelines.
 
 ## What We Do Not Copy
 
-- No LZA runner, Core CLI wrapper, repository clone manager, or deployment path
-  without a real owner-provided validation command and a deliberate product
-  decision.
+- No LZA synth/deploy runner, Core CLI deployment wrapper, repository clone
+  manager, or deployment path. A validation-only adapter may run the official
+  local config validator and record evidence.
 - No dashboard, broad plugin loader, or generic platform portal until repeated
   usage evidence shows review artifacts are insufficient.
 - No broad AWS LZA schema expansion from curiosity. Add schema depth only when a
@@ -47,15 +47,15 @@ NTC, or deployment pipelines.
    generated `network-config.yaml` and capture a completed checklist, exact LZA
    command output, pipeline output, or schema/error output before claiming owner
    validation.
-2. **Version and sample awareness, not execution**: surface the LZA
-   baseline/sample source used by generated bundles when known. Do not invoke LZA
-   Core CLI or clone LZA repositories.
-3. **Daily-ops review language**: improve static review guidance around update
+2. **Validation-only evidence**: run the official local LZA config validator
+   against generated config files when the user supplies an existing LZA source
+   checkout and development toolchain. Record command output as evidence only.
+3. **Version and sample awareness, not execution**: surface the LZA
+   baseline/sample source used by generated bundles when known. Do not clone LZA
+   repositories, install dependencies, synthesize, deploy, or run pipelines.
+4. **Daily-ops review language**: improve static review guidance around update
    drift, pipeline failure ownership, account lifecycle, and config sections
    requiring owner review.
-4. **Optional validation adapter after evidence**: if a downstream owner provides
-   a stable validation command, plan a separate opt-in adapter that records
-   evidence only and never applies changes.
 
 ## Source Threads
 

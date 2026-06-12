@@ -84,6 +84,19 @@ For Bedrock/OpenAI options and model-quality workflows, see
 | Check shared terminology | [docs/GLOSSARY.md](docs/GLOSSARY.md) |
 | Visualize graphs and results | [docs/DEVELOPER_VISUALS.md](docs/DEVELOPER_VISUALS.md) |
 
+AWS LZA users with a local LZA checkout and installed development toolchain can
+also run validation-only evidence capture:
+
+```bash
+iac-llm-wrapper lza validate \
+  --bundle out/engineer-handoff-lza \
+  --lza-source /path/to/landing-zone-accelerator-on-aws
+```
+
+This runs only the official LZA config validator and writes
+`lza-validation-evidence.yaml`; it does not synth, deploy, clone, install, or
+call AWS APIs.
+
 ## Patterns
 
 Patterns define questions, defaults, contracts, validators, and output files.
