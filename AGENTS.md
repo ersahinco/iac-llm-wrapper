@@ -100,16 +100,16 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy, pyr
 
 ### Current Goal
 
-T56: Simplify AWS LZA validation follow-up record
+T59: Less docs and less duplicated implementation
 
 ### Status
 
-- **Tests**: 364 passing, 5 skipped
-- **Lint**: clean
-- **Format**: clean
+- **Tests**: 368 passing, 1 skipped; golden journey passed; fixture drift check passed
+- **Lint**: clean (`ruff check .`)
+- **Format**: clean (`ruff format --check .`)
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Public schema comparison revealed generator fixes. Unverified local evidence was removed. Owner validation still requires a real downstream command, pipeline output, or checklist.
+- **Last session**: README stayed minimal, contributor mechanics live in `CONTRIBUTING.md`, the only new doc is the AWS LZA downstream-owner checklist, and duplicate artifact YAML writer logic was centralized. Owner validation still requires a completed checklist, real downstream command output, pipeline output, or schema/error output.
 
 ### Done
 
@@ -150,10 +150,13 @@ T56: Simplify AWS LZA validation follow-up record
 - T54 AWS LZA plan-ready proof: Realistic AWS LZA packets were compiled and their plan manifests inspected; blocker text is useful for config-ready-but-plan-blocked packets. The almost-plan-ready packet now reaches `planReady: ready` with explicit account emails, core VPC route tables/subnets/NAT gateways, TGW route tables/routes, and TGW attachments, while still emitting metadata only and no invocation. Negated "No Terraform root modules, Terragrunt..." boundary language no longer triggers unsupported Terraform generation routing.
 - T55 AWS LZA network schema comparison: Public schema comparison revealed generator fixes. Owner validation still requires a real downstream command, pipeline output, or checklist.
 - T56 validation evidence cleanup: Unverified local evidence was removed. Do not claim owner validation without an actual downstream validation signal or deliberate product artifact.
+- T57 contributor onboarding and LZA validation packet: README was shortened into a front door and the LZA validation checklist was introduced as the first owner evidence target.
+- T58 less-docs refinement: Removed the separate contributor onboarding doc and merged its unique value into `CONTRIBUTING.md`: repo map, tracked-vs-generated rule, change matrix, anti-slop doc rule, and real-owner-evidence rule. README no longer carries repo layout or quality gate detail. The only new doc left is `docs/LZA_DOWNSTREAM_VALIDATION.md`, kept as a checklist-first owner packet.
+- T59 implementation reduction: Added a small shared YAML artifact writer in `core/yaml_utils.py` and removed duplicated YAML dump/write helpers from core generator, compiler artifact writes, AWS LZA helpers, and Kubernetes generators without changing CLI/runtime interfaces or artifact intent.
 
 ### Next
 
-1. Get actual downstream owner validation signal before claiming owner validation.
+1. Send `docs/LZA_DOWNSTREAM_VALIDATION.md` with a generated `network-config.yaml` packet to the downstream owner and capture the completed checklist before claiming owner validation.
 2. Use diff-aware compile plus `review compare` whenever a long document or sample configuration changes incrementally; review only the delta first, then decide whether a repeated/blocking point deserves implementation.
 3. Continue packet-based requirement harvesting before adding product surface: record only stuck/mistrust/manual-translation moments, and implement only repeated or handoff-blocking requirements.
 4. Stop harness expansion unless real local/Bedrock model runs expose pain.

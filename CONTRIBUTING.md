@@ -4,64 +4,72 @@ Thanks for considering contributing to `iac-llm-wrapper`, the intent-to-IaC
 orchestration framework. `intent-engine` is the core that owns requirement
 graphs, target contracts, validation, and handoff artifacts.
 
-## How to contribute
+## First Principles
 
-1. **Fork the repo** and create a feature branch from `main`.
-2. **Write tests** for your changes.
-3. **Run quality gates** before committing:
+- Core code is generic and lives under `src/intent_engine/core/`.
+- Target-specific behavior lives under `src/intent_engine/patterns/`.
+- LLM output is evidence. Graphs, validators, contracts, and artifact checks
+  decide acceptance.
+- New docs need a distinct audience or durable workflow. Prefer improving or
+  deleting existing docs over adding a new file.
+- Readiness claims need tests, contracts, or real owner evidence. For AWS LZA
+  downstream-readiness claims, use
+  [docs/LZA_DOWNSTREAM_VALIDATION.md](docs/LZA_DOWNSTREAM_VALIDATION.md).
+
+## Repo Map
+
+```text
+src/intent_engine/core/       # Generic graph, extraction, validation, contracts, artifacts
+src/intent_engine/patterns/   # Pattern-owned models, graphs, validators, generators, samples
+scripts/                      # Evals, fixture sync, benchmark comparison, dev views
+fixtures/                     # Checked-in sample bundles and authored trial inputs
+tests/                        # Unit, integration, pattern, CLI, and product-language tests
+tests/results/                # Ignored local evidence; only .gitkeep is tracked
+docs/                         # Reference docs and owner-facing checklists
+```
+
+`fixtures/` are checked-in product examples. `tests/results/` and `out/` are
+local evidence. Do not cite local output as owner validation unless a real
+downstream owner, command, pipeline, or schema result produced it.
+
+## Change Matrix
+
+| Change | Start here | Usual checks |
+| --- | --- | --- |
+| Docs only | `README.md`, `docs/`, product-language tests | `uv run pytest tests/core/test_product_language.py`, `uv run ruff format --check .`, `uv run ruff check .` |
+| AWS LZA field or validation | `src/intent_engine/patterns/aws_lza/` | Pattern tests, golden journey, fixture drift |
+| Generic graph or validation behavior | `src/intent_engine/core/requirements.py`, `validator.py`, `compiler.py` | Core tests, pattern tests, extraction/usability evals |
+| Artifact shape | `contracts.py`, `generator.py`, pattern generators | Contract tests, fixture drift, golden journey |
+| Prompt/model behavior | Pattern `prompt_context`, extractor, eval fixtures | Deterministic evals plus LLM-backed evals from `docs/LLM_SETUP.md` |
+| New pattern | `docs/PATTERN_AUTHORING.md`, `docs/EXTENSION.md` | Pattern check, compile test, fixture/eval coverage |
+
+## Local Setup
 
 ```bash
 uv venv
 source .venv/bin/activate
 uv pip install -e ".[dev,llm]"
 uv run pytest
+```
+
+## Full Gate
+
+```bash
+uv run pytest
 uv run ruff check .
 uv run ruff format --check .
 uv run --extra dev mypy
+uv run --extra dev pyright .
 uv run python scripts/sync-sample-fixtures.py --check
+uv run python scripts/evaluate-golden-journey.py
 uv run python scripts/evaluate-extraction.py
 uv run python scripts/evaluate-usability.py
 uv run pre-commit run --all-files
 ```
 
-CI also runs coverage, dependency audit, static security scan, and SBOM generation:
-
-```bash
-uv run pytest --cov=src/intent_engine --cov-fail-under=80
-uv run pip-audit --skip-editable
-uv run bandit -c bandit.yaml -r src -q -ll
-```
-
-4. **Test extraction quality** (mandatory for extraction changes):
-
-This project is **LLM-assisted and deterministic-first for acceptance**. The LLM
-extracts candidate decisions from prose. The deterministic harness decides what
-is acceptable. The fallback path (graph defaults plus structured Markdown
-recovery) is not sufficient for real narrative design documents. Every change
-that affects extraction, patterns, or prompts must be validated with an LLM:
-
-Use deterministic evals for fixture drift and LLM-backed evals when validating
-prompt/model behavior:
-
-```bash
-uv run python scripts/evaluate-extraction.py
-uv run python scripts/evaluate-usability.py
-uv run python scripts/evaluate-extraction.py --llm --provider ollama --model qwen2.5:7b
-uv run python scripts/evaluate-usability.py --llm --provider ollama --model qwen2.5:7b
-```
-
-The deterministic fallback (`INTENT_ENGINE_DISABLE_LLM=1`) exists for unit tests
-and CI bootstrapping only. It applies defaults and does keyword matching; it
-cannot parse free-form prose. Do not treat it as a production extraction path.
-
-5. **Open a pull request** describing the problem and solution.
-
-## Extension guide
-
-Use [docs/GLOSSARY.md](docs/GLOSSARY.md) for shared project language. Use
-[docs/PATTERN_AUTHORING.md](docs/PATTERN_AUTHORING.md) as the checklist for
-adding or changing a pattern. See [docs/EXTENSION.md](docs/EXTENSION.md) for the
-exact API contract for new target patterns and requirements.
+For small changes, run the smallest relevant subset from the change matrix.
+Extraction, pattern, or prompt changes should also use the LLM-backed workflows
+in [docs/LLM_SETUP.md](docs/LLM_SETUP.md) when model behavior matters.
 
 ## Code conventions
 
@@ -72,41 +80,13 @@ exact API contract for new target patterns and requirements.
   not deployable infrastructure from prose. Future pattern-owned execution paths
   must run behind graph, contract, gate, evidence, and rollback checks.
 
-## Getting started
+## PR Checklist
 
-```bash
-# Clone
-git clone https://github.com/ersahinco/iac-llm-wrapper
-cd iac-llm-wrapper
-
-# Set up virtualenv
-uv venv
-source .venv/bin/activate
-
-# Install with dev + LLM dependencies
-uv pip install -e ".[dev,llm]"
-
-# Run tests
-uv run pytest
-
-# Optional: install pre-commit hooks
-uv run pre-commit install
-```
-
-## Required checks on `main`
-
-PRs should pass all CI jobs:
-
-- `lint` (ruff, format, type check, fixture drift check)
-- `test` (multi-version tests with coverage threshold)
-- `security` (`pip-audit`, `bandit`, SBOM generation)
-- `pre-commit` (optional but recommended - lower friction for reviewers)
-
-Branch protection should enforce:
-
-- Required review from `CODEOWNERS` for core framework changes.
-- No direct pushes to `main` — all changes through PR.
-- Required status checks (`lint`, `test`, `security`) must pass before merge.
+- State the user or reviewer problem first.
+- Name the pattern or core subsystem touched.
+- Explain whether artifact shape changed.
+- Include the smallest relevant command output.
+- Attach real AWS LZA owner evidence before claiming downstream validation.
 
 ## Code of conduct
 

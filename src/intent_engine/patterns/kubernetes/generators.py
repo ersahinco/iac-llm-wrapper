@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from io import StringIO
 from pathlib import Path
 from typing import Any
 
-import ruamel.yaml
+from intent_engine.core.yaml_utils import write_yaml_artifact
 
 from .models import K8sIntent
 
@@ -19,14 +18,7 @@ def _k8s_intent(payload: Any) -> K8sIntent | None:
 
 
 def _write_yaml(output_dir: Path, name: str, data: dict[str, Any]) -> None:
-    yaml = ruamel.yaml.YAML()
-    yaml.default_flow_style = False
-    yaml.indent(mapping=2, sequence=4, offset=2)
-    buf = StringIO()
-    yaml.dump(data, buf)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    rendered = "\n".join(line.rstrip() for line in buf.getvalue().splitlines()) + "\n"
-    (output_dir / name).write_text(rendered)
+    write_yaml_artifact(output_dir / name, data, header="")
 
 
 def gen_cluster_config(intent: Any, output_dir: Path) -> None:
