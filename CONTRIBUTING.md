@@ -15,6 +15,10 @@ graphs, target contracts, validation, and handoff artifacts.
 - Readiness claims need tests, contracts, or real owner evidence. For AWS LZA
   downstream-readiness claims, use
   [docs/LZA_DOWNSTREAM_VALIDATION.md](docs/LZA_DOWNSTREAM_VALIDATION.md).
+- Related-work inspired features must map to owner evidence, decision
+  validation, sample alignment, review clarity, or registered-target contract
+  depth. Do not add runners, dashboards, plugin loaders, or broad schema
+  expansion without repeated evidence.
 
 ## Repo Map
 

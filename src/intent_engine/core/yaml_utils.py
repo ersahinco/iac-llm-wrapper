@@ -9,15 +9,24 @@ from typing import Any
 import ruamel.yaml
 
 
-def dump_yaml(data: Any) -> str:
+def dump_yaml(data: Any, *, indent: bool = True) -> str:
     yaml = ruamel.yaml.YAML()
     yaml.default_flow_style = False
-    yaml.indent(mapping=2, sequence=4, offset=2)
+    if indent:
+        yaml.indent(mapping=2, sequence=4, offset=2)
     buf = StringIO()
     yaml.dump(data, buf)
     return "\n".join(line.rstrip() for line in buf.getvalue().splitlines()) + "\n"
 
 
-def write_yaml_artifact(path: Path, data: Any, header: str) -> None:
+def write_yaml_artifact(path: Path, data: Any, header: str, *, indent: bool = True) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(header + dump_yaml(data))
+    path.write_text(header + dump_yaml(data, indent=indent))
+
+
+def read_yaml_mapping(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    yaml = ruamel.yaml.YAML(typ="safe")
+    data = yaml.load(path.read_text())
+    return data if isinstance(data, dict) else {}

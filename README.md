@@ -2,10 +2,10 @@
 
 **Architect exchange to registered target configuration.**
 
-Architects write messy design docs. `iac-llm-wrapper` extracts structured
-decisions, checks them against requirement graphs and target contracts, and emits
-traceable target configuration artifacts for engineers and existing deployment
-mechanisms.
+Architects write messy design docs. `iac-llm-wrapper` is a pre-flight decision
+capture and handoff-readiness layer: it extracts structured decisions, checks
+them against requirement graphs and target contracts, and emits traceable target
+configuration artifacts for engineers and existing deployment mechanisms.
 
 The repository and package are named `iac-llm-wrapper`. The core is
 **intent-engine**. Today it wraps LLM extraction with deterministic decision
@@ -14,9 +14,9 @@ deployment, dashboards, and cloud changes stay downstream; the tool can say when
 a bundle is ready for an existing deployment mechanism, but it does not invoke
 that mechanism. It also does not generate whole IaC from scratch.
 
-AWS Landing Zone Accelerator is the reference path: collected and validated
-inputs become LZA YAML/config files consumed by the downstream LZA deployment
-process.
+AWS Landing Zone Accelerator is the reference path and downstream authority:
+collected and validated inputs become LZA YAML/config files consumed by the
+owner-controlled LZA validation and deployment process.
 
 ## Core Flow
 
@@ -38,6 +38,8 @@ flowchart TD
 LLMs help read intent. Human-owned models, requirement graphs, contracts,
 validators, lineage, runbooks, and evals decide what is acceptable. Existing
 accelerators, modules, and provisioning pipelines remain the delivery layer.
+This project is not an LZA replacement, LZA CLI wrapper, Terraform/NTC
+alternative, or deployment pipeline.
 
 ## Five-Minute Local Run
 
@@ -77,6 +79,7 @@ For Bedrock/OpenAI options and model-quality workflows, see
 | Add or change a pattern | [docs/PATTERN_AUTHORING.md](docs/PATTERN_AUTHORING.md) and [docs/EXTENSION.md](docs/EXTENSION.md) |
 | Keep LLM context reviewable | [docs/CONTEXT_AS_CODE.md](docs/CONTEXT_AS_CODE.md) |
 | Tune or compare LLMs | [docs/LLM_SETUP.md](docs/LLM_SETUP.md) |
+| Understand LZA ecosystem positioning | [docs/LZA_RELATED_WORK_STRATEGY.md](docs/LZA_RELATED_WORK_STRATEGY.md) |
 | Give downstream AWS LZA feedback | [docs/LZA_DOWNSTREAM_VALIDATION.md](docs/LZA_DOWNSTREAM_VALIDATION.md) |
 | Check shared terminology | [docs/GLOSSARY.md](docs/GLOSSARY.md) |
 | Visualize graphs and results | [docs/DEVELOPER_VISUALS.md](docs/DEVELOPER_VISUALS.md) |
