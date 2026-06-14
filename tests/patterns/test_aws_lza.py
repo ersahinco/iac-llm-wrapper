@@ -156,6 +156,7 @@ class TestAwsLzaPattern:
         workload_names = {account["name"] for account in accounts["workloadAccounts"]}
         assert {"Management", "Audit", "LogArchive"} <= mandatory_names
         assert {"SecurityTooling", "Network", "Dev", "Prod"} <= workload_names
+        assert accounts["mandatoryAccounts"][0]["organizationalUnit"] == "Root"
         assert all("@" in account["email"] for account in accounts["mandatoryAccounts"])
 
         iam = yaml.load((output / "iam-config.yaml").read_text())
@@ -181,7 +182,10 @@ class TestAwsLzaPattern:
             "centralizeBuckets": True,
             "useManagementAccessRole": True,
         }
-        assert global_config["snsTopics"] == []
+        assert global_config["snsTopics"] == {
+            "deploymentTargets": {"organizationalUnits": ["Root"]},
+            "topics": [],
+        }
         assert global_config["tags"] == []
         assert global_config["logging"]["centralizedLoggingRegion"] == "eu-central-1"
         assert global_config["logging"]["centralLogBucket"] == {"lifecycleRules": []}
@@ -211,7 +215,7 @@ class TestAwsLzaPattern:
         assert network["transitGateways"][0]["tags"] == []
 
         security = yaml.load((output / "security-config.yaml").read_text())
-        assert security["centralSecurityServices"]["delegatedAdminAccount"] == "SecurityTooling"
+        assert security["centralSecurityServices"]["delegatedAdminAccount"] == "Audit"
         assert security["centralSecurityServices"]["ebsDefaultVolumeEncryption"] == {
             "enable": True,
             "excludeRegions": [],
@@ -220,10 +224,7 @@ class TestAwsLzaPattern:
             "enable": True,
             "excludeAccounts": [],
         }
-        assert security["centralSecurityServices"]["scpRevertChangesConfig"] == {
-            "enable": True,
-            "snsTopicName": "Security",
-        }
+        assert security["centralSecurityServices"]["scpRevertChangesConfig"] == {"enable": True}
         assert security["centralSecurityServices"]["macie"] == {
             "enable": False,
             "excludeRegions": [],
@@ -249,8 +250,6 @@ class TestAwsLzaPattern:
         assert security["centralSecurityServices"]["snsSubscriptions"] == []
         assert security["centralSecurityServices"]["securityHub"]["autoEnableOrgMembers"] is True
         assert security["centralSecurityServices"]["securityHub"]["regionAggregation"] is True
-        assert security["centralSecurityServices"]["securityHub"]["snsTopicName"] == "Security"
-        assert security["centralSecurityServices"]["securityHub"]["notificationLevel"] == "HIGH"
         assert security["centralSecurityServices"]["securityHub"]["excludeRegions"] == []
         assert security["centralSecurityServices"]["securityHub"]["standards"][0][
             "deploymentTargets"

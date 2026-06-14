@@ -100,7 +100,7 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy, pyr
 
 ### Current Goal
 
-T66: Real AWS LZA validation evidence
+T67: Evidence traceability hardening
 
 ### Status
 
@@ -109,7 +109,7 @@ T66: Real AWS LZA validation evidence
 - **Format**: clean (`ruff format --check .`)
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added the canonical evidence-first T66-T71 roadmap to keep broader improvement work tracked as independently finishable slices. No public API, CLI, schema, artifact, or runtime behavior changed.
+- **Last session**: Completed the T66 local toolchain evidence slice. A fresh customer-packet AWS LZA bundle was generated at `tests/results/t66-lza-validation` and validated against local AWS LZA source version `1.15.0`; the first official validator run exposed schema compatibility issues, which were fixed without adding deploy/synth behavior. The rerun reaches official config validation without parse errors and remains failed only on placeholder account email plus an AWS account lookup `AccessDeniedException`. Do not claim downstream validation yet.
 
 ### Done
 
@@ -159,18 +159,20 @@ T66: Real AWS LZA validation evidence
 - T63 AI-generated code cleanup: Recent LZA validation adapter code was reviewed for unnecessary comments, over-defensive internal checks, and avoidable duplication. The resulting change stayed deliberately small: centralize the evidence filename usage and keep safety checks only where they guard user input, local toolchain discovery, subprocess execution, malformed package metadata, and evidence capture.
 - T64 project-wide AI slop cleanup: Consolidated remaining obvious YAML writer duplication into `core.yaml_utils` where semantics matched, trimmed restating comments in discovery/model introspection, and kept defensive code at filesystem, subprocess, parser, model, LLM, and downstream validation boundaries.
 - T65 review remediation: Full-bundle AWS LZA owner packet wording replaced network-only validation language; LZA validation evidence now records SHA256s for each config artifact; compile warns on LLM extraction failure when fallback proceeds; the stale `llm` install extra was removed from contributor setup; AWS LZA prompt context now flags explicit Terraform requests as unsupported. AWS LZA sample context/replay fixtures were refreshed for the prompt-context digest change.
+- T66 real AWS LZA validation evidence: Ran `fixtures/eval/customer-packet-banking-lza.md` through a fresh service-style compile and `iac-llm-wrapper lza validate` against `/Users/cemreoguz.ersahin/Downloads/landing-zone-accelerator-on-aws` (`packageVersion: 1.15.0`). The official validator first rejected generated schema shapes for `snsTopics`, Identity Center `sessionDuration`, Management OU placement, central security delegated admin, and unbacked Security Hub SNS references. The generator/contract now emits official-compatible shapes: `snsTopics` object, numeric session durations, Management in `Root`, Audit as central security services delegate, and no invented notification topic references. Rerun evidence is at ignored path `tests/results/t66-lza-validation/lza-validation-evidence.yaml`; it fails only because `audit@example.com` is still a placeholder and local AWS account lookup returned `AccessDeniedException`.
 
 ### Next
 
-1. Send the full-bundle owner packet with `lza-validation-evidence.yaml` included and capture owner acceptance, real pipeline output, or owner schema/error output before claiming downstream validation.
-2. Use diff-aware compile plus `review compare` whenever a long document or sample configuration changes incrementally; review only the delta first, then decide whether a repeated/blocking point deserves implementation.
-3. Continue packet-based requirement harvesting before adding product surface: record only stuck/mistrust/manual-translation moments, and implement only repeated or handoff-blocking requirements.
-4. Stop harness expansion unless real local/Bedrock model runs expose pain.
-5. Run `evaluate-extraction.py --llm`, `evaluate-usability.py --llm`, and `compare-model-benchmarks.py --require-conformant` with approved local/Bedrock models when broader model regression confidence is needed; use result artifacts to decide whether prompts or fixtures need tightening.
-6. If reviewers still struggle to resolve blockers, consider adding lightweight anchors from blocker rows to exported requirement graph nodes without adding JavaScript.
-7. Continue AWS LZA schema depth only where real customer inputs justify it.
-8. Bring Terraform module-composition toward plan-ready only after AWS LZA's plan-ready network/account fields survive one owner-reviewed packet.
-9. Next data-modeling increments should add typed entities only where a real
+1. Start T67 by checking whether `lza-validation-evidence.yaml`, `replay-manifest.yaml`, `lineage-manifest.yaml`, and review output let a reviewer trace the exact files, hashes, command, LZA source, and remaining validator blockers.
+2. Replace placeholder account emails with owner-approved values and rerun `iac-llm-wrapper lza validate` with AWS credentials that can satisfy the LZA account lookup before claiming downstream validation.
+3. Use diff-aware compile plus `review compare` whenever a long document or sample configuration changes incrementally; review only the delta first, then decide whether a repeated/blocking point deserves implementation.
+4. Continue packet-based requirement harvesting before adding product surface: record only stuck/mistrust/manual-translation moments, and implement only repeated or handoff-blocking requirements.
+5. Stop harness expansion unless real local/Bedrock model runs expose pain.
+6. Run `evaluate-extraction.py --llm`, `evaluate-usability.py --llm`, and `compare-model-benchmarks.py --require-conformant` with approved local/Bedrock models when broader model regression confidence is needed; use result artifacts to decide whether prompts or fixtures need tightening.
+7. If reviewers still struggle to resolve blockers, consider adding lightweight anchors from blocker rows to exported requirement graph nodes without adding JavaScript.
+8. Continue AWS LZA schema depth only where real customer inputs justify it.
+9. Bring Terraform module-composition toward plan-ready only after AWS LZA's plan-ready network/account fields survive one owner-reviewed packet.
+10. Next data-modeling increments should add typed entities only where a real
    packet exposes a missed relationship; defer Datalog until constraints become
    deeply inferential or platform-team policy preferences need rule composition.
 

@@ -3,6 +3,7 @@
 mandatoryAccounts:
   - name: Management
     email: management@example.com
+    organizationalUnit: Root
   - name: LogArchive
     email: logarchive@example.com
     organizationalUnit: Security

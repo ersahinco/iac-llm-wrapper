@@ -7,11 +7,11 @@ identityCenter:
   identityCenterPermissionSets:
     - name: ClinicalReadOnly
       description: ClinicalReadOnly access boundary
-      sessionDuration: PT8H
+      sessionDuration: 480
       managedPolicies: []
     - name: SecurityAudit
       description: SecurityAudit access boundary
-      sessionDuration: PT8H
+      sessionDuration: 480
       managedPolicies: []
   identityCenterAssignments:
     - name: ClinicalPlatform:ClinicalReadOnly:ClinicalProd

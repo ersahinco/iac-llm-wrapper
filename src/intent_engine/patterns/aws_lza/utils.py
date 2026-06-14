@@ -91,7 +91,7 @@ def _primary_vpc_account(intent: AwsLzaIntent) -> str:
 def _mandatory_accounts(intent: AwsLzaIntent) -> list[dict[str, str]]:
     account_emails = _account_email_map(intent)
     return [
-        _account_record(_MANAGEMENT_ACCOUNT, account_emails=account_emails),
+        _account_record(_MANAGEMENT_ACCOUNT, "Root", account_emails),
         _account_record(intent.log_archive_account, _SECURITY_OU, account_emails),
         _account_record(intent.audit_account, _SECURITY_OU, account_emails),
     ]
@@ -162,7 +162,7 @@ def _identity_center_config(intent: AwsLzaIntent) -> dict[str, Any]:
             {
                 "name": name,
                 "description": f"{name} access boundary",
-                "sessionDuration": "PT8H",
+                "sessionDuration": 480,
                 "managedPolicies": [],
             }
             for name in intent.identity_center_permission_sets
@@ -214,8 +214,6 @@ def _security_hub_config(intent: AwsLzaIntent) -> dict[str, Any]:
         "enable": intent.security_hub_enabled,
         "autoEnableOrgMembers": True,
         "regionAggregation": True,
-        "snsTopicName": "Security",
-        "notificationLevel": "HIGH",
         "excludeRegions": [],
         "standards": _security_hub_standards(intent),
     }

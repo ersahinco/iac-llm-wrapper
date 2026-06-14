@@ -71,7 +71,10 @@ def gen_lza_global_config(intent: Any, output_dir: Path) -> None:
             "useManagementAccessRole": True,
         },
         "controlTower": {"enable": str(intent.org_mode) == "control-tower"},
-        "snsTopics": [],
+        "snsTopics": {
+            "deploymentTargets": {"organizationalUnits": ["Root"]},
+            "topics": [],
+        },
         "tags": [],
         "logging": {
             "account": intent.log_archive_account,
@@ -115,10 +118,10 @@ def gen_lza_security_config(intent: Any, output_dir: Path) -> None:
             "alarmSets": [],
         },
         "centralSecurityServices": {
-            "delegatedAdminAccount": intent.security_tooling_account,
+            "delegatedAdminAccount": intent.audit_account,
             "ebsDefaultVolumeEncryption": {"enable": True, "excludeRegions": []},
             "s3PublicAccessBlock": {"enable": True, "excludeAccounts": []},
-            "scpRevertChangesConfig": {"enable": True, "snsTopicName": "Security"},
+            "scpRevertChangesConfig": {"enable": True},
             "macie": {
                 "enable": str(intent.compliance_overlay) != "none",
                 "excludeRegions": [],

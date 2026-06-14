@@ -8,7 +8,7 @@ target:
   sourceUrl:
     https://awslabs.github.io/landing-zone-accelerator-on-aws/latest/sample-configurations/
   contractSha256:
-    743b3cc9f41650379c093b5db517c18a728e4a53145853e3d44fd058554eb5c2
+    032fac8eff3c3f95feafefb6c4db5785ef5f74d030f94f7cd249e1b58c694c71
 maturity:
   configReady:
     status: ready
@@ -42,17 +42,17 @@ maturity:
         owner: network-owner
 immutableInputs:
   - artifact: accounts-config.yaml
-    sha256: 0aaf497cbe18694311f304885ccc5fef504f189968b200dfe90d2a2da255c30b
+    sha256: bdf64d940cd40f3fc1a502dadd2e144718aa1b15d8b9d09f348b02dd609a676d
   - artifact: global-config.yaml
-    sha256: 33bb20b892ad8d4d5e593106f1062ce8328a4deb9163ca33476fdfc5f22245b3
+    sha256: 477f2eeb1f8066f5bf564d9609535651824815e2b46aee765dd642672abdef46
   - artifact: iam-config.yaml
-    sha256: 93c07ec8dfabf691d356d52d645af26ac8d889bd51111c7c5d6b0af910265e37
+    sha256: 32345f049b5f518633a0451c93dec5e88d8949c0ad4be8843029c144d17d7e36
   - artifact: network-config.yaml
     sha256: 000755dbf0416044054eb1f0862c90b5838086f78b86fb5d1a5d9ea620a7fee0
   - artifact: organization-config.yaml
     sha256: 984a78c1f9c988ceaf24ac68c3de6ec2caed28e336329a37a922b2f8f2d06adc
   - artifact: security-config.yaml
-    sha256: 56debbcd0af9d3918469ebe2642ea1b30bb3d27b9c1da19b26bccfa583a737f7
+    sha256: e5c423a5cefb54f33f924c03789b65c1471a87ad4307c8bc5e7982278f4e5cce
 sampleRecommendations:
   artifact: sample-recommendations.yaml
   sha256: 7db04b2e75d5ce73bb96750c0cf732808b0e8e2185e2881f53a0eb68cf3de830

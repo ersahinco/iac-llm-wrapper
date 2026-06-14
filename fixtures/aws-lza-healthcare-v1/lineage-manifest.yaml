@@ -147,7 +147,6 @@ artifacts:
       - centralSecurityServices.s3PublicAccessBlock.enable
       - centralSecurityServices.s3PublicAccessBlock.excludeAccounts
       - centralSecurityServices.scpRevertChangesConfig.enable
-      - centralSecurityServices.scpRevertChangesConfig.snsTopicName
       - centralSecurityServices.macie.enable
       - centralSecurityServices.macie.excludeRegions
       - centralSecurityServices.macie.policyFindingsPublishingFrequency
@@ -168,8 +167,6 @@ artifacts:
       - centralSecurityServices.securityHub.enable
       - centralSecurityServices.securityHub.autoEnableOrgMembers
       - centralSecurityServices.securityHub.regionAggregation
-      - centralSecurityServices.securityHub.snsTopicName
-      - centralSecurityServices.securityHub.notificationLevel
       - centralSecurityServices.securityHub.excludeRegions
       - centralSecurityServices.securityHub.standards[]
       - centralSecurityServices.securityHub.standards[].name
@@ -186,9 +183,6 @@ artifacts:
         oneOf: []
       - path: centralSecurityServices.scpRevertChangesConfig.enable
         equals: true
-        oneOf: []
-      - path: centralSecurityServices.scpRevertChangesConfig.snsTopicName
-        equals: Security
         oneOf: []
       - path: centralSecurityServices.macie.policyFindingsPublishingFrequency
         equals: FIFTEEN_MINUTES
@@ -216,12 +210,6 @@ artifacts:
         oneOf: []
       - path: centralSecurityServices.securityHub.regionAggregation
         equals: true
-        oneOf: []
-      - path: centralSecurityServices.securityHub.snsTopicName
-        equals: Security
-        oneOf: []
-      - path: centralSecurityServices.securityHub.notificationLevel
-        equals: HIGH
         oneOf: []
   - name: decision-report.yaml
     required: true

@@ -12,7 +12,11 @@ cdkOptions:
   useManagementAccessRole: true
 controlTower:
   enable: true
-snsTopics: []
+snsTopics:
+  deploymentTargets:
+    organizationalUnits:
+      - Root
+  topics: []
 tags: []
 logging:
   account: LogArchive

@@ -19,7 +19,7 @@ cloudWatch:
   metricSets: []
   alarmSets: []
 centralSecurityServices:
-  delegatedAdminAccount: SecurityTooling
+  delegatedAdminAccount: Audit
   ebsDefaultVolumeEncryption:
     enable: true
     excludeRegions: []
@@ -28,7 +28,6 @@ centralSecurityServices:
     excludeAccounts: []
   scpRevertChangesConfig:
     enable: true
-    snsTopicName: Security
   macie:
     enable: true
     excludeRegions: []
@@ -55,8 +54,6 @@ centralSecurityServices:
     enable: true
     autoEnableOrgMembers: true
     regionAggregation: true
-    snsTopicName: Security
-    notificationLevel: HIGH
     excludeRegions: []
     standards:
       - name: AWS Foundational Security Best Practices v1.0.0

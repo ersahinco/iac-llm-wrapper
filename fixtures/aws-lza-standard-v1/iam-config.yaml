@@ -7,11 +7,11 @@ identityCenter:
   identityCenterPermissionSets:
     - name: ReadOnlyAccess
       description: ReadOnlyAccess access boundary
-      sessionDuration: PT8H
+      sessionDuration: 480
       managedPolicies: []
     - name: PowerUserAccess
       description: PowerUserAccess access boundary
-      sessionDuration: PT8H
+      sessionDuration: 480
       managedPolicies: []
   identityCenterAssignments:
     - name: PlatformAdmins:PowerUserAccess:Management

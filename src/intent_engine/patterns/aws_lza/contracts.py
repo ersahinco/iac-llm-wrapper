@@ -149,7 +149,6 @@ AWS_LZA_SAMPLE_CONFIG_CONTRACT = TargetContract(
                 "centralSecurityServices.s3PublicAccessBlock.enable",
                 "centralSecurityServices.s3PublicAccessBlock.excludeAccounts",
                 "centralSecurityServices.scpRevertChangesConfig.enable",
-                "centralSecurityServices.scpRevertChangesConfig.snsTopicName",
                 "centralSecurityServices.macie.enable",
                 "centralSecurityServices.macie.excludeRegions",
                 "centralSecurityServices.macie.policyFindingsPublishingFrequency",
@@ -170,8 +169,6 @@ AWS_LZA_SAMPLE_CONFIG_CONTRACT = TargetContract(
                 "centralSecurityServices.securityHub.enable",
                 "centralSecurityServices.securityHub.autoEnableOrgMembers",
                 "centralSecurityServices.securityHub.regionAggregation",
-                "centralSecurityServices.securityHub.snsTopicName",
-                "centralSecurityServices.securityHub.notificationLevel",
                 "centralSecurityServices.securityHub.excludeRegions",
                 "centralSecurityServices.securityHub.standards[]",
                 "centralSecurityServices.securityHub.standards[].name",
@@ -193,10 +190,6 @@ AWS_LZA_SAMPLE_CONFIG_CONTRACT = TargetContract(
                 ArtifactValueAssertion(
                     path="centralSecurityServices.scpRevertChangesConfig.enable",
                     equals=True,
-                ),
-                ArtifactValueAssertion(
-                    path="centralSecurityServices.scpRevertChangesConfig.snsTopicName",
-                    equals="Security",
                 ),
                 ArtifactValueAssertion(
                     path="centralSecurityServices.macie.policyFindingsPublishingFrequency",
@@ -229,14 +222,6 @@ AWS_LZA_SAMPLE_CONFIG_CONTRACT = TargetContract(
                 ArtifactValueAssertion(
                     path="centralSecurityServices.securityHub.regionAggregation",
                     equals=True,
-                ),
-                ArtifactValueAssertion(
-                    path="centralSecurityServices.securityHub.snsTopicName",
-                    equals="Security",
-                ),
-                ArtifactValueAssertion(
-                    path="centralSecurityServices.securityHub.notificationLevel",
-                    equals="HIGH",
                 ),
             ],
         ),
