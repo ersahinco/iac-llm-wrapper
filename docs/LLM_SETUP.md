@@ -2,11 +2,12 @@
 
 ## Overview
 
-`iac-llm-wrapper` is an LLM-assisted intent-to-IaC orchestration framework. Local
-models via Ollama are the primary development path. No API key or cloud service
-required. A 3B parameter model running locally is sufficient for many structured
-design docs; use a 7B model when customer-style notes are the quality bar and
-your workstation can handle the latency.
+`iac-llm-wrapper` uses LLMs to help extract architect intent for registered
+target configuration handoff. Local models via Ollama are the primary
+development path. No API key or cloud service required. A 3B parameter model
+running locally is sufficient for many structured design docs; use a 7B model
+when customer-style notes are the quality bar and your workstation can handle
+the latency.
 
 **Important**: LLM testing is a local developer responsibility. CI does not run LLM tests (no API keys in GitHub Actions, no Ollama in CI). Every developer validates extraction quality with their own local models before submitting PRs.
 

@@ -2,7 +2,7 @@
 
 This framework is a **general-purpose intent-driven decision system** for
 registered target configuration. AWS LZA is one target pattern, not a special
-core mode: accepted decisions become validated LZA YAML/config files for the
+core mode: accepted decisions become contract-checked LZA YAML/config files for the
 downstream LZA deployment process. You can add new target patterns (for example
 `kubernetes-cluster`, `gcp-org`, or `saas-tenant`) without modifying core
 framework files.

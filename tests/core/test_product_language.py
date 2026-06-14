@@ -24,7 +24,7 @@ def test_agents_context_uses_registered_target_language():
     text = _read("AGENTS.md")
 
     assert "architect-exchange-to-registered-target" in text
-    assert "validated LZA YAML/config files" in text
+    assert "contract-checked LZA YAML/config files" in text
     assert "target configuration artifacts" in text
     assert "Direct deployment and whole-IaC-from-scratch generation stay out" in text
 
@@ -37,6 +37,21 @@ def test_pattern_authoring_keeps_deployment_invocation_out_of_scope():
     assert "deployment target contracts" in text
     assert "Do not invoke cloud APIs, Terraform, CloudFormation, AWS LZA, apply commands" in text
     assert "plan invocation must be registered, plan-only, contract-backed" in text
+
+
+def test_public_surfaces_avoid_intent_to_iac_positioning():
+    public_text = "\n".join(
+        _read(path)
+        for path in (
+            "CONTRIBUTING.md",
+            "docs/LLM_SETUP.md",
+            "pyproject.toml",
+            "src/intent_engine/cli.py",
+        )
+    ).lower()
+
+    assert "intent-to-iac orchestration" not in public_text
+    assert "registered target configuration" in public_text
 
 
 def test_docs_do_not_claim_direct_deployment_from_prose():

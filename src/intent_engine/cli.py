@@ -58,7 +58,7 @@ APP_VERSION = "0.1.0"
 
 app = typer.Typer(
     name=APP_NAME,
-    help="Intent-to-IaC orchestration for validated handoff artifacts",
+    help="Architect intent to registered target configuration handoff artifacts",
 )
 graph_app = typer.Typer(help="Inspect and export requirement graphs")
 app.add_typer(graph_app, name="graph")

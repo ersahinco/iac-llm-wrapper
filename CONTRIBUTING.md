@@ -1,7 +1,7 @@
 # Contributing
 
-Thanks for considering contributing to `iac-llm-wrapper`, the intent-to-IaC
-orchestration framework. `intent-engine` is the core that owns requirement
+Thanks for considering contributing to `iac-llm-wrapper`, the registered target
+configuration handoff framework. `intent-engine` is the core that owns requirement
 graphs, target contracts, validation, and handoff artifacts.
 
 ## First Principles

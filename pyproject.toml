@@ -1,7 +1,7 @@
 [project]
 name = "iac-llm-wrapper"
 version = "0.1.0"
-description = "Intent-to-IaC orchestration framework. Extract intent, validate decisions, and emit traceable handoff artifacts."
+description = "Architect intent to registered target configuration. Extract decisions, validate readiness, and emit traceable handoff artifacts."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"

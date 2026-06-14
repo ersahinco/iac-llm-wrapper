@@ -10,7 +10,7 @@ mechanisms. Direct deployment and whole-IaC-from-scratch generation stay out of
 runtime scope.
 
 AWS Landing Zone Accelerator is the first product path: collected inputs become
-validated LZA YAML/config files for the downstream LZA deployment process. The
+contract-checked LZA YAML/config files for the downstream LZA deployment process. The
 core must stay generic: patterns own domain models, contracts, validators,
 samples, and target configuration emitters.
 
@@ -100,16 +100,16 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy, pyr
 
 ### Current Goal
 
-T70: Product boundary cleanup
+T71: Packet-driven improvement loop
 
 ### Status
 
-- **Tests**: 375 passing, 1 skipped; golden journey passed; fixture drift check passed
+- **Tests**: 376 passing, 1 skipped; golden journey passed; fixture drift check passed
 - **Lint**: clean (`ruff check .`)
 - **Format**: clean (`ruff format --check .`)
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Completed T69 as a deliberately small architecture slice. The CLI no longer owns duplicate YAML read/write mechanics for raw LLM evidence and incremental compile summaries; those paths now reuse `core.yaml_utils` without changing command behavior, public surface, or artifact schema.
+- **Last session**: Completed T70 product-boundary cleanup. Public package metadata, contributor intro, LLM setup, CLI help, README, extension docs, architecture docs, and AGENTS now use registered target configuration and contract-checked LZA wording instead of stale intent-to-IaC orchestration or ambiguous downstream-validation language. Product-language guardrails now block the stale public positioning phrase.
 
 ### Done
 
@@ -163,10 +163,11 @@ T70: Product boundary cleanup
 - T67 evidence traceability hardening: Static review context and HTML now include LZA validation evidence when `lza-validation-evidence.yaml` exists. Reviewers can see validation status, exit code, command, source checkout path/version/commit when available, config file SHA256s, a link to the evidence file, and raw validator output without hunting through the bundle.
 - T68 failure visibility hardening: Review context and HTML now classify two quiet failure paths explicitly: LLM parse/backend errors are visible in the summary, model benchmark section, expected weaknesses, and reviewer next actions; failed AWS LZA validation evidence becomes the first reviewer next action so reviewers do not read "pass reviewed artifacts" before the failed downstream-validation warning.
 - T69 lean architecture slice: `src/intent_engine/cli.py` now delegates raw evidence YAML writing and incremental compile summary YAML reading to `core.yaml_utils`, removing local ruamel plumbing while keeping the CLI as the orchestration surface.
+- T70 product boundary cleanup: Public surfaces now avoid stale intent-to-IaC orchestration positioning and describe the promise as registered target configuration handoff. AWS LZA wording now distinguishes contract-checked generated YAML from downstream LZA validation and application.
 
 ### Next
 
-1. Start T70 by checking README, CONTRIBUTING, validation docs, CLI guidance, and AGENTS for product-boundary drift; delete or soften inflated wording before adding any new docs.
+1. Start T71 with messy customer-style packets through `discover -> compile --no-raw-evidence -> review`; record only repeated stuckness, mistrust, manual translation, or blocker confusion.
 2. Replace placeholder account emails with owner-approved values and rerun `iac-llm-wrapper lza validate` with AWS credentials that can satisfy the LZA account lookup before claiming downstream validation.
 3. Use diff-aware compile plus `review compare` whenever a long document or sample configuration changes incrementally; review only the delta first, then decide whether a repeated/blocking point deserves implementation.
 4. Continue packet-based requirement harvesting before adding product surface: record only stuck/mistrust/manual-translation moments, and implement only repeated or handoff-blocking requirements.

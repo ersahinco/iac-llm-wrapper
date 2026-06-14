@@ -115,7 +115,7 @@ Those tools provision infrastructure. This tool captures and validates the
 decisions that must be made before provisioning. Today it emits deterministic
 target configuration artifacts engineers use with existing accelerators, sample
 configurations, and IaC modules. AWS LZA YAML is the canonical example: the tool
-can assemble validated config files for the registered target, but the LZA
+can assemble contract-checked config files for the registered target, but the LZA
 deployment process remains downstream.
 
 ## Project Status

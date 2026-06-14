@@ -49,5 +49,5 @@ Artifacts can be consumed by another UI or tool, but this repo remains
 CLI-first, artifact-first, and handoff-first.
 
 AWS Landing Zone Accelerator is the reference target: accepted decisions produce
-validated LZA YAML/config files, and the downstream LZA process remains
-responsible for applying them.
+contract-checked LZA YAML/config files, and the downstream LZA process remains
+responsible for validating and applying them.
