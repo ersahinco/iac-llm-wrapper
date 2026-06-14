@@ -48,6 +48,7 @@ from .core.pattern_check import check_pattern
 from .core.patterns import GLOBAL_REGISTRY, Pattern
 from .core.sample_config import GLOBAL_SAMPLE_REGISTRY, SampleConfig
 from .core.suggestion import SuggestionEngine
+from .core.yaml_utils import read_yaml_mapping, write_yaml_artifact
 from .patterns import load_builtin_patterns
 
 load_builtin_patterns()
@@ -77,12 +78,7 @@ def _write_evidence_output(evidence_output: Path | None, evidence_store: LLMEvid
     if not evidence_output or not evidence_store.entries:
         return
 
-    import ruamel.yaml
-
-    evidence_output.parent.mkdir(parents=True, exist_ok=True)
-    yaml = ruamel.yaml.YAML(typ="safe")
-    with open(evidence_output, "w") as fh:
-        yaml.dump(evidence_store.to_dict(), fh)
+    write_yaml_artifact(evidence_output, evidence_store.to_dict(), "", indent=False)
     typer.echo(f"LLM evidence written to: {evidence_output}")
 
 
@@ -223,11 +219,8 @@ def _emit_incremental_compile_summary(output: Path) -> None:
     diff_path = output / "input-diff-report.yaml"
     if not report_path.exists():
         return
-    import ruamel.yaml
 
-    yaml = ruamel.yaml.YAML(typ="safe")
-    data = yaml.load(report_path.read_text()) or {}
-    decisions = data.get("decisions", {}) if isinstance(data, dict) else {}
+    decisions = read_yaml_mapping(report_path).get("decisions", {})
     if not isinstance(decisions, dict):
         return
     changed = decisions.get("changed", []) or []
