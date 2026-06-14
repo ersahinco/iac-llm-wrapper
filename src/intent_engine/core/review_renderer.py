@@ -101,6 +101,10 @@ def render_review_html(context: dict[str, Any]) -> str:
                         "Model conformance",
                         str(model_quality.get("conformanceStatus", "unknown")),
                     ),
+                    _kv(
+                        "Model parse errors",
+                        str(review_summary.get("modelParseErrorCount", 0)),
+                    ),
                     _kv("Raw LLM coverage", str(model_quality.get("rawCoverage", "not-run"))),
                     _kv("Raw missing decisions", str(model_quality.get("rawMissingCount", 0))),
                     _list_block("Missing raw decision keys", model_quality.get("missingKeys", [])),
@@ -227,6 +231,7 @@ def render_review_html(context: dict[str, Any]) -> str:
                     ),
                     _kv("Raw LLM coverage", str(model_quality.get("rawCoverage", "0/0"))),
                     _kv("Raw missing decisions", str(model_quality.get("rawMissingCount", 0))),
+                    _kv("Parse errors", str(model_quality.get("parseErrorCount", 0))),
                     _artifact_link_row("Model benchmark", links.get("modelBenchmark")),
                     _artifact_link_row("Contract validation", links.get("contractValidation")),
                     _details("Raw model benchmark", _yaml_dump(benchmark)),

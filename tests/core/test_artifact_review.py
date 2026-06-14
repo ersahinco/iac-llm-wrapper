@@ -24,6 +24,7 @@ def _write_review_bundle(
     mode: str = "llm",
     raw_evidence_status: str = "requested",
     lza_validation: bool = False,
+    parse_error_count: int = 0,
 ) -> Path:
     input_dir.mkdir(parents=True)
     evidence_path = input_dir / "raw-evidence.yaml"
@@ -82,7 +83,7 @@ def _write_review_bundle(
                 "rawLlmAcceptedCoverageCount": 0,
                 "rawLlmMissingAcceptedDecisionCount": 1,
                 "rawLlmMissingAcceptedDecisions": ["organization_name"],
-                "parseErrorCount": 0,
+                "parseErrorCount": parse_error_count,
             },
             "conformance": {
                 "status": "review",
@@ -222,6 +223,7 @@ def test_build_review_context_uses_report_readiness_and_artifact_rows(tmp_path: 
     assert context["contractValidation"][0]["name"] == "example-contract"
     assert context["contractStatus"] == "fail"
     assert context["reviewSummary"]["contractStatus"] == "fail"
+    assert context["reviewSummary"]["modelParseErrorCount"] == 0
     assert context["reviewSummary"]["selectedTargetPath"] == [
         "accelerator",
         "module-composition",
@@ -288,6 +290,33 @@ def test_review_context_surfaces_lza_validation_evidence(tmp_path: Path):
         ],
     }
     assert context["links"]["lzaValidation"] == "lza-validation-evidence.yaml"
+    assert (
+        "Do not claim downstream AWS LZA validation until lza-validation-evidence.yaml "
+        "failures are resolved."
+    ) in context["reviewerNextActions"]
+
+
+def test_review_context_warns_on_llm_parse_errors(tmp_path: Path):
+    input_dir = tmp_path / "out"
+    validation_path = _write_review_bundle(input_dir, parse_error_count=2)
+
+    context = build_review_context(
+        input_dir,
+        link_base_dir=input_dir,
+        graph_exports={},
+        contract_validation_path=validation_path,
+    )
+
+    assert context["reviewSummary"]["modelParseErrorCount"] == 2
+    assert context["modelQuality"]["parseErrorCount"] == 2
+    assert (
+        "LLM extraction recorded parse or backend errors; deterministic extraction may "
+        "have carried the run."
+    ) in context["modelQuality"]["expectedWeaknesses"]
+    assert (
+        "LLM extraction recorded parse or backend errors; review llm-trace-summary.yaml "
+        "and model-benchmark.yaml before trusting model contribution."
+    ) in context["reviewerNextActions"]
 
 
 def test_review_context_maps_pattern_validator_blockers_to_requirement_questions(
@@ -416,6 +445,8 @@ def test_render_review_html_uses_existing_graph_exports(tmp_path: Path):
     assert "bespoke-workload-infrastructure" in html
     assert "target-capability-graph.yaml" in html
     assert "Model conformance" in html
+    assert "Model parse errors" in html
+    assert "Parse errors" in html
     assert "review" in html
     assert "Raw LLM coverage" in html
     assert "0/1" in html

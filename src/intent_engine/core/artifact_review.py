@@ -94,6 +94,7 @@ def build_review_context(
             "contractStatus": contract_status,
             "allowedNextAction": readiness.get("allowedNextAction", ""),
             "modelQuality": model_quality,
+            "modelParseErrorCount": model_quality.get("parseErrorCount", 0),
             "lzaValidationStatus": lza_validation_summary.get("status", "not-run"),
             "selectedTargetPath": target_capabilities.get("selectedTargetPath", []),
             "unsupportedTargetGapCount": len(
@@ -119,6 +120,8 @@ def build_review_context(
             contract_status=contract_status,
             raw_evidence=raw_evidence,
             artifacts=artifacts,
+            model_quality=model_quality,
+            lza_validation_summary=lza_validation_summary,
         ),
         "artifacts": artifacts,
         "handoff": handoff,
@@ -366,7 +369,13 @@ def _model_quality(benchmark: dict[str, Any], trace: dict[str, Any]) -> dict[str
     ]
     llm_applied = _coerce_list(applied.get("llm"))
     markdown_applied = _coerce_list(applied.get("markdown"))
+    parse_error_count = int(quality.get("parseErrorCount", 0) or 0)
     warnings: list[str] = []
+    if parse_error_count:
+        warnings.append(
+            "LLM extraction recorded parse or backend errors; deterministic extraction may "
+            "have carried the run."
+        )
     if mode != "llm":
         raw_missing = 0
         missing_keys = []
@@ -384,7 +393,7 @@ def _model_quality(benchmark: dict[str, Any], trace: dict[str, Any]) -> dict[str
         "conformanceStatus": str(conformance.get("status", "unknown")),
         "conformanceReason": str(conformance.get("reason", "")),
         "expectedWeaknesses": warnings,
-        "parseErrorCount": int(quality.get("parseErrorCount", 0) or 0),
+        "parseErrorCount": parse_error_count,
     }
 
 
@@ -451,6 +460,8 @@ def _reviewer_next_actions(
     contract_status: str,
     raw_evidence: str,
     artifacts: list[dict[str, str]],
+    model_quality: dict[str, Any],
+    lza_validation_summary: dict[str, Any],
 ) -> list[str]:
     status = str(readiness.get("status", "unknown"))
     handoff_allowed = bool(
@@ -481,6 +492,12 @@ def _reviewer_next_actions(
                 + ", ".join(missing_artifacts)
                 + ".",
             )
+    if str(lza_validation_summary.get("status", "not-run")) == "fail":
+        actions.insert(
+            0,
+            "Do not claim downstream AWS LZA validation until lza-validation-evidence.yaml "
+            "failures are resolved.",
+        )
     raw_evidence_status = _raw_evidence_status_label(raw_evidence)
     if raw_evidence_status in {"captured", "requested"}:
         actions.append(
@@ -496,6 +513,11 @@ def _reviewer_next_actions(
         actions.append(
             "Raw prompt/response evidence was omitted; use trace and benchmark "
             "summaries for review."
+        )
+    if int(model_quality.get("parseErrorCount", 0) or 0):
+        actions.append(
+            "LLM extraction recorded parse or backend errors; review llm-trace-summary.yaml "
+            "and model-benchmark.yaml before trusting model contribution."
         )
     return actions
 
