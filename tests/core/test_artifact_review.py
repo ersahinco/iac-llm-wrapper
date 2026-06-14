@@ -23,6 +23,7 @@ def _write_review_bundle(
     *,
     mode: str = "llm",
     raw_evidence_status: str = "requested",
+    lza_validation: bool = False,
 ) -> Path:
     input_dir.mkdir(parents=True)
     evidence_path = input_dir / "raw-evidence.yaml"
@@ -146,6 +147,33 @@ def _write_review_bundle(
             ],
         },
     )
+    if lza_validation:
+        _write_yaml(
+            input_dir / "lza-validation-evidence.yaml",
+            {
+                "schemaVersion": "intent-engine/aws-lza-validation-evidence/v1",
+                "status": "fail",
+                "input": {
+                    "configFileDigests": [
+                        {
+                            "name": "network-config.yaml",
+                            "bundlePath": str(input_dir / "network-config.yaml"),
+                            "sha256": "abc123",
+                        }
+                    ]
+                },
+                "lzaSource": {
+                    "requestedPath": "/tmp/landing-zone-accelerator-on-aws",
+                    "commandWorkingDirectory": "/tmp/landing-zone-accelerator-on-aws/source",
+                    "gitCommit": "abcde12",
+                    "packageVersion": "1.15.0",
+                },
+                "command": {
+                    "argv": ["corepack", "yarn", "validate-config", "/tmp/config"],
+                    "exitCode": 1,
+                },
+            },
+        )
     return validation_path
 
 
@@ -229,6 +257,37 @@ def test_build_review_context_uses_report_readiness_and_artifact_rows(tmp_path: 
     assert {"name": "present.yaml", "status": "present"} in context["artifacts"]
     assert {"name": "missing.yaml", "status": "missing"} in context["artifacts"]
     assert {"name": "lineage-only.yaml", "status": "missing"} in context["artifacts"]
+
+
+def test_review_context_surfaces_lza_validation_evidence(tmp_path: Path):
+    input_dir = tmp_path / "out"
+    validation_path = _write_review_bundle(input_dir, lza_validation=True)
+
+    context = build_review_context(
+        input_dir,
+        link_base_dir=input_dir,
+        graph_exports={},
+        contract_validation_path=validation_path,
+    )
+
+    assert context["reviewSummary"]["lzaValidationStatus"] == "fail"
+    assert context["lzaValidationSummary"] == {
+        "status": "fail",
+        "exitCode": "1",
+        "command": "corepack yarn validate-config /tmp/config",
+        "sourcePath": "/tmp/landing-zone-accelerator-on-aws",
+        "sourceCwd": "/tmp/landing-zone-accelerator-on-aws/source",
+        "packageVersion": "1.15.0",
+        "gitCommit": "abcde12",
+        "configFileDigests": [
+            {
+                "name": "network-config.yaml",
+                "bundlePath": str(input_dir / "network-config.yaml"),
+                "sha256": "abc123",
+            }
+        ],
+    }
+    assert context["links"]["lzaValidation"] == "lza-validation-evidence.yaml"
 
 
 def test_review_context_maps_pattern_validator_blockers_to_requirement_questions(
@@ -329,7 +388,7 @@ def test_review_context_maps_pattern_validator_blockers_to_requirement_questions
 
 def test_render_review_html_uses_existing_graph_exports(tmp_path: Path):
     input_dir = tmp_path / "out"
-    _write_review_bundle(input_dir)
+    _write_review_bundle(input_dir, lza_validation=True)
     (input_dir / "requirement-graph.json").write_text("{}\n")
     (input_dir / "requirement-graph.mmd").write_text("flowchart TD\n")
 
@@ -365,6 +424,10 @@ def test_render_review_html_uses_existing_graph_exports(tmp_path: Path):
     assert "requirement-graph.json" in html
     assert "requirement-graph.mmd" in html
     assert "raw-evidence.yaml" in html
+    assert "LZA Validation Evidence" in html
+    assert "lza-validation-evidence.yaml" in html
+    assert "network-config.yaml" in html
+    assert "abc123" in html
 
 
 def test_render_review_html_marks_missing_target_capability_graph_as_not_declared(

@@ -18,6 +18,7 @@ def render_review_html(context: dict[str, Any]) -> str:
     links = _dict(context.get("links"))
     review_summary = _dict(context.get("reviewSummary"))
     model_quality = _dict(context.get("modelQuality"))
+    lza_validation_summary = _dict(context.get("lzaValidationSummary"))
     target_capabilities = _dict(context.get("targetCapabilities"))
     target_capabilities_declared = bool(target_capabilities)
     summary_target_path = _target_path_label(
@@ -81,6 +82,10 @@ def render_review_html(context: dict[str, Any]) -> str:
                         str(review_summary.get("blockingContradictionCount", 0)),
                     ),
                     _kv("Contract status", str(review_summary.get("contractStatus", "unknown"))),
+                    _kv(
+                        "LZA validation",
+                        str(review_summary.get("lzaValidationStatus", "not-run")),
+                    ),
                     _kv("Selected target path", summary_target_path),
                     _kv(
                         "Unsupported target gaps",
@@ -181,6 +186,14 @@ def render_review_html(context: dict[str, Any]) -> str:
                         _yaml_dump(context.get("contractValidationArtifact", {})),
                     ),
                 ],
+            ),
+            _section(
+                "LZA Validation Evidence",
+                _lza_validation_section(
+                    lza_validation_summary,
+                    _dict(context.get("lzaValidationEvidence")),
+                    links.get("lzaValidation"),
+                ),
             ),
             _section("Target Artifacts", [_artifact_table(_coerce_list(context.get("artifacts")))]),
             _section("Handoff Plan", [_handoff_steps(_dict(context.get("handoff")))]),
@@ -331,6 +344,44 @@ def _contract_table(results: list[Any]) -> str:
             "</tr>"
         )
     return "<table>" + "".join(rows) + "</table>"
+
+
+def _lza_validation_section(
+    summary: dict[str, Any],
+    evidence: dict[str, Any],
+    evidence_link: Any,
+) -> list[str]:
+    if summary.get("status") == "not-run":
+        return ['<p class="muted">No LZA validation evidence found.</p>']
+    return [
+        _kv("Status", str(summary.get("status", "unknown"))),
+        _kv("Exit code", str(summary.get("exitCode", "unknown"))),
+        _kv("Package version", str(summary.get("packageVersion", "unknown"))),
+        _kv("Git commit", str(summary.get("gitCommit", "unknown"))),
+        _kv("Source path", str(summary.get("sourcePath", ""))),
+        _kv("Command", str(summary.get("command", ""))),
+        _artifact_link_row("LZA validation evidence", evidence_link),
+        _digest_table(_coerce_list(summary.get("configFileDigests"))),
+        _details("Raw LZA validation evidence", _yaml_dump(evidence)),
+    ]
+
+
+def _digest_table(digests: list[Any]) -> str:
+    if not digests:
+        return '<p class="muted">No config file digests recorded.</p>'
+    rows = []
+    for digest in digests:
+        if not isinstance(digest, dict):
+            continue
+        rows.append(
+            "<tr>"
+            f"<th>{escape(str(digest.get('name', 'unknown')))}</th>"
+            f"<td><code>{escape(str(digest.get('sha256', '')))}</code></td>"
+            "</tr>"
+        )
+    if not rows:
+        return '<p class="muted">No config file digests recorded.</p>'
+    return "<h3>Config File Digests</h3><table>" + "".join(rows) + "</table>"
 
 
 def _capability_table(capabilities: list[Any]) -> str:

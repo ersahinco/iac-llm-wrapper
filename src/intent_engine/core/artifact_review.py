@@ -10,6 +10,7 @@ import ruamel.yaml
 
 from .contract_validation import build_contract_validation, write_contract_validation
 from .graph_export import graph_to_json, graph_to_mermaid
+from .lza_validation import LZA_VALIDATION_EVIDENCE
 from .patterns import GLOBAL_REGISTRY
 from .review_renderer import render_review_html as render_review_html_context
 
@@ -75,6 +76,8 @@ def build_review_context(
     blocking_contradictions = _trace_list(trace, "contradictions", "blocking")
     artifacts = _artifact_rows(input_dir, _artifact_names(input_dir, handoff, lineage))
     raw_evidence = _raw_evidence(trace)
+    lza_validation_evidence = _read_yaml(input_dir / LZA_VALIDATION_EVIDENCE)
+    lza_validation_summary = _lza_validation_summary(lza_validation_evidence)
 
     return {
         "pattern": str(report.get("pattern", handoff.get("pattern", "handoff"))),
@@ -91,6 +94,7 @@ def build_review_context(
             "contractStatus": contract_status,
             "allowedNextAction": readiness.get("allowedNextAction", ""),
             "modelQuality": model_quality,
+            "lzaValidationStatus": lza_validation_summary.get("status", "not-run"),
             "selectedTargetPath": target_capabilities.get("selectedTargetPath", []),
             "unsupportedTargetGapCount": len(
                 _coerce_list(target_capabilities.get("unsupportedGaps"))
@@ -107,6 +111,8 @@ def build_review_context(
         "contractValidation": _coerce_list(contract_validation.get("contracts")),
         "contractValidationArtifact": contract_validation,
         "contractStatus": contract_status,
+        "lzaValidationEvidence": lza_validation_evidence,
+        "lzaValidationSummary": lza_validation_summary,
         "targetCapabilities": target_capabilities,
         "reviewerNextActions": _reviewer_next_actions(
             readiness=readiness,
@@ -126,6 +132,7 @@ def build_review_context(
             "contractValidation": _href(link_base_dir, contract_validation_path)
             if contract_validation_path is not None
             else None,
+            "lzaValidation": _artifact_href(input_dir, link_base_dir, LZA_VALIDATION_EVIDENCE),
             "targetCapabilities": _artifact_href(
                 input_dir,
                 link_base_dir,
@@ -416,6 +423,26 @@ def _raw_evidence(trace: dict[str, Any]) -> str:
     status = raw.get("status", "unknown")
     path = raw.get("path")
     return f"{status} ({path})" if path else str(status)
+
+
+def _lza_validation_summary(evidence: dict[str, Any]) -> dict[str, Any]:
+    if not evidence:
+        return {"status": "not-run", "configFileDigests": []}
+    command = _dict(evidence.get("command"))
+    source = _dict(evidence.get("lzaSource"))
+    input_block = _dict(evidence.get("input"))
+    argv = command.get("argv")
+    command_text = " ".join(str(item) for item in argv) if isinstance(argv, list) else ""
+    return {
+        "status": str(evidence.get("status", "unknown")),
+        "exitCode": str(command.get("exitCode", "unknown")),
+        "command": command_text,
+        "sourcePath": str(source.get("requestedPath", "")),
+        "sourceCwd": str(source.get("commandWorkingDirectory", "")),
+        "packageVersion": str(source.get("packageVersion", "unknown")),
+        "gitCommit": str(source.get("gitCommit") or "unknown"),
+        "configFileDigests": _coerce_list(input_block.get("configFileDigests")),
+    }
 
 
 def _reviewer_next_actions(

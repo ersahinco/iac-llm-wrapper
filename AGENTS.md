@@ -100,7 +100,7 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy, pyr
 
 ### Current Goal
 
-T67: Evidence traceability hardening
+T68: Failure visibility hardening
 
 ### Status
 
@@ -109,7 +109,7 @@ T67: Evidence traceability hardening
 - **Format**: clean (`ruff format --check .`)
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Completed the T66 local toolchain evidence slice. A fresh customer-packet AWS LZA bundle was generated at `tests/results/t66-lza-validation` and validated against local AWS LZA source version `1.15.0`; the first official validator run exposed schema compatibility issues, which were fixed without adding deploy/synth behavior. The rerun reaches official config validation without parse errors and remains failed only on placeholder account email plus an AWS account lookup `AccessDeniedException`. Do not claim downstream validation yet.
+- **Last session**: Completed T67 evidence traceability. Static review pages now surface `lza-validation-evidence.yaml` when present, including validation status, exit code, command, LZA source/version, config file SHA256s, and raw validator output. The local T66 review page now shows the remaining official-validator blockers directly: placeholder `audit@example.com` and AWS account lookup `AccessDeniedException`.
 
 ### Done
 
@@ -160,10 +160,11 @@ T67: Evidence traceability hardening
 - T64 project-wide AI slop cleanup: Consolidated remaining obvious YAML writer duplication into `core.yaml_utils` where semantics matched, trimmed restating comments in discovery/model introspection, and kept defensive code at filesystem, subprocess, parser, model, LLM, and downstream validation boundaries.
 - T65 review remediation: Full-bundle AWS LZA owner packet wording replaced network-only validation language; LZA validation evidence now records SHA256s for each config artifact; compile warns on LLM extraction failure when fallback proceeds; the stale `llm` install extra was removed from contributor setup; AWS LZA prompt context now flags explicit Terraform requests as unsupported. AWS LZA sample context/replay fixtures were refreshed for the prompt-context digest change.
 - T66 real AWS LZA validation evidence: Ran `fixtures/eval/customer-packet-banking-lza.md` through a fresh service-style compile and `iac-llm-wrapper lza validate` against `/Users/cemreoguz.ersahin/Downloads/landing-zone-accelerator-on-aws` (`packageVersion: 1.15.0`). The official validator first rejected generated schema shapes for `snsTopics`, Identity Center `sessionDuration`, Management OU placement, central security delegated admin, and unbacked Security Hub SNS references. The generator/contract now emits official-compatible shapes: `snsTopics` object, numeric session durations, Management in `Root`, Audit as central security services delegate, and no invented notification topic references. Rerun evidence is at ignored path `tests/results/t66-lza-validation/lza-validation-evidence.yaml`; it fails only because `audit@example.com` is still a placeholder and local AWS account lookup returned `AccessDeniedException`.
+- T67 evidence traceability hardening: Static review context and HTML now include LZA validation evidence when `lza-validation-evidence.yaml` exists. Reviewers can see validation status, exit code, command, source checkout path/version/commit when available, config file SHA256s, a link to the evidence file, and raw validator output without hunting through the bundle.
 
 ### Next
 
-1. Start T67 by checking whether `lza-validation-evidence.yaml`, `replay-manifest.yaml`, `lineage-manifest.yaml`, and review output let a reviewer trace the exact files, hashes, command, LZA source, and remaining validator blockers.
+1. Start T68 by inventorying fallback paths: failed LLM calls, skipped raw evidence, deterministic defaults, missing optional evidence, blocked compile artifacts, and failed downstream validation evidence.
 2. Replace placeholder account emails with owner-approved values and rerun `iac-llm-wrapper lza validate` with AWS credentials that can satisfy the LZA account lookup before claiming downstream validation.
 3. Use diff-aware compile plus `review compare` whenever a long document or sample configuration changes incrementally; review only the delta first, then decide whether a repeated/blocking point deserves implementation.
 4. Continue packet-based requirement harvesting before adding product surface: record only stuck/mistrust/manual-translation moments, and implement only repeated or handoff-blocking requirements.
