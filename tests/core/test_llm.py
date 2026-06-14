@@ -469,6 +469,66 @@ class TestEndToEndLLM:
         assert "network_cidr" not in trace["appliedDecisions"]["llm"]
         assert "network_cidr" not in trace["appliedDecisions"]["signals"]
 
+    def test_markdown_locked_llm_contradiction_does_not_block_compile(self, tmp_path: Path):
+        import ruamel.yaml
+
+        import intent_engine.patterns.terraform_vpc  # noqa: F401
+
+        fixture = tmp_path / "design.md"
+        fixture.write_text(
+            """# Terraform VPC Customer Notes
+
+The networking squad owns an approved VPC module. The team wants three
+availability zones, per-AZ NAT for resilience, and DNS hostnames enabled.
+
+- vpc_name: payments-shared-vpc
+- primary_region: eu-west-1
+- cidr: 10.90.0.0/16
+- az_count: 3
+- public_subnet_cidrs: 10.90.0.0/24, 10.90.1.0/24, 10.90.2.0/24
+- private_subnet_cidrs: 10.90.10.0/24, 10.90.11.0/24, 10.90.12.0/24
+- enable_nat_gateway: true
+- single_nat_gateway: false
+- enable_dns_hostnames: true
+"""
+        )
+        response = json.dumps(
+            {
+                "decisions": {
+                    "enable_nat_gateway": "true",
+                    "single_nat_gateway": "false",
+                },
+                "signal_decisions": {},
+                "gaps": [],
+                "contradictions": [
+                    {
+                        "key": "single_nat_gateway",
+                        "reason": "Contradicts with enable_nat_gateway being true",
+                        "details": "Cannot have both single NAT gateway and per-AZ NAT",
+                    }
+                ],
+            }
+        )
+
+        output = tmp_path / "output"
+        compile_design(
+            fixture,
+            output,
+            llm_caller=LLMCaller(MockLLMBackend(response)),
+            pattern="terraform-vpc",
+        )
+
+        yaml = ruamel.yaml.YAML(typ="safe")
+        report = yaml.load((output / "decision-report.yaml").read_text())
+        trace = yaml.load((output / "llm-trace-summary.yaml").read_text())
+        benchmark = yaml.load((output / "model-benchmark.yaml").read_text())
+
+        assert report["handoffReadiness"]["handoffAllowed"] is True
+        assert trace["contradictions"]["raw"][0]["key"] == "single_nat_gateway"
+        assert trace["contradictions"]["blocking"] == []
+        assert benchmark["quality"]["rawContradictionCount"] == 1
+        assert benchmark["quality"]["blockingContradictionCount"] == 0
+
 
 class TestMalformedLLMResponse:
     def test_markdown_fence_recovery(self):

@@ -100,16 +100,16 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy, pyr
 
 ### Current Goal
 
-T71: Packet-driven improvement loop
+T72: Owner validation follow-up
 
 ### Status
 
-- **Tests**: 376 passing, 1 skipped; golden journey passed; fixture drift check passed
+- **Tests**: 377 passing, 1 skipped; golden journey passed; fixture drift check passed
 - **Lint**: clean (`ruff check .`)
 - **Format**: clean (`ruff format --check .`)
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Completed T70 product-boundary cleanup. Public package metadata, contributor intro, LLM setup, CLI help, README, extension docs, architecture docs, and AGENTS now use registered target configuration and contract-checked LZA wording instead of stale intent-to-IaC orchestration or ambiguous downstream-validation language. Product-language guardrails now block the stale public positioning phrase.
+- **Last session**: Completed T71 packet-driven loop. Banking LZA compiled ready, messy blocked LZA stayed safely blocked with concrete blocker traceability, and the Terraform VPC packet exposed a real LLM/readiness trust bug: a raw LLM contradiction on a Markdown-locked NAT decision blocked an otherwise complete handoff. The compiler now preserves raw model contradictions as evidence but does not let redundant same-value contradictions override deterministic locked decisions.
 
 ### Done
 
@@ -164,11 +164,12 @@ T71: Packet-driven improvement loop
 - T68 failure visibility hardening: Review context and HTML now classify two quiet failure paths explicitly: LLM parse/backend errors are visible in the summary, model benchmark section, expected weaknesses, and reviewer next actions; failed AWS LZA validation evidence becomes the first reviewer next action so reviewers do not read "pass reviewed artifacts" before the failed downstream-validation warning.
 - T69 lean architecture slice: `src/intent_engine/cli.py` now delegates raw evidence YAML writing and incremental compile summary YAML reading to `core.yaml_utils`, removing local ruamel plumbing while keeping the CLI as the orchestration surface.
 - T70 product boundary cleanup: Public surfaces now avoid stale intent-to-IaC orchestration positioning and describe the promise as registered target configuration handoff. AWS LZA wording now distinguishes contract-checked generated YAML from downstream LZA validation and application.
+- T71 packet-driven improvement loop: Ran customer-style banking LZA, messy blocked LZA, and Terraform VPC packets through `discover -> compile --no-raw-evidence -> review`. The repeated LZA paths were clear; the Terraform path found and fixed a real trust issue where redundant raw LLM contradictions could block deterministic Markdown decisions. Regression coverage keeps raw contradictions visible in trace/benchmark artifacts while blocking count remains zero.
 
 ### Next
 
-1. Start T71 with messy customer-style packets through `discover -> compile --no-raw-evidence -> review`; record only repeated stuckness, mistrust, manual translation, or blocker confusion.
-2. Replace placeholder account emails with owner-approved values and rerun `iac-llm-wrapper lza validate` with AWS credentials that can satisfy the LZA account lookup before claiming downstream validation.
+1. Start T72 by replacing placeholder account emails with owner-approved values and rerun `iac-llm-wrapper lza validate` with AWS credentials that can satisfy the LZA account lookup before claiming downstream validation.
+2. Keep using packet-driven loops before adding product surface: record only repeated stuckness, mistrust, manual translation, or blocker confusion.
 3. Use diff-aware compile plus `review compare` whenever a long document or sample configuration changes incrementally; review only the delta first, then decide whether a repeated/blocking point deserves implementation.
 4. Continue packet-based requirement harvesting before adding product surface: record only stuck/mistrust/manual-translation moments, and implement only repeated or handoff-blocking requirements.
 5. Stop harness expansion unless real local/Bedrock model runs expose pain.

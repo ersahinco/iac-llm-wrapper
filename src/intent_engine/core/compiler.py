@@ -170,6 +170,61 @@ def _llm_result_violations(graph, llm_result: LLMGraphResult) -> list[Violation]
     return violations
 
 
+def _llm_result_for_blocking(
+    llm_result: LLMGraphResult,
+    locked_decision_keys: set[str],
+    accepted_decisions: dict[str, Any],
+) -> LLMGraphResult:
+    if not locked_decision_keys or not llm_result.contradictions:
+        return llm_result
+    contradictions = [
+        contradiction
+        for contradiction in llm_result.contradictions
+        if not _locked_llm_contradiction_is_redundant(
+            contradiction,
+            llm_result,
+            locked_decision_keys,
+            accepted_decisions,
+        )
+    ]
+    if len(contradictions) == len(llm_result.contradictions):
+        return llm_result
+    return LLMGraphResult(
+        decisions=llm_result.decisions,
+        design_doc=llm_result.design_doc,
+        signal_decisions=llm_result.signal_decisions,
+        gaps=llm_result.gaps,
+        contradictions=contradictions,
+        raw_response=llm_result.raw_response,
+    )
+
+
+def _locked_llm_contradiction_is_redundant(
+    contradiction: dict[str, Any],
+    llm_result: LLMGraphResult,
+    locked_decision_keys: set[str],
+    accepted_decisions: dict[str, Any],
+) -> bool:
+    key = str(contradiction.get("key", ""))
+    if key not in locked_decision_keys:
+        return False
+    raw_value = llm_result.decisions.get(key, llm_result.signal_decisions.get(key))
+    if raw_value is None or key not in accepted_decisions:
+        return False
+    return _same_decision_value(raw_value, accepted_decisions[key])
+
+
+def _same_decision_value(left: Any, right: Any) -> bool:
+    return str(left).strip().lower() == str(right).strip().lower()
+
+
+def _deterministic_applied_decision_keys(applied_decisions: dict[str, list[str]]) -> set[str]:
+    keys: set[str] = set()
+    for source in ("baseline", "markdown"):
+        keys.update(applied_decisions.get(source, []))
+    return keys
+
+
 def _markdown_contradiction_violations(
     contradictions: list[dict[str, Any]],
 ) -> list[Violation]:
@@ -321,6 +376,7 @@ def _build_extraction_summary(
     accepted_decisions: dict[str, Any],
     graph,
     target_capability_report: dict[str, Any] | None = None,
+    blocking_llm_result: LLMGraphResult | None = None,
 ) -> dict[str, Any]:
     calls = []
     evidence_entries = evidence_store.entries if evidence_store is not None else []
@@ -335,11 +391,12 @@ def _build_extraction_summary(
             }
         )
     first = calls[0] if calls else {}
-    blocking_gaps = _blocking_gaps(graph, llm_result.gaps)
+    blocking_result = blocking_llm_result or llm_result
+    blocking_gaps = _blocking_gaps(graph, blocking_result.gaps)
     resolved_gaps = [
         gap for gap in llm_result.gaps if isinstance(gap, dict) and _gap_is_resolved(graph, gap)
     ]
-    blocking_contradictions = _blocking_contradictions(graph, llm_result.contradictions)
+    blocking_contradictions = _blocking_contradictions(graph, blocking_result.contradictions)
     raw_evidence = _raw_evidence_status(raw_evidence_path, evidence_store)
     summary = {
         "pattern": pattern,
@@ -520,11 +577,13 @@ def _build_failure_artifacts_and_raise(
     target_capability_report: dict[str, Any] | None,
     dry_run: bool,
     extra_artifacts: dict[str, Any] | None = None,
+    blocking_llm_result: LLMGraphResult | None = None,
 ) -> None:
+    blocking_result = blocking_llm_result or llm_result
     readiness = _build_handoff_readiness(
         graph,
         violations,
-        llm_result,
+        blocking_result,
         target_capability_report,
     )
     extraction_summary = _build_extraction_summary(
@@ -539,6 +598,7 @@ def _build_failure_artifacts_and_raise(
         accepted_decisions=graph.typed_decisions(),
         graph=graph,
         target_capability_report=target_capability_report,
+        blocking_llm_result=blocking_result,
     )
     if not dry_run:
         _write_failed_compile_artifacts(
@@ -700,13 +760,18 @@ def compile_design(
     )
     violations = validate(intent, graph=graph, extra_validators=pattern_obj.validators)
     violations.extend(_markdown_contradiction_violations(markdown_result.contradictions))
-    violations.extend(_llm_result_violations(graph, llm_result))
+    blocking_llm_result = _llm_result_for_blocking(
+        llm_result,
+        _deterministic_applied_decision_keys(applied_decisions),
+        graph.typed_decisions(),
+    )
+    violations.extend(_llm_result_violations(graph, blocking_llm_result))
     violations.extend(_target_capability_violations(target_capability_report))
     violations.extend(_plan_ready_capability_violations(pattern, target_capability_report))
     readiness = _build_handoff_readiness(
         graph,
         violations,
-        llm_result,
+        blocking_llm_result,
         target_capability_report,
     )
     extraction_summary = _build_extraction_summary(
@@ -721,6 +786,7 @@ def compile_design(
         accepted_decisions=graph.typed_decisions(),
         graph=graph,
         target_capability_report=target_capability_report,
+        blocking_llm_result=blocking_llm_result,
     )
     if violations:
         _build_failure_artifacts_and_raise(
@@ -736,6 +802,7 @@ def compile_design(
             applied_decisions=applied_decisions,
             target_capability_report=target_capability_report,
             dry_run=dry_run,
+            blocking_llm_result=blocking_llm_result,
         )
 
     if dry_run:
@@ -767,6 +834,7 @@ def compile_design(
             applied_decisions=applied_decisions,
             target_capability_report=target_capability_report,
             dry_run=False,
+            blocking_llm_result=blocking_llm_result,
         )
 
 
@@ -876,7 +944,12 @@ def compile_incremental_design(
     )
     violations = validate(intent, graph=graph, extra_validators=pattern_obj.validators)
     violations.extend(_markdown_contradiction_violations(markdown_result.contradictions))
-    violations.extend(_llm_result_violations(graph, llm_result))
+    blocking_llm_result = _llm_result_for_blocking(
+        llm_result,
+        _deterministic_applied_decision_keys(applied_decisions),
+        graph.typed_decisions(),
+    )
+    violations.extend(_llm_result_violations(graph, blocking_llm_result))
     violations.extend(_target_capability_violations(target_capability_report))
     violations.extend(_plan_ready_capability_violations(pattern, target_capability_report))
     incremental_report = incremental_decision_report(
@@ -900,7 +973,7 @@ def compile_incremental_design(
     readiness = _build_handoff_readiness(
         graph,
         violations,
-        llm_result,
+        blocking_llm_result,
         target_capability_report,
     )
     extraction_summary = _build_extraction_summary(
@@ -915,6 +988,7 @@ def compile_incremental_design(
         accepted_decisions=graph.typed_decisions(),
         graph=graph,
         target_capability_report=target_capability_report,
+        blocking_llm_result=blocking_llm_result,
     )
 
     if violations:
@@ -935,6 +1009,7 @@ def compile_incremental_design(
                 "input-diff-report.yaml": input_diff,
                 "incremental-compile-report.yaml": incremental_report,
             },
+            blocking_llm_result=blocking_llm_result,
         )
 
     if dry_run:
@@ -977,6 +1052,7 @@ def compile_incremental_design(
                 "input-diff-report.yaml": input_diff,
                 "incremental-compile-report.yaml": incremental_report,
             },
+            blocking_llm_result=blocking_llm_result,
         )
 
 
