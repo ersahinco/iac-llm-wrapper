@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,8 @@ from .graph_export import graph_to_json, graph_to_mermaid
 from .lza_validation import LZA_VALIDATION_EVIDENCE
 from .patterns import GLOBAL_REGISTRY
 from .review_renderer import render_review_html as render_review_html_context
+
+_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def write_review_html(input_dir: Path, output: Path) -> None:
@@ -96,6 +99,7 @@ def build_review_context(
             "modelQuality": model_quality,
             "modelParseErrorCount": model_quality.get("parseErrorCount", 0),
             "lzaValidationStatus": lza_validation_summary.get("status", "not-run"),
+            "lzaValidationFailure": lza_validation_summary.get("failureExcerpt", ""),
             "selectedTargetPath": target_capabilities.get("selectedTargetPath", []),
             "unsupportedTargetGapCount": len(
                 _coerce_list(target_capabilities.get("unsupportedGaps"))
@@ -450,8 +454,28 @@ def _lza_validation_summary(evidence: dict[str, Any]) -> dict[str, Any]:
         "sourceCwd": str(source.get("commandWorkingDirectory", "")),
         "packageVersion": str(source.get("packageVersion", "unknown")),
         "gitCommit": str(source.get("gitCommit") or "unknown"),
+        "failureExcerpt": _lza_validation_failure_excerpt(command),
         "configFileDigests": _coerce_list(input_block.get("configFileDigests")),
     }
+
+
+def _lza_validation_failure_excerpt(command: dict[str, Any]) -> str:
+    text = "\n".join(str(command.get(key, "") or "") for key in ("stdout", "stderr"))
+    lines = [_ANSI_ESCAPE_RE.sub("", line).strip() for line in text.splitlines()]
+    for line in lines:
+        if "AccessDeniedException" in line:
+            return line[line.find("AccessDeniedException") :]
+    for line in lines:
+        if "Default email" in line:
+            return line[line.find("Default email") :]
+    for line in lines:
+        if " has " in line and " issues:" in line:
+            return line.rsplit("|", 1)[-1].strip()
+    for line in lines:
+        clean = _ANSI_ESCAPE_RE.sub("", line).strip()
+        if "Config file validation failed" in clean:
+            return "Config file validation failed."
+    return ""
 
 
 def _reviewer_next_actions(

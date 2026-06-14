@@ -86,6 +86,16 @@ def render_review_html(context: dict[str, Any]) -> str:
                         "LZA validation",
                         str(review_summary.get("lzaValidationStatus", "not-run")),
                     ),
+                    *(
+                        [
+                            _kv(
+                                "LZA validation failure",
+                                str(review_summary.get("lzaValidationFailure", "")),
+                            )
+                        ]
+                        if review_summary.get("lzaValidationFailure")
+                        else []
+                    ),
                     _kv("Selected target path", summary_target_path),
                     _kv(
                         "Unsupported target gaps",
@@ -361,6 +371,11 @@ def _lza_validation_section(
     return [
         _kv("Status", str(summary.get("status", "unknown"))),
         _kv("Exit code", str(summary.get("exitCode", "unknown"))),
+        *(
+            [_kv("Failure", str(summary.get("failureExcerpt", "")))]
+            if summary.get("failureExcerpt")
+            else []
+        ),
         _kv("Package version", str(summary.get("packageVersion", "unknown"))),
         _kv("Git commit", str(summary.get("gitCommit", "unknown"))),
         _kv("Source path", str(summary.get("sourcePath", ""))),

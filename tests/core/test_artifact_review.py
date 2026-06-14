@@ -172,6 +172,11 @@ def _write_review_bundle(
                 "command": {
                     "argv": ["corepack", "yarn", "validate-config", "/tmp/config"],
                     "exitCode": 1,
+                    "stdout": (
+                        "2026-06-15 | warn | config-validator | "
+                        "AccessDeniedException: You don't have permissions to access this "
+                        "resource. in accounts-config.yaml config file"
+                    ),
                 },
             },
         )
@@ -281,6 +286,10 @@ def test_review_context_surfaces_lza_validation_evidence(tmp_path: Path):
         "sourceCwd": "/tmp/landing-zone-accelerator-on-aws/source",
         "packageVersion": "1.15.0",
         "gitCommit": "abcde12",
+        "failureExcerpt": (
+            "AccessDeniedException: You don't have permissions to access this resource. "
+            "in accounts-config.yaml config file"
+        ),
         "configFileDigests": [
             {
                 "name": "network-config.yaml",
@@ -457,6 +466,8 @@ def test_render_review_html_uses_existing_graph_exports(tmp_path: Path):
     assert "raw-evidence.yaml" in html
     assert "LZA Validation Evidence" in html
     assert "lza-validation-evidence.yaml" in html
+    assert "LZA validation failure" in html
+    assert "AccessDeniedException" in html
     assert "network-config.yaml" in html
     assert "abc123" in html
 
