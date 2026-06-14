@@ -66,7 +66,6 @@ def derive_target_type(annotation: Any) -> str:
     Returns one of: 'string', 'int', 'bool', 'float', 'cidr_list',
     or the class name for enums / StrEnum.
     """
-    # Unwrap Optional[X]
     origin = get_origin(annotation)
     if origin is not None:
         args = get_args(annotation)
@@ -74,7 +73,6 @@ def derive_target_type(annotation: Any) -> str:
             annotation = next(a for a in args if a is not type(None))
             origin = get_origin(annotation)
 
-    # Unwrap list[X]
     if origin is list:
         args = get_args(annotation)
         if args and args[0] is str:
@@ -90,7 +88,6 @@ def derive_target_type(annotation: Any) -> str:
     if annotation is float:
         return "float"
 
-    # Enum types
     if isinstance(annotation, type) and issubclass(annotation, StrEnum):
         return annotation.__name__
     if isinstance(annotation, type) and issubclass(annotation, str):
@@ -112,7 +109,6 @@ def coerce_value(raw: Any, annotation: Any) -> Any:
     if raw is None:
         return None
 
-    # Unwrap Optional[X]
     origin = get_origin(annotation)
     if origin is not None:
         args = get_args(annotation)
@@ -195,7 +191,6 @@ def discover_model_fields(
         origin = get_origin(annotation)
         args = get_args(annotation)
 
-        # Unwrap Optional
         if origin is not None and type(None) in args:
             annotation = next(a for a in args if a is not type(None))
             origin = get_origin(annotation)
@@ -212,7 +207,6 @@ def discover_model_fields(
                 except TypeError:
                     pass
 
-        # Recurse into nested BaseModel
         if isinstance(annotation, type) and issubclass(annotation, BaseModel):
             result.update(discover_model_fields(annotation, path))
             continue

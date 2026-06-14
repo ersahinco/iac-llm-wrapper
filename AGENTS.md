@@ -100,7 +100,7 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy, pyr
 
 ### Current Goal
 
-T62: AWS LZA validation-only evidence adapter
+T64: Project-wide AI slop cleanup
 
 ### Status
 
@@ -109,7 +109,7 @@ T62: AWS LZA validation-only evidence adapter
 - **Format**: clean (`ruff format --check .`)
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added `iac-llm-wrapper lza validate`, a validation-only AWS LZA config-validator adapter that stages generated LZA config files, runs `yarn validate-config` or `corepack yarn validate-config` from a user-supplied local LZA source checkout, and writes `lza-validation-evidence.yaml`. It does not clone, install, synth, deploy, run pipelines, or mutate AWS. Owner validation still requires owner review or downstream acceptance of the evidence.
+- **Last session**: Ran a bounded project-wide AI slop cleanup. The pass kept the LZA validation cleanup, removed leftover duplicated YAML writer mechanics in contract validation, battle summaries, and CloudFormation parameter artifacts, and trimmed comments that only restated nearby code. No CLI behavior, artifact schema, fixture shape, or validation semantics changed.
 
 ### Done
 
@@ -156,10 +156,12 @@ T62: AWS LZA validation-only evidence adapter
 - T60 compiler slimming: Extracted incremental baseline parsing to `core/baseline.py`, readiness shaping to `core/readiness.py`, and artifact staging/promotion/contract validation to `core/compile_artifacts.py`. `compiler.py` remains the orchestrator and still exposes the existing public validation helpers for compatibility.
 - T61 LZA ecosystem positioning: Added `docs/LZA_RELATED_WORK_STRATEGY.md` to synthesize AWS LZA Universal Configuration, Luminarlz, Nuvibit NTC, and daily LZA operations into product principles and an ordered backlog. README now frames the tool as pre-flight decision capture and handoff readiness before AWS LZA runs, and CONTRIBUTING rejects related-work-inspired runners, dashboards, plugin loaders, or schema expansion without repeated evidence.
 - T62 LZA validation-only evidence: `iac-llm-wrapper lza validate --bundle <bundle> --lza-source <local-lza-repo-or-source>` runs the official local AWS LZA config validator against staged generated config files and writes `lza-validation-evidence.yaml` with command, exit code, stdout/stderr, package version, optional git commit, and explicit no-deploy/no-synth/no-clone/no-install/no-AWS-mutation guardrails. It falls back to Corepack when a direct `yarn` executable is not on PATH.
+- T63 AI-generated code cleanup: Recent LZA validation adapter code was reviewed for unnecessary comments, over-defensive internal checks, and avoidable duplication. The resulting change stayed deliberately small: centralize the evidence filename usage and keep safety checks only where they guard user input, local toolchain discovery, subprocess execution, malformed package metadata, and evidence capture.
+- T64 project-wide AI slop cleanup: Consolidated remaining obvious YAML writer duplication into `core.yaml_utils` where semantics matched, trimmed restating comments in discovery/model introspection, and kept defensive code at filesystem, subprocess, parser, model, LLM, and downstream validation boundaries.
 
 ### Next
 
-1. Run `iac-llm-wrapper lza validate` against a real local AWS LZA source checkout when available, include `lza-validation-evidence.yaml` with the owner packet, and capture owner acceptance before claiming downstream validation.
+1. Send the owner packet with `lza-validation-evidence.yaml` included and capture owner acceptance, real pipeline output, or owner schema/error output before claiming downstream validation.
 2. Use diff-aware compile plus `review compare` whenever a long document or sample configuration changes incrementally; review only the delta first, then decide whether a repeated/blocking point deserves implementation.
 3. Continue packet-based requirement harvesting before adding product surface: record only stuck/mistrust/manual-translation moments, and implement only repeated or handoff-blocking requirements.
 4. Stop harness expansion unless real local/Bedrock model runs expose pain.

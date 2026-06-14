@@ -140,11 +140,9 @@ class DiscoveryEngine:
         for key, val in field_map.items():
             if val is not None:
                 if key in self.graph._requirements:
-                    # Only treat as a user decision if it differs from the model default
                     if val != default_map.get(key):
                         self.graph.decide(key, val)
                     else:
-                        # Value matches model default — apply as default in graph
                         req = self.graph._requirements[key]
                         if req.default is None or str(req.default).strip() == "":
                             # Graph has no default; model default is not evidence
@@ -195,7 +193,6 @@ class DiscoveryEngine:
             if st in (RequirementStatus.DECIDED, RequirementStatus.DEFAULTED):
                 continue
 
-            # This requirement is applicable, not blocked, and not set — it's a gap
             priority = 1 if req.violation_code else 2
             result.missing.append(
                 RequirementGap(
@@ -213,7 +210,6 @@ class DiscoveryEngine:
 
         Checks graph relationships that are violated by intent values.
         """
-        # Check if any decision violates a blocked_if rule
         for key, req in self.graph._requirements.items():
             for condition_key, blocking_values in req.blocked_if.items():
                 cond_val = self.graph.get(condition_key)
@@ -283,10 +279,8 @@ class DiscoveryEngine:
         for key, req in self.graph._requirements.items():
             for sig in req.signals:
                 req_by_signal.setdefault(sig, []).append(key)
-                # Derive keywords from signal name
                 keywords = sig.replace("-", " ").replace("_", " ").split()
                 signal_keywords.setdefault(sig, []).extend(keywords)
-                # Add some common synonyms for known signals
                 if sig == "on-prem-ad":
                     signal_keywords[sig].extend(["active directory", "ad domain"])
                 elif sig == "mpls":

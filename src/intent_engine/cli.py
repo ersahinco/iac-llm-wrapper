@@ -39,6 +39,7 @@ from .core.graph_export import graph_to_json, graph_to_mermaid
 from .core.interview import InterviewEngine
 from .core.llm_caller import LLMEvidenceStore, auto_detect_llm
 from .core.lza_validation import (
+    LZA_VALIDATION_EVIDENCE,
     LzaValidationError,
     validate_lza_config_bundle,
 )
@@ -359,6 +360,7 @@ def lza_validate(
     ),
 ) -> None:
     """Run the official AWS LZA config validator and write evidence only."""
+    evidence_path = output or bundle / LZA_VALIDATION_EVIDENCE
     try:
         evidence = validate_lza_config_bundle(
             bundle_dir=bundle,
@@ -368,7 +370,6 @@ def lza_validate(
     except LzaValidationError as exc:
         typer.echo(str(exc), err=True)
         if exc.evidence:
-            evidence_path = output or bundle / "lza-validation-evidence.yaml"
             typer.echo(f"Validation evidence written to: {evidence_path}", err=True)
             typer.echo(
                 f"Exit code: {exc.evidence['command']['exitCode']}",
@@ -376,7 +377,6 @@ def lza_validate(
             )
         raise typer.Exit(1) from None
 
-    evidence_path = output or bundle / "lza-validation-evidence.yaml"
     typer.echo("AWS LZA config validation passed.")
     typer.echo(f"Validation evidence written to: {evidence_path}")
     typer.echo(f"Command: {' '.join(evidence['command']['argv'])}")

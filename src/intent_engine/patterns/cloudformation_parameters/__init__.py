@@ -5,8 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import ruamel.yaml
-
 from intent_engine.core.contracts import (
     GLOBAL_CONTRACT_REGISTRY,
     ArtifactContract,
@@ -17,6 +15,7 @@ from intent_engine.core.generator import register_generator
 from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern
 from intent_engine.core.requirements import Requirement, RequirementGraph
 from intent_engine.core.validator import Violation
+from intent_engine.core.yaml_utils import write_yaml_artifact
 
 from .models import CloudFormationParametersIntent
 
@@ -181,12 +180,7 @@ def _validate_intent(intent: Any) -> list[Violation]:
 
 
 def _write_yaml(output_dir: Path, name: str, data: dict[str, Any]) -> None:
-    yaml = ruamel.yaml.YAML()
-    yaml.default_flow_style = False
-    yaml.indent(mapping=2, sequence=4, offset=2)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    with open(output_dir / name, "w") as file:
-        yaml.dump(data, file)
+    write_yaml_artifact(output_dir / name, data, header="")
 
 
 def gen_cloudformation_parameters(intent: Any, output_dir: Path) -> None:

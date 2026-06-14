@@ -70,7 +70,10 @@ def validate_lza_config_bundle(
         except FileNotFoundError:
             exit_code = 127
             stdout = ""
-            stderr = "yarn executable not found; install the AWS LZA development toolchain first."
+            stderr = (
+                "yarn/corepack executable not found; install the AWS LZA development "
+                "toolchain first."
+            )
 
         duration_ms = round((time.monotonic() - start_time) * 1000, 1)
         evidence = _build_evidence(

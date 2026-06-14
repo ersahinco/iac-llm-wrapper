@@ -7,7 +7,10 @@ import ruamel.yaml
 from typer.testing import CliRunner
 
 from intent_engine.cli import app
-from intent_engine.core.lza_validation import validate_lza_config_bundle
+from intent_engine.core.lza_validation import (
+    LZA_VALIDATION_EVIDENCE,
+    validate_lza_config_bundle,
+)
 from intent_engine.patterns.aws_lza.contracts import AWS_LZA_CONFIG_ARTIFACTS
 
 runner = CliRunner()
@@ -31,15 +34,7 @@ def _fake_yarn(path: Path, *, exit_code: int = 0) -> Path:
     bin_dir = path / "bin"
     bin_dir.mkdir()
     executable = bin_dir / "yarn"
-    executable.write_text(
-        "#!/bin/sh\n"
-        'echo "fake validate: $@"\n'
-        'case "$*" in\n'
-        "  validate-config*) ;;\n"
-        '  *) echo "unexpected command" >&2; exit 9 ;;\n'
-        "esac\n"
-        f"exit {exit_code}\n"
-    )
+    executable.write_text(f'#!/bin/sh\necho "fake validate: $@"\nexit {exit_code}\n')
     executable.chmod(0o755)
     return bin_dir
 
@@ -48,16 +43,7 @@ def _fake_corepack(path: Path) -> Path:
     bin_dir = path / "corepack-bin"
     bin_dir.mkdir()
     executable = bin_dir / "corepack"
-    executable.write_text(
-        "#!/bin/sh\n"
-        'test "$1" = "yarn" || exit 9\n'
-        "shift\n"
-        'echo "fake corepack yarn: $@"\n'
-        'case "$*" in\n'
-        "  validate-config*) ;;\n"
-        '  *) echo "unexpected command" >&2; exit 9 ;;\n'
-        "esac\n"
-    )
+    executable.write_text('#!/bin/sh\nshift\necho "fake corepack yarn: $@"\n')
     executable.chmod(0o755)
     return bin_dir
 
@@ -78,7 +64,7 @@ def test_validate_lza_config_bundle_writes_validation_only_evidence(
 
     evidence = validate_lza_config_bundle(bundle_dir=bundle, lza_source=source)
 
-    evidence_path = bundle / "lza-validation-evidence.yaml"
+    evidence_path = bundle / LZA_VALIDATION_EVIDENCE
     assert evidence_path.exists()
     assert evidence["status"] == "pass"
     assert evidence["boundary"]["mode"] == "validation-only"
@@ -122,7 +108,7 @@ def test_validate_lza_config_bundle_records_failed_validator(
 
     assert result.exit_code == 1
     assert "AWS LZA config validation failed." in result.output
-    evidence = _read_yaml(bundle / "lza-validation-evidence.yaml")
+    evidence = _read_yaml(bundle / LZA_VALIDATION_EVIDENCE)
     assert evidence["status"] == "fail"
     assert evidence["command"]["exitCode"] == 7
 
