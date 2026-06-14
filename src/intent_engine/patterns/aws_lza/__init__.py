@@ -255,8 +255,8 @@ def _register_pattern() -> None:
             prompt_context=(
                 "This pattern gathers decisions for AWS Landing Zone Accelerator. "
                 "Use AWS LZA sample configurations as the downstream deployment contract. "
-                "Extract only decisions needed for LZA configuration and handoff; do not "
-                "infer custom Terraform unless explicitly requested."
+                "Extract only decisions needed for LZA configuration and handoff; flag "
+                "explicit custom Terraform requests as unsupported for this pattern."
             ),
             contracts=[AWS_LZA_SAMPLE_CONFIG_CONTRACT],
             plan_ready=True,

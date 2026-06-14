@@ -86,6 +86,21 @@ def _write_evidence_output(evidence_output: Path | None, evidence_store: LLMEvid
     typer.echo(f"LLM evidence written to: {evidence_output}")
 
 
+def _emit_llm_fallback_warning(evidence_store: LLMEvidenceStore) -> None:
+    failures = [
+        str(entry.get("parse_error"))
+        for entry in evidence_store.entries
+        if entry.get("parse_error")
+    ]
+    if not failures:
+        return
+    typer.echo(
+        "WARNING: LLM extraction failed; deterministic Markdown/default extraction continued.",
+        err=True,
+    )
+    typer.echo(f"  First LLM error: {failures[0]}", err=True)
+
+
 def _default_evidence_output(
     *,
     llm_caller: object | None,
@@ -544,6 +559,7 @@ def compile(
         typer.echo("Violations:", err=True)
         for v in e.violations:
             typer.echo(f"  [{v.code}] {v.message}", err=True)
+        _emit_llm_fallback_warning(evidence_store)
         if e.readiness and not dry_run:
             typer.echo(
                 "Safe assessment artifacts written to output: "
@@ -562,10 +578,12 @@ def compile(
 
     if dry_run:
         typer.echo("[Dry-run] Validation successful. No files written.")
+        _emit_llm_fallback_warning(evidence_store)
         _write_evidence_output(evidence_path, evidence_store)
         return
 
     typer.echo(f"Compilation successful. Output written to: {output}")
+    _emit_llm_fallback_warning(evidence_store)
     if incremental:
         _emit_incremental_compile_summary(output)
 

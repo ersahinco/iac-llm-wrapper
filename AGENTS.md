@@ -100,16 +100,16 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy, pyr
 
 ### Current Goal
 
-T64: Project-wide AI slop cleanup
+T66: Real AWS LZA validation evidence
 
 ### Status
 
-- **Tests**: 372 passing, 1 skipped; golden journey passed; fixture drift check passed
+- **Tests**: 373 passing, 1 skipped; golden journey passed; fixture drift check passed
 - **Lint**: clean (`ruff check .`)
 - **Format**: clean (`ruff format --check .`)
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Ran a bounded project-wide AI slop cleanup. The pass kept the LZA validation cleanup, removed leftover duplicated YAML writer mechanics in contract validation, battle summaries, and CloudFormation parameter artifacts, and trimmed comments that only restated nearby code. No CLI behavior, artifact schema, fixture shape, or validation semantics changed.
+- **Last session**: Added the canonical evidence-first T66-T71 roadmap to keep broader improvement work tracked as independently finishable slices. No public API, CLI, schema, artifact, or runtime behavior changed.
 
 ### Done
 
@@ -158,10 +158,11 @@ T64: Project-wide AI slop cleanup
 - T62 LZA validation-only evidence: `iac-llm-wrapper lza validate --bundle <bundle> --lza-source <local-lza-repo-or-source>` runs the official local AWS LZA config validator against staged generated config files and writes `lza-validation-evidence.yaml` with command, exit code, stdout/stderr, package version, optional git commit, and explicit no-deploy/no-synth/no-clone/no-install/no-AWS-mutation guardrails. It falls back to Corepack when a direct `yarn` executable is not on PATH.
 - T63 AI-generated code cleanup: Recent LZA validation adapter code was reviewed for unnecessary comments, over-defensive internal checks, and avoidable duplication. The resulting change stayed deliberately small: centralize the evidence filename usage and keep safety checks only where they guard user input, local toolchain discovery, subprocess execution, malformed package metadata, and evidence capture.
 - T64 project-wide AI slop cleanup: Consolidated remaining obvious YAML writer duplication into `core.yaml_utils` where semantics matched, trimmed restating comments in discovery/model introspection, and kept defensive code at filesystem, subprocess, parser, model, LLM, and downstream validation boundaries.
+- T65 review remediation: Full-bundle AWS LZA owner packet wording replaced network-only validation language; LZA validation evidence now records SHA256s for each config artifact; compile warns on LLM extraction failure when fallback proceeds; the stale `llm` install extra was removed from contributor setup; AWS LZA prompt context now flags explicit Terraform requests as unsupported. AWS LZA sample context/replay fixtures were refreshed for the prompt-context digest change.
 
 ### Next
 
-1. Send the owner packet with `lza-validation-evidence.yaml` included and capture owner acceptance, real pipeline output, or owner schema/error output before claiming downstream validation.
+1. Send the full-bundle owner packet with `lza-validation-evidence.yaml` included and capture owner acceptance, real pipeline output, or owner schema/error output before claiming downstream validation.
 2. Use diff-aware compile plus `review compare` whenever a long document or sample configuration changes incrementally; review only the delta first, then decide whether a repeated/blocking point deserves implementation.
 3. Continue packet-based requirement harvesting before adding product surface: record only stuck/mistrust/manual-translation moments, and implement only repeated or handoff-blocking requirements.
 4. Stop harness expansion unless real local/Bedrock model runs expose pain.
@@ -172,6 +173,69 @@ T64: Project-wide AI slop cleanup
 9. Next data-modeling increments should add typed entities only where a real
    packet exposes a missed relationship; defer Datalog until constraints become
    deeply inferential or platform-team policy preferences need rule composition.
+
+### Roadmap
+
+Roadmap rules:
+
+- Keep `### Current Goal` set to the active slice only.
+- Work in evidence-first order: T66, T67, T68, T69, T70, then T71.
+- Close each slice independently with its own tests, evidence, and session-state update.
+- Do not add dashboards, deploy runners, synth runners, plugin loaders, broad AWS schema expansion, or extra harnesses unless repeated real evidence forces the need.
+
+#### T66: Real AWS LZA validation evidence
+
+- **Goal**: Replace locally plausible validation with one real owner/toolchain signal.
+- **Why now**: This is the highest-trust gap before stronger downstream claims are credible.
+- **In scope**: Generate one realistic AWS LZA bundle from an existing customer-style packet; run `iac-llm-wrapper lza validate --bundle ... --lza-source ...` against a real local AWS LZA source checkout; send the full generated config bundle plus `decision-report.yaml`, `lineage-manifest.yaml`, `handoff-plan.yaml`, `replay-manifest.yaml`, `context-manifest.yaml`, and `lza-validation-evidence.yaml` to the downstream owner; capture owner approval, official validator output, pipeline output, or concrete schema/error output.
+- **Out of scope**: Generator rewrites, schema expansion, deploy/synth invocation, AWS mutation, new harnesses, dashboards, or product claims stronger than the captured evidence.
+- **Done when**: The repo has one captured downstream validation signal for a realistic packet and still clearly states that handoff artifacts are not deployments.
+- **Tests/evidence**: `uv run pytest tests/core/test_lza_validation.py`; `uv run python scripts/sync-sample-fixtures.py --check`; attach the real owner/toolchain evidence path or summary to session state.
+
+#### T67: Evidence traceability hardening
+
+- **Goal**: Make every trust claim inspectable.
+- **Why now**: Hashes now exist in validation evidence, but reviewers still need the full evidence chain to tell one consistent story.
+- **In scope**: Check consistency between `lza-validation-evidence.yaml`, `replay-manifest.yaml`, `lineage-manifest.yaml`, and static review output; confirm validation evidence hashes match exact generated AWS LZA config files; add hash visibility to review artifacts only if owner/reviewer use shows a need; rename or soften any field that implies stronger validation than the evidence supports.
+- **Out of scope**: New artifact families, dashboards, JavaScript review apps, or changing generated target config semantics.
+- **Done when**: A reviewer can answer what files were validated, from which bundle, by which command, against which LZA source, with what result.
+- **Tests/evidence**: `uv run pytest tests/core/test_lza_validation.py`; relevant artifact review tests if review output changes; `uv run python scripts/sync-sample-fixtures.py --check`.
+
+#### T68: Failure visibility hardening
+
+- **Goal**: Make fallback behavior useful but never quiet.
+- **Why now**: The CLI now warns on LLM backend failure, but other fallback paths should be intentionally classified.
+- **In scope**: Inventory failed LLM calls, skipped raw evidence, deterministic defaults, missing optional evidence, and blocked compile artifacts; classify each as expected, warning-worthy, or compile-blocking; add warnings/tests only where user trust or handoff readiness would otherwise be misleading.
+- **Out of scope**: Turning deterministic fallback into blanket compile failure, adding model dashboards, or making raw evidence mandatory for service-style runs.
+- **Done when**: CLI and review artifacts make it obvious when the model helped, failed, or was bypassed.
+- **Tests/evidence**: `uv run pytest tests/core/test_cli.py`; targeted review/artifact tests for any changed review wording; `uv run pytest` before closing the slice.
+
+#### T69: Lean architecture slices
+
+- **Goal**: Reduce `compiler.py` and `cli.py` gravity wells without a rewrite.
+- **Why now**: The boundaries are mostly right, but repeated nearby changes should leave the code smaller and clearer.
+- **In scope**: Extract small cohesive helpers only when touching nearby behavior; prefer boring ownership modules for readiness, evidence, validation, or review helpers; preserve existing public interfaces and artifact shapes unless a slice explicitly owns the change.
+- **Out of scope**: Broad rewrites, service layers, plugin loaders, generic framework abstractions, or churn that does not remove real complexity.
+- **Done when**: Large modules shrink opportunistically while behavior and tests stay stable.
+- **Tests/evidence**: The tests covering the touched behavior plus `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run --extra dev mypy`, and `uv run --extra dev pyright .`.
+
+#### T70: Product boundary cleanup
+
+- **Goal**: Keep the promise crisp: registered target configuration and handoff readiness.
+- **Why now**: The product is strongest when its claims are narrower than its evidence.
+- **In scope**: Search docs and CLI output for inflated claims around deployment, IaC generation, automation, and downstream validation; keep only claims backed by contracts, tests, owner evidence, or generated artifacts; delete duplicate docs before adding new ones; keep AWS LZA as the proof path.
+- **Out of scope**: Broad target depth, new public docs that repeat existing guidance, or positioning that implies direct deployment from prose.
+- **Done when**: README, CONTRIBUTING, validation docs, CLI guidance, and AGENTS all describe the same restrained product boundary.
+- **Tests/evidence**: `uv run pytest tests/core/test_product_language.py`; CLI guidance tests if terminal text changes; `git diff --check`.
+
+#### T71: Packet-driven improvement loop
+
+- **Goal**: Let real packets choose the roadmap.
+- **Why now**: The next useful requirements should come from observed handoff friction, not imagined capability.
+- **In scope**: Run messy customer-style packets through `discover -> compile --no-raw-evidence -> review`; record only stuckness, mistrust, manual translation, or repeated blocker confusion; promote repeated pain into the next T-number slice.
+- **Out of scope**: One-off polish, dashboarding, new harnesses, broad schema depth, or speculative target expansion.
+- **Done when**: New implementation work is backed by repeated packet friction or a handoff-blocking issue.
+- **Tests/evidence**: Store or summarize packet results in session state; run the targeted tests for any behavior changed by the resulting slice.
 
 ### Durable Decisions
 

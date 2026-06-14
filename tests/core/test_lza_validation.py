@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 from pathlib import Path
 
@@ -73,6 +74,12 @@ def test_validate_lza_config_bundle_writes_validation_only_evidence(
     assert evidence["command"]["argv"][0:2] == ["yarn", "validate-config"]
     assert evidence["command"]["exitCode"] == 0
     assert evidence["lzaSource"]["packageVersion"] == "1.2.3"
+    digests = {item["name"]: item["sha256"] for item in evidence["input"]["configFileDigests"]}
+    assert set(digests) == set(AWS_LZA_CONFIG_ARTIFACTS)
+    assert (
+        digests["network-config.yaml"]
+        == hashlib.sha256((bundle / "network-config.yaml").read_bytes()).hexdigest()
+    )
     assert _read_yaml(evidence_path)["schemaVersion"].endswith("aws-lza-validation-evidence/v1")
 
 

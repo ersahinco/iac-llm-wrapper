@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import subprocess
@@ -117,6 +118,17 @@ def _validator_command(staged_config: Path) -> list[str]:
     return ["yarn", "validate-config", str(staged_config)]
 
 
+def _config_file_records(bundle_dir: Path) -> list[dict[str, str]]:
+    return [
+        {
+            "name": name,
+            "bundlePath": str(bundle_dir / name),
+            "sha256": hashlib.sha256((bundle_dir / name).read_bytes()).hexdigest(),
+        }
+        for name in AWS_LZA_CONFIG_ARTIFACTS
+    ]
+
+
 def _build_evidence(
     *,
     bundle_dir: Path,
@@ -147,6 +159,7 @@ def _build_evidence(
             "bundlePath": str(bundle_dir),
             "stagedConfigDir": str(staged_config),
             "configFiles": list(AWS_LZA_CONFIG_ARTIFACTS),
+            "configFileDigests": _config_file_records(bundle_dir),
         },
         "lzaSource": {
             "requestedPath": str(lza_source),

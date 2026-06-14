@@ -11,12 +11,12 @@ contextInventory:
     intentModel: intent_engine.patterns.aws_lza.models.AwsLzaIntent
   promptContext:
     present: true
-    sha256: 616a0f5156e1d8a952d77128ead1c4b1cd6e58e1e4c0cf0843ca1997e2f91d69
-    wordCount: 36
+    sha256: 8a057319be772134b9fd334521916bdf2a99115f5b6198ab22aec22d2587330d
+    wordCount: 38
     text: This pattern gathers decisions for AWS Landing Zone Accelerator. Use
       AWS LZA sample configurations as the downstream deployment contract.
-      Extract only decisions needed for LZA configuration and handoff; do not
-      infer custom Terraform unless explicitly requested.
+      Extract only decisions needed for LZA configuration and handoff; flag
+      explicit custom Terraform requests as unsupported for this pattern.
   requirementGraph:
     nodeCount: 27
     edgeCount: 5

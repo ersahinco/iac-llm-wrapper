@@ -23,6 +23,11 @@ class _MockBackend(LLMBackend):
         return self.response
 
 
+class _FailingBackend(LLMBackend):
+    def complete(self, prompt: str, **kwargs: Any) -> str:
+        raise RuntimeError("model unavailable")
+
+
 class TestCompileCommand:
     def test_compile_aws_lza_handoff(self, tmp_path: Path, monkeypatch):
         monkeypatch.setenv("INTENT_ENGINE_DISABLE_LLM", "1")
@@ -99,6 +104,33 @@ class TestCompileCommand:
         assert "LLM evidence written to:" not in result.stdout
         assert not (output / "raw-evidence.yaml").exists()
         assert "status: not-requested" in (output / "llm-trace-summary.yaml").read_text()
+
+    def test_compile_warns_when_llm_fails_and_markdown_fallback_succeeds(
+        self,
+        tmp_path: Path,
+        monkeypatch,
+    ):
+        output = tmp_path / "output"
+        monkeypatch.setattr(
+            "intent_engine.cli.auto_detect_llm",
+            lambda **kwargs: LLMCaller(_FailingBackend()),
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "compile",
+                "--input",
+                str(FIXTURES / "usability" / "engineer-handoff-lza.md"),
+                "--output",
+                str(output),
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "WARNING: LLM extraction failed" in result.output
+        assert "First LLM error: model unavailable" in result.output
+        assert "parseError: model unavailable" in (output / "llm-trace-summary.yaml").read_text()
 
     def test_compile_missing_input_fails(self, tmp_path: Path):
         result = runner.invoke(

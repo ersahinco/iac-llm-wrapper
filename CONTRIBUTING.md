@@ -52,7 +52,7 @@ downstream owner, command, pipeline, or schema result produced it.
 ```bash
 uv venv
 source .venv/bin/activate
-uv pip install -e ".[dev,llm]"
+uv pip install -e ".[dev]"
 uv run pytest
 ```
 

@@ -1,13 +1,15 @@
 # AWS LZA Downstream Validation
 
-Owner-facing packet for generated AWS LZA `network-config.yaml`. Do not claim
+Owner-facing packet for the generated AWS LZA configuration bundle. Do not claim
 owner validation until this checklist, exact validation command output, pipeline
 output, schema/error output, or `lza-validation-evidence.yaml` reviewed by the
 downstream owner exists.
 
 ## Packet To Send
 
-- generated `network-config.yaml`
+- generated AWS LZA config files:
+  `accounts-config.yaml`, `global-config.yaml`, `iam-config.yaml`,
+  `network-config.yaml`, `organization-config.yaml`, and `security-config.yaml`
 - `decision-report.yaml`
 - `lineage-manifest.yaml`
 - `handoff-plan.yaml`
@@ -15,13 +17,13 @@ downstream owner exists.
 - `lza-validation-evidence.yaml` when local validation has been run
 - this checklist
 
-Ask only whether `network-config.yaml` can enter the current AWS LZA validation
-or pipeline path after normal manual gates.
+Ask only whether the generated AWS LZA config bundle can enter the current AWS
+LZA validation or pipeline path after normal manual gates.
 
 ## Checklist Template
 
 ```markdown
-# AWS LZA network-config.yaml Owner Checklist
+# AWS LZA Generated Config Bundle Owner Checklist
 
 Reviewer:
 Team:
@@ -40,6 +42,9 @@ Generated bundle path or commit:
 ## Reviewed Sections
 
 - [ ] `homeRegion`
+- [ ] `accounts-config.yaml`
+- [ ] `global-config.yaml`
+- [ ] `iam-config.yaml`
 - [ ] `defaultVpc`
 - [ ] `transitGateways`
 - [ ] `transitGateways[].routeTables`
@@ -51,12 +56,14 @@ Generated bundle path or commit:
 - [ ] `vpcs[].natGateways`
 - [ ] `vpcs[].transitGatewayAttachments`
 - [ ] `centralNetworkServices`
+- [ ] `organization-config.yaml`
+- [ ] `security-config.yaml`
 - [ ] Other:
 
 ## Required Owner Answers
 
-Can this `network-config.yaml` enter your current LZA validation or pipeline
-path after normal manual gates?
+Can this generated AWS LZA config bundle enter your current LZA validation or
+pipeline path after normal manual gates?
 
 Answer:
 
