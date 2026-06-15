@@ -10,7 +10,6 @@ run:
 readiness:
   status: ready
   handoffAllowed: true
-  deploymentAllowed: true
   blockerCount: 0
 latency:
   totalMs: 0

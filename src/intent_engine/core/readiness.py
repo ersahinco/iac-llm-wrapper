@@ -152,8 +152,6 @@ def build_handoff_readiness(
     )
     readiness: dict[str, Any] = {
         "handoffAllowed": handoff_allowed,
-        # Backward-compatible alias for existing artifact consumers.
-        "deploymentAllowed": handoff_allowed,
         "status": "ready" if handoff_allowed else "blocked",
         "allowedNextAction": allowed_next_action,
         "summary": (

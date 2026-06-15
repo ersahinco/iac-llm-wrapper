@@ -199,9 +199,7 @@ def gen_cloudformation_parameters(intent: Any, output_dir: Path) -> None:
 
 
 def gen_decision_report(intent: Any, output_dir: Path) -> None:
-    readiness = getattr(intent, "handoff_readiness", None)
-    if readiness is None:
-        readiness = getattr(intent, "deployment_readiness", {})
+    readiness = getattr(intent, "handoff_readiness", {})
     model = _intent(intent)
     if model is None:
         return
@@ -221,8 +219,6 @@ def gen_decision_report(intent: Any, output_dir: Path) -> None:
     }
     if readiness:
         data["handoffReadiness"] = readiness
-        # Backward-compatible alias for existing artifact consumers.
-        data["deploymentReadiness"] = readiness
     _write_yaml(output_dir, "decision-report.yaml", data)
 
 

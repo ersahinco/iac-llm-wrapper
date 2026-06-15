@@ -420,11 +420,8 @@ def gen_handoff_plan(intent: Any, output_dir: Path) -> None:
     from .patterns import GLOBAL_REGISTRY as PATTERN_REGISTRY
 
     pattern_obj = PATTERN_REGISTRY.get(pattern)
-    readiness = getattr(intent, "handoff_readiness", None)
-    if readiness is None:
-        readiness = getattr(intent, "deployment_readiness", {})
-    readiness = readiness or {}
-    allowed = bool(readiness.get("handoffAllowed", readiness.get("deploymentAllowed", True)))
+    readiness = getattr(intent, "handoff_readiness", {}) or {}
+    allowed = bool(readiness.get("handoffAllowed", True))
     allowed_next_action = readiness.get(
         "allowedNextAction",
         (
@@ -463,8 +460,6 @@ def gen_handoff_plan(intent: Any, output_dir: Path) -> None:
         "readiness": {
             "status": readiness.get("status", "ready" if allowed else "blocked"),
             "handoffAllowed": allowed,
-            # Backward-compatible alias for existing artifact consumers.
-            "deploymentAllowed": allowed,
             "blockers": readiness.get("blockers", []),
             "configReady": readiness.get("configReady", {}),
             "planReady": readiness.get("planReady", {}),

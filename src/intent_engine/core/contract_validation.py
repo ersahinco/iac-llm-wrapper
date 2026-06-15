@@ -28,7 +28,7 @@ def build_contract_validation(input_dir: Path) -> dict[str, Any]:
     readiness = _readiness(report, handoff)
     contracts = []
 
-    if readiness.get("handoffAllowed", readiness.get("deploymentAllowed", False)):
+    if readiness.get("handoffAllowed", False):
         pattern = str(report.get("pattern", handoff.get("pattern", "")) or "")
         try:
             pattern_obj = GLOBAL_REGISTRY.get(pattern)
@@ -88,7 +88,7 @@ def write_contract_validation(input_dir: Path) -> Path:
 
 
 def _readiness(report: dict[str, Any], handoff: dict[str, Any]) -> dict[str, Any]:
-    report_readiness = report.get("handoffReadiness") or report.get("deploymentReadiness")
+    report_readiness = report.get("handoffReadiness")
     if not isinstance(report_readiness, dict):
         report_readiness = {}
     handoff_readiness = handoff.get("readiness")
@@ -98,7 +98,6 @@ def _readiness(report: dict[str, Any], handoff: dict[str, Any]) -> dict[str, Any
         return {
             "status": "blocked",
             "handoffAllowed": False,
-            "deploymentAllowed": False,
             "blockers": [
                 {
                     "code": "READINESS_METADATA_MISSING",
@@ -108,10 +107,8 @@ def _readiness(report: dict[str, Any], handoff: dict[str, Any]) -> dict[str, Any
         }
     allowed: bool | None = None
     for source in (report_readiness, handoff_readiness):
-        for key in ("handoffAllowed", "deploymentAllowed"):
-            if key in source:
-                allowed = bool(source[key])
-                break
+        if "handoffAllowed" in source:
+            allowed = bool(source["handoffAllowed"])
         if allowed is not None:
             break
     blockers = report_readiness.get("blockers", handoff_readiness.get("blockers", []))
@@ -124,20 +121,17 @@ def _readiness(report: dict[str, Any], handoff: dict[str, Any]) -> dict[str, Any
             {
                 "code": "READINESS_METADATA_INCOMPLETE",
                 "message": (
-                    "Bundle readiness metadata must explicitly include status and "
-                    "handoffAllowed or deploymentAllowed."
+                    "Bundle readiness metadata must explicitly include status and handoffAllowed."
                 ),
             },
         ]
         return {
             "status": "blocked",
             "handoffAllowed": False,
-            "deploymentAllowed": False,
             "blockers": blockers,
         }
     return {
         "status": status,
         "handoffAllowed": allowed,
-        "deploymentAllowed": allowed,
         "blockers": blockers,
     }

@@ -397,7 +397,7 @@ def _readiness(
     handoff: dict[str, Any],
     contract: dict[str, Any],
 ) -> dict[str, Any]:
-    report_readiness = _dict(report.get("handoffReadiness") or report.get("deploymentReadiness"))
+    report_readiness = _dict(report.get("handoffReadiness"))
     handoff_readiness = _dict(handoff.get("readiness"))
     contract_readiness = _dict(contract.get("readiness"))
     status = str(
@@ -409,16 +409,7 @@ def _readiness(
     allowed = bool(
         report_readiness.get(
             "handoffAllowed",
-            report_readiness.get(
-                "deploymentAllowed",
-                handoff_readiness.get(
-                    "handoffAllowed",
-                    handoff_readiness.get(
-                        "deploymentAllowed",
-                        contract_readiness.get("handoffAllowed", False),
-                    ),
-                ),
-            ),
+            handoff_readiness.get("handoffAllowed", contract_readiness.get("handoffAllowed", False)),
         )
     )
     return {
@@ -448,7 +439,6 @@ def _flatten_report_decisions(report: dict[str, Any]) -> dict[str, Any]:
     ignored = {
         "pattern",
         "handoffReadiness",
-        "deploymentReadiness",
         "schemaVersion",
         "boundary",
     }

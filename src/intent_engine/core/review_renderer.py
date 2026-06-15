@@ -57,12 +57,7 @@ def render_review_html(context: dict[str, Any]) -> str:
                     _kv("Readiness", str(review_summary.get("readiness", "unknown"))),
                     _kv(
                         "Handoff allowed",
-                        str(
-                            review_summary.get(
-                                "handoffAllowed",
-                                review_summary.get("deploymentAllowed", False),
-                            )
-                        ),
+                        str(review_summary.get("handoffAllowed", False)),
                     ),
                     _kv("Blocker count", str(review_summary.get("blockerCount", 0))),
                     _kv(
@@ -133,12 +128,7 @@ def render_review_html(context: dict[str, Any]) -> str:
                 [
                     _kv(
                         "Handoff allowed",
-                        str(
-                            readiness.get(
-                                "handoffAllowed",
-                                readiness.get("deploymentAllowed", False),
-                            )
-                        ),
+                        str(readiness.get("handoffAllowed", False)),
                     ),
                     _kv("Allowed next action", str(readiness.get("allowedNextAction", ""))),
                     _blocker_table(_coerce_list(context.get("blockerRows"))),

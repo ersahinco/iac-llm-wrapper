@@ -47,7 +47,6 @@ expect:
     values:
       pattern: terraform-vpc
       handoffReadiness.status: ready
-      deploymentReadiness.status: ready
     deterministicValues:
       callCount: 0
       rawEvidence.status: not-requested

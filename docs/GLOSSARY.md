@@ -64,15 +64,13 @@ are not deployments and do not make cloud changes.
 The status that says whether a handoff is ready, blocked, or missing required
 input. Readiness is graph- and contract-owned, not model-owned.
 
-Artifacts may still expose the legacy YAML key `deploymentReadiness` for
-backward compatibility. Treat it as an alias for handoff readiness, not as
-permission to deploy from prose.
+Artifacts expose `handoffReadiness` as the canonical readiness object. It is
+not permission to deploy from prose.
 
 ## Handoff Allowed
 
 The `handoffAllowed` readiness field: whether the reviewed artifact bundle can
-move to the existing downstream toolchain after manual gates. Older artifacts may
-also expose `deploymentAllowed` as a compatibility alias. Neither field means
+move to the existing downstream toolchain after manual gates. It does not mean
 this tool deploys infrastructure.
 
 ## Allowed Next Action

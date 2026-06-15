@@ -51,7 +51,7 @@ expect:
     security.complianceOverlay: financial-services
     semanticModel.summary.failedConstraintCount: 0
     handoffReadiness.status: ready
-    handoffReadiness.deploymentAllowed: true
+    handoffReadiness.handoffAllowed: true
     handoffReadiness.targetCapabilities.selectedTargetPath:
       - accelerator
     handoffReadiness.targetCapabilities.unsupportedGapCount: 0
@@ -103,7 +103,6 @@ expect:
     values:
       pattern: aws-lza
       handoffReadiness.status: ready
-      deploymentReadiness.status: ready
     deterministicValues:
       callCount: 0
       rawEvidence.status: not-requested

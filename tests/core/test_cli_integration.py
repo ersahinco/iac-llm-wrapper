@@ -331,7 +331,7 @@ class TestCLICompile:
         assert "template --pattern <pattern>" not in result.output
         assert "AWS_LZA_NETWORK_ACCOUNT_REQUIRED" in result.output
         report = (output_dir / "decision-report.yaml").read_text()
-        assert "deploymentAllowed: false" in report
+        assert "handoffAllowed: false" in report
         assert "Cannot hand off yet" in report
         trace = (output_dir / "llm-trace-summary.yaml").read_text()
         assert "callCount: 0" in trace
@@ -341,7 +341,7 @@ class TestCLICompile:
         assert "rawEvidencePath:" not in trace
         benchmark = (output_dir / "model-benchmark.yaml").read_text()
         assert "mode: deterministic" in benchmark
-        assert "deploymentAllowed: false" in benchmark
+        assert "handoffAllowed: false" in benchmark
         assert "blockingGapCount:" in benchmark
 
     def test_compile_duplicate_structured_decision_blocks(self, tmp_path: Path, monkeypatch):

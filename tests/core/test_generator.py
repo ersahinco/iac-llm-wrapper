@@ -254,7 +254,7 @@ class TestGenHandoffPlan:
         try:
             payload = SimpleNamespace(
                 pattern="handoff-semantic-test",
-                deployment_readiness={"status": "ready", "deploymentAllowed": True},
+                handoff_readiness={"status": "ready", "handoffAllowed": True},
             )
 
             gen_handoff_plan(payload, tmp_path)
@@ -283,9 +283,9 @@ class TestGenHandoffPlan:
         try:
             payload = SimpleNamespace(
                 pattern="handoff-semantic-test",
-                deployment_readiness={
+                handoff_readiness={
                     "status": "blocked",
-                    "deploymentAllowed": False,
+                    "handoffAllowed": False,
                     "blockers": [{"code": "REGION_REQUIRED", "message": "Region required."}],
                 },
             )
@@ -298,7 +298,6 @@ class TestGenHandoffPlan:
             )
             assert plan["readiness"]["status"] == "blocked"
             assert plan["readiness"]["handoffAllowed"] is False
-            assert plan["readiness"]["deploymentAllowed"] is False
             assert plan["readiness"]["blockers"] == [
                 {"code": "REGION_REQUIRED", "message": "Region required."}
             ]

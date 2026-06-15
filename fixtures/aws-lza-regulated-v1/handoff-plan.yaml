@@ -9,7 +9,6 @@ allowedNextAction: Pass the reviewed artifacts to the existing target toolchain
 readiness:
   status: ready
   handoffAllowed: true
-  deploymentAllowed: true
   blockers: &id001 []
   configReady:
     status: ready

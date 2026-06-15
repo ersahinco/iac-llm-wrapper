@@ -439,7 +439,6 @@ BLOCKED_ASSESSMENT_CONTRACT = TargetContract(
             required_paths=[
                 "pattern",
                 "handoffReadiness.handoffAllowed",
-                "handoffReadiness.deploymentAllowed",
                 "handoffReadiness.status",
                 "handoffReadiness.summary",
                 "handoffReadiness.blockers[]",
@@ -452,10 +451,6 @@ BLOCKED_ASSESSMENT_CONTRACT = TargetContract(
             value_assertions=[
                 ArtifactValueAssertion(
                     path="handoffReadiness.handoffAllowed",
-                    equals=False,
-                ),
-                ArtifactValueAssertion(
-                    path="handoffReadiness.deploymentAllowed",
                     equals=False,
                 ),
                 ArtifactValueAssertion(path="handoffReadiness.status", equals="blocked"),
@@ -479,7 +474,6 @@ BLOCKED_ASSESSMENT_CONTRACT = TargetContract(
                 "gaps.blocking",
                 "contradictions.blocking",
                 "handoffReadiness.handoffAllowed",
-                "handoffReadiness.deploymentAllowed",
                 "handoffReadiness.status",
                 "handoffReadiness.blockerCount",
                 "handoffReadiness.blockingGapCount",
@@ -490,10 +484,6 @@ BLOCKED_ASSESSMENT_CONTRACT = TargetContract(
             value_assertions=[
                 ArtifactValueAssertion(
                     path="handoffReadiness.handoffAllowed",
-                    equals=False,
-                ),
-                ArtifactValueAssertion(
-                    path="handoffReadiness.deploymentAllowed",
                     equals=False,
                 ),
                 ArtifactValueAssertion(path="handoffReadiness.status", equals="blocked"),
@@ -511,7 +501,6 @@ BLOCKED_ASSESSMENT_CONTRACT = TargetContract(
                 "run.callCount",
                 "readiness.status",
                 "readiness.handoffAllowed",
-                "readiness.deploymentAllowed",
                 "readiness.blockerCount",
                 "latency.totalMs",
                 "latency.averageMs",
@@ -538,7 +527,6 @@ BLOCKED_ASSESSMENT_CONTRACT = TargetContract(
             ],
             value_assertions=[
                 ArtifactValueAssertion(path="readiness.handoffAllowed", equals=False),
-                ArtifactValueAssertion(path="readiness.deploymentAllowed", equals=False),
                 ArtifactValueAssertion(path="readiness.status", equals="blocked"),
             ],
         ),
@@ -578,7 +566,6 @@ HANDOFF_PLAN_CONTRACT = TargetContract(
                 "allowedNextAction",
                 "readiness.status",
                 "readiness.handoffAllowed",
-                "readiness.deploymentAllowed",
                 "targetContracts[]",
                 "targetContracts[].name",
                 "targetContracts[].kind",

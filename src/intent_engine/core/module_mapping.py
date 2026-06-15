@@ -76,7 +76,6 @@ class IaCIntentPayload:
         target_capability_report: dict[str, Any] | None = None,
         source_context: dict[str, Any] | None = None,
         handoff_readiness: dict[str, Any] | None = None,
-        deployment_readiness: dict[str, Any] | None = None,
     ) -> None:
         self.design_doc = design_doc
         self.module_inputs = module_inputs
@@ -86,9 +85,7 @@ class IaCIntentPayload:
         self.extraction_summary = extraction_summary or {}
         self.target_capability_report = target_capability_report or {}
         self.source_context = source_context or {}
-        self._handoff_readiness = (
-            handoff_readiness if handoff_readiness is not None else deployment_readiness or {}
-        )
+        self._handoff_readiness = handoff_readiness or {}
 
     @property
     def handoff_readiness(self) -> dict[str, Any]:
@@ -97,15 +94,6 @@ class IaCIntentPayload:
 
     @handoff_readiness.setter
     def handoff_readiness(self, value: dict[str, Any]) -> None:
-        self._handoff_readiness = value
-
-    @property
-    def deployment_readiness(self) -> dict[str, Any]:
-        """Compatibility alias for older callers and artifacts."""
-        return self._handoff_readiness
-
-    @deployment_readiness.setter
-    def deployment_readiness(self, value: dict[str, Any]) -> None:
         self._handoff_readiness = value
 
     def __getattr__(self, name: str) -> Any:
@@ -124,7 +112,6 @@ class IaCIntentPayload:
             "target_capability_report",
             "source_context",
             "handoff_readiness",
-            "deployment_readiness",
             "_handoff_readiness",
         ):
             return object.__getattribute__(self, name)

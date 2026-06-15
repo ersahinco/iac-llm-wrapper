@@ -11,9 +11,8 @@ nodePool:
   minSize: 2
   maxSize: 5
 namespace: production
-handoffReadiness: &id002
+handoffReadiness:
   handoffAllowed: true
-  deploymentAllowed: true
   status: ready
   allowedNextAction: Pass the reviewed artifacts to the existing target
     toolchain after manual gates.
@@ -38,4 +37,3 @@ handoffReadiness: &id002
     - Validate target contracts and artifact owner approvals before downstream
       use.
     - Pass only reviewed artifacts to the existing target toolchain.
-deploymentReadiness: *id002

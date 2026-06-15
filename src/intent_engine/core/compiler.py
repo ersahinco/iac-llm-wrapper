@@ -422,16 +422,6 @@ def _build_extraction_summary(
         },
         "handoffReadiness": {
             "handoffAllowed": readiness["handoffAllowed"],
-            "deploymentAllowed": readiness["deploymentAllowed"],
-            "status": readiness["status"],
-            "blockerCount": len(readiness["blockers"]),
-            "blockingGapCount": len(blocking_gaps),
-            "blockingContradictionCount": len(blocking_contradictions),
-        },
-        # Backward-compatible alias for existing artifact consumers.
-        "deploymentReadiness": {
-            "handoffAllowed": readiness["handoffAllowed"],
-            "deploymentAllowed": readiness["deploymentAllowed"],
             "status": readiness["status"],
             "blockerCount": len(readiness["blockers"]),
             "blockingGapCount": len(blocking_gaps),
@@ -498,8 +488,6 @@ def _write_failed_compile_artifacts(
         "pattern": pattern,
         "decisions": _to_builtin(graph.typed_decisions()),
         "handoffReadiness": readiness,
-        # Backward-compatible alias for existing artifact consumers.
-        "deploymentReadiness": readiness,
     }
     if target_capability_report:
         report["targetCapabilities"] = target_capability_report

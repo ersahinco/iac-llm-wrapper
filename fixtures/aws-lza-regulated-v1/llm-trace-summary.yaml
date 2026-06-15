@@ -76,14 +76,6 @@ contradictions:
   raw: []
 handoffReadiness:
   handoffAllowed: true
-  deploymentAllowed: true
-  status: ready
-  blockerCount: 0
-  blockingGapCount: 0
-  blockingContradictionCount: 0
-deploymentReadiness:
-  handoffAllowed: true
-  deploymentAllowed: true
   status: ready
   blockerCount: 0
   blockingGapCount: 0

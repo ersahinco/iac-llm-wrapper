@@ -34,7 +34,6 @@ expect:
     values:
       pattern: cloudformation-parameters
       handoffReadiness.status: ready
-      deploymentReadiness.status: ready
     deterministicValues:
       callCount: 0
       rawEvidence.status: not-requested

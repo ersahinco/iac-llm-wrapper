@@ -77,14 +77,13 @@ class TestIaCIntentPayload:
         assert payload.pattern == "aws-lza"
         assert payload.decisions["baseline"] == "standard"
 
-    def test_handoff_readiness_aliases_legacy_field(self):
-        readiness = {"status": "ready", "deploymentAllowed": True}
+    def test_handoff_readiness_field(self):
+        readiness = {"status": "ready", "handoffAllowed": True}
         payload = IaCIntentPayload(
             design_doc=DesignDocument(),
             module_inputs=[],
             intent=SampleIntent(),
-            deployment_readiness=readiness,
+            handoff_readiness=readiness,
         )
 
         assert payload.handoff_readiness is readiness
-        assert payload.deployment_readiness is readiness

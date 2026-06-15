@@ -33,7 +33,7 @@ def baseline_summary_from_bundle(bundle: Path) -> dict[str, Any]:
     report = read_yaml_mapping(bundle / "decision-report.yaml")
     trace = read_yaml_mapping(bundle / "llm-trace-summary.yaml")
     benchmark = read_yaml_mapping(bundle / "model-benchmark.yaml")
-    readiness = report.get("handoffReadiness") or report.get("deploymentReadiness") or {}
+    readiness = report.get("handoffReadiness") or {}
     quality = benchmark.get("quality", {}) if isinstance(benchmark.get("quality"), dict) else {}
     return {
         "pattern": report.get("pattern", trace.get("pattern", benchmark.get("pattern", "unknown"))),

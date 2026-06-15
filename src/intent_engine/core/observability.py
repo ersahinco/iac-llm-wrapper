@@ -11,9 +11,7 @@ def build_model_benchmark(extraction_summary: dict[str, Any]) -> dict[str, Any]:
     latencies = [float(call.get("latencyMs", 0) or 0) for call in calls]
     total_latency = round(sum(latencies), 1)
     token_totals = _token_totals(calls)
-    readiness = _dict(
-        extraction_summary.get("handoffReadiness") or extraction_summary.get("deploymentReadiness")
-    )
+    readiness = _dict(extraction_summary.get("handoffReadiness"))
     gaps = _dict(extraction_summary.get("gaps"))
     contradictions = _dict(extraction_summary.get("contradictions"))
     raw_evidence = _dict(extraction_summary.get("rawEvidence"))
@@ -39,11 +37,7 @@ def build_model_benchmark(extraction_summary: dict[str, Any]) -> dict[str, Any]:
         },
         "readiness": {
             "status": readiness.get("status", "unknown"),
-            "handoffAllowed": readiness.get(
-                "handoffAllowed",
-                readiness.get("deploymentAllowed", False),
-            ),
-            "deploymentAllowed": readiness.get("deploymentAllowed", False),
+            "handoffAllowed": readiness.get("handoffAllowed", False),
             "blockerCount": blocker_count,
         },
         "latency": {

@@ -87,7 +87,6 @@ def build_review_context(
         "reviewSummary": {
             "readiness": readiness.get("status", "unknown"),
             "handoffAllowed": readiness.get("handoffAllowed", False),
-            "deploymentAllowed": readiness.get("deploymentAllowed", False),
             "blockerCount": len(_coerce_list(readiness.get("blockers"))),
             "missingDecisionCount": len(_coerce_list(readiness.get("missingDecisions"))),
             "conflictingDecisionCount": len(_coerce_list(readiness.get("conflictingDecisions"))),
@@ -195,18 +194,12 @@ def _dict(value: Any) -> dict[str, Any]:
 
 
 def _readiness(report: dict[str, Any], handoff: dict[str, Any]) -> dict[str, Any]:
-    report_readiness = _dict(report.get("handoffReadiness") or report.get("deploymentReadiness"))
+    report_readiness = _dict(report.get("handoffReadiness"))
     handoff_readiness = _dict(handoff.get("readiness"))
     allowed = bool(
         report_readiness.get(
             "handoffAllowed",
-            report_readiness.get(
-                "deploymentAllowed",
-                handoff_readiness.get(
-                    "handoffAllowed",
-                    handoff_readiness.get("deploymentAllowed", True),
-                ),
-            ),
+            handoff_readiness.get("handoffAllowed", True),
         )
     )
     status = str(report_readiness.get("status", handoff_readiness.get("status", "ready"))).lower()
@@ -218,7 +211,6 @@ def _readiness(report: dict[str, Any], handoff: dict[str, Any]) -> dict[str, Any
     return {
         "status": status,
         "handoffAllowed": allowed,
-        "deploymentAllowed": allowed,
         "allowedNextAction": str(
             handoff.get(
                 "allowedNextAction",
@@ -235,7 +227,7 @@ def _readiness(report: dict[str, Any], handoff: dict[str, Any]) -> dict[str, Any
 
 
 def _graph_decisions(report: dict[str, Any]) -> dict[str, Any]:
-    ignored = {"deploymentReadiness", "handoffReadiness"}
+    ignored = {"handoffReadiness"}
     return {key: value for key, value in report.items() if key not in ignored}
 
 
@@ -521,9 +513,7 @@ def _reviewer_next_actions(
     lza_validation_summary: dict[str, Any],
 ) -> list[str]:
     status = str(readiness.get("status", "unknown"))
-    handoff_allowed = bool(
-        readiness.get("handoffAllowed", readiness.get("deploymentAllowed", False))
-    )
+    handoff_allowed = bool(readiness.get("handoffAllowed", False))
     if status == "blocked" or not handoff_allowed:
         actions = [
             "Do not pass target artifacts to the provisioning toolchain yet.",

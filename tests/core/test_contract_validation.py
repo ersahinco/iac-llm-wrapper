@@ -79,12 +79,6 @@ def _write_ready_bundle(output_dir: Path, *, include_config: bool = True) -> Non
             "handoffReadiness": {
                 "status": "ready",
                 "handoffAllowed": True,
-                "deploymentAllowed": True,
-            },
-            "deploymentReadiness": {
-                "status": "ready",
-                "handoffAllowed": True,
-                "deploymentAllowed": True,
             },
         },
     )
@@ -94,7 +88,7 @@ def _write_ready_bundle(output_dir: Path, *, include_config: bool = True) -> Non
             "pattern": "contract-validation-example",
             "boundary": "handoff only",
             "allowedNextAction": "Review config.",
-            "readiness": {"status": "ready", "handoffAllowed": True, "deploymentAllowed": True},
+            "readiness": {"status": "ready", "handoffAllowed": True},
             "targetContracts": [
                 {
                     "name": "example-config",
@@ -167,7 +161,6 @@ def _write_blocked_bundle(output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     readiness = {
         "handoffAllowed": False,
-        "deploymentAllowed": False,
         "status": "blocked",
         "summary": "Cannot hand off yet.",
         "blockers": [{"code": "REGION_REQUIRED", "message": "Region required."}],
@@ -180,7 +173,6 @@ def _write_blocked_bundle(output_dir: Path) -> None:
         {
             "pattern": "contract-validation-example",
             "handoffReadiness": readiness,
-            "deploymentReadiness": readiness,
         },
     )
     _write_yaml(
@@ -200,15 +192,6 @@ def _write_blocked_bundle(output_dir: Path) -> None:
             "contradictions": {"blocking": []},
             "handoffReadiness": {
                 "handoffAllowed": False,
-                "deploymentAllowed": False,
-                "status": "blocked",
-                "blockerCount": 1,
-                "blockingGapCount": 1,
-                "blockingContradictionCount": 0,
-            },
-            "deploymentReadiness": {
-                "handoffAllowed": False,
-                "deploymentAllowed": False,
                 "status": "blocked",
                 "blockerCount": 1,
                 "blockingGapCount": 1,
@@ -226,7 +209,6 @@ def _write_blocked_bundle(output_dir: Path) -> None:
             "readiness": {
                 "status": "blocked",
                 "handoffAllowed": False,
-                "deploymentAllowed": False,
                 "blockerCount": 1,
             },
             "latency": {"totalMs": 0, "averageMs": 0, "maxMs": 0},
@@ -303,7 +285,6 @@ def test_blocked_bundle_validates_blocked_assessment_only(tmp_path: Path):
     assert result["summary"]["status"] == "pass"
     assert [item["name"] for item in result["contracts"]] == ["blocked-assessment-artifacts"]
     assert result["readiness"]["handoffAllowed"] is False
-    assert result["readiness"]["deploymentAllowed"] is False
 
 
 def test_unknown_ready_pattern_fails_without_guessing_contracts(tmp_path: Path):
@@ -314,18 +295,12 @@ def test_unknown_ready_pattern_fails_without_guessing_contracts(tmp_path: Path):
             "handoffReadiness": {
                 "status": "ready",
                 "handoffAllowed": True,
-                "deploymentAllowed": True,
-            },
-            "deploymentReadiness": {
-                "status": "ready",
-                "handoffAllowed": True,
-                "deploymentAllowed": True,
             },
         },
     )
     _write_yaml(
         tmp_path / "handoff-plan.yaml",
-        {"readiness": {"handoffAllowed": True, "deploymentAllowed": True}},
+        {"readiness": {"handoffAllowed": True}},
     )
 
     result = build_contract_validation(tmp_path)
@@ -341,7 +316,6 @@ def test_missing_readiness_metadata_fails_closed(tmp_path: Path):
 
     assert result["readiness"]["status"] == "blocked"
     assert result["readiness"]["handoffAllowed"] is False
-    assert result["readiness"]["deploymentAllowed"] is False
     assert result["readiness"]["blockers"] == [
         {
             "code": "READINESS_METADATA_MISSING",
@@ -363,13 +337,11 @@ def test_incomplete_readiness_metadata_fails_closed(tmp_path: Path):
 
     assert result["readiness"]["status"] == "blocked"
     assert result["readiness"]["handoffAllowed"] is False
-    assert result["readiness"]["deploymentAllowed"] is False
     assert result["readiness"]["blockers"] == [
         {
             "code": "READINESS_METADATA_INCOMPLETE",
             "message": (
-                "Bundle readiness metadata must explicitly include status and "
-                "handoffAllowed or deploymentAllowed."
+                "Bundle readiness metadata must explicitly include status and handoffAllowed."
             ),
         }
     ]

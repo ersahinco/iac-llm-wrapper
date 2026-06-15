@@ -170,7 +170,6 @@ allowedNextAction: Pass reviewed artifacts to the existing target toolchain.
 readiness:
   status: ready
   handoffAllowed: true
-  deploymentAllowed: true
 targetContracts:
   - name: kubernetes-cluster-config
     kind: kubernetes-cluster-config

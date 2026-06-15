@@ -163,9 +163,9 @@ class TestModelBenchmark:
                 "appliedDecisions": {"llm": ["home_region"]},
                 "gaps": {"resolved": [{}], "blocking": [], "raw": [{}]},
                 "contradictions": {"blocking": [], "raw": []},
-                "deploymentReadiness": {
+                "handoffReadiness": {
                     "status": "ready",
-                    "deploymentAllowed": True,
+                    "handoffAllowed": True,
                     "blockerCount": 0,
                 },
             }
@@ -356,7 +356,7 @@ class TestEndToEndLLM:
         assert "aws-lza" in report
         assert "AppProd" in report
         assert "Network" in report
-        assert "deploymentAllowed: true" in report
+        assert "handoffAllowed: true" in report
         assert (output / "lineage-manifest.yaml").exists()
         assert (output / "llm-trace-summary.yaml").exists()
         assert (output / "model-benchmark.yaml").exists()
@@ -403,7 +403,7 @@ class TestEndToEndLLM:
             compile_design(fixture, output, llm_caller=LLMCaller(MockLLMBackend(response)))
 
         report = (output / "decision-report.yaml").read_text()
-        assert "deploymentAllowed: false" in report
+        assert "handoffAllowed: false" in report
         assert "home region not enabled" in report
 
     def test_llm_non_contract_findings_do_not_block_handoff(self, tmp_path: Path):
@@ -434,7 +434,7 @@ class TestEndToEndLLM:
 
         report = (output / "decision-report.yaml").read_text()
         trace = (output / "llm-trace-summary.yaml").read_text()
-        assert "deploymentAllowed: true" in report
+        assert "handoffAllowed: true" in report
         assert "project_name" in trace
         assert "compliance_tags" in trace
         assert "blocking: []" in trace

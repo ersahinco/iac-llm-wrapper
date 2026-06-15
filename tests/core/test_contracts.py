@@ -250,19 +250,6 @@ class TestContractValidator:
             """pattern: aws-lza
 handoffReadiness:
   handoffAllowed: false
-  deploymentAllowed: false
-  status: blocked
-  summary: Cannot hand off yet.
-  blockers:
-    - code: EXAMPLE
-      message: blocked
-  missingDecisions: []
-  conflictingDecisions: []
-  safeHandoffPath:
-    - Fix blockers.
-deploymentReadiness:
-  handoffAllowed: false
-  deploymentAllowed: false
   status: blocked
   summary: Cannot hand off yet.
   blockers:
@@ -296,14 +283,6 @@ contradictions:
   blocking: []
 handoffReadiness:
   handoffAllowed: false
-  deploymentAllowed: false
-  status: blocked
-  blockerCount: 1
-  blockingGapCount: 0
-  blockingContradictionCount: 0
-deploymentReadiness:
-  handoffAllowed: false
-  deploymentAllowed: false
   status: blocked
   blockerCount: 1
   blockingGapCount: 0
@@ -324,7 +303,6 @@ run:
 readiness:
   status: blocked
   handoffAllowed: false
-  deploymentAllowed: false
   blockerCount: 1
 latency:
   totalMs: 0.0
@@ -374,7 +352,6 @@ allowedNextAction: Pass reviewed artifacts to the existing toolchain.
 readiness:
   status: ready
   handoffAllowed: true
-  deploymentAllowed: true
 targetContracts:
   - name: cloudformation-parameters-handoff
     kind: cloudformation-parameters
@@ -404,7 +381,6 @@ allowedNextAction: Pass reviewed artifacts to the existing toolchain.
 readiness:
   status: ready
   handoffAllowed: true
-  deploymentAllowed: true
 targetContracts:
   - name: cloudformation-parameters-handoff
     kind: cloudformation-parameters

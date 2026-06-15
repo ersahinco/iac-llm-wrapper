@@ -38,7 +38,6 @@ def _write_review_bundle(
             "handoffReadiness": {
                 "status": "blocked",
                 "handoffAllowed": False,
-                "deploymentAllowed": False,
                 "blockers": [{"code": "MISSING_NETWORK", "message": "Network missing"}],
                 "missingDecisions": [
                     {
@@ -50,12 +49,6 @@ def _write_review_bundle(
                 ],
                 "conflictingDecisions": [{"code": "CIDR_CONFLICT"}],
                 "safeHandoffPath": ["Resolve network ownership."],
-            },
-            "deploymentReadiness": {
-                "status": "blocked",
-                "handoffAllowed": False,
-                "deploymentAllowed": False,
-                "blockers": [{"code": "MISSING_NETWORK", "message": "Network missing"}],
             },
         },
     )
@@ -95,7 +88,7 @@ def _write_review_bundle(
         input_dir / "handoff-plan.yaml",
         {
             "pattern": "example-pattern",
-            "readiness": {"status": "ready", "handoffAllowed": True, "deploymentAllowed": True},
+            "readiness": {"status": "ready", "handoffAllowed": True},
             "allowedNextAction": "Resolve blockers.",
             "targetContracts": [
                 {
@@ -216,7 +209,6 @@ def test_build_review_context_uses_report_readiness_and_artifact_rows(tmp_path: 
     assert context["pattern"] == "example-pattern"
     assert context["readiness"]["status"] == "blocked"
     assert context["readiness"]["handoffAllowed"] is False
-    assert context["readiness"]["deploymentAllowed"] is False
     assert context["readiness"]["allowedNextAction"] == "Resolve blockers."
     assert context["readiness"]["missingDecisions"] == [
         {
@@ -257,7 +249,6 @@ def test_build_review_context_uses_report_readiness_and_artifact_rows(tmp_path: 
         "bespoke-workload-infrastructure"
     )
     assert context["reviewSummary"]["handoffAllowed"] is False
-    assert context["reviewSummary"]["deploymentAllowed"] is False
     assert context["reviewSummary"]["blockerCount"] == 1
     assert context["reviewSummary"]["missingDecisionCount"] == 1
     assert context["reviewSummary"]["conflictingDecisionCount"] == 1
@@ -378,7 +369,6 @@ def test_review_context_maps_pattern_validator_blockers_to_requirement_questions
             "handoffReadiness": {
                 "status": "blocked",
                 "handoffAllowed": False,
-                "deploymentAllowed": False,
                 "blockers": [
                     {
                         "code": "AWS_LZA_INFRASTRUCTURE_OU_REQUIRED",

@@ -9,10 +9,8 @@ expect:
     - CLOUDFORMATION_PARAMETERS_REQUIRED
   values:
     pattern: cloudformation-parameters
-    handoffReadiness.deploymentAllowed: false
+    handoffReadiness.handoffAllowed: false
     handoffReadiness.status: blocked
-    deploymentReadiness.deploymentAllowed: false
-    deploymentReadiness.status: blocked
   artifacts:
     - decision-report.yaml
     - llm-trace-summary.yaml
@@ -38,7 +36,6 @@ expect:
     values:
       pattern: cloudformation-parameters
       handoffReadiness.status: blocked
-      deploymentReadiness.status: blocked
     deterministicValues:
       callCount: 0
       rawEvidence.status: not-requested

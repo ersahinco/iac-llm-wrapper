@@ -200,9 +200,7 @@ def gen_lza_lineage_manifest(intent: Any, output_dir: Path) -> None:
 
 
 def gen_lza_deployment_runbook(intent: Any, output_dir: Path) -> None:
-    readiness = getattr(intent, "handoff_readiness", None)
-    if readiness is None:
-        readiness = getattr(intent, "deployment_readiness", {})
+    readiness = getattr(intent, "handoff_readiness", {})
     intent = _aws_lza_intent(intent)
     if intent is None:
         return
@@ -283,10 +281,7 @@ def gen_lza_deployment_runbook(intent: Any, output_dir: Path) -> None:
         "Use AWS LZA for landing-zone deployment unless a documented gap requires custom IaC.",
     ]
     if readiness:
-        handoff_allowed = readiness.get(
-            "handoffAllowed",
-            readiness.get("deploymentAllowed", False),
-        )
+        handoff_allowed = readiness.get("handoffAllowed", False)
         lines.extend(
             [
                 "",
@@ -390,9 +385,7 @@ def _lza_plan_readiness(intent: Any) -> dict[str, Any]:
 
 
 def gen_lza_plan_manifest(payload: Any, output_dir: Path) -> None:
-    readiness = getattr(payload, "handoff_readiness", None)
-    if readiness is None:
-        readiness = getattr(payload, "deployment_readiness", {})
+    readiness = getattr(payload, "handoff_readiness", {})
     intent = _aws_lza_intent(payload)
     if intent is None:
         return
@@ -422,12 +415,7 @@ def gen_lza_plan_manifest(payload: Any, output_dir: Path) -> None:
         "maturity": {
             "configReady": {
                 "status": (readiness or {}).get("status", "unknown"),
-                "allowed": bool(
-                    (readiness or {}).get(
-                        "handoffAllowed",
-                        (readiness or {}).get("deploymentAllowed", False),
-                    )
-                ),
+                "allowed": bool((readiness or {}).get("handoffAllowed", False)),
                 "summary": (readiness or {}).get("summary", ""),
             },
             "planReady": plan_readiness,
@@ -477,9 +465,7 @@ def gen_lza_plan_manifest(payload: Any, output_dir: Path) -> None:
 
 
 def gen_lza_decision_report(intent: Any, output_dir: Path) -> None:
-    readiness = getattr(intent, "handoff_readiness", None)
-    if readiness is None:
-        readiness = getattr(intent, "deployment_readiness", {})
+    readiness = getattr(intent, "handoff_readiness", {})
     intent = _aws_lza_intent(intent)
     if intent is None:
         return
@@ -519,6 +505,4 @@ def gen_lza_decision_report(intent: Any, output_dir: Path) -> None:
         readiness = dict(readiness)
         readiness["planReady"] = _lza_plan_readiness(intent)
         data["handoffReadiness"] = readiness
-        # Backward-compatible alias for existing artifact consumers.
-        data["deploymentReadiness"] = readiness
     _write_yaml(output_dir, "decision-report.yaml", data)

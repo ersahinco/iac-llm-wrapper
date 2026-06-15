@@ -14,10 +14,8 @@ expect:
     - MARKDOWN_CONTRADICTION_NETWORK_CIDR
   values:
     pattern: aws-lza
-    handoffReadiness.deploymentAllowed: false
+    handoffReadiness.handoffAllowed: false
     handoffReadiness.status: blocked
-    deploymentReadiness.deploymentAllowed: false
-    deploymentReadiness.status: blocked
   artifacts:
     - decision-report.yaml
     - llm-trace-summary.yaml
@@ -44,7 +42,6 @@ expect:
     values:
       pattern: aws-lza
       handoffReadiness.status: blocked
-      deploymentReadiness.status: blocked
     deterministicValues:
       callCount: 0
       rawEvidence.status: not-requested

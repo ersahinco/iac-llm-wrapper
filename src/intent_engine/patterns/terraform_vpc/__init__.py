@@ -259,9 +259,7 @@ def map_terraform_vpc_modules(intent: Any) -> list[ModuleInputs]:
 
 
 def gen_decision_report(intent: Any, output_dir: Path) -> None:
-    readiness = getattr(intent, "handoff_readiness", None)
-    if readiness is None:
-        readiness = getattr(intent, "deployment_readiness", {})
+    readiness = getattr(intent, "handoff_readiness", {})
     model = _intent(intent)
     if model is None:
         return
@@ -285,8 +283,6 @@ def gen_decision_report(intent: Any, output_dir: Path) -> None:
     }
     if readiness:
         data["handoffReadiness"] = readiness
-        # Backward-compatible alias for existing artifact consumers.
-        data["deploymentReadiness"] = readiness
     write_yaml_artifact(output_dir / "decision-report.yaml", data, header="")
 
 

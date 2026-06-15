@@ -324,15 +324,15 @@ def _validate_blocked_files(output_dir: Path) -> list[str]:
 
 def _validate_readiness(report: dict[str, Any], handoff_plan: dict[str, Any]) -> list[str]:
     failures: list[str] = []
-    report_readiness = _dict(report.get("handoffReadiness") or report.get("deploymentReadiness"))
+    report_readiness = _dict(report.get("handoffReadiness"))
     plan_readiness = _dict(handoff_plan.get("readiness"))
     if report_readiness.get("status") != "ready":
         failures.append("decision report is not ready")
-    if report_readiness.get("deploymentAllowed") is not True:
+    if report_readiness.get("handoffAllowed") is not True:
         failures.append("decision report does not allow handoff")
     if plan_readiness.get("status") != "ready":
         failures.append("handoff plan is not ready")
-    if plan_readiness.get("deploymentAllowed") is not True:
+    if plan_readiness.get("handoffAllowed") is not True:
         failures.append("handoff plan does not allow handoff")
     if handoff_plan.get("allowedNextAction") != EXPECTED_ALLOWED_NEXT_ACTION:
         failures.append("handoff plan missing clear allowed next action")
@@ -341,10 +341,10 @@ def _validate_readiness(report: dict[str, Any], handoff_plan: dict[str, Any]) ->
 
 def _validate_blocked_readiness(report: dict[str, Any]) -> list[str]:
     failures: list[str] = []
-    readiness = _dict(report.get("handoffReadiness") or report.get("deploymentReadiness"))
+    readiness = _dict(report.get("handoffReadiness"))
     if readiness.get("status") != "blocked":
         failures.append("decision report is not blocked")
-    if readiness.get("deploymentAllowed") is not False:
+    if readiness.get("handoffAllowed") is not False:
         failures.append("blocked decision report allows handoff")
     if not _coerce_list(readiness.get("blockers")):
         failures.append("blocked decision report has no blockers")

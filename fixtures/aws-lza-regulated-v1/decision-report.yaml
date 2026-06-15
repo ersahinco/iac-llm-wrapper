@@ -433,9 +433,8 @@ semanticModel:
       evidence: PlatformAdmins:ReadOnlyAccess:Management
       violationCode: AWS_LZA_IDENTITY_CENTER_ASSIGNMENT_ACCOUNT_UNKNOWN
       violationMessage: Identity Center assignments must target known accounts.
-handoffReadiness: &id002
+handoffReadiness:
   handoffAllowed: true
-  deploymentAllowed: true
   status: ready
   allowedNextAction: Pass the reviewed artifacts to the existing target
     toolchain after manual gates.
@@ -486,4 +485,3 @@ handoffReadiness: &id002
       - accelerator
     unsupportedGapCount: 0
     unsupportedGaps: []
-deploymentReadiness: *id002
