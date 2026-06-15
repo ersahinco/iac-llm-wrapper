@@ -29,6 +29,11 @@ def test_agents_context_uses_registered_target_language():
     assert "contract-checked LZA YAML/config files" in text
     assert "target configuration artifacts" in text
     assert "Direct deployment and whole-IaC-from-scratch generation stay out" in text
+    assert "compile/generation paths make no AWS API calls" in text
+    assert "validation-only adapter" in text
+    assert "read-only account lookup" in text
+    assert "Current built-ins make no AWS API calls" not in text
+    assert "Current built-ins make no cloud API calls" not in text
 
 
 def test_pattern_authoring_keeps_deployment_invocation_out_of_scope():

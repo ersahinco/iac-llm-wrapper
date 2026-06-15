@@ -56,7 +56,10 @@ uv run pre-commit run --all-files
 - Core stays domain-agnostic. Use-case logic lives in pattern packages.
 - Graph owns decision order, branching, blocked paths, cascades, gaps, provenance, and handoff sequencing.
 - Existing accelerators/modules are registered targets with contracts and data models before they are emitted configuration artifacts.
-- Current built-ins make no AWS API calls and do not deploy. No arbitrary Terraform from prose.
+- Current compile/generation paths make no AWS API calls and do not deploy. The
+  AWS LZA validation-only evidence adapter may run the official local validator,
+  which can perform read-only account lookup through the provided AWS/LZA
+  context. No arbitrary Terraform from prose.
 - "Wrapper" means architect exchange to registered target configuration, not bypassing IaC tools, accelerators, or gates.
 - Sample recommendations must persist as artifacts, not terminal-only hints.
 - `src/intent_engine/patterns/aws_lza` is the only AWS LZA path. Old research path was removed to avoid two-source confusion.
@@ -109,12 +112,12 @@ T72: Owner validation follow-up
 - **Format**: clean (`ruff format --check .`)
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Continued T72 owner-validation follow-up by carrying the no-mutation/read-only lookup boundary into the validation evidence artifact and static review. New `lza-validation-evidence.yaml` files now state that AWS mutation is forbidden while the official AWS LZA validator may perform read-only account lookup through the provided AWS/LZA context. No owner validation is claimed.
+- **Last session**: Continued T72 owner-validation follow-up by narrowing stale AGENTS boundary wording. Repo memory now distinguishes no-cloud-call compile/generation paths from the AWS LZA validation-only adapter, whose official local validator may perform read-only account lookup through the provided AWS/LZA context. No owner validation is claimed.
 
 ### Done
 
 - Core: graph-driven extraction/discovery/interview/validation, pattern registry, contracts, handoff generation, static review, contract validation, benchmark/battle artifacts, sample matching, and CLI commands are implemented and covered.
-- Built-ins: `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, and `terraform-vpc` are contract-backed handoff paths. Current built-ins make no cloud API calls and do not deploy from prose.
+- Built-ins: `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, and `terraform-vpc` are contract-backed handoff paths. Their compile/generation paths make no cloud API calls and do not deploy from prose. The AWS LZA validation-only adapter is a separate evidence path that may run the official local validator with read-only account lookup through the provided AWS/LZA context.
 - Evaluation: deterministic extraction corpus includes clean, blocked, BYOM, and customer-style prose cases; role usability trials, forbidden-artifact checks, fixture drift guard, contract validation tests, battle-summary tests, static review tests, stakeholder handoff-confidence checks, and full repo gate are green.
 - Golden journey: `scripts/evaluate-golden-journey.py` is the quickest product-confidence check for the core promise: messy customer-style AWS LZA notes to service-style reviewed handoff bundle. It supports `--scenario ready`, `--scenario blocked`, `--scenario all`, `--require-conformant`, `--benchmark-output`, and `--output` for readiness, blocked-safety, model baseline checks, and CI/archive result artifacts.
 - Bedrock: `--provider bedrock` uses the local AWS CLI session with Bedrock Runtime Converse, defaulting region from `INTENT_ENGINE_AWS_REGION`, `AWS_REGION`, `AWS_DEFAULT_REGION`, then `eu-central-1`; it records Bedrock token usage in the existing trace/benchmark schema without adding a new harness or SDK dependency.
@@ -170,6 +173,7 @@ T72: Owner validation follow-up
 - T72 validation diagnostic hardening: `lza-validation-evidence.yaml` now records a diagnostic category, summary, and next action alongside raw validator stdout/stderr. CLI failure output and static review surface non-pass diagnostic categories and next actions while remaining compatible with older evidence files.
 - T72 validation boundary wording: README, architecture, artifact catalog, and downstream-validation packet now distinguish no AWS mutation from possible read-only AWS account lookup by the official local LZA validator. Product-language tests guard against the old "no AWS API call" wording.
 - T72 validation evidence boundary hardening: `lza-validation-evidence.yaml` now records the no-mutation/read-only account lookup boundary directly, and `handoff-review.html` surfaces that boundary without requiring reviewers to expand raw YAML. Older evidence files remain compatible.
+- T72 repo-memory boundary hardening: AGENTS now distinguishes no-cloud-call compile/generation paths from the AWS LZA validation-only adapter's possible read-only account lookup. Product-language tests guard against the stale broad "built-ins make no AWS/cloud API calls" wording.
 
 ### Next
 
