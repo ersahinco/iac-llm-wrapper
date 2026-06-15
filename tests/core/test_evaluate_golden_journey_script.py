@@ -85,7 +85,7 @@ def test_evaluate_golden_journey_passes_blocked_service_style_path(tmp_path: Pat
     assert "Validated: no deployable or target handoff artifacts" in result.stdout
     assert (output_dir / "decision-report.yaml").exists()
     assert (output_dir / "handoff-review.html").exists()
-    assert (output_dir / "contract-validation.yaml").exists()
+    assert not (output_dir / "contract-validation.yaml").exists()
     assert not (output_dir / "network-config.yaml").exists()
     assert not (output_dir / "handoff-plan.yaml").exists()
     assert not (output_dir / "raw-evidence.yaml").exists()

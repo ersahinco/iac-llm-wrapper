@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from .baseline import (
     baseline_decisions_from_bundle,
@@ -312,7 +312,7 @@ def _build_target_capability_report(
 ) -> dict[str, Any]:
     if pattern_obj.target_report_builder is None:
         return {}
-    return pattern_obj.target_report_builder(decisions, source_text)
+    return cast(dict[str, Any], pattern_obj.target_report_builder(decisions, source_text))
 
 
 _HIGH_RISK_RECONFIRMATION_CATEGORIES = {

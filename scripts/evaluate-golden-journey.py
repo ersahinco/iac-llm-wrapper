@@ -14,6 +14,8 @@ from typing import Any
 
 import ruamel.yaml
 
+from intent_engine.core.contract_validation import build_contract_validation
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 READY_FIXTURE = REPO_ROOT / "fixtures" / "eval" / "aws-lza-customer-board-notes.md"
 BLOCKED_FIXTURE = REPO_ROOT / "fixtures" / "eval" / "aws-lza-enterprise-messy-blocked.md"
@@ -41,9 +43,6 @@ EXPECTED_REVIEW_ARTIFACTS = (
     "llm-trace-summary.yaml",
     "model-benchmark.yaml",
     "handoff-review.html",
-    "contract-validation.yaml",
-    "requirement-graph.json",
-    "requirement-graph.mmd",
 )
 FORBIDDEN_ARTIFACTS = (
     "raw-evidence.yaml",
@@ -58,9 +57,6 @@ BLOCKED_SAFE_ARTIFACTS = (
     "llm-trace-summary.yaml",
     "model-benchmark.yaml",
     "handoff-review.html",
-    "contract-validation.yaml",
-    "requirement-graph.json",
-    "requirement-graph.mmd",
 )
 BLOCKED_FORBIDDEN_ARTIFACTS = (
     "accounts-config.yaml",
@@ -250,8 +246,6 @@ def _validate_ready_output(config: JourneyConfig, output_dir: Path) -> list[str]
         return failures + ["missing llm-trace-summary.yaml"]
     if not (output_dir / "model-benchmark.yaml").exists():
         return failures + ["missing model-benchmark.yaml"]
-    if not (output_dir / "contract-validation.yaml").exists():
-        return failures + ["missing contract-validation.yaml"]
     if not (output_dir / "handoff-review.html").exists():
         return failures + ["missing handoff-review.html"]
 
@@ -259,7 +253,7 @@ def _validate_ready_output(config: JourneyConfig, output_dir: Path) -> list[str]
     handoff_plan = _yaml_load(output_dir / "handoff-plan.yaml")
     trace = _yaml_load(output_dir / "llm-trace-summary.yaml")
     benchmark = _yaml_load(output_dir / "model-benchmark.yaml")
-    contract_validation = _yaml_load(output_dir / "contract-validation.yaml")
+    contract_validation = build_contract_validation(output_dir)
     html = (output_dir / "handoff-review.html").read_text()
 
     failures.extend(_validate_readiness(report, handoff_plan))
@@ -281,15 +275,13 @@ def _validate_blocked_output(config: JourneyConfig, output_dir: Path) -> list[st
         return failures + ["missing llm-trace-summary.yaml"]
     if not (output_dir / "model-benchmark.yaml").exists():
         return failures + ["missing model-benchmark.yaml"]
-    if not (output_dir / "contract-validation.yaml").exists():
-        return failures + ["missing contract-validation.yaml"]
     if not (output_dir / "handoff-review.html").exists():
         return failures + ["missing handoff-review.html"]
 
     report = _yaml_load(output_dir / "decision-report.yaml")
     trace = _yaml_load(output_dir / "llm-trace-summary.yaml")
     benchmark = _yaml_load(output_dir / "model-benchmark.yaml")
-    contract_validation = _yaml_load(output_dir / "contract-validation.yaml")
+    contract_validation = build_contract_validation(output_dir)
     html = (output_dir / "handoff-review.html").read_text()
 
     failures.extend(_validate_blocked_readiness(report))
@@ -744,11 +736,7 @@ def _scenario_result(
         if (result.output_dir / "model-benchmark.yaml").exists()
         else {}
     )
-    contract_validation = (
-        _yaml_load(result.output_dir / "contract-validation.yaml")
-        if (result.output_dir / "contract-validation.yaml").exists()
-        else {}
-    )
+    contract_validation = _contract_validation_summary_input(result.output_dir)
     readiness = _dict(benchmark.get("readiness"))
     raw_evidence = _dict(benchmark.get("rawEvidence"))
     contract_summary = _dict(contract_validation.get("summary"))
@@ -767,6 +755,15 @@ def _scenario_result(
         "failures": result.failures,
         "validatedChecks": VALIDATED_CHECKS.get(config.scenario, []),
     }
+
+
+def _contract_validation_summary_input(output_dir: Path) -> dict[str, Any]:
+    if not (output_dir / "decision-report.yaml").exists():
+        return {}
+    try:
+        return build_contract_validation(output_dir)
+    except Exception:
+        return {}
 
 
 def _print_result(result: JourneyResult, config: JourneyConfig) -> int:
