@@ -37,11 +37,6 @@ from .core.extractor import Extractor
 from .core.graph_export import graph_to_json, graph_to_mermaid
 from .core.interview import InterviewEngine
 from .core.llm_caller import LLMEvidenceStore, auto_detect_llm
-from .core.lza_validation import (
-    LZA_VALIDATION_EVIDENCE,
-    LzaValidationError,
-    validate_lza_config_bundle,
-)
 from .core.markdown_extractor import extract_from_markdown
 from .core.pattern_check import check_pattern
 from .core.patterns import GLOBAL_REGISTRY, Pattern
@@ -49,6 +44,11 @@ from .core.sample_config import SampleConfig
 from .core.suggestion import SuggestionEngine
 from .core.yaml_utils import read_yaml_mapping, write_yaml_artifact
 from .patterns import load_builtin_patterns
+from .patterns.aws_lza.validation import (
+    LZA_VALIDATION_EVIDENCE,
+    LzaValidationError,
+    validate_lza_config_bundle,
+)
 
 load_builtin_patterns()
 

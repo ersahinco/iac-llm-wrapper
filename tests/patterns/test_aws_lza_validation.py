@@ -9,13 +9,13 @@ import ruamel.yaml
 from typer.testing import CliRunner
 
 from intent_engine.cli import app
-from intent_engine.core.lza_validation import (
+from intent_engine.patterns.aws_lza.contracts import AWS_LZA_CONFIG_ARTIFACTS
+from intent_engine.patterns.aws_lza.validation import (
     LZA_VALIDATION_EVIDENCE,
     LzaValidationError,
     summarize_lza_validation_output,
     validate_lza_config_bundle,
 )
-from intent_engine.patterns.aws_lza.contracts import AWS_LZA_CONFIG_ARTIFACTS
 
 runner = CliRunner()
 

@@ -13,9 +13,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from intent_engine.patterns.aws_lza.contracts import AWS_LZA_CONFIG_ARTIFACTS
+from intent_engine.core.yaml_utils import write_yaml_artifact
 
-from .yaml_utils import write_yaml_artifact
+from .contracts import AWS_LZA_CONFIG_ARTIFACTS
 
 LZA_VALIDATION_EVIDENCE = "lza-validation-evidence.yaml"
 LZA_VALIDATION_SCHEMA_VERSION = "intent-engine/aws-lza-validation-evidence/v1"

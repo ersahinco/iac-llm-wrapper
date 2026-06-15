@@ -7,8 +7,12 @@ import re
 from pathlib import Path
 from typing import Any
 
+from intent_engine.patterns.aws_lza.validation import (
+    LZA_VALIDATION_EVIDENCE,
+    summarize_lza_validation_output,
+)
+
 from .contract_validation import build_contract_validation
-from .lza_validation import LZA_VALIDATION_EVIDENCE, summarize_lza_validation_output
 from .patterns import GLOBAL_REGISTRY
 from .review_renderer import render_review_html as render_review_html_context
 from .yaml_utils import read_yaml_mapping
