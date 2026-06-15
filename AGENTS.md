@@ -95,7 +95,7 @@ Do not add provider-specific branches to core CLI/compiler/extractor/generator.
 
 ## Stack
 
-Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy, pyright.
+Python 3.11+, Pydantic v2, Typer, ruamel.yaml, pytest, ruff, mypy, pyright.
 
 ## Session State
 
@@ -103,16 +103,16 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, networkx, pytest, ruff, mypy, pyr
 
 ### Current Goal
 
-T72: Owner validation follow-up
+T73: High-risk lean cleanup
 
 ### Status
 
-- **Tests**: 382 passing, 1 skipped; golden journey passed; fixture drift check passed
+- **Tests**: 377 passing, 1 skipped; golden journey passed; fixture drift check passed
 - **Lint**: clean (`ruff check .`)
 - **Format**: clean (`ruff format --check .`)
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Continued T72 owner-validation follow-up by making temporary staging and command replay limits explicit in AWS LZA validation evidence and static review. New evidence now states that generated configs are copied to a temporary validator directory that is removed after validation, so reviewers should rerun `iac-llm-wrapper lza validate` against the source bundle instead of replaying captured temp-path argv. No owner validation is claimed.
+- **Last session**: Implemented the high-risk lean cleanup pass. Compile validation/generation now shares one internal path; samples/contracts are pattern-owned; `review html` is read-only; AWS LZA validation and target routing live under the AWS LZA pattern; `decision-audit.yaml` is a first-class core artifact; golden-journey checks were aligned with read-only review. No owner validation is claimed.
 
 ### Done
 
@@ -128,6 +128,7 @@ T72: Owner validation follow-up
 - Customer packet trial: `fixtures/eval/customer-packet-banking-lza.md` captures a realistic banking AWS LZA packet with client notes, architect clarification, security review, secret-store references, and engineer handoff reminders. Its expected artifact contract is part of the existing extraction eval corpus.
 - Usability: `scripts/evaluate-usability.py` now includes ready and blocked static-review stakeholder trials plus a service-style handoff-confidence trial that verifies what is ready, what can move next, target contracts, manual gates, and raw evidence omission.
 - Cleanup: removed stale LZA research/extension/diff/apply/default-normalizer surfaces, no-contract artifact fallback, pattern `extra_artifacts`, duplicate fixture normalization, and stale duplicate LLM docs.
+- T73 high-risk lean cleanup: collapsed duplicated compile validation/generation flow, moved samples/contracts fully onto patterns, made review HTML read-only against input bundles, moved AWS LZA validation and target routing under AWS LZA pattern ownership, made `decision-audit.yaml` a core expected artifact with stable replay hashing, and aligned golden-journey checks with the read-only review contract.
 - Language: user-facing docs and artifacts use `handoffReadiness`/`handoffAllowed` only. Docs now also state that secrets should travel as secret-store references and expected parameter names, never raw values.
 - Quality gates: Ruff, Ruff format, mypy, Pyright/Pylance, fixture drift, coverage tests, extraction/usability/golden journey checks, Bandit, pip-audit, uv build, and pre-commit are wired into local/CI workflows as applicable.
 - T36 usability: CLI output now points first-time users from discovery and compile results to service-style compile, blocked review generation, `handoff-plan.yaml`, and static review creation. `handoff-review.html` now includes reviewer next actions derived from readiness, contract status, artifacts, and raw evidence state. README and LLM setup now include a concise real customer packet path for Ollama and direct Bedrock runs with `--no-raw-evidence`.
@@ -258,7 +259,7 @@ Roadmap rules:
 
 - Core stays domain-agnostic; pattern packages own models, graphs, contracts, validators, samples, and generators.
 - Two-layer graph architecture is the product direction: requirement graphs own decisions, gaps, blockers, provenance, and readiness; target capability graphs own downstream route selection, target coverage, unsupported asks, manual gates, and blocked generation paths.
-- Typed property graph plus predicate constraints is the current data-modeling direction. Keep Pydantic as the serialized handoff model and NetworkX/dataclasses for traversal/evaluation; do not introduce RDF/OWL, Datalog, or graph databases until real policy inference needs justify them.
+- Typed property graph plus predicate constraints is the current data-modeling direction. Keep Pydantic as the serialized handoff model and lightweight stdlib/dataclass traversal/evaluation; do not introduce RDF/OWL, Datalog, or graph databases until real policy inference needs justify them.
 - Graph and contracts own readiness. LLM output is evidence until accepted by graph requirements and artifact contracts.
 - Handoff artifacts are not deployments. `handoffReadiness` is the canonical readiness field.
 - Raw LLM evidence is local development/debug material. Service-style runs can disable raw prompt/response storage with `--no-raw-evidence` while preserving `llm-trace-summary.yaml`, `model-benchmark.yaml`, and `handoff-review.html` for interpretation review.
