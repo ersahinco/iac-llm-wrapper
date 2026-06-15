@@ -165,6 +165,11 @@ def _build_evidence(
         "input": {
             "bundlePath": str(bundle_dir),
             "stagedConfigDir": str(staged_config),
+            "stagedConfigRetained": False,
+            "stagingBoundary": (
+                "Generated config files are copied into a temporary directory for the "
+                "official validator; the temporary copy is removed after validation."
+            ),
             "configFiles": list(AWS_LZA_CONFIG_ARTIFACTS),
             "configFileDigests": _config_file_records(bundle_dir),
         },
@@ -180,6 +185,11 @@ def _build_evidence(
             "exitCode": exit_code,
             "startedAt": started.isoformat(),
             "durationMs": duration_ms,
+            "replayable": False,
+            "replayBoundary": (
+                "The captured argv records the executed temporary staging path. Re-run "
+                "iac-llm-wrapper lza validate against the source bundle to reproduce."
+            ),
             "stdout": stdout,
             "stderr": stderr,
         },

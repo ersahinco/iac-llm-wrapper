@@ -162,13 +162,19 @@ def _write_review_bundle(
                     ),
                 },
                 "input": {
+                    "stagedConfigRetained": False,
+                    "stagingBoundary": (
+                        "Generated config files are copied into a temporary directory "
+                        "for the official validator; the temporary copy is removed "
+                        "after validation."
+                    ),
                     "configFileDigests": [
                         {
                             "name": "network-config.yaml",
                             "bundlePath": str(input_dir / "network-config.yaml"),
                             "sha256": "abc123",
                         }
-                    ]
+                    ],
                 },
                 "lzaSource": {
                     "requestedPath": "/tmp/landing-zone-accelerator-on-aws",
@@ -179,6 +185,12 @@ def _write_review_bundle(
                 "command": {
                     "argv": ["corepack", "yarn", "validate-config", "/tmp/config"],
                     "exitCode": 1,
+                    "replayable": False,
+                    "replayBoundary": (
+                        "The captured argv records the executed temporary staging path. "
+                        "Re-run iac-llm-wrapper lza validate against the source bundle "
+                        "to reproduce."
+                    ),
                     "stdout": (
                         "2026-06-15 | warn | config-validator | "
                         "AccessDeniedException: You don't have permissions to access this "
@@ -296,6 +308,15 @@ def test_review_context_surfaces_lza_validation_evidence(tmp_path: Path):
         "awsLookupBoundary": (
             "The official AWS LZA validator may perform read-only account lookup "
             "through the provided AWS/LZA context."
+        ),
+        "stagingBoundary": (
+            "Generated config files are copied into a temporary directory for the "
+            "official validator; the temporary copy is removed after validation."
+        ),
+        "commandReplayable": False,
+        "commandReplayBoundary": (
+            "The captured argv records the executed temporary staging path. Re-run "
+            "iac-llm-wrapper lza validate against the source bundle to reproduce."
         ),
         "diagnosticCategory": "aws-account-lookup-permission",
         "diagnosticNextAction": (

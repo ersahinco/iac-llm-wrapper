@@ -394,6 +394,21 @@ def _lza_validation_section(
             if summary.get("awsLookupBoundary")
             else []
         ),
+        *(
+            [_kv("Staging boundary", str(summary.get("stagingBoundary", "")))]
+            if summary.get("stagingBoundary")
+            else []
+        ),
+        *(
+            [_kv("Command replayable", str(summary.get("commandReplayable", "unknown")))]
+            if summary.get("commandReplayable") != "unknown"
+            else []
+        ),
+        *(
+            [_kv("Replay boundary", str(summary.get("commandReplayBoundary", "")))]
+            if summary.get("commandReplayBoundary")
+            else []
+        ),
         _kv("Command", str(summary.get("command", ""))),
         _artifact_link_row("LZA validation evidence", evidence_link),
         _digest_table(_coerce_list(summary.get("configFileDigests"))),

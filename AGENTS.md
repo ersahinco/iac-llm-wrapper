@@ -112,7 +112,7 @@ T72: Owner validation follow-up
 - **Format**: clean (`ruff format --check .`)
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Continued T72 owner-validation follow-up by narrowing stale AGENTS boundary wording. Repo memory now distinguishes no-cloud-call compile/generation paths from the AWS LZA validation-only adapter, whose official local validator may perform read-only account lookup through the provided AWS/LZA context. No owner validation is claimed.
+- **Last session**: Continued T72 owner-validation follow-up by making temporary staging and command replay limits explicit in AWS LZA validation evidence and static review. New evidence now states that generated configs are copied to a temporary validator directory that is removed after validation, so reviewers should rerun `iac-llm-wrapper lza validate` against the source bundle instead of replaying captured temp-path argv. No owner validation is claimed.
 
 ### Done
 
@@ -174,6 +174,7 @@ T72: Owner validation follow-up
 - T72 validation boundary wording: README, architecture, artifact catalog, and downstream-validation packet now distinguish no AWS mutation from possible read-only AWS account lookup by the official local LZA validator. Product-language tests guard against the old "no AWS API call" wording.
 - T72 validation evidence boundary hardening: `lza-validation-evidence.yaml` now records the no-mutation/read-only account lookup boundary directly, and `handoff-review.html` surfaces that boundary without requiring reviewers to expand raw YAML. Older evidence files remain compatible.
 - T72 repo-memory boundary hardening: AGENTS now distinguishes no-cloud-call compile/generation paths from the AWS LZA validation-only adapter's possible read-only account lookup. Product-language tests guard against the stale broad "built-ins make no AWS/cloud API calls" wording.
+- T72 validation replay boundary hardening: `lza-validation-evidence.yaml` now records that the validator input is a temporary staged copy removed after validation and that captured command argv is not replayable after the temp directory is gone. Static review surfaces the staging/replay boundary so reviewers know to rerun `iac-llm-wrapper lza validate` against the source bundle.
 
 ### Next
 
