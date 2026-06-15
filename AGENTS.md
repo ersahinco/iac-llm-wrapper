@@ -103,16 +103,16 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, pytest, ruff, mypy, pyright.
 
 ### Current Goal
 
-T73: High-risk lean cleanup
+T74: Owner-validation evidence follow-up
 
 ### Status
 
-- **Tests**: 377 passing, 1 skipped; golden journey passed; fixture drift check passed
+- **Tests**: targeted AWS LZA validation/review tests passed (42 passing); previous full gate was 377 passing, 1 skipped
 - **Lint**: clean (`ruff check .`)
 - **Format**: clean (`ruff format --check .`)
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Implemented the high-risk lean cleanup pass. Compile validation/generation now shares one internal path; samples/contracts are pattern-owned; `review html` is read-only; AWS LZA validation and target routing live under the AWS LZA pattern; `decision-audit.yaml` is a first-class core artifact; golden-journey checks were aligned with read-only review. No owner validation is claimed.
+- **Last session**: Built a private ignored banking AWS LZA validation bundle with non-placeholder account emails and reran the official local AWS LZA validator against LZA `1.15.0`. The bundle is deterministic, handoff-ready, and review HTML includes `lza-validation-evidence.yaml`. Validation still fails with `aws-account-lookup-permission` / `AccessDeniedException` from the official validator, so no owner validation is claimed.
 
 ### Done
 
@@ -129,6 +129,7 @@ T73: High-risk lean cleanup
 - Usability: `scripts/evaluate-usability.py` now includes ready and blocked static-review stakeholder trials plus a service-style handoff-confidence trial that verifies what is ready, what can move next, target contracts, manual gates, and raw evidence omission.
 - Cleanup: removed stale LZA research/extension/diff/apply/default-normalizer surfaces, no-contract artifact fallback, pattern `extra_artifacts`, duplicate fixture normalization, and stale duplicate LLM docs.
 - T73 high-risk lean cleanup: collapsed duplicated compile validation/generation flow, moved samples/contracts fully onto patterns, made review HTML read-only against input bundles, moved AWS LZA validation and target routing under AWS LZA pattern ownership, made `decision-audit.yaml` a core expected artifact with stable replay hashing, and aligned golden-journey checks with the read-only review contract.
+- T74 owner-validation evidence follow-up: refreshed AWS credentials, compiled the existing banking packet into ignored `tests/results/owner-lza-validation-banking/` with private non-placeholder account emails, regenerated static review, and ran `iac-llm-wrapper lza validate` against the local AWS LZA checkout. Evidence is private/ignored and shows only the remaining read-only account lookup permission blocker.
 - Language: user-facing docs and artifacts use `handoffReadiness`/`handoffAllowed` only. Docs now also state that secrets should travel as secret-store references and expected parameter names, never raw values.
 - Quality gates: Ruff, Ruff format, mypy, Pyright/Pylance, fixture drift, coverage tests, extraction/usability/golden journey checks, Bandit, pip-audit, uv build, and pre-commit are wired into local/CI workflows as applicable.
 - T36 usability: CLI output now points first-time users from discovery and compile results to service-style compile, blocked review generation, `handoff-plan.yaml`, and static review creation. `handoff-review.html` now includes reviewer next actions derived from readiness, contract status, artifacts, and raw evidence state. README and LLM setup now include a concise real customer packet path for Ollama and direct Bedrock runs with `--no-raw-evidence`.
@@ -179,7 +180,7 @@ T73: High-risk lean cleanup
 
 ### Next
 
-1. Finish T72 only after owner-approved account emails and an AWS/LZA validation context with account lookup permission are available; rerun `iac-llm-wrapper lza validate` and capture owner/toolchain acceptance or concrete schema/error output.
+1. Finish owner validation only after an AWS/LZA validation context with account lookup permission is available, or after the downstream owner reviews the private `aws-account-lookup-permission` evidence and supplies acceptance or concrete next-step output.
 2. Keep using packet-driven loops before adding product surface: record only repeated stuckness, mistrust, manual translation, or blocker confusion.
 3. Use diff-aware compile plus `review compare` whenever a long document or sample configuration changes incrementally; review only the delta first, then decide whether a repeated/blocking point deserves implementation.
 4. Continue packet-based requirement harvesting before adding product surface: record only stuck/mistrust/manual-translation moments, and implement only repeated or handoff-blocking requirements.
