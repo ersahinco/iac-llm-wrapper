@@ -104,12 +104,12 @@ T72: Owner validation follow-up
 
 ### Status
 
-- **Tests**: 377 passing, 1 skipped; golden journey passed; fixture drift check passed
+- **Tests**: focused T72 doc check passed (`tests/core/test_product_language.py`); previous full gate was 377 passing, 1 skipped with golden journey and fixture drift checks passed
 - **Lint**: clean (`ruff check .`)
 - **Format**: clean (`ruff format --check .`)
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Continued T72 owner-validation follow-up without overstating downstream validation. A local deterministic AWS LZA bundle with explicit non-`example.com` account emails was generated at ignored path `tests/results/t72-lza-validation-no-default-email` and validated against local AWS LZA `1.15.0`. The prior default-email validator issue disappeared; validation still failed on `AccessDeniedException` from the local AWS/LZA account lookup. Static review now surfaces the concise LZA validator failure excerpt instead of hiding the specific blocker inside raw evidence details.
+- **Last session**: Continued T72 owner-validation follow-up by tightening the owner packet around the two prerequisites exposed by local validation: owner-approved account vending emails and an AWS/LZA validation context with account lookup permission. No owner validation is claimed; `AccessDeniedException`, schema output, and pipeline output are treated as blocker evidence until an owner/toolchain acceptance signal exists.
 
 ### Done
 
@@ -166,6 +166,7 @@ T72: Owner validation follow-up
 - T70 product boundary cleanup: Public surfaces now avoid stale intent-to-IaC orchestration positioning and describe the promise as registered target configuration handoff. AWS LZA wording now distinguishes contract-checked generated YAML from downstream LZA validation and application.
 - T71 packet-driven improvement loop: Ran customer-style banking LZA, messy blocked LZA, and Terraform VPC packets through `discover -> compile --no-raw-evidence -> review`. The repeated LZA paths were clear; the Terraform path found and fixed a real trust issue where redundant raw LLM contradictions could block deterministic Markdown decisions. Regression coverage keeps raw contradictions visible in trace/benchmark artifacts while blocking count remains zero.
 - T72 partial owner-validation follow-up: Re-ran local AWS LZA validation against a bundle with explicit account emails rather than generated `example.com` placeholders. Evidence at ignored path `tests/results/t72-lza-validation-no-default-email/lza-validation-evidence.yaml` shows the default-email issue is gone and the remaining failure is `AccessDeniedException` in `accounts-config.yaml`. This is not owner validation because the emails are not owner-approved and the local AWS session still lacks the required lookup permission.
+- T72 owner-packet prerequisite hardening: `docs/LZA_DOWNSTREAM_VALIDATION.md` now requires owner-approved account vending emails and an AWS account lookup context/profile before local or owner validation claims. The checklist also treats `AccessDeniedException`, schema output, and pipeline output as concrete blocker evidence rather than acceptance.
 
 ### Next
 

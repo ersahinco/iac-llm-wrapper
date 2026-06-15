@@ -20,6 +20,18 @@ downstream owner exists.
 Ask only whether the generated AWS LZA config bundle can enter the current AWS
 LZA validation or pipeline path after normal manual gates.
 
+## Before Local Validation
+
+- Replace generated `example.com` account emails in `accounts-config.yaml` with
+  owner-approved account vending email addresses.
+- Use an already-prepared local AWS LZA source checkout and toolchain; this
+  project must not clone, install, synth, deploy, or mutate AWS.
+- Run the validator with an AWS session that can satisfy the official AWS LZA
+  account lookup used by the owner or toolchain path.
+- Treat `AccessDeniedException`, schema output, or pipeline output as concrete
+  blocker evidence to send back to the owner; do not convert it into an
+  acceptance claim.
+
 ## Checklist Template
 
 ```markdown
@@ -31,6 +43,8 @@ Date:
 LZA repo, pipeline, or validation path:
 LZA version, schema version, or commit if known:
 Generated bundle path or commit:
+Account emails owner-approved by:
+AWS account lookup context or profile:
 
 ## Decision
 
@@ -61,6 +75,16 @@ Generated bundle path or commit:
 - [ ] Other:
 
 ## Required Owner Answers
+
+Are all account emails in `accounts-config.yaml` owner-approved account vending
+emails?
+
+Answer:
+
+Did the validator or pipeline run with credentials that can perform its required
+AWS account lookup?
+
+Answer:
 
 Can this generated AWS LZA config bundle enter your current LZA validation or
 pipeline path after normal manual gates?
