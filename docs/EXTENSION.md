@@ -101,27 +101,18 @@ Rules:
 Register output generators that emit target configuration files:
 
 ```python
-from io import StringIO
 from pathlib import Path
 
-import ruamel.yaml
-
 from intent_engine.core.generator import register_generator
+from intent_engine.core.yaml_utils import write_yaml_artifact
 from intent_engine.patterns.my_pattern.models import K8sIntent
-
-def _write_yaml(path: Path, data: dict) -> None:
-    yaml = ruamel.yaml.YAML()
-    yaml.default_flow_style = False
-    buffer = StringIO()
-    yaml.dump(data, buffer)
-    path.write_text(buffer.getvalue())
 
 def gen_cluster_config(intent, output_dir: Path) -> None:
     model = getattr(intent, "intent", intent)
     if not isinstance(model, K8sIntent):
         return
     data = {"cluster": {"name": model.cluster_name}}
-    _write_yaml(output_dir / "cluster-config.yaml", data)
+    write_yaml_artifact(output_dir / "cluster-config.yaml", data, header="")
 
 register_generator(
     "k8s-cluster",
