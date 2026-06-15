@@ -109,7 +109,7 @@ T72: Owner validation follow-up
 - **Format**: clean (`ruff format --check .`)
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Continued T72 owner-validation follow-up by adding machine-readable diagnostics to AWS LZA validation evidence, CLI failure output, and review output. Failed official validator runs now keep raw stdout/stderr and also classify common blockers such as AWS account lookup permission failures, placeholder account emails, local toolchain gaps, and schema/config validation errors. No owner validation is claimed.
+- **Last session**: Continued T72 owner-validation follow-up by aligning public validation wording with observed AWS LZA validator behavior. Docs now say `iac-llm-wrapper lza validate` is validation-only and must not mutate AWS, while the official AWS LZA validator may perform read-only account lookup through the provided AWS/LZA context. No owner validation is claimed.
 
 ### Done
 
@@ -168,6 +168,7 @@ T72: Owner validation follow-up
 - T72 partial owner-validation follow-up: Re-ran local AWS LZA validation against a bundle with explicit account emails rather than generated `example.com` placeholders. Evidence at ignored path `tests/results/t72-lza-validation-no-default-email/lza-validation-evidence.yaml` shows the default-email issue is gone and the remaining failure is `AccessDeniedException` in `accounts-config.yaml`. This is not owner validation because the emails are not owner-approved and the local AWS session still lacks the required lookup permission.
 - T72 owner-packet prerequisite hardening: `docs/LZA_DOWNSTREAM_VALIDATION.md` now requires owner-approved account vending emails and an AWS account lookup context/profile before local or owner validation claims. The checklist also treats `AccessDeniedException`, schema output, and pipeline output as concrete blocker evidence rather than acceptance.
 - T72 validation diagnostic hardening: `lza-validation-evidence.yaml` now records a diagnostic category, summary, and next action alongside raw validator stdout/stderr. CLI failure output and static review surface non-pass diagnostic categories and next actions while remaining compatible with older evidence files.
+- T72 validation boundary wording: README, architecture, artifact catalog, and downstream-validation packet now distinguish no AWS mutation from possible read-only AWS account lookup by the official local LZA validator. Product-language tests guard against the old "no AWS API call" wording.
 
 ### Next
 

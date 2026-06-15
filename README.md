@@ -95,7 +95,9 @@ iac-llm-wrapper lza validate \
 
 This runs only the official LZA config validator and writes
 `lza-validation-evidence.yaml`; it does not synth, deploy, clone, install, or
-call AWS APIs.
+mutate AWS. Depending on the AWS LZA version and local validation path, the
+official validator may perform read-only AWS account lookup through your
+configured AWS/LZA context.
 
 ## Patterns
 

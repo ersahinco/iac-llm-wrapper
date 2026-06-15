@@ -39,8 +39,10 @@ Architect packet / Markdown / Interview
 - Patterns own domain models, requirement graphs, validators, deployment target
   contracts, sample configs, semantic model derivation, predicate constraints,
   and pattern-specific target configuration emitters.
-- Existing deployment mechanisms own deployment. Current built-ins do not call
-  cloud APIs or invoke pipelines.
+- Existing deployment mechanisms own deployment. Current compile/generation
+  paths do not call cloud APIs or invoke pipelines; the AWS LZA validation-only
+  adapter may run the official local validator, which can require read-only
+  account lookup through the provided AWS/LZA context.
 
 ## Boundary
 

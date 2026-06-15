@@ -27,7 +27,8 @@ LZA validation or pipeline path after normal manual gates.
 - Use an already-prepared local AWS LZA source checkout and toolchain; this
   project must not clone, install, synth, deploy, or mutate AWS.
 - Run the validator with an AWS session that can satisfy the official AWS LZA
-  account lookup used by the owner or toolchain path.
+  account lookup used by the owner or toolchain path. This is validation
+  evidence capture, not AWS mutation.
 - Treat `AccessDeniedException`, schema output, or pipeline output as concrete
   blocker evidence to send back to the owner; do not convert it into an
   acceptance claim.
@@ -136,8 +137,10 @@ Answer:
 - Do not mark plan readiness as owner-validated without the completed checklist,
   real command/schema/pipeline output, or owner-reviewed
   `lza-validation-evidence.yaml`.
-- Do not run LZA synth, deploy, pipeline stages, cloud APIs, clone, or install
-  steps from this project. `iac-llm-wrapper lza validate` is validation-only and
-  requires an already-prepared local AWS LZA source checkout.
+- Do not run LZA synth, deploy, pipeline stages, AWS mutation, clone, or install
+  steps from this project. `iac-llm-wrapper lza validate` is validation-only,
+  requires an already-prepared local AWS LZA source checkout, and may require
+  the official validator to perform read-only account lookup with the provided
+  AWS/LZA context.
 - Do not broaden AWS LZA schema depth unless the checklist exposes a real
   handoff blocker.

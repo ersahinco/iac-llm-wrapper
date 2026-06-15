@@ -18,6 +18,8 @@ def test_readme_frames_registered_target_configuration_boundary():
     assert "existing deployment mechanism" in text
     assert "AWS Landing Zone Accelerator is the reference path" in text
     assert "does not generate whole IaC from scratch" in normalized
+    assert "official validator may perform read-only AWS account lookup" in text
+    assert "does not synth, deploy, clone, install, or call AWS APIs" not in text
 
 
 def test_agents_context_uses_registered_target_language():
