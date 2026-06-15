@@ -8,6 +8,7 @@ from typing import Any
 
 from .markdown_extractor import extract_from_markdown_with_diagnostics
 from .sample_config import SampleConfig
+from .yaml_utils import dump_yaml
 
 
 def build_input_diff_report(
@@ -258,15 +259,7 @@ def _hunks(before_text: str | None, after_text: str) -> list[str]:
 
 
 def _yaml_like(data: Any) -> str:
-    import io
-
-    import ruamel.yaml
-
-    yaml = ruamel.yaml.YAML()
-    yaml.default_flow_style = False
-    buf = io.StringIO()
-    yaml.dump(data, buf)
-    return buf.getvalue().strip()
+    return dump_yaml(data, indent=False).strip()
 
 
 def _coerce_list(value: Any) -> list[Any]:

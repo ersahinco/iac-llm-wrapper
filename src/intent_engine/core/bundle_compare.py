@@ -8,9 +8,8 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
-import ruamel.yaml
-
 from .sample_config import SampleConfig
+from .yaml_utils import read_yaml_mapping, write_yaml_artifact
 
 
 @dataclass(frozen=True)
@@ -158,12 +157,7 @@ def compare_handoff_bundles(before_dir: Path, after_dir: Path) -> dict[str, Any]
 
 def write_bundle_comparison(report: dict[str, Any], output: Path) -> None:
     """Write a bundle comparison report as YAML."""
-    output.parent.mkdir(parents=True, exist_ok=True)
-    yaml = ruamel.yaml.YAML()
-    yaml.default_flow_style = False
-    yaml.indent(mapping=2, sequence=4, offset=2)
-    with output.open("w") as file:
-        yaml.dump(report, file)
+    write_yaml_artifact(output, report, "")
 
 
 def write_bundle_comparison_html(report: dict[str, Any], output: Path) -> None:
@@ -395,11 +389,7 @@ def _load_bundle(path: Path) -> _BundleSnapshot:
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:
-    if not path.exists():
-        return {}
-    yaml = ruamel.yaml.YAML(typ="safe")
-    data = yaml.load(path.read_text())
-    return data if isinstance(data, dict) else {}
+    return read_yaml_mapping(path)
 
 
 def _readiness(

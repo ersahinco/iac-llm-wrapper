@@ -10,8 +10,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import ruamel.yaml
-
 from intent_engine.core.contracts import (
     GLOBAL_CONTRACT_REGISTRY,
     ArtifactContract,
@@ -24,6 +22,7 @@ from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern
 from intent_engine.core.requirements import Requirement, RequirementGraph
 from intent_engine.core.sample_config import GLOBAL_SAMPLE_REGISTRY, ModuleRef, SampleConfig
 from intent_engine.core.validator import Violation
+from intent_engine.core.yaml_utils import write_yaml_artifact
 
 from .models import TerraformVpcIntent
 
@@ -266,8 +265,6 @@ def gen_decision_report(intent: Any, output_dir: Path) -> None:
     model = _intent(intent)
     if model is None:
         return
-    yaml = ruamel.yaml.YAML()
-    yaml.default_flow_style = False
     data = {
         "pattern": "terraform-vpc",
         "vpc": {
@@ -290,9 +287,7 @@ def gen_decision_report(intent: Any, output_dir: Path) -> None:
         data["handoffReadiness"] = readiness
         # Backward-compatible alias for existing artifact consumers.
         data["deploymentReadiness"] = readiness
-    output_dir.mkdir(parents=True, exist_ok=True)
-    with open(output_dir / "decision-report.yaml", "w") as file:
-        yaml.dump(data, file)
+    write_yaml_artifact(output_dir / "decision-report.yaml", data, header="")
 
 
 SECTION_MAP: dict[str, tuple[str, str | None]] = {

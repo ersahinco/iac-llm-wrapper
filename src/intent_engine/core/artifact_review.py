@@ -7,13 +7,12 @@ import re
 from pathlib import Path
 from typing import Any
 
-import ruamel.yaml
-
 from .contract_validation import build_contract_validation, write_contract_validation
 from .graph_export import graph_to_json, graph_to_mermaid
 from .lza_validation import LZA_VALIDATION_EVIDENCE, summarize_lza_validation_output
 from .patterns import GLOBAL_REGISTRY
 from .review_renderer import render_review_html as render_review_html_context
+from .yaml_utils import read_yaml_mapping
 
 _ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -188,11 +187,7 @@ def _relative_graph_exports(
 
 
 def _read_yaml(path: Path | None) -> dict[str, Any]:
-    if path is None or not path.exists():
-        return {}
-    yaml = ruamel.yaml.YAML(typ="safe")
-    data = yaml.load(path.read_text())
-    return data if isinstance(data, dict) else {}
+    return read_yaml_mapping(path) if path is not None else {}
 
 
 def _dict(value: Any) -> dict[str, Any]:

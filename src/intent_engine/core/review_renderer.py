@@ -5,7 +5,7 @@ from __future__ import annotations
 from html import escape
 from typing import Any
 
-import ruamel.yaml
+from .yaml_utils import dump_yaml
 
 
 def render_review_html(context: dict[str, Any]) -> str:
@@ -260,13 +260,7 @@ def _dict(value: Any) -> dict[str, Any]:
 
 
 def _yaml_dump(data: Any) -> str:
-    from io import StringIO
-
-    yaml = ruamel.yaml.YAML()
-    yaml.default_flow_style = False
-    buf = StringIO()
-    yaml.dump(data, buf)
-    return buf.getvalue()
+    return dump_yaml(data, indent=False)
 
 
 def _section(title: str, body: list[str]) -> str:
