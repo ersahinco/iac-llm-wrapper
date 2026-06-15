@@ -87,7 +87,7 @@ def _build_payload(
     source_context: dict[str, Any] | None = None,
 ) -> Any:
     """Wrap intent in IaCIntentPayload with design doc and module inputs."""
-    from .module_mapping import DesignDocument, IaCIntentPayload, map_intent_to_modules
+    from .module_mapping import DesignDocument, IaCIntentPayload
 
     design_doc = DesignDocument()
     if design_doc_data:
@@ -96,7 +96,8 @@ def _build_payload(
         design_doc.estimated_tier = design_doc_data.get("estimated_tier", "")
         design_doc.compliance_tags = design_doc_data.get("compliance_tags", [])
 
-    module_inputs = map_intent_to_modules(intent, pattern)
+    pattern_obj = GLOBAL_REGISTRY.get(pattern)
+    module_inputs = pattern_obj.module_mapper(intent) if pattern_obj.module_mapper else []
     return IaCIntentPayload(
         design_doc=design_doc,
         module_inputs=module_inputs,

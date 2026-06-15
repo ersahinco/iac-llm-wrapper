@@ -10,6 +10,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from .contracts import ContractValidator, TargetContract
+from .module_mapping import ModuleInputs
 from .requirements import RequirementGraph
 from .target_capabilities import TargetCapability
 
@@ -33,6 +34,8 @@ class Pattern:
     free_form_examples: dict[str, list[str]] = field(default_factory=dict)
     # Extra validators: list of functions(intent) -> list[Violation]
     validators: list[Callable[[Any], list[Any]]] = field(default_factory=list)
+    # Optional module handoff mapper owned by the pattern.
+    module_mapper: Callable[[Any], list[ModuleInputs]] | None = None
     # Target contracts that drive decisions, validation, and generated artifacts
     contracts: list[TargetContract] = field(default_factory=list)
     # Downstream target capability graph declarations.

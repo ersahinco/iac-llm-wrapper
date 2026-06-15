@@ -1,4 +1,4 @@
-"""Module mapping: bridge from validated intent to IaC module variable inputs.
+"""Module handoff models for validated intent.
 
 This layer carries design context and module inputs:
 - DesignDocument: business/architectural context for documentation/PRs
@@ -8,7 +8,6 @@ This layer carries design context and module inputs:
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -116,42 +115,3 @@ class IaCIntentPayload:
         ):
             return object.__getattribute__(self, name)
         return getattr(self.intent, name)
-
-
-ModuleMapperFn = Callable[[Any], list[ModuleInputs]]
-
-
-class ModuleMapperRegistry:
-    """Registry of intent-to-module mappers per pattern."""
-
-    def __init__(self) -> None:
-        self._mappers: dict[str, ModuleMapperFn] = {}
-
-    def register(self, pattern_name: str, fn: ModuleMapperFn) -> None:
-        self._mappers[pattern_name] = fn
-
-    def get(self, pattern_name: str) -> ModuleMapperFn | None:
-        return self._mappers.get(pattern_name)
-
-    def list(self) -> list[str]:
-        return sorted(self._mappers.keys())
-
-
-# Global registry instance (populated by domain-specific modules)
-GLOBAL_MAPPER_REGISTRY = ModuleMapperRegistry()
-
-
-def register_module_mapper(pattern_name: str, fn: ModuleMapperFn) -> None:
-    """Register a module mapper for a pattern without modifying core code."""
-    GLOBAL_MAPPER_REGISTRY.register(pattern_name, fn)
-
-
-def map_intent_to_modules(intent: Any, pattern_name: str) -> list[ModuleInputs]:
-    """Map a validated intent to module-specific variable inputs.
-
-    Falls back to an empty list when no mapper is registered for the pattern.
-    """
-    mapper = GLOBAL_MAPPER_REGISTRY.get(pattern_name)
-    if mapper is None:
-        return []
-    return mapper(intent)

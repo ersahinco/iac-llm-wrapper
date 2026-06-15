@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from intent_engine.core.generator import register_generator
-from intent_engine.core.module_mapping import ModuleInputs, register_module_mapper
+from intent_engine.core.module_mapping import ModuleInputs
 from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern
 
 from .contracts import K8S_CONTRACT
@@ -82,12 +82,12 @@ def _register_pattern() -> None:
                 "- Namespace section -> namespace_name\n"
                 "Do not generate deployable cluster scaffolding from prose."
             ),
+            module_mapper=map_k8s_intent_to_modules,
             contracts=[K8S_CONTRACT],
         )
     )
 
 
 _register_generators()
-register_module_mapper("kubernetes-cluster", map_k8s_intent_to_modules)
 _register_pattern()
 register_k8s_samples()

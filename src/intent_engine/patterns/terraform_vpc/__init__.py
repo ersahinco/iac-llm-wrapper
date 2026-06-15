@@ -17,7 +17,7 @@ from intent_engine.core.contracts import (
     TargetContract,
 )
 from intent_engine.core.generator import register_generator
-from intent_engine.core.module_mapping import ModuleInputs, register_module_mapper
+from intent_engine.core.module_mapping import ModuleInputs
 from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern
 from intent_engine.core.requirements import Requirement, RequirementGraph
 from intent_engine.core.sample_config import GLOBAL_SAMPLE_REGISTRY, ModuleRef, SampleConfig
@@ -299,7 +299,6 @@ SECTION_MAP: dict[str, tuple[str, str | None]] = {
 }
 
 GLOBAL_CONTRACT_REGISTRY.register(_CONTRACT)
-register_module_mapper("terraform-vpc", map_terraform_vpc_modules)
 register_generator(
     "terraform-vpc-decision-report",
     gen_decision_report,
@@ -320,6 +319,7 @@ GLOBAL_REGISTRY.register(
             "settings, and DNS flags only. Do not generate root Terraform scaffolding "
             "from prose."
         ),
+        module_mapper=map_terraform_vpc_modules,
         validators=[_validate_intent],
         contracts=[_CONTRACT],
     )
