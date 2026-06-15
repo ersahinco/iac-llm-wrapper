@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .sample_config import GLOBAL_SAMPLE_REGISTRY
+from .patterns import GLOBAL_REGISTRY
 
 
 def review_html_command(app_name: str, output: Path) -> str:
@@ -13,7 +13,7 @@ def review_html_command(app_name: str, output: Path) -> str:
 
 
 def sample_match_lines(app_name: str, pattern: str, decisions: dict[str, Any]) -> list[str]:
-    matches = GLOBAL_SAMPLE_REGISTRY.find_best_matches(decisions, pattern=pattern, limit=3)
+    matches = GLOBAL_REGISTRY.find_sample_matches(decisions, pattern=pattern, limit=3)
     if not matches:
         return []
 

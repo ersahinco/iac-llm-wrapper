@@ -9,7 +9,7 @@ import ruamel.yaml
 
 import intent_engine.patterns.aws_lza  # noqa: F401 — triggers pattern registration
 from intent_engine.core.compiler import CompileError, compile_design, compile_from_interview
-from intent_engine.core.contracts import GLOBAL_CONTRACT_REGISTRY, ContractValidator
+from intent_engine.core.contracts import ContractValidator
 from intent_engine.core.extractor import Extractor
 from intent_engine.core.generator import generate_all
 from intent_engine.core.patterns import GLOBAL_REGISTRY
@@ -47,7 +47,7 @@ class TestAwsLzaPattern:
         assert ContractValidator(AWS_LZA_SAMPLE_CONFIG_CONTRACT).validate_graph(graph) == []
 
     def test_contract_is_registered(self):
-        contract = GLOBAL_CONTRACT_REGISTRY.get("aws-lza-sample-configuration")
+        contract = GLOBAL_REGISTRY.contract("aws-lza-sample-configuration")
         assert contract is AWS_LZA_SAMPLE_CONFIG_CONTRACT
 
     def test_extractor_with_graph_uses_pattern_intent_model(self):

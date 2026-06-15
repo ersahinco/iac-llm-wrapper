@@ -31,7 +31,7 @@ from .core.compiler import (
     generate_template,
     validate_generated,
 )
-from .core.contracts import GLOBAL_CONTRACT_REGISTRY, TargetContract
+from .core.contracts import TargetContract
 from .core.discovery import DiscoveryEngine, generate_clarifying_questions
 from .core.extractor import Extractor
 from .core.graph_export import graph_to_json, graph_to_mermaid
@@ -45,7 +45,7 @@ from .core.lza_validation import (
 from .core.markdown_extractor import extract_from_markdown
 from .core.pattern_check import check_pattern
 from .core.patterns import GLOBAL_REGISTRY, Pattern
-from .core.sample_config import GLOBAL_SAMPLE_REGISTRY, SampleConfig
+from .core.sample_config import SampleConfig
 from .core.suggestion import SuggestionEngine
 from .core.yaml_utils import read_yaml_mapping, write_yaml_artifact
 from .patterns import load_builtin_patterns
@@ -149,12 +149,12 @@ def _selected_contracts_or_exit(
     pattern: str | None,
 ) -> list[TargetContract]:
     if action == "list":
-        return [GLOBAL_CONTRACT_REGISTRY.get(n) for n in GLOBAL_CONTRACT_REGISTRY.list()]
+        return GLOBAL_REGISTRY.contracts()
     if pattern:
         return _contracts_for_pattern_or_exit(pattern)
     if name:
         try:
-            return [GLOBAL_CONTRACT_REGISTRY.get(name)]
+            return [GLOBAL_REGISTRY.contract(name)]
         except KeyError as exc:
             typer.echo(str(exc), err=True)
             raise typer.Exit(1) from exc
@@ -172,18 +172,18 @@ def _selected_samples_or_exit(
     if action == "list":
         if pattern:
             _get_pattern_or_exit(pattern)
-        samples = GLOBAL_SAMPLE_REGISTRY.find(pattern=pattern, contract=contract, tag=tag)
+        samples = GLOBAL_REGISTRY.find_samples(pattern=pattern, contract=contract, tag=tag)
         return samples
     if pattern:
         _get_pattern_or_exit(pattern)
-        samples = GLOBAL_SAMPLE_REGISTRY.find(pattern=pattern, contract=contract, tag=tag)
+        samples = GLOBAL_REGISTRY.find_samples(pattern=pattern, contract=contract, tag=tag)
         if not samples:
             typer.echo(f"Pattern has no sample configs: {pattern}", err=True)
             raise typer.Exit(1)
         return samples
     if name:
         try:
-            return [GLOBAL_SAMPLE_REGISTRY.get(name)]
+            return [GLOBAL_REGISTRY.sample(name)]
         except KeyError as exc:
             typer.echo(str(exc), err=True)
             raise typer.Exit(1) from exc

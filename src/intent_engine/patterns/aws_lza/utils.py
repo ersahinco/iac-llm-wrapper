@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from intent_engine.core.sample_config import GLOBAL_SAMPLE_REGISTRY, SampleConfig
+from intent_engine.core.sample_config import SampleConfig, find_best_sample_matches
 from intent_engine.core.yaml_utils import write_yaml_artifact
 
 from .contracts import AWS_LZA_SAMPLE_CONFIG_CONTRACT
@@ -220,8 +220,11 @@ def _security_hub_config(intent: AwsLzaIntent) -> dict[str, Any]:
 
 
 def _sample_recommendation_runbook_lines(intent: AwsLzaIntent) -> list[str]:
+    from .samples import aws_lza_samples
+
     decisions = SampleConfig.to_builtin(intent.model_dump())
-    matches = GLOBAL_SAMPLE_REGISTRY.find_best_matches(
+    matches = find_best_sample_matches(
+        aws_lza_samples(),
         decisions,
         pattern="aws-lza",
         limit=3,

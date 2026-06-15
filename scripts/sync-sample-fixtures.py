@@ -11,7 +11,8 @@ import tempfile
 from pathlib import Path
 
 from intent_engine.core.compiler import compile_from_interview
-from intent_engine.core.sample_config import GLOBAL_SAMPLE_REGISTRY, SampleConfig
+from intent_engine.core.patterns import GLOBAL_REGISTRY
+from intent_engine.core.sample_config import SampleConfig
 from intent_engine.patterns import load_builtin_patterns
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -23,12 +24,10 @@ def _selected_samples(names: list[str]) -> list[SampleConfig]:
     if not names:
         return [
             sample
-            for sample in (
-                GLOBAL_SAMPLE_REGISTRY.get(name) for name in GLOBAL_SAMPLE_REGISTRY.list()
-            )
+            for sample in GLOBAL_REGISTRY.samples()
             if sample.fixture_dir or (FIXTURES_ROOT / sample.fixture_name).exists()
         ]
-    return [GLOBAL_SAMPLE_REGISTRY.get(name) for name in names]
+    return [GLOBAL_REGISTRY.sample(name) for name in names]
 
 
 def _fixture_dir(sample: SampleConfig) -> Path:

@@ -10,7 +10,8 @@ from types import ModuleType
 import ruamel.yaml
 
 from intent_engine.core.compiler import compile_from_interview
-from intent_engine.core.sample_config import GLOBAL_SAMPLE_REGISTRY
+from intent_engine.core.patterns import GLOBAL_REGISTRY
+from intent_engine.core.sample_config import SampleConfig
 from intent_engine.patterns import load_builtin_patterns
 
 FIXTURES = Path(__file__).parent.parent.parent / "fixtures"
@@ -31,9 +32,17 @@ def _load_sync_script() -> ModuleType:
 _normalized_artifact_text = _load_sync_script()._normalized_artifact_text
 
 
+def _sample(name: str) -> SampleConfig:
+    return GLOBAL_REGISTRY.sample(name)
+
+
+def _sample_names() -> list[str]:
+    return [sample.name for sample in GLOBAL_REGISTRY.samples()]
+
+
 class TestAwsLzaSampleConfigRegistered:
     def test_aws_lza_standard_v1_registered(self):
-        cfg = GLOBAL_SAMPLE_REGISTRY.get("aws-lza-standard-v1")
+        cfg = _sample("aws-lza-standard-v1")
         assert cfg.pattern == "aws-lza"
         assert cfg.version == "1.0.0"
         assert cfg.source_contract == "aws-lza-sample-configuration"
@@ -43,14 +52,14 @@ class TestAwsLzaSampleConfigRegistered:
         assert cfg.source_url.startswith("https://awslabs.github.io/")
 
     def test_aws_lza_regulated_v1_registered(self):
-        cfg = GLOBAL_SAMPLE_REGISTRY.get("aws-lza-regulated-v1")
+        cfg = _sample("aws-lza-regulated-v1")
         assert cfg.pattern == "aws-lza"
         assert cfg.decisions["compliance_overlay"] == "regulated"
         assert cfg.upstream_variant == "standard"
         assert "regulated" in cfg.tags
 
     def test_aws_lza_healthcare_v1_registered(self):
-        cfg = GLOBAL_SAMPLE_REGISTRY.get("aws-lza-healthcare-v1")
+        cfg = _sample("aws-lza-healthcare-v1")
         assert cfg.pattern == "aws-lza"
         assert cfg.decisions["baseline"] == "healthcare"
         assert cfg.decisions["compliance_overlay"] == "healthcare"
@@ -60,7 +69,7 @@ class TestAwsLzaSampleConfigRegistered:
 
 class TestAwsLzaSampleConfigFixtures:
     def test_aws_lza_registered_sample_decisions_compile(self, tmp_path: Path):
-        cfg = GLOBAL_SAMPLE_REGISTRY.get("aws-lza-regulated-v1")
+        cfg = _sample("aws-lza-regulated-v1")
 
         compile_from_interview(cfg.decisions, tmp_path / "regulated", pattern="aws-lza")
 
@@ -104,20 +113,20 @@ class TestAwsLzaSampleConfigFixtures:
 
 class TestK8sSampleConfigRegistered:
     def test_k8s_cluster_v1_registered(self):
-        cfg = GLOBAL_SAMPLE_REGISTRY.get("k8s-cluster-v1")
+        cfg = _sample("k8s-cluster-v1")
         assert cfg.pattern == "kubernetes-cluster"
         assert cfg.fixture_name == "k8s-cluster-v1"
         assert cfg.version == "1.0.0"
         assert cfg.decisions["cluster_name"] == "prod-k8s"
 
     def test_k8s_v1_has_module_refs(self):
-        cfg = GLOBAL_SAMPLE_REGISTRY.get("k8s-cluster-v1")
+        cfg = _sample("k8s-cluster-v1")
         module_names = {m.module_name for m in cfg.module_refs}
         assert "terraform-aws-eks" in module_names
         assert "terraform-aws-vpc" in module_names
 
     def test_k8s_v1_module_refs_have_versions(self):
-        cfg = GLOBAL_SAMPLE_REGISTRY.get("k8s-cluster-v1")
+        cfg = _sample("k8s-cluster-v1")
         for ref in cfg.module_refs:
             assert ref.version
             assert ref.source
@@ -153,15 +162,15 @@ class TestK8sSampleConfigFixtures:
 class TestSampleConfigConsistency:
     def test_registered_samples_with_fixture_dirs(self):
         """Samples with fixture dirs should have valid directories."""
-        for name in GLOBAL_SAMPLE_REGISTRY.list():
-            cfg = GLOBAL_SAMPLE_REGISTRY.get(name)
+        for name in _sample_names():
+            cfg = _sample(name)
             expected_dir = FIXTURES / cfg.fixture_name
             if expected_dir.exists():
                 assert expected_dir.is_dir(), f"{name} fixture path is not a directory"
 
     def test_fixture_bundles_match_fresh_compile(self, tmp_path: Path):
-        for name in GLOBAL_SAMPLE_REGISTRY.list():
-            cfg = GLOBAL_SAMPLE_REGISTRY.get(name)
+        for name in _sample_names():
+            cfg = _sample(name)
             fixture_dir = FIXTURES / cfg.fixture_name
             if not fixture_dir.exists():
                 continue
@@ -186,15 +195,15 @@ class TestSampleConfigConsistency:
 
     def test_all_samples_have_module_versions(self):
         """Every module ref should have a version and source."""
-        for name in GLOBAL_SAMPLE_REGISTRY.list():
-            cfg = GLOBAL_SAMPLE_REGISTRY.get(name)
+        for name in _sample_names():
+            cfg = _sample(name)
             for ref in cfg.module_refs:
                 assert ref.version, f"{name}/{ref.module_name} missing version"
                 assert ref.source, f"{name}/{ref.module_name} missing source"
 
     def test_all_samples_with_contract_metadata_have_source_url(self):
-        for name in GLOBAL_SAMPLE_REGISTRY.list():
-            cfg = GLOBAL_SAMPLE_REGISTRY.get(name)
+        for name in _sample_names():
+            cfg = _sample(name)
             if cfg.source_contract:
                 assert cfg.source_url, f"{name} missing source_url"
                 assert cfg.upstream_variant, f"{name} missing upstream_variant"

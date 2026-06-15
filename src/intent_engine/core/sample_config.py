@@ -9,6 +9,7 @@ safely when module sources are updated.
 from __future__ import annotations
 
 import builtins
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -156,84 +157,58 @@ class SampleMatch:
     diff: dict[str, Any]
 
 
-class SampleConfigRegistry:
-    """Registry of version-pinned sample configurations."""
+def find_samples(
+    samples: Iterable[SampleConfig],
+    *,
+    pattern: str | None = None,
+    contract: str | None = None,
+    tag: str | None = None,
+) -> builtins.list[SampleConfig]:
+    """Filter pattern-owned sample configs."""
+    matches = list(samples)
+    if pattern is not None:
+        matches = [sample for sample in matches if sample.pattern == pattern]
+    if contract is not None:
+        matches = [sample for sample in matches if sample.source_contract == contract]
+    if tag is not None:
+        needle = tag.lower()
+        matches = [
+            sample
+            for sample in matches
+            if any(candidate.lower() == needle for candidate in sample.tags)
+        ]
+    return sorted(matches, key=lambda sample: sample.name)
 
-    def __init__(self) -> None:
-        self._samples: dict[str, SampleConfig] = {}
 
-    def register(self, config: SampleConfig) -> None:
-        self._samples[config.name] = config
-
-    def get(self, name: str) -> SampleConfig:
-        if name not in self._samples:
-            raise KeyError(f"Unknown sample config: {name}")
-        return self._samples[name]
-
-    def list(self) -> builtins.list[str]:
-        return sorted(self._samples.keys())
-
-    def find_by_pattern(self, pattern: str) -> builtins.list[SampleConfig]:
-        return self.find(pattern=pattern)
-
-    def find_by_contract(self, contract: str) -> builtins.list[SampleConfig]:
-        return self.find(contract=contract)
-
-    def find_by_tag(self, tag: str) -> builtins.list[SampleConfig]:
-        return self.find(tag=tag)
-
-    def find(
-        self,
-        *,
-        pattern: str | None = None,
-        contract: str | None = None,
-        tag: str | None = None,
-    ) -> builtins.list[SampleConfig]:
-        samples = list(self._samples.values())
-        if pattern is not None:
-            samples = [sample for sample in samples if sample.pattern == pattern]
-        if contract is not None:
-            samples = [sample for sample in samples if sample.source_contract == contract]
-        if tag is not None:
-            needle = tag.lower()
-            samples = [
-                sample
-                for sample in samples
-                if any(candidate.lower() == needle for candidate in sample.tags)
-            ]
-        return sorted(samples, key=lambda sample: sample.name)
-
-    def find_best_matches(
-        self,
-        current_decisions: dict[str, Any],
-        *,
-        pattern: str | None = None,
-        contract: str | None = None,
-        tag: str | None = None,
-        limit: int = 3,
-    ) -> builtins.list[SampleMatch]:
-        ranked: builtins.list[SampleMatch] = []
-        for sample in self.find(pattern=pattern, contract=contract, tag=tag):
-            diff = sample.compare_to(current_decisions)
-            ranked.append(
-                SampleMatch(
-                    sample=sample,
-                    same_count=len(diff["same"]),
-                    different_count=len(diff["different"]),
-                    missing_count=len(diff["missing_in_current"]),
-                    total_sample_decisions=len(sample.decisions),
-                    diff=diff,
-                )
-            )
-        ranked.sort(
-            key=lambda match: (
-                -match.same_count,
-                match.different_count,
-                match.missing_count,
-                match.sample.name,
+def find_best_sample_matches(
+    samples: Iterable[SampleConfig],
+    current_decisions: dict[str, Any],
+    *,
+    pattern: str | None = None,
+    contract: str | None = None,
+    tag: str | None = None,
+    limit: int = 3,
+) -> builtins.list[SampleMatch]:
+    """Rank sample configs against accepted decisions."""
+    ranked: builtins.list[SampleMatch] = []
+    for sample in find_samples(samples, pattern=pattern, contract=contract, tag=tag):
+        diff = sample.compare_to(current_decisions)
+        ranked.append(
+            SampleMatch(
+                sample=sample,
+                same_count=len(diff["same"]),
+                different_count=len(diff["different"]),
+                missing_count=len(diff["missing_in_current"]),
+                total_sample_decisions=len(sample.decisions),
+                diff=diff,
             )
         )
-        return ranked[:limit]
-
-
-GLOBAL_SAMPLE_REGISTRY = SampleConfigRegistry()
+    ranked.sort(
+        key=lambda match: (
+            -match.same_count,
+            match.different_count,
+            match.missing_count,
+            match.sample.name,
+        )
+    )
+    return ranked[:limit]

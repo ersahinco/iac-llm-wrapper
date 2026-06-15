@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 from intent_engine.core.contracts import (
-    GLOBAL_CONTRACT_REGISTRY,
     ArtifactContract,
     DecisionLineage,
     TargetContract,
@@ -230,7 +229,6 @@ SECTION_MAP: dict[str, tuple[str, str | None]] = {
     "execution_role_arn": ("Execution", "execution_role_arn"),
 }
 
-GLOBAL_CONTRACT_REGISTRY.register(_CONTRACT)
 GLOBAL_REGISTRY.register(
     Pattern(
         name="cloudformation-parameters",

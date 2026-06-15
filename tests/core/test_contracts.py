@@ -9,15 +9,19 @@ from pydantic import BaseModel
 from intent_engine.core.contracts import (
     BLOCKED_ASSESSMENT_CONTRACT,
     CONTEXT_MANIFEST_CONTRACT,
+    CORE_CONTRACTS,
     HANDOFF_PLAN_CONTRACT,
     ArtifactContract,
     ArtifactValueAssertion,
-    ContractRegistry,
     ContractValidator,
     DecisionLineage,
     TargetContract,
 )
+from intent_engine.core.patterns import GLOBAL_REGISTRY
 from intent_engine.core.requirements import Requirement, RequirementGraph
+from intent_engine.patterns import load_builtin_patterns
+
+load_builtin_patterns()
 
 
 class ExampleIntent(BaseModel):
@@ -496,29 +500,18 @@ guardrails:
         ]
 
 
-class TestContractRegistry:
-    def test_register_and_get_contract(self):
-        registry = ContractRegistry()
-        contract = _contract()
+class TestPatternOwnedContracts:
+    def test_core_contracts_are_validated_contracts(self):
+        assert {contract.name for contract in CORE_CONTRACTS} == {
+            "blocked-assessment-artifacts",
+            "generic-handoff-plan",
+            "generic-context-manifest",
+            "generic-plan-ready-bundle",
+        }
+        for contract in CORE_CONTRACTS:
+            assert ContractValidator(contract).validate_contract() == []
 
-        registry.register(contract)
+    def test_pattern_registry_finds_builtin_contracts(self):
+        contract = GLOBAL_REGISTRY.contract("aws-lza-sample-configuration")
 
-        assert registry.get("example") is contract
-        assert registry.list() == ["example"]
-
-    def test_invalid_contract_rejected(self):
-        registry = ContractRegistry()
-        contract = TargetContract(
-            name="bad",
-            kind="test",
-            source_url="https://example.com",
-            artifacts=[],
-            required_decisions=[],
-        )
-
-        try:
-            registry.register(contract)
-        except ValueError as exc:
-            assert "Invalid contract 'bad'" in str(exc)
-        else:
-            raise AssertionError("invalid contract was accepted")
+        assert contract.kind == "aws-lza-sample-configuration"

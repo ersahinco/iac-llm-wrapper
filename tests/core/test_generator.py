@@ -19,7 +19,7 @@ from intent_engine.core.generator import (
 from intent_engine.core.module_mapping import DesignDocument, IaCIntentPayload, ModuleInputs
 from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern, PatternGenerator
 from intent_engine.core.requirements import Requirement, RequirementGraph
-from intent_engine.core.sample_config import GLOBAL_SAMPLE_REGISTRY, SampleConfig
+from intent_engine.core.sample_config import SampleConfig
 
 
 def _yaml_load(path: Path) -> dict:
@@ -362,31 +362,42 @@ class TestGenContextManifest:
 
 class TestGenSampleRecommendations:
     def test_writes_file_when_pattern_has_sample_matches(self, tmp_path: Path):
-        GLOBAL_SAMPLE_REGISTRY.register(
-            SampleConfig(
-                name="test-sample-rec-v1",
-                pattern="test-pattern-rec",
-                version="1.0.0",
-                release_date="2026-05-27",
-                source_url="https://example.com",
-                decisions={"region": "eu-central-1", "enabled": "true"},
+        original = dict(GLOBAL_REGISTRY._patterns)
+        try:
+            GLOBAL_REGISTRY.register(
+                Pattern(
+                    name="test-pattern-rec",
+                    description="Sample recommendation test",
+                    graph_factory=_handoff_graph,
+                    samples=[
+                        SampleConfig(
+                            name="test-sample-rec-v1",
+                            pattern="test-pattern-rec",
+                            version="1.0.0",
+                            release_date="2026-05-27",
+                            source_url="https://example.com",
+                            decisions={"region": "eu-central-1", "enabled": "true"},
+                        )
+                    ],
+                )
             )
-        )
-        payload = IaCIntentPayload(
-            design_doc=None,  # type: ignore[arg-type]
-            module_inputs=[],
-            intent=None,
-            pattern="test-pattern-rec",
-            decisions={"region": "eu-central-1", "enabled": True},
-        )
+            payload = IaCIntentPayload(
+                design_doc=None,  # type: ignore[arg-type]
+                module_inputs=[],
+                intent=None,
+                pattern="test-pattern-rec",
+                decisions={"region": "eu-central-1", "enabled": True},
+            )
 
-        gen_sample_recommendations(payload, tmp_path)
+            gen_sample_recommendations(payload, tmp_path)
 
-        out = tmp_path / "sample-recommendations.yaml"
-        assert out.exists()
-        content = out.read_text()
-        assert "test-sample-rec-v1" in content
-        assert "sameDecisionCount: 2" in content
+            out = tmp_path / "sample-recommendations.yaml"
+            assert out.exists()
+            content = out.read_text()
+            assert "test-sample-rec-v1" in content
+            assert "sameDecisionCount: 2" in content
+        finally:
+            GLOBAL_REGISTRY._patterns = original
 
     def test_skips_without_pattern_decisions(self, tmp_path: Path):
         payload = IaCIntentPayload(

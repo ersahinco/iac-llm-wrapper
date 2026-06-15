@@ -24,7 +24,7 @@ from .generators import (
 )
 from .graph import build_aws_lza_graph
 from .models import AwsLzaIntent
-from .samples import register_aws_lza_samples
+from .samples import aws_lza_samples
 from .validators import validate_aws_lza_intent
 
 _AWS_LZA_SECTION_MAP: dict[str, tuple[str, str | None]] = {
@@ -207,10 +207,10 @@ def _register_pattern() -> None:
                 "explicit custom Terraform requests as unsupported for this pattern."
             ),
             contracts=[AWS_LZA_SAMPLE_CONFIG_CONTRACT],
+            samples=aws_lza_samples(),
             plan_ready=True,
         )
     )
 
 
 _register_pattern()
-register_aws_lza_samples()

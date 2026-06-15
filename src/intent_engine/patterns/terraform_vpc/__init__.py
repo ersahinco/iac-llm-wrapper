@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 
 from intent_engine.core.contracts import (
-    GLOBAL_CONTRACT_REGISTRY,
     ArtifactContract,
     DecisionLineage,
     TargetContract,
@@ -20,7 +19,7 @@ from intent_engine.core.generator import gen_tfvars
 from intent_engine.core.module_mapping import ModuleInputs
 from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern, PatternGenerator
 from intent_engine.core.requirements import Requirement, RequirementGraph
-from intent_engine.core.sample_config import GLOBAL_SAMPLE_REGISTRY, ModuleRef, SampleConfig
+from intent_engine.core.sample_config import ModuleRef, SampleConfig
 from intent_engine.core.validator import Violation
 from intent_engine.core.yaml_utils import write_yaml_artifact
 
@@ -298,7 +297,6 @@ SECTION_MAP: dict[str, tuple[str, str | None]] = {
     "enable_dns_hostnames": ("DNS", "enable_dns_hostnames"),
 }
 
-GLOBAL_CONTRACT_REGISTRY.register(_CONTRACT)
 GLOBAL_REGISTRY.register(
     Pattern(
         name="terraform-vpc",
@@ -320,37 +318,38 @@ GLOBAL_REGISTRY.register(
         ],
         validators=[_validate_intent],
         contracts=[_CONTRACT],
-    )
-)
-
-GLOBAL_SAMPLE_REGISTRY.register(
-    SampleConfig(
-        name="terraform-vpc-basic-v1",
-        pattern="terraform-vpc",
-        description="Two-AZ private/public subnet VPC for Terraform AWS VPC module handoff",
-        version="1.0.0",
-        release_date="2026-05-28",
-        source_url="https://registry.terraform.io/modules/terraform-aws-modules/vpc/aws",
-        source_contract="terraform-aws-vpc-module",
-        upstream_variant="two-az-public-private",
-        tags=["byom", "terraform", "vpc"],
-        decisions={
-            "vpc_name": "orders-vpc",
-            "primary_region": "eu-central-1",
-            "cidr": "10.30.0.0/16",
-            "az_count": "2",
-            "public_subnet_cidrs": "10.30.0.0/24,10.30.1.0/24",
-            "private_subnet_cidrs": "10.30.10.0/24,10.30.11.0/24",
-            "enable_nat_gateway": "true",
-            "single_nat_gateway": "false",
-            "enable_dns_hostnames": "true",
-        },
-        module_refs=[
-            ModuleRef(
-                module_name="terraform-aws-vpc",
-                source="terraform-aws-modules/vpc/aws",
-                version="~> 5.0",
-                description="Community Terraform VPC module fed by intent-engine decisions.",
+        samples=[
+            SampleConfig(
+                name="terraform-vpc-basic-v1",
+                pattern="terraform-vpc",
+                description="Two-AZ private/public subnet VPC for Terraform AWS VPC module handoff",
+                version="1.0.0",
+                release_date="2026-05-28",
+                source_url="https://registry.terraform.io/modules/terraform-aws-modules/vpc/aws",
+                source_contract="terraform-aws-vpc-module",
+                upstream_variant="two-az-public-private",
+                tags=["byom", "terraform", "vpc"],
+                decisions={
+                    "vpc_name": "orders-vpc",
+                    "primary_region": "eu-central-1",
+                    "cidr": "10.30.0.0/16",
+                    "az_count": "2",
+                    "public_subnet_cidrs": "10.30.0.0/24,10.30.1.0/24",
+                    "private_subnet_cidrs": "10.30.10.0/24,10.30.11.0/24",
+                    "enable_nat_gateway": "true",
+                    "single_nat_gateway": "false",
+                    "enable_dns_hostnames": "true",
+                },
+                module_refs=[
+                    ModuleRef(
+                        module_name="terraform-aws-vpc",
+                        source="terraform-aws-modules/vpc/aws",
+                        version="~> 5.0",
+                        description=(
+                            "Community Terraform VPC module fed by intent-engine decisions."
+                        ),
+                    )
+                ],
             )
         ],
     )

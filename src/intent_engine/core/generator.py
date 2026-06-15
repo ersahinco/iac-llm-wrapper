@@ -140,9 +140,10 @@ def gen_sample_recommendations(intent: Any, output_dir: Path) -> None:
     if not pattern or not decisions:
         return
 
-    from .sample_config import GLOBAL_SAMPLE_REGISTRY, SampleConfig
+    from .patterns import GLOBAL_REGISTRY as PATTERN_REGISTRY
+    from .sample_config import SampleConfig
 
-    matches = GLOBAL_SAMPLE_REGISTRY.find_best_matches(decisions, pattern=pattern, limit=3)
+    matches = PATTERN_REGISTRY.find_sample_matches(decisions, pattern=pattern, limit=3)
     if not matches:
         return
 
@@ -230,7 +231,6 @@ def gen_context_manifest(intent: Any, output_dir: Path) -> None:
         return
 
     from .patterns import GLOBAL_REGISTRY as PATTERN_REGISTRY
-    from .sample_config import GLOBAL_SAMPLE_REGISTRY
 
     pattern_obj = PATTERN_REGISTRY.get(pattern)
     graph = pattern_obj.create_graph()
@@ -239,7 +239,7 @@ def gen_context_manifest(intent: Any, output_dir: Path) -> None:
     extraction_summary = getattr(intent, "extraction_summary", {}) or {}
     target_capability_report = getattr(intent, "target_capability_report", {}) or {}
     module_inputs = getattr(intent, "module_inputs", []) or []
-    samples = GLOBAL_SAMPLE_REGISTRY.find_by_pattern(pattern)
+    samples = sorted(PATTERN_REGISTRY.get(pattern).samples, key=lambda sample: sample.name)
 
     data = {
         "pattern": pattern,

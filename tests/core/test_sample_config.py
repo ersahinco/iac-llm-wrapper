@@ -5,7 +5,8 @@ from __future__ import annotations
 from intent_engine.core.sample_config import (
     ModuleRef,
     SampleConfig,
-    SampleConfigRegistry,
+    find_best_sample_matches,
+    find_samples,
 )
 
 
@@ -126,86 +127,58 @@ class TestSampleConfig:
         assert changes["a"]["current"] is None
 
 
-class TestSampleConfigRegistry:
-    def test_register_and_get(self):
-        reg = SampleConfigRegistry()
-        cfg = SampleConfig(
-            name="test",
-            pattern="test-pattern",
-            version="1.0.0",
-            release_date="2025-01-01",
-            source_url="https://example.com",
-        )
-        reg.register(cfg)
-        assert reg.get("test").name == "test"
-
-    def test_get_unknown_raises(self):
-        reg = SampleConfigRegistry()
-        import pytest
-
-        with pytest.raises(KeyError):
-            reg.get("nonexistent")
-
-    def test_list(self):
-        reg = SampleConfigRegistry()
-        reg.register(
+class TestSampleConfigQueries:
+    def test_find_samples_sorts_by_name(self):
+        samples = [
             SampleConfig(
                 name="b",
                 pattern="t1",
                 version="1.0.0",
                 release_date="2025-01-01",
                 source_url="https://example.com",
-            )
-        )
-        reg.register(
+            ),
             SampleConfig(
                 name="a",
                 pattern="t2",
                 version="1.0.0",
                 release_date="2025-01-01",
                 source_url="https://example.com",
-            )
-        )
-        names = reg.list()
-        assert names == ["a", "b"]
+            ),
+        ]
+
+        assert [sample.name for sample in find_samples(samples)] == ["a", "b"]
 
     def test_find_by_pattern(self):
-        reg = SampleConfigRegistry()
-        reg.register(
+        samples = [
             SampleConfig(
                 name="a",
                 pattern="p1",
                 version="1.0.0",
                 release_date="2025-01-01",
                 source_url="https://example.com",
-            )
-        )
-        reg.register(
+            ),
             SampleConfig(
                 name="b",
                 pattern="p1",
                 version="2.0.0",
                 release_date="2025-06-01",
                 source_url="https://example.com",
-            )
-        )
-        reg.register(
+            ),
             SampleConfig(
                 name="c",
                 pattern="p2",
                 version="1.0.0",
                 release_date="2025-01-01",
                 source_url="https://example.com",
-            )
-        )
-        p1_samples = reg.find_by_pattern("p1")
+            ),
+        ]
+        p1_samples = find_samples(samples, pattern="p1")
         assert len(p1_samples) == 2
         assert p1_samples[0].name == "a"
         assert p1_samples[1].name == "b"
 
     def test_find_by_contract(self):
-        reg = SampleConfigRegistry()
-        reg.register(
+        samples = [
             SampleConfig(
                 name="a",
                 pattern="p1",
@@ -213,9 +186,7 @@ class TestSampleConfigRegistry:
                 release_date="2025-01-01",
                 source_url="https://example.com",
                 source_contract="contract-a",
-            )
-        )
-        reg.register(
+            ),
             SampleConfig(
                 name="b",
                 pattern="p1",
@@ -223,16 +194,15 @@ class TestSampleConfigRegistry:
                 release_date="2025-01-01",
                 source_url="https://example.com",
                 source_contract="contract-b",
-            )
-        )
+            ),
+        ]
 
-        matches = reg.find_by_contract("contract-a")
+        matches = find_samples(samples, contract="contract-a")
 
         assert [sample.name for sample in matches] == ["a"]
 
     def test_find_by_tag(self):
-        reg = SampleConfigRegistry()
-        reg.register(
+        samples = [
             SampleConfig(
                 name="a",
                 pattern="p1",
@@ -240,9 +210,7 @@ class TestSampleConfigRegistry:
                 release_date="2025-01-01",
                 source_url="https://example.com",
                 tags=["regulated", "aws"],
-            )
-        )
-        reg.register(
+            ),
             SampleConfig(
                 name="b",
                 pattern="p1",
@@ -250,10 +218,10 @@ class TestSampleConfigRegistry:
                 release_date="2025-01-01",
                 source_url="https://example.com",
                 tags=["kubernetes"],
-            )
-        )
+            ),
+        ]
 
-        matches = reg.find_by_tag("AWS")
+        matches = find_samples(samples, tag="AWS")
 
         assert [sample.name for sample in matches] == ["a"]
 
@@ -284,8 +252,7 @@ class TestSampleConfigRegistry:
         assert diff["extra_in_current"] == {"extra": "value"}
 
     def test_find_best_matches_prefers_more_exact_overlap(self):
-        reg = SampleConfigRegistry()
-        reg.register(
+        samples = [
             SampleConfig(
                 name="close",
                 pattern="aws-lza",
@@ -293,9 +260,7 @@ class TestSampleConfigRegistry:
                 release_date="2026-05-27",
                 source_url="https://example.com",
                 decisions={"baseline": "standard", "centralized_logging": "true"},
-            )
-        )
-        reg.register(
+            ),
             SampleConfig(
                 name="far",
                 pattern="aws-lza",
@@ -303,10 +268,11 @@ class TestSampleConfigRegistry:
                 release_date="2026-05-27",
                 source_url="https://example.com",
                 decisions={"baseline": "healthcare", "centralized_logging": "false"},
-            )
-        )
+            ),
+        ]
 
-        matches = reg.find_best_matches(
+        matches = find_best_sample_matches(
+            samples,
             {"baseline": "standard", "centralized_logging": True},
             pattern="aws-lza",
         )
@@ -314,8 +280,3 @@ class TestSampleConfigRegistry:
         assert [match.sample.name for match in matches] == ["close", "far"]
         assert matches[0].same_count == 2
         assert matches[1].different_count == 2
-
-    def test_global_registry_importable(self):
-        from intent_engine.core.sample_config import GLOBAL_SAMPLE_REGISTRY
-
-        assert GLOBAL_SAMPLE_REGISTRY is not None

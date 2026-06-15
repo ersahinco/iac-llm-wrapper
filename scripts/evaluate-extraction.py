@@ -19,7 +19,11 @@ from typing import Any
 
 import ruamel.yaml
 
-from intent_engine.core.contracts import GLOBAL_CONTRACT_REGISTRY, ContractValidator
+from intent_engine.core.contracts import ContractValidator
+from intent_engine.core.patterns import GLOBAL_REGISTRY
+from intent_engine.patterns import load_builtin_patterns
+
+load_builtin_patterns()
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_FIXTURES_DIR = REPO_ROOT / "fixtures" / "eval"
@@ -243,7 +247,7 @@ def _compare_contracts(output_dir: Path, expected_contracts: Any) -> list[str]:
             failures.append("expect.contracts entries must be strings")
             continue
         try:
-            contract = GLOBAL_CONTRACT_REGISTRY.get(contract_name)
+            contract = GLOBAL_REGISTRY.contract(contract_name)
         except KeyError as exc:
             failures.append(str(exc))
             continue

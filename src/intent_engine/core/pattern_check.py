@@ -8,7 +8,6 @@ from pathlib import Path
 from .contracts import ContractValidator
 from .patterns import Pattern
 from .requirements import expression_dependencies, validate_expression
-from .sample_config import GLOBAL_SAMPLE_REGISTRY
 
 
 @dataclass(frozen=True)
@@ -43,7 +42,7 @@ def check_pattern(
             requirements=0,
             contracts=len(pattern.contracts),
             expected_artifacts=len(pattern.expected_artifacts()),
-            samples=len(GLOBAL_SAMPLE_REGISTRY.find_by_pattern(pattern.name)),
+            samples=len(pattern.samples),
             context_rules=0,
             violations=[f"graph factory failed: {exc}"],
         )
@@ -106,7 +105,7 @@ def check_pattern(
         if not artifact:
             violations.append("expected artifact list contains an empty name")
 
-    samples = GLOBAL_SAMPLE_REGISTRY.find_by_pattern(pattern.name)
+    samples = pattern.samples
     for sample in samples:
         if not sample.decisions:
             violations.append(f"{sample.name}: sample has no decisions")

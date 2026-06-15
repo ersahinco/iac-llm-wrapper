@@ -10,9 +10,10 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from .contracts import ContractValidator, TargetContract
+from .contracts import CORE_CONTRACTS, ContractValidator, TargetContract
 from .module_mapping import ModuleInputs
 from .requirements import RequirementGraph
+from .sample_config import SampleConfig, SampleMatch, find_best_sample_matches, find_samples
 from .target_capabilities import TargetCapability
 
 GeneratorFn = Callable[[Any, Path], None]
@@ -52,6 +53,8 @@ class Pattern:
     generators: list[PatternGenerator] = field(default_factory=list)
     # Target contracts that drive decisions, validation, and generated artifacts
     contracts: list[TargetContract] = field(default_factory=list)
+    # Version-pinned reference bundles owned by the pattern.
+    samples: list[SampleConfig] = field(default_factory=list)
     # Downstream target capability graph declarations.
     target_capabilities: list[TargetCapability] = field(default_factory=list)
     # Whether this pattern emits a registered target plan-ready metadata bundle.
@@ -65,14 +68,12 @@ class Pattern:
         return graph
 
     def expected_artifacts(self) -> list[str]:
-        from .sample_config import GLOBAL_SAMPLE_REGISTRY
-
         artifacts: list[str] = ["context-manifest.yaml"]
         for contract in self.contracts:
             artifacts.extend(contract.required_artifacts)
         if self.contracts:
             artifacts.append("handoff-plan.yaml")
-        if GLOBAL_SAMPLE_REGISTRY.find_by_pattern(self.name):
+        if self.samples:
             artifacts.append("sample-recommendations.yaml")
         if self.target_capabilities:
             artifacts.append("target-capability-graph.yaml")
@@ -148,6 +149,66 @@ class PatternRegistry:
     def list(self) -> builtins.list[str]:
         self._load_builtins_if_global()
         return sorted(self._patterns.keys())
+
+    def contracts(self, *, include_core: bool = True) -> builtins.list[TargetContract]:
+        self._load_builtins_if_global()
+        contracts = [*CORE_CONTRACTS] if include_core else []
+        for pattern in sorted(self._patterns.values(), key=lambda item: item.name):
+            contracts.extend(pattern.contracts)
+        by_name: dict[str, TargetContract] = {}
+        for contract in contracts:
+            by_name.setdefault(contract.name, contract)
+        return list(by_name.values())
+
+    def contract(self, name: str, *, include_core: bool = True) -> TargetContract:
+        contracts_by_name = {
+            contract.name: contract for contract in self.contracts(include_core=include_core)
+        }
+        if name not in contracts_by_name:
+            available = ", ".join(sorted(contracts_by_name))
+            raise KeyError(f"Unknown contract '{name}'. Available: {available}")
+        return contracts_by_name[name]
+
+    def samples(self) -> builtins.list[SampleConfig]:
+        self._load_builtins_if_global()
+        items: list[SampleConfig] = []
+        for pattern in sorted(self._patterns.values(), key=lambda item: item.name):
+            items.extend(pattern.samples)
+        return sorted(items, key=lambda sample: sample.name)
+
+    def sample(self, name: str) -> SampleConfig:
+        samples_by_name = {sample.name: sample for sample in self.samples()}
+        if name not in samples_by_name:
+            available = ", ".join(sorted(samples_by_name))
+            raise KeyError(f"Unknown sample config '{name}'. Available: {available}")
+        return samples_by_name[name]
+
+    def find_samples(
+        self,
+        *,
+        pattern: str | None = None,
+        contract: str | None = None,
+        tag: str | None = None,
+    ) -> builtins.list[SampleConfig]:
+        return find_samples(self.samples(), pattern=pattern, contract=contract, tag=tag)
+
+    def find_sample_matches(
+        self,
+        current_decisions: dict[str, Any],
+        *,
+        pattern: str | None = None,
+        contract: str | None = None,
+        tag: str | None = None,
+        limit: int = 3,
+    ) -> builtins.list[SampleMatch]:
+        return find_best_sample_matches(
+            self.samples(),
+            current_decisions,
+            pattern=pattern,
+            contract=contract,
+            tag=tag,
+            limit=limit,
+        )
 
 
 # Global registries (populated by domain-specific modules) --------------------

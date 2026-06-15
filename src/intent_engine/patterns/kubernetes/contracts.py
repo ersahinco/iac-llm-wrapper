@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from intent_engine.core.contracts import (
-    GLOBAL_CONTRACT_REGISTRY,
     ArtifactContract,
     DecisionLineage,
     TargetContract,
@@ -82,5 +81,3 @@ K8S_CONTRACT = TargetContract(
         ),
     ],
 )
-
-GLOBAL_CONTRACT_REGISTRY.register(K8S_CONTRACT)

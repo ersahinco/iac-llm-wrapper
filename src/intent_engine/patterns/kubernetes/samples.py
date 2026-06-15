@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from intent_engine.core.sample_config import GLOBAL_SAMPLE_REGISTRY, ModuleRef, SampleConfig
+from intent_engine.core.sample_config import ModuleRef, SampleConfig
 
 
-def register_k8s_samples() -> None:
-    GLOBAL_SAMPLE_REGISTRY.register(
+def k8s_samples() -> list[SampleConfig]:
+    return [
         SampleConfig(
             name="k8s-cluster-v1",
             pattern="kubernetes-cluster",
@@ -40,4 +40,4 @@ def register_k8s_samples() -> None:
                 ),
             ],
         )
-    )
+    ]

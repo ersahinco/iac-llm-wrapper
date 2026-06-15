@@ -8,7 +8,6 @@ import ruamel.yaml
 
 import intent_engine.patterns.terraform_vpc  # noqa: F401 - triggers registration
 from intent_engine.core.compiler import compile_from_interview, validate_generated
-from intent_engine.core.contracts import GLOBAL_CONTRACT_REGISTRY
 from intent_engine.core.patterns import GLOBAL_REGISTRY
 
 
@@ -24,7 +23,7 @@ class TestTerraformVpcPattern:
         assert pattern.contracts[0].name == "terraform-aws-vpc-module"
 
     def test_contract_is_registered(self):
-        contract = GLOBAL_CONTRACT_REGISTRY.get("terraform-aws-vpc-module")
+        contract = GLOBAL_REGISTRY.contract("terraform-aws-vpc-module")
         assert contract.kind == "terraform-module"
         assert "module-inputs.yaml" in contract.required_artifacts
 

@@ -17,7 +17,7 @@ from .graph import (
     build_k8s_graph,
 )
 from .models import K8sIntent
-from .samples import register_k8s_samples
+from .samples import k8s_samples
 
 
 def map_k8s_intent_to_modules(intent: Any) -> list[ModuleInputs]:
@@ -70,9 +70,9 @@ def _register_pattern() -> None:
             module_mapper=map_k8s_intent_to_modules,
             generators=list(_K8S_GENERATORS),
             contracts=[K8S_CONTRACT],
+            samples=k8s_samples(),
         )
     )
 
 
 _register_pattern()
-register_k8s_samples()

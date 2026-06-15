@@ -401,32 +401,6 @@ class ContractValidator:
         return current
 
 
-class ContractRegistry:
-    """Registry for reusable target contracts."""
-
-    def __init__(self) -> None:
-        self._contracts: dict[str, TargetContract] = {}
-
-    def register(self, contract: TargetContract) -> None:
-        violations = ContractValidator(contract).validate_contract()
-        if violations:
-            msg = "; ".join(f"{violation.code}: {violation.message}" for violation in violations)
-            raise ValueError(f"Invalid contract '{contract.name}': {msg}")
-        self._contracts[contract.name] = contract
-
-    def get(self, name: str) -> TargetContract:
-        if name not in self._contracts:
-            available = ", ".join(sorted(self._contracts))
-            raise KeyError(f"Unknown contract '{name}'. Available: {available}")
-        return self._contracts[name]
-
-    def list(self) -> list[str]:
-        return sorted(self._contracts)
-
-
-GLOBAL_CONTRACT_REGISTRY = ContractRegistry()
-
-
 BLOCKED_ASSESSMENT_CONTRACT = TargetContract(
     name="blocked-assessment-artifacts",
     kind="intent-engine-diagnostic",
@@ -703,7 +677,15 @@ PLAN_READY_BUNDLE_CONTRACT = TargetContract(
     ],
 )
 
-GLOBAL_CONTRACT_REGISTRY.register(BLOCKED_ASSESSMENT_CONTRACT)
-GLOBAL_CONTRACT_REGISTRY.register(HANDOFF_PLAN_CONTRACT)
-GLOBAL_CONTRACT_REGISTRY.register(CONTEXT_MANIFEST_CONTRACT)
-GLOBAL_CONTRACT_REGISTRY.register(PLAN_READY_BUNDLE_CONTRACT)
+CORE_CONTRACTS = [
+    BLOCKED_ASSESSMENT_CONTRACT,
+    HANDOFF_PLAN_CONTRACT,
+    CONTEXT_MANIFEST_CONTRACT,
+    PLAN_READY_BUNDLE_CONTRACT,
+]
+
+for _contract in CORE_CONTRACTS:
+    _violations = ContractValidator(_contract).validate_contract()
+    if _violations:
+        _msg = "; ".join(f"{violation.code}: {violation.message}" for violation in _violations)
+        raise ValueError(f"Invalid contract '{_contract.name}': {_msg}")

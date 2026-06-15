@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from intent_engine.core.contracts import (
-    GLOBAL_CONTRACT_REGISTRY,
     ArtifactContract,
     ArtifactValueAssertion,
     DecisionLineage,
@@ -366,5 +365,3 @@ AWS_LZA_SAMPLE_CONFIG_CONTRACT = TargetContract(
         ),
     ],
 )
-
-GLOBAL_CONTRACT_REGISTRY.register(AWS_LZA_SAMPLE_CONFIG_CONTRACT)

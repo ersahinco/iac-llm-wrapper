@@ -8,7 +8,7 @@ from intent_engine.core.contracts import ArtifactContract, TargetContract
 from intent_engine.core.pattern_check import check_pattern
 from intent_engine.core.patterns import Pattern
 from intent_engine.core.requirements import Requirement, RequirementGraph
-from intent_engine.core.sample_config import GLOBAL_SAMPLE_REGISTRY, SampleConfig
+from intent_engine.core.sample_config import SampleConfig
 
 
 def _graph(*requirements: Requirement) -> RequirementGraph:
@@ -222,9 +222,11 @@ def test_check_pattern_reports_contract_and_empty_artifact_failures(tmp_path: Pa
 
 
 def test_check_pattern_reports_missing_sample_fixture(tmp_path: Path):
-    original_samples = dict(GLOBAL_SAMPLE_REGISTRY._samples)
-    try:
-        GLOBAL_SAMPLE_REGISTRY.register(
+    pattern = Pattern(
+        name="sample-pattern",
+        description="Sample pattern",
+        graph_factory=lambda: _graph(_requirement()),
+        samples=[
             SampleConfig(
                 name="sample-missing-fixture",
                 pattern="sample-pattern",
@@ -234,19 +236,13 @@ def test_check_pattern_reports_missing_sample_fixture(tmp_path: Path):
                 fixture_dir="missing-fixture",
                 decisions={"region": "eu-central-1"},
             )
-        )
-        pattern = Pattern(
-            name="sample-pattern",
-            description="Sample pattern",
-            graph_factory=lambda: _graph(_requirement()),
-        )
+        ],
+    )
 
-        result = check_pattern(pattern, fixtures_root=tmp_path)
+    result = check_pattern(pattern, fixtures_root=tmp_path)
 
-        assert result.samples == 1
-        assert (
-            f"sample-missing-fixture: missing fixture dir {tmp_path / 'missing-fixture'}"
-            in result.violations
-        )
-    finally:
-        GLOBAL_SAMPLE_REGISTRY._samples = original_samples
+    assert result.samples == 1
+    assert (
+        f"sample-missing-fixture: missing fixture dir {tmp_path / 'missing-fixture'}"
+        in result.violations
+    )
