@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-import networkx as nx
-
 from .contracts import ContractValidator
 from .patterns import Pattern
 from .requirements import expression_dependencies, validate_expression
@@ -57,10 +55,7 @@ def check_pattern(
     context_rules += _check_prompt_context(pattern, violations)
     if not graph._requirements:
         violations.append("graph has no requirements")
-    try:
-        cycle = nx.find_cycle(graph._graph)
-    except nx.NetworkXNoCycle:
-        cycle = []
+    cycle = graph.cycle_edges()
     if cycle:
         violations.append(f"requirement graph has a cycle: {cycle}")
 

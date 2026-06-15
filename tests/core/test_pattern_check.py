@@ -145,6 +145,28 @@ def test_check_pattern_reports_invalid_requirement_expressions(tmp_path: Path):
     )
 
 
+def test_check_pattern_reports_requirement_cycles(tmp_path: Path):
+    pattern = Pattern(
+        name="cycle",
+        description="Cycle",
+        graph_factory=lambda: _graph(
+            _requirement(key="a", depends_on=["c"]),
+            _requirement(key="b", depends_on=["a"]),
+            _requirement(key="c", depends_on=["b"]),
+        ),
+        prompt_context=(
+            "This pattern captures approved region handoff context only. "
+            "Extract the region decision for an existing target contract."
+        ),
+    )
+
+    result = check_pattern(pattern, fixtures_root=tmp_path)
+
+    assert "requirement graph has a cycle: [('a', 'b'), ('b', 'c'), ('c', 'a')]" in (
+        result.violations
+    )
+
+
 def test_check_pattern_reports_missing_or_vague_context(tmp_path: Path):
     missing_context = Pattern(
         name="missing-context",

@@ -6,8 +6,6 @@ import json
 import re
 from typing import Any
 
-import networkx as nx
-
 from .requirements import (
     RequirementGraph,
     describe_expression,
@@ -18,12 +16,14 @@ from .requirements import (
 def graph_to_dict(graph: RequirementGraph, pattern: str) -> dict[str, Any]:
     """Return a stable JSON-serializable view of a requirement graph."""
     try:
-        ordered_keys = list(nx.topological_sort(graph._graph))
-    except nx.NetworkXUnfeasible:
+        ordered_keys = graph.topological_order()
+    except ValueError:
         ordered_keys = list(graph._requirements)
 
     nodes = []
     for key in ordered_keys:
+        if key not in graph._requirements:
+            continue
         req = graph._requirements[key]
         nodes.append(
             {
@@ -53,7 +53,7 @@ def graph_to_dict(graph: RequirementGraph, pattern: str) -> dict[str, Any]:
     return {
         "pattern": pattern,
         "nodeCount": len(nodes),
-        "edgeCount": graph._graph.number_of_edges(),
+        "edgeCount": graph.edge_count(),
         "nodes": nodes,
         "edges": [
             {
@@ -62,7 +62,8 @@ def graph_to_dict(graph: RequirementGraph, pattern: str) -> dict[str, Any]:
                 "kind": _edge_kind(graph, source, target),
                 "condition": _edge_condition(graph, source, target),
             }
-            for source, target in sorted(graph._graph.edges())
+            for source, target in graph.edges()
+            if target in graph._requirements
         ],
     }
 

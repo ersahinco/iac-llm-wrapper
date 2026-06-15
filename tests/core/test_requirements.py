@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from intent_engine.core.requirements import (
     Requirement,
     RequirementGraph,
@@ -351,6 +353,17 @@ class TestRequirementGraph:
 
         assert applied == ["topology", "network_account"]
         assert g.get("network_account") == "Network"
+
+    def test_graph_reports_edges_and_cycles_without_external_dependency(self):
+        g = RequirementGraph()
+        g.add(Requirement(key="a", label="A", question="A?", depends_on=["c"]))
+        g.add(Requirement(key="b", label="B", question="B?", depends_on=["a"]))
+        g.add(Requirement(key="c", label="C", question="C?", depends_on=["b"]))
+
+        assert g.edge_count() == 3
+        assert g.cycle_edges() == [("a", "b"), ("b", "c"), ("c", "a")]
+        with pytest.raises(ValueError, match="requirement graph has a cycle"):
+            g.topological_order()
 
     def test_typed_decisions_restores_structured_values(self):
         g = RequirementGraph()

@@ -10,8 +10,6 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
-import networkx as nx
-
 
 class TargetCapabilityType(StrEnum):
     ACCELERATOR = "accelerator"
@@ -146,11 +144,13 @@ class TargetCapabilityGraph:
 
     def __init__(self, capabilities: list[TargetCapability]) -> None:
         self.capabilities = capabilities
-        self._graph = nx.DiGraph()
-        for capability in capabilities:
-            self._graph.add_node(capability.key, capability=capability)
-            for dep in capability.depends_on:
-                self._graph.add_edge(dep, capability.key)
+        self._edges = list(
+            dict.fromkeys(
+                (dep, capability.key)
+                for capability in capabilities
+                for dep in capability.depends_on
+            )
+        )
 
     def evaluate(
         self,
@@ -237,7 +237,7 @@ class TargetCapabilityGraph:
                 "unsupportedAsks": [fact.to_dict() for fact in unsupported_ask_facts],
             },
             "manualGates": list(dict.fromkeys(manual_gates)),
-            "edges": [{"from": source, "to": target} for source, target in self._graph.edges()],
+            "edges": [{"from": source, "to": target} for source, target in self._edges],
         }
 
 

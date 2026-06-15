@@ -316,7 +316,7 @@ def gen_context_manifest(intent: Any, output_dir: Path) -> None:
             },
             "requirementGraph": {
                 "nodeCount": len(graph._requirements),
-                "edgeCount": graph._graph.number_of_edges(),
+                "edgeCount": graph.edge_count(),
                 "requirements": [
                     {
                         "key": key,

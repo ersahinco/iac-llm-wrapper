@@ -7,8 +7,6 @@ from datetime import UTC
 from enum import StrEnum
 from typing import Any
 
-import networkx as nx
-
 RequirementExpression = dict[str, Any]
 _EXPRESSION_OPERATORS = {"all", "any", "not", "equals", "contains", "present"}
 
@@ -232,7 +230,8 @@ class RequirementGraph:
     """Tracks requirements, their dependencies, and resolution status."""
 
     def __init__(self, intent_model: Any = None) -> None:
-        self._graph = nx.DiGraph()
+        self._edges: list[tuple[str, str]] = []
+        self._edge_set: set[tuple[str, str]] = set()
         self._requirements: dict[str, Requirement] = {}
         self._decisions: dict[str, str] = {}
         self._status: dict[str, RequirementStatus] = {}
@@ -245,10 +244,83 @@ class RequirementGraph:
         if self._intent_model is not None:
             self._auto_derive_requirement(req)
         self._requirements[req.key] = req
-        self._graph.add_node(req.key)
         for dep in self._ordering_dependencies(req):
-            self._graph.add_edge(dep, req.key)
+            self._add_edge(dep, req.key)
         self._status[req.key] = RequirementStatus.PENDING
+
+    def _add_edge(self, source: str, target: str) -> None:
+        edge = (source, target)
+        if edge in self._edge_set:
+            return
+        self._edge_set.add(edge)
+        self._edges.append(edge)
+
+    def edges(self) -> list[tuple[str, str]]:
+        return sorted(self._edges)
+
+    def edge_count(self) -> int:
+        return len(self._edges)
+
+    def topological_order(self) -> list[str]:
+        nodes = self._ordered_nodes()
+        outgoing: dict[str, list[str]] = {node: [] for node in nodes}
+        indegree: dict[str, int] = {node: 0 for node in nodes}
+        for source, target in self._edges:
+            outgoing.setdefault(source, []).append(target)
+            indegree.setdefault(source, 0)
+            indegree[target] = indegree.get(target, 0) + 1
+
+        ready = [node for node in nodes if indegree.get(node, 0) == 0]
+        ordered: list[str] = []
+        while ready:
+            node = ready.pop(0)
+            ordered.append(node)
+            for target in outgoing.get(node, []):
+                indegree[target] -= 1
+                if indegree[target] == 0:
+                    ready.append(target)
+
+        if len(ordered) != len(nodes):
+            raise ValueError(f"requirement graph has a cycle: {self.cycle_edges()}")
+        return ordered
+
+    def cycle_edges(self) -> list[tuple[str, str]]:
+        nodes = self._ordered_nodes()
+        outgoing: dict[str, list[str]] = {node: [] for node in nodes}
+        for source, target in self._edges:
+            outgoing.setdefault(source, []).append(target)
+
+        state: dict[str, str] = {}
+        stack: list[str] = []
+
+        def visit(node: str) -> list[tuple[str, str]]:
+            state[node] = "visiting"
+            stack.append(node)
+            for target in outgoing.get(node, []):
+                if state.get(target) == "visiting":
+                    cycle_nodes = stack[stack.index(target) :] + [target]
+                    return list(zip(cycle_nodes, cycle_nodes[1:]))
+                if state.get(target) != "visited":
+                    cycle = visit(target)
+                    if cycle:
+                        return cycle
+            stack.pop()
+            state[node] = "visited"
+            return []
+
+        for node in nodes:
+            if state.get(node) is None:
+                cycle = visit(node)
+                if cycle:
+                    return cycle
+        return []
+
+    def _ordered_nodes(self) -> list[str]:
+        nodes = dict.fromkeys(self._requirements)
+        for source, target in self._edges:
+            nodes.setdefault(source, None)
+            nodes.setdefault(target, None)
+        return list(nodes)
 
     def _ordering_dependencies(self, req: Requirement) -> list[str]:
         deps = list(req.depends_on)
@@ -484,7 +556,7 @@ class RequirementGraph:
         Returns the list of keys that were successfully applied.
         """
         applied: list[str] = []
-        ordered_keys = [key for key in nx.topological_sort(self._graph) if key in decisions]
+        ordered_keys = [key for key in self.topological_order() if key in decisions]
         ordered_keys.extend(key for key in decisions if key not in self._requirements)
         for key in ordered_keys:
             value = decisions[key]
