@@ -451,28 +451,10 @@ class TestCLIValidate:
 
 
 class TestCLIReview:
-    def test_review_identical_reports(self, tmp_path: Path):
-        before = tmp_path / "before.yaml"
-        after = tmp_path / "after.yaml"
-        data = "homeRegion: eu-central-1\ntopology: hub-spoke\n"
-        before.write_text(data)
-        after.write_text(data)
-        result = runner.invoke(app, ["review", "--before", str(before), "--after", str(after)])
-        assert result.exit_code == 0
-        assert "review diff is deprecated" in result.output
-        assert "No differences found" in result.output
-
-    def test_review_changed_values(self, tmp_path: Path):
-        before = tmp_path / "before.yaml"
-        after = tmp_path / "after.yaml"
-        before.write_text("homeRegion: eu-central-1\n")
-        after.write_text("homeRegion: eu-west-1\n")
-        result = runner.invoke(app, ["review", "--before", str(before), "--after", str(after)])
-        assert result.exit_code == 0
-        assert "review diff is deprecated" in result.output
-        assert "Changed" in result.output
-        assert "eu-central-1" in result.output
-        assert "eu-west-1" in result.output
+    def test_review_requires_action(self):
+        result = runner.invoke(app, ["review"])
+        assert result.exit_code != 0
+        assert "Missing argument" in result.output
 
     def test_review_compare_generated_bundles(self, tmp_path: Path, monkeypatch):
         monkeypatch.setenv("INTENT_ENGINE_DISABLE_LLM", "1")

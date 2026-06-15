@@ -13,7 +13,6 @@ from .core.artifact_review import write_review_html
 from .core.bundle_compare import (
     compare_handoff_bundles,
     render_bundle_comparison_text,
-    review_reports,
     write_bundle_comparison,
     write_bundle_comparison_html,
 )
@@ -1137,20 +1136,20 @@ def explain(
 @app.command()
 def review(
     action: str = typer.Argument(
-        "diff",
-        help="Action: diff, compare, html",
+        ...,
+        help="Action: compare, html",
     ),
     before: Path = typer.Option(
         None,
         "--before",
         "-b",
-        help="Before decision report for diff or artifact directory for compare",
+        help="Before artifact directory for compare",
     ),
     after: Path = typer.Option(
         None,
         "--after",
         "-a",
-        help="After decision report for diff or artifact directory for compare",
+        help="After artifact directory for compare",
     ),
     input: Path = typer.Option(
         None,
@@ -1170,7 +1169,7 @@ def review(
         help="Optional static HTML output path for review compare",
     ),
 ) -> None:
-    """Review generated artifacts: diff reports, compare bundles, or write static HTML."""
+    """Review generated artifacts: compare bundles or write static HTML."""
     if action == "html":
         if input is None or output is None:
             typer.echo("Error: review html requires --input and --output", err=True)
@@ -1202,79 +1201,8 @@ def review(
             typer.echo(f"Comparison HTML written to: {html_output}")
         return
 
-    if action != "diff":
-        typer.echo("Unknown review action. Use: diff, compare, html", err=True)
-        raise typer.Exit(1)
-    if before is None or after is None:
-        typer.echo("Error: review diff requires --before and --after", err=True)
-        raise typer.Exit(1)
-    if not before.exists():
-        typer.echo(f"Error: before file does not exist: {before}", err=True)
-        raise typer.Exit(1)
-    if not after.exists():
-        typer.echo(f"Error: after file does not exist: {after}", err=True)
-        raise typer.Exit(1)
-
-    typer.echo(
-        "WARNING: review diff is deprecated; use review compare on generated bundles.",
-        err=True,
-    )
-    diff = review_reports(before, after)
-
-    typer.echo("=== Decision Report Review ===")
-    typer.echo("")
-
-    if diff["added"]:
-        typer.echo(f"[+] Added ({len(diff['added'])}):")
-        for item in diff["added"]:
-            typer.echo(f"  {item['key']} = {item['value']}")
-        typer.echo("")
-
-    if diff["removed"]:
-        typer.echo(f"[-] Removed ({len(diff['removed'])}):")
-        for item in diff["removed"]:
-            typer.echo(f"  {item['key']} = {item['value']}")
-        typer.echo("")
-
-    if diff["changes"]:
-        typer.echo(f"[~] Changed ({len(diff['changes'])}):")
-        for item in diff["changes"]:
-            typer.echo(f"  {item['key']}: {item['before']} -> {item['after']}")
-        typer.echo("")
-
-    if not diff["added"] and not diff["removed"] and not diff["changes"]:
-        typer.echo("[=] No differences found. Reports are identical.")
-        typer.echo("")
-
-    b_wa = diff["wellArchitectedCoverage"]["before"]
-    a_wa = diff["wellArchitectedCoverage"]["after"]
-    if b_wa or a_wa:
-        typer.echo("=== Well-Architected Coverage ===")
-        typer.echo(f"  Before: {len(b_wa)} pillars")
-        typer.echo(f"  After:  {len(a_wa)} pillars")
-        for pillar in sorted(set(b_wa) | set(a_wa)):
-            b_count = len(b_wa.get(pillar, []))
-            a_count = len(a_wa.get(pillar, []))
-            if b_count != a_count:
-                typer.echo(f"  [~] {pillar}: {b_count} -> {a_count} decisions")
-        typer.echo("")
-
-    audit = diff["audit"]
-    typer.echo("=== Decision Audit Trail ===")
-    typer.echo(f"  Before: {audit['before_count']} entries")
-    typer.echo(f"  After:  {audit['after_count']} entries")
-    if audit["new_entries"]:
-        typer.echo(f"  [+] {len(audit['new_entries'])} new audit entries:")
-        for entry in audit["new_entries"]:
-            ts = entry.get("timestamp", "?")
-            key = entry.get("key", "?")
-            val = entry.get("value", "?")
-            how = entry.get("how", "?")
-            reason = entry.get("reason", "")
-            line = f"    {ts} | {key} = {val} ({how})"
-            if reason:
-                line += f" | {reason}"
-            typer.echo(line)
+    typer.echo("Unknown review action. Use: compare, html", err=True)
+    raise typer.Exit(1)
 
 
 @app.command()
