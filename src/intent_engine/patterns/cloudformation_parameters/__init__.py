@@ -240,14 +240,12 @@ register_generator(
     "cloudformation-parameters",
     gen_cloudformation_parameters,
     priority=10,
-    category="cloudformation",
     applies_to={"cloudformation-parameters"},
 )
 register_generator(
     "cloudformation-decision-report",
     gen_decision_report,
     priority=11,
-    category="cloudformation",
     applies_to={"cloudformation-parameters"},
 )
 

@@ -44,21 +44,18 @@ def _register_generators() -> None:
         "k8s-cluster-config",
         gen_cluster_config,
         priority=10,
-        category="core",
         applies_to=_K8S_GENERATOR_SCOPE,
     )
     register_generator(
         "k8s-namespace-config",
         gen_namespace_config,
         priority=11,
-        category="core",
         applies_to=_K8S_GENERATOR_SCOPE,
     )
     register_generator(
         "k8s-decision-report",
         gen_k8s_decision_report,
         priority=5,
-        category="meta",
         applies_to=_K8S_GENERATOR_SCOPE,
     )
 

@@ -31,7 +31,6 @@ class RegisteredGenerator:
     name: str
     fn: GeneratorFn
     priority: int  # lower = earlier
-    category: str  # e.g., "core", "security", "workload"
     applies_to: set[str] | None = None
 
 
@@ -46,11 +45,10 @@ class GeneratorRegistry:
         name: str,
         fn: GeneratorFn,
         priority: int = 50,
-        category: str = "general",
         applies_to: list[str] | set[str] | None = None,
     ) -> None:
         scope = set(applies_to) if applies_to else None
-        self._generators.append(RegisteredGenerator(name, fn, priority, category, scope))
+        self._generators.append(RegisteredGenerator(name, fn, priority, scope))
         self._generators.sort(key=lambda g: g.priority)
 
     def generate(self, intent: Any, output_dir: Path, pattern: str | None = None) -> None:
@@ -87,11 +85,10 @@ def register_generator(
     name: str,
     fn: GeneratorFn,
     priority: int = 50,
-    category: str = "custom",
     applies_to: list[str] | set[str] | None = None,
 ) -> None:
     """Register a custom generator without modifying core code."""
-    GLOBAL_REGISTRY.register(name, fn, priority, category, applies_to)
+    GLOBAL_REGISTRY.register(name, fn, priority, applies_to)
 
 
 def generate_all(intent: Any, output_dir: Path, pattern: str | None = None) -> None:
@@ -571,29 +568,26 @@ def gen_replay_manifest(intent: Any, output_dir: Path) -> None:
     _write(output_dir, "replay-manifest.yaml", data, "intent-engine/replay-manifest/v1")
 
 
-register_generator("design-doc", gen_design_doc, priority=4, category="meta")
-register_generator("context-manifest", gen_context_manifest, priority=4, category="meta")
-register_generator("module-inputs", gen_module_inputs, priority=5, category="meta")
-register_generator("llm-trace-summary", gen_llm_trace_summary, priority=5, category="meta")
-register_generator("model-benchmark", gen_model_benchmark, priority=5, category="meta")
+register_generator("design-doc", gen_design_doc, priority=4)
+register_generator("context-manifest", gen_context_manifest, priority=4)
+register_generator("module-inputs", gen_module_inputs, priority=5)
+register_generator("llm-trace-summary", gen_llm_trace_summary, priority=5)
+register_generator("model-benchmark", gen_model_benchmark, priority=5)
 register_generator(
     "target-capability-graph",
     gen_target_capability_graph,
     priority=5,
-    category="meta",
 )
-register_generator("handoff-plan", gen_handoff_plan, priority=6, category="meta")
+register_generator("handoff-plan", gen_handoff_plan, priority=6)
 register_generator(
     "sample-recommendations",
     gen_sample_recommendations,
     priority=5,
-    category="meta",
 )
 register_generator(
     "terraform-tfvars",
     gen_tfvars,
     priority=5,
-    category="meta",
     applies_to={"terraform-vpc", "kubernetes-cluster"},
 )
-register_generator("replay-manifest", gen_replay_manifest, priority=100, category="meta")
+register_generator("replay-manifest", gen_replay_manifest, priority=100)

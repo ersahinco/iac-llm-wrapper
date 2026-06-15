@@ -78,7 +78,7 @@ class TestGeneratorRegistry:
         def fake_gen(intent: object, output_dir: Path) -> None:
             pass
 
-        reg.register("fake", fake_gen, priority=10, category="test")
+        reg.register("fake", fake_gen, priority=10)
         assert "fake" in reg.list()
 
     def test_priority_ordering(self):
@@ -106,15 +106,6 @@ class TestGeneratorRegistry:
         reg1.register("a", fake_gen)
         assert "a" in reg1.list()
         assert "a" not in reg2.list()
-
-    def test_register_with_category(self):
-        reg = GeneratorRegistry()
-
-        def fake_gen(intent: object, output_dir: Path) -> None:
-            pass
-
-        reg.register("cat_gen", fake_gen, category="custom")
-        assert "cat_gen" in reg.list()
 
     def test_scoped_generator_runs_only_for_matching_pattern(self):
         reg = GeneratorRegistry()

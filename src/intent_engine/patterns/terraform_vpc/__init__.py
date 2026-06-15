@@ -308,7 +308,6 @@ register_generator(
     "terraform-vpc-decision-report",
     gen_decision_report,
     priority=10,
-    category="network",
     applies_to={"terraform-vpc"},
 )
 GLOBAL_REGISTRY.register(
