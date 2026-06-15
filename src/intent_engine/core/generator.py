@@ -3,67 +3,19 @@
 Produces decision reports, contract handoff artifacts, lineage, runbooks, and
 module input files that engineers use alongside their IaC modules.
 
-The generator uses a registry pattern so new output modules can be added
-without modifying core generation logic. Each registered generator is a
-function(intent, output_dir) that writes its own files.
+Core artifact generators are fixed here. Pattern-specific generators live on
+their owning Pattern.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .patterns import PatternGenerator
 from .yaml_utils import write_yaml_artifact
-
-# ---------------------------------------------------------------------------
-# Registry
-# ---------------------------------------------------------------------------
-
-GeneratorFn = Callable[[Any, Path], None]
-
-
-@dataclass
-class RegisteredGenerator:
-    name: str
-    fn: GeneratorFn
-    priority: int  # lower = earlier
-    applies_to: set[str] | None = None
-
-
-class GeneratorRegistry:
-    """Registry of output generators."""
-
-    def __init__(self) -> None:
-        self._generators: list[RegisteredGenerator] = []
-
-    def register(
-        self,
-        name: str,
-        fn: GeneratorFn,
-        priority: int = 50,
-        applies_to: list[str] | set[str] | None = None,
-    ) -> None:
-        scope = set(applies_to) if applies_to else None
-        self._generators.append(RegisteredGenerator(name, fn, priority, scope))
-        self._generators.sort(key=lambda g: g.priority)
-
-    def generate(self, intent: Any, output_dir: Path, pattern: str | None = None) -> None:
-        for gen in self._generators:
-            if pattern is not None and gen.applies_to is not None and pattern not in gen.applies_to:
-                continue
-            gen.fn(intent, output_dir)
-
-    def list(self) -> list[str]:
-        return [g.name for g in self._generators]
-
-
-# Global registry instance
-GLOBAL_REGISTRY = GeneratorRegistry()
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -81,18 +33,9 @@ def _write(output_dir: Path, name: str, data: Any, schema_version: str | None = 
     write_yaml_artifact(output_dir / name, data, header)
 
 
-def register_generator(
-    name: str,
-    fn: GeneratorFn,
-    priority: int = 50,
-    applies_to: list[str] | set[str] | None = None,
-) -> None:
-    """Register a custom generator without modifying core code."""
-    GLOBAL_REGISTRY.register(name, fn, priority, applies_to)
-
-
 def generate_all(intent: Any, output_dir: Path, pattern: str | None = None) -> None:
     from .module_mapping import DesignDocument, IaCIntentPayload
+    from .patterns import GLOBAL_REGISTRY as PATTERN_REGISTRY
 
     if isinstance(intent, IaCIntentPayload):
         payload = intent
@@ -103,7 +46,12 @@ def generate_all(intent: Any, output_dir: Path, pattern: str | None = None) -> N
             intent=intent,
         )
     effective_pattern = pattern or getattr(payload, "pattern", "") or None
-    GLOBAL_REGISTRY.generate(payload, output_dir, pattern=effective_pattern)
+    pattern_generators: list[PatternGenerator] = []
+    if effective_pattern:
+        pattern_generators = PATTERN_REGISTRY.get(effective_pattern).generators
+    generators = [*CORE_GENERATORS, *pattern_generators]
+    for generator in sorted(generators, key=lambda item: item.priority):
+        generator.fn(payload, output_dir)
 
 
 def gen_design_doc(intent: Any, output_dir: Path) -> None:
@@ -563,26 +511,14 @@ def gen_replay_manifest(intent: Any, output_dir: Path) -> None:
     _write(output_dir, "replay-manifest.yaml", data, "intent-engine/replay-manifest/v1")
 
 
-register_generator("design-doc", gen_design_doc, priority=4)
-register_generator("context-manifest", gen_context_manifest, priority=4)
-register_generator("module-inputs", gen_module_inputs, priority=5)
-register_generator("llm-trace-summary", gen_llm_trace_summary, priority=5)
-register_generator("model-benchmark", gen_model_benchmark, priority=5)
-register_generator(
-    "target-capability-graph",
-    gen_target_capability_graph,
-    priority=5,
-)
-register_generator("handoff-plan", gen_handoff_plan, priority=6)
-register_generator(
-    "sample-recommendations",
-    gen_sample_recommendations,
-    priority=5,
-)
-register_generator(
-    "terraform-tfvars",
-    gen_tfvars,
-    priority=5,
-    applies_to={"terraform-vpc", "kubernetes-cluster"},
-)
-register_generator("replay-manifest", gen_replay_manifest, priority=100)
+CORE_GENERATORS = [
+    PatternGenerator("design-doc", gen_design_doc, priority=4),
+    PatternGenerator("context-manifest", gen_context_manifest, priority=4),
+    PatternGenerator("module-inputs", gen_module_inputs, priority=5),
+    PatternGenerator("llm-trace-summary", gen_llm_trace_summary, priority=5),
+    PatternGenerator("model-benchmark", gen_model_benchmark, priority=5),
+    PatternGenerator("target-capability-graph", gen_target_capability_graph, priority=5),
+    PatternGenerator("sample-recommendations", gen_sample_recommendations, priority=5),
+    PatternGenerator("handoff-plan", gen_handoff_plan, priority=6),
+    PatternGenerator("replay-manifest", gen_replay_manifest, priority=100),
+]

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from intent_engine.core.generator import register_generator
+from intent_engine.core.generator import gen_tfvars
 from intent_engine.core.module_mapping import ModuleInputs
-from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern
+from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern, PatternGenerator
 
 from .contracts import K8S_CONTRACT
 from .generators import gen_cluster_config, gen_k8s_decision_report, gen_namespace_config
@@ -18,8 +18,6 @@ from .graph import (
 )
 from .models import K8sIntent
 from .samples import register_k8s_samples
-
-_K8S_GENERATOR_SCOPE = {"kubernetes-cluster"}
 
 
 def map_k8s_intent_to_modules(intent: Any) -> list[ModuleInputs]:
@@ -39,25 +37,12 @@ def map_k8s_intent_to_modules(intent: Any) -> list[ModuleInputs]:
     ]
 
 
-def _register_generators() -> None:
-    register_generator(
-        "k8s-cluster-config",
-        gen_cluster_config,
-        priority=10,
-        applies_to=_K8S_GENERATOR_SCOPE,
-    )
-    register_generator(
-        "k8s-namespace-config",
-        gen_namespace_config,
-        priority=11,
-        applies_to=_K8S_GENERATOR_SCOPE,
-    )
-    register_generator(
-        "k8s-decision-report",
-        gen_k8s_decision_report,
-        priority=5,
-        applies_to=_K8S_GENERATOR_SCOPE,
-    )
+_K8S_GENERATORS = [
+    PatternGenerator("k8s-decision-report", gen_k8s_decision_report, priority=5),
+    PatternGenerator("terraform-tfvars", gen_tfvars, priority=5),
+    PatternGenerator("k8s-cluster-config", gen_cluster_config, priority=10),
+    PatternGenerator("k8s-namespace-config", gen_namespace_config, priority=11),
+]
 
 
 def _register_pattern() -> None:
@@ -83,11 +68,11 @@ def _register_pattern() -> None:
                 "Do not generate deployable cluster scaffolding from prose."
             ),
             module_mapper=map_k8s_intent_to_modules,
+            generators=list(_K8S_GENERATORS),
             contracts=[K8S_CONTRACT],
         )
     )
 
 
-_register_generators()
 _register_pattern()
 register_k8s_samples()

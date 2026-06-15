@@ -357,7 +357,10 @@ def _readiness(
     allowed = bool(
         report_readiness.get(
             "handoffAllowed",
-            handoff_readiness.get("handoffAllowed", contract_readiness.get("handoffAllowed", False)),
+            handoff_readiness.get(
+                "handoffAllowed",
+                contract_readiness.get("handoffAllowed", False),
+            ),
         )
     )
     return {

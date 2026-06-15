@@ -16,9 +16,9 @@ from intent_engine.core.contracts import (
     DecisionLineage,
     TargetContract,
 )
-from intent_engine.core.generator import register_generator
+from intent_engine.core.generator import gen_tfvars
 from intent_engine.core.module_mapping import ModuleInputs
-from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern
+from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern, PatternGenerator
 from intent_engine.core.requirements import Requirement, RequirementGraph
 from intent_engine.core.sample_config import GLOBAL_SAMPLE_REGISTRY, ModuleRef, SampleConfig
 from intent_engine.core.validator import Violation
@@ -299,12 +299,6 @@ SECTION_MAP: dict[str, tuple[str, str | None]] = {
 }
 
 GLOBAL_CONTRACT_REGISTRY.register(_CONTRACT)
-register_generator(
-    "terraform-vpc-decision-report",
-    gen_decision_report,
-    priority=10,
-    applies_to={"terraform-vpc"},
-)
 GLOBAL_REGISTRY.register(
     Pattern(
         name="terraform-vpc",
@@ -320,6 +314,10 @@ GLOBAL_REGISTRY.register(
             "from prose."
         ),
         module_mapper=map_terraform_vpc_modules,
+        generators=[
+            PatternGenerator("terraform-tfvars", gen_tfvars, priority=5),
+            PatternGenerator("terraform-vpc-decision-report", gen_decision_report, priority=10),
+        ],
         validators=[_validate_intent],
         contracts=[_CONTRACT],
     )

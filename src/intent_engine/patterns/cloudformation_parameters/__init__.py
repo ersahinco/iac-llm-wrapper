@@ -11,8 +11,7 @@ from intent_engine.core.contracts import (
     DecisionLineage,
     TargetContract,
 )
-from intent_engine.core.generator import register_generator
-from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern
+from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern, PatternGenerator
 from intent_engine.core.requirements import Requirement, RequirementGraph
 from intent_engine.core.validator import Violation
 from intent_engine.core.yaml_utils import write_yaml_artifact
@@ -232,19 +231,6 @@ SECTION_MAP: dict[str, tuple[str, str | None]] = {
 }
 
 GLOBAL_CONTRACT_REGISTRY.register(_CONTRACT)
-register_generator(
-    "cloudformation-parameters",
-    gen_cloudformation_parameters,
-    priority=10,
-    applies_to={"cloudformation-parameters"},
-)
-register_generator(
-    "cloudformation-decision-report",
-    gen_decision_report,
-    priority=11,
-    applies_to={"cloudformation-parameters"},
-)
-
 GLOBAL_REGISTRY.register(
     Pattern(
         name="cloudformation-parameters",
@@ -263,6 +249,14 @@ GLOBAL_REGISTRY.register(
             "deployable stack or template."
         ),
         validators=[_validate_intent],
+        generators=[
+            PatternGenerator(
+                "cloudformation-parameters",
+                gen_cloudformation_parameters,
+                priority=10,
+            ),
+            PatternGenerator("cloudformation-decision-report", gen_decision_report, priority=11),
+        ],
         contracts=[_CONTRACT],
     )
 )

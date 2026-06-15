@@ -16,7 +16,7 @@ an existing deployment mechanism. The detailed API contract lives in
    artifact ownership.
 5. Define bounded `Pattern.prompt_context` using
    [context-as-code rules](CONTEXT_AS_CODE.md).
-6. Register scoped target configuration emitters with `applies_to={"your-pattern"}`.
+6. Attach target configuration emitters to `Pattern.generators`.
 7. Add sample configs only when they represent a reusable reference bundle.
 8. Add extraction fixtures for ready and blocked cases.
 9. Add usability or battle tests when the change affects handoff quality.

@@ -96,16 +96,16 @@ Rules:
   relationships between entities such as accounts, OUs, permission sets,
   assignments, controls, artifacts, or target capabilities.
 
-### 3. Register Generators
+### 3. Define Generators
 
-Register output generators that emit target configuration files:
+Define output generators that emit target configuration files:
 
 ```python
 from pathlib import Path
 
-from intent_engine.core.generator import register_generator
 from intent_engine.core.yaml_utils import write_yaml_artifact
 from intent_engine.patterns.my_pattern.models import K8sIntent
+
 
 def gen_cluster_config(intent, output_dir: Path) -> None:
     model = getattr(intent, "intent", intent)
@@ -113,17 +113,10 @@ def gen_cluster_config(intent, output_dir: Path) -> None:
         return
     data = {"cluster": {"name": model.cluster_name}}
     write_yaml_artifact(output_dir / "cluster-config.yaml", data, header="")
-
-register_generator(
-    "k8s-cluster",
-    gen_cluster_config,
-    priority=10,
-    applies_to={"kubernetes-cluster"},
-)
 ```
 
-Important: register generators with `applies_to={"your-pattern"}`. Keep lightweight runtime
-guards only as fallback safety.
+Attach generators to the owning `Pattern`. Keep lightweight runtime guards only
+as fallback safety.
 
 ### 4. Register the Pattern
 
@@ -131,7 +124,7 @@ Register a `Pattern` in `GLOBAL_REGISTRY`:
 
 ```python
 from intent_engine.core.contracts import ArtifactContract, TargetContract
-from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern
+from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern, PatternGenerator
 from intent_engine.patterns.my_pattern.models import K8sIntent
 
 contract = TargetContract(
@@ -165,6 +158,9 @@ GLOBAL_REGISTRY.register(Pattern(
         "Do not generate raw IaC or invoke deployment."
     ),
     contracts=[contract],
+    generators=[
+        PatternGenerator("k8s-cluster", gen_cluster_config, priority=10),
+    ],
 ))
 ```
 
@@ -175,6 +171,7 @@ Pattern metadata fields:
 - `section_map` — Maps requirement keys to template sections
 - `free_form_examples` — Free-form Markdown examples for templates
 - `validators` — List of extra validator functions `intent -> list[Violation]`
+- `generators` — Pattern-owned artifact emitters declared as `PatternGenerator`
 - `contracts` — Deployment target contracts for required files, required paths,
   value assertions, decisions, and lineage
 - `context-manifest.yaml` — Generic context-as-code inventory emitted automatically for
@@ -221,7 +218,7 @@ def test_k8s_compiles(tmp_path):
 
 1. **The requirement graph is the product brain** — Adding one `Requirement` node updates LLM prompts, interview questions, validation rules, and template sections.
 2. **Target contracts define handoff shape** — Required files, paths, value assertions, and lineage live in contracts.
-3. **Generators are scoped** — Use `applies_to` so multiple patterns coexist in the same registry.
+3. **Generators are pattern-owned** — Attach target emitters to the `Pattern` that owns their contracts.
 4. **Defaults are explicit** — Put defaults in the model or requirement graph so prompts, interviews, validation, and artifacts agree.
 5. **Validators are layered** — Graph-driven rules come from `Requirement` metadata; pattern-specific rules come from `Pattern.validators`.
 6. **No core code changes for new target patterns** — If you find yourself editing `extractor.py`, `compiler.py`, `validator.py`, `interview.py`, or `cli.py`, the framework is leaking domain assumptions. Move them to the pattern layer.

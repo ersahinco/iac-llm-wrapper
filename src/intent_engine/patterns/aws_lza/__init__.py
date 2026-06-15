@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from intent_engine.core.generator import register_generator
-from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern
+from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern, PatternGenerator
 from intent_engine.core.target_capabilities import (
     TargetCapability,
     TargetCapabilityType,
@@ -83,8 +82,6 @@ _AWS_LZA_FREE_FORM_EXAMPLES = {
         ),
     ],
 }
-
-_AWS_LZA_GENERATOR_SCOPE = {"aws-lza"}
 
 _AWS_LZA_TARGET_CAPABILITIES = [
     TargetCapability(
@@ -176,68 +173,18 @@ _AWS_LZA_TARGET_CAPABILITIES = [
     ),
 ]
 
-
-def _register_generators() -> None:
-    register_generator(
-        "aws-lza-organization",
-        gen_lza_organization_config,
-        priority=20,
-        applies_to=_AWS_LZA_GENERATOR_SCOPE,
-    )
-    register_generator(
-        "aws-lza-accounts",
-        gen_lza_accounts_config,
-        priority=21,
-        applies_to=_AWS_LZA_GENERATOR_SCOPE,
-    )
-    register_generator(
-        "aws-lza-global",
-        gen_lza_global_config,
-        priority=22,
-        applies_to=_AWS_LZA_GENERATOR_SCOPE,
-    )
-    register_generator(
-        "aws-lza-security",
-        gen_lza_security_config,
-        priority=23,
-        applies_to=_AWS_LZA_GENERATOR_SCOPE,
-    )
-    register_generator(
-        "aws-lza-iam",
-        gen_lza_iam_config,
-        priority=24,
-        applies_to=_AWS_LZA_GENERATOR_SCOPE,
-    )
-    register_generator(
-        "aws-lza-network",
-        gen_lza_network_config,
-        priority=25,
-        applies_to=_AWS_LZA_GENERATOR_SCOPE,
-    )
-    register_generator(
-        "aws-lza-decision-report",
-        gen_lza_decision_report,
-        priority=26,
-        applies_to=_AWS_LZA_GENERATOR_SCOPE,
-    )
-    register_generator(
-        "aws-lza-lineage",
-        gen_lza_lineage_manifest,
-        priority=27,
-        applies_to=_AWS_LZA_GENERATOR_SCOPE,
-    )
-    register_generator(
-        "aws-lza-runbook",
-        gen_lza_deployment_runbook,
-        priority=28,
-        applies_to=_AWS_LZA_GENERATOR_SCOPE,
-    )
-    register_generator(
-        "aws-lza-plan-manifest",
-        gen_lza_plan_manifest,
-        priority=29,
-        applies_to=_AWS_LZA_GENERATOR_SCOPE,
-    )
+_AWS_LZA_GENERATORS = [
+    PatternGenerator("aws-lza-organization", gen_lza_organization_config, priority=20),
+    PatternGenerator("aws-lza-accounts", gen_lza_accounts_config, priority=21),
+    PatternGenerator("aws-lza-global", gen_lza_global_config, priority=22),
+    PatternGenerator("aws-lza-security", gen_lza_security_config, priority=23),
+    PatternGenerator("aws-lza-iam", gen_lza_iam_config, priority=24),
+    PatternGenerator("aws-lza-network", gen_lza_network_config, priority=25),
+    PatternGenerator("aws-lza-decision-report", gen_lza_decision_report, priority=26),
+    PatternGenerator("aws-lza-lineage", gen_lza_lineage_manifest, priority=27),
+    PatternGenerator("aws-lza-runbook", gen_lza_deployment_runbook, priority=28),
+    PatternGenerator("aws-lza-plan-manifest", gen_lza_plan_manifest, priority=29),
+]
 
 
 def _register_pattern() -> None:
@@ -252,6 +199,7 @@ def _register_pattern() -> None:
             section_order=list(_AWS_LZA_SECTION_ORDER),
             free_form_examples=dict(_AWS_LZA_FREE_FORM_EXAMPLES),
             target_capabilities=list(_AWS_LZA_TARGET_CAPABILITIES),
+            generators=list(_AWS_LZA_GENERATORS),
             prompt_context=(
                 "This pattern gathers decisions for AWS Landing Zone Accelerator. "
                 "Use AWS LZA sample configurations as the downstream deployment contract. "
@@ -264,6 +212,5 @@ def _register_pattern() -> None:
     )
 
 
-_register_generators()
 _register_pattern()
 register_aws_lza_samples()

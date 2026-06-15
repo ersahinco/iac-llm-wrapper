@@ -5,6 +5,7 @@ from __future__ import annotations
 import builtins
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
@@ -13,6 +14,17 @@ from .contracts import ContractValidator, TargetContract
 from .module_mapping import ModuleInputs
 from .requirements import RequirementGraph
 from .target_capabilities import TargetCapability
+
+GeneratorFn = Callable[[Any, Path], None]
+
+
+@dataclass
+class PatternGenerator:
+    """Pattern-owned artifact generator."""
+
+    name: str
+    fn: GeneratorFn
+    priority: int = 50
 
 
 @dataclass
@@ -36,6 +48,8 @@ class Pattern:
     validators: list[Callable[[Any], list[Any]]] = field(default_factory=list)
     # Optional module handoff mapper owned by the pattern.
     module_mapper: Callable[[Any], list[ModuleInputs]] | None = None
+    # Pattern-owned target artifact generators.
+    generators: list[PatternGenerator] = field(default_factory=list)
     # Target contracts that drive decisions, validation, and generated artifacts
     contracts: list[TargetContract] = field(default_factory=list)
     # Downstream target capability graph declarations.
