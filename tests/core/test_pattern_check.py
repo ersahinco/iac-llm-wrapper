@@ -70,7 +70,7 @@ def test_check_pattern_passes_for_minimal_valid_pattern(tmp_path: Path):
     assert result.passed
     assert result.requirements == 1
     assert result.contracts == 1
-    assert result.expected_artifacts == 3
+    assert result.expected_artifacts == 4
     assert result.samples == 0
     assert result.context_rules == 3
 

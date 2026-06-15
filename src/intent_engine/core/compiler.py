@@ -54,7 +54,7 @@ from .readiness import (
     gap_is_resolved as _gap_is_resolved,
 )
 from .validator import Violation, validate
-from .yaml_utils import read_yaml_mapping, write_yaml_artifact
+from .yaml_utils import read_yaml_mapping
 
 
 class CompileError(Exception):
@@ -84,6 +84,7 @@ def _build_payload(
     handoff_readiness: dict[str, Any] | None = None,
     target_capability_report: dict[str, Any] | None = None,
     source_context: dict[str, Any] | None = None,
+    decision_audit: list[dict[str, Any]] | None = None,
 ) -> Any:
     """Wrap intent in IaCIntentPayload with design doc and module inputs."""
     from .module_mapping import DesignDocument, IaCIntentPayload
@@ -106,6 +107,7 @@ def _build_payload(
         extraction_summary=extraction_summary or {},
         target_capability_report=target_capability_report or {},
         source_context=source_context or {},
+        decision_audit=decision_audit or [],
         handoff_readiness=handoff_readiness or {},
     )
 
@@ -738,6 +740,7 @@ def _validate_and_generate(
         handoff_readiness=readiness,
         target_capability_report=target_capability_report,
         source_context=source_context,
+        decision_audit=graph.audit_log(),
     )
     artifact_violations = _generate_validated_artifacts(
         payload,
@@ -1062,12 +1065,6 @@ def compile_from_graph(graph, output_dir: Path, pattern: str = "aws-lza") -> Non
         applied_decisions=applied_decisions,
         dry_run=False,
     )
-
-    # Write decision audit trail for traceability
-    audit = graph.audit_log()
-    if audit:
-        audit_path = output_dir / "decision-audit.yaml"
-        write_yaml_artifact(audit_path, {"auditTrail": audit}, "", indent=False)
 
 
 def validate_generated_violations(input_dir: Path, pattern: str = "aws-lza") -> list[Violation]:

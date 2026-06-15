@@ -181,6 +181,7 @@ runtimeContext:
 outputs:
   expectedArtifacts:
     - context-manifest.yaml
+    - decision-audit.yaml
     - cluster-config.yaml
     - namespace-config.yaml
     - decision-report.yaml

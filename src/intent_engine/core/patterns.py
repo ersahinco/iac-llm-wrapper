@@ -68,7 +68,7 @@ class Pattern:
         return graph
 
     def expected_artifacts(self) -> list[str]:
-        artifacts: list[str] = ["context-manifest.yaml"]
+        artifacts: list[str] = ["context-manifest.yaml", "decision-audit.yaml"]
         for contract in self.contracts:
             artifacts.extend(contract.required_artifacts)
         if self.contracts:

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -193,12 +194,37 @@ def gen_model_benchmark(intent: Any, output_dir: Path) -> None:
     _write(output_dir, "model-benchmark.yaml", build_model_benchmark(summary))
 
 
+def gen_decision_audit(intent: Any, output_dir: Path) -> None:
+    """Write the graph decision audit trail captured during compile."""
+    audit = getattr(intent, "decision_audit", None)
+    if audit is None:
+        return
+    write_yaml_artifact(
+        output_dir / "decision-audit.yaml",
+        {"auditTrail": audit},
+        "",
+        indent=False,
+    )
+
+
 def _sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 def _sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _sha256_replay_artifact(path: Path) -> str:
+    if path.name != "decision-audit.yaml":
+        return _sha256_file(path)
+    text = re.sub(
+        r"(^\s*-?\s*timestamp:\s*).+$",
+        r"\1<TIMESTAMP>",
+        path.read_text(),
+        flags=re.MULTILINE,
+    )
+    return _sha256_text(text)
 
 
 def _contract_digest(contract: Any) -> str:
@@ -476,7 +502,7 @@ def gen_replay_manifest(intent: Any, output_dir: Path) -> None:
     files = [
         {
             "name": item.name,
-            "sha256": _sha256_file(item),
+            "sha256": _sha256_replay_artifact(item),
         }
         for item in sorted(output_dir.iterdir())
         if item.is_file() and not item.name.startswith(".") and item.name != "replay-manifest.yaml"
@@ -510,6 +536,7 @@ CORE_GENERATORS = [
     PatternGenerator("module-inputs", gen_module_inputs, priority=5),
     PatternGenerator("llm-trace-summary", gen_llm_trace_summary, priority=5),
     PatternGenerator("model-benchmark", gen_model_benchmark, priority=5),
+    PatternGenerator("decision-audit", gen_decision_audit, priority=5),
     PatternGenerator("sample-recommendations", gen_sample_recommendations, priority=5),
     PatternGenerator("handoff-plan", gen_handoff_plan, priority=6),
     PatternGenerator("replay-manifest", gen_replay_manifest, priority=100),

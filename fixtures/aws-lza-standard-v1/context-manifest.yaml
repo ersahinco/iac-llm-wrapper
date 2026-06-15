@@ -474,6 +474,7 @@ runtimeContext:
 outputs:
   expectedArtifacts:
     - context-manifest.yaml
+    - decision-audit.yaml
     - accounts-config.yaml
     - global-config.yaml
     - iam-config.yaml

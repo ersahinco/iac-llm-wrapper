@@ -7,6 +7,7 @@ Existing deployment mechanisms remain downstream.
 | Artifact | Purpose | Owner | Emitted When | Deployable |
 | --- | --- | --- | --- | --- |
 | `decision-report.yaml` | Accepted decisions, handoff readiness, blockers, safe handoff path, and pattern-owned semantic model details when available. | Core + pattern | Every compile, including blocked compiles. | No |
+| `decision-audit.yaml` | Graph audit trail showing each accepted, defaulted, or skipped decision and its reason. | Core generator | Successful pattern-backed compiles. | No |
 | `context-manifest.yaml` | Code-owned context inventory: pattern metadata, prompt context digest/text, requirement graph, target contracts, samples, target capabilities, runtime extraction summary, expected artifacts, and guardrails. | Core | Pattern-backed successful handoffs. | No |
 | `handoff-plan.yaml` | Ordered review/handoff steps, owners, dependencies, manual gates, rollback, boundary, `handoffAllowed`, and allowed next action. | Core | Contract-backed successful handoffs. | No |
 | `plan-manifest.yaml` | Registered target plan metadata: immutable input artifacts, plan readiness, plan-only command text, expected plan outputs, blockers, and no-apply boundary. | Pattern + core contract | Plan-ready registered targets such as AWS LZA. | No |
@@ -16,15 +17,15 @@ Existing deployment mechanisms remain downstream.
 | `model-benchmark.yaml` | Mode, provider/model, latency, token availability, raw LLM coverage, conformance, quality counts, readiness, cost status, and external-observability boundary. | Core | Every compile. | No |
 | `input-diff-report.yaml` | Changed headings, changed structured decision lines, likely impacted requirements, and scoped hunks for an incremental document update. | Core incremental compile | `compile --baseline-bundle --changed-doc`. | No |
 | `incremental-compile-report.yaml` | Reused, changed, added, removed, carried-forward, and re-confirmation decision summary for diff-aware compile. | Core incremental compile | `compile --baseline-bundle --changed-doc`. | No |
-| `contract-validation.yaml` | Standalone pass/fail validation of emitted artifacts against target contracts. | Core review tooling | `iac-llm-wrapper review html`. | No |
+| `contract-validation.yaml` | Standalone pass/fail validation of emitted artifacts against target contracts. | Core validation helper | Explicit validation artifact writes; `review html` computes validation in memory. | No |
 | `target-capability-graph.yaml` | Downstream target coverage, selected target path, manual gates, and unsupported asks represented as semantic facts with evidence spans. | Pattern-owned target report builder | AWS LZA today; future patterns only when they own comparable target routing. | No |
 | `handoff-comparison.yaml` | Compact before/after bundle delta for incremental packet or sample updates: readiness, requirement completeness, decisions, blockers, artifacts, model quality, and sample recommendations. | Core review tooling | `iac-llm-wrapper review compare --output`. | No |
 | `handoff-comparison.html` | Static delta review page for what changed, what stayed stable, and what must be reviewed. | Core review tooling | `iac-llm-wrapper review compare --html-output`. | No |
 | `lza-validation-evidence.yaml` | Validation-only AWS LZA config-validator command, no-mutation/read-only lookup boundary, temporary-staging/replay boundary, source metadata, config digests, exit code, diagnostic summary, and captured stdout/stderr. | AWS LZA validation adapter | `iac-llm-wrapper lza validate`. | No |
 | `battle-summary.yaml` | Battle-test verdict, confidence categories, findings, and improvement items. | Battle harness | `scripts/battle-test.py`. | No |
 | `handoff-review.html` | Static human review page summarizing readiness, contract status, allowed next action, reviewer next actions, blocker traceability, raw LLM coverage, expected weaknesses, graph, evidence, benchmark, contract validation, handoff plan, and target artifacts. | Core review tooling | `iac-llm-wrapper review html`. | No |
-| `requirement-graph.json` | Machine-readable graph export for external viewers and tools. | Core review tooling | `iac-llm-wrapper review html` or `graph export`. | No |
-| `requirement-graph.mmd` | Mermaid graph export for lightweight visual inspection. | Core review tooling | `iac-llm-wrapper review html` or `graph export`. | No |
+| `requirement-graph.json` | Machine-readable graph export for external viewers and tools. | Core graph tooling | `iac-llm-wrapper graph export`. | No |
+| `requirement-graph.mmd` | Mermaid graph export for lightweight visual inspection. | Core graph tooling | `iac-llm-wrapper graph export`. | No |
 | Pattern-specific target configuration files | Target-shaped config or parameter handoff, such as AWS LZA YAML or CloudFormation parameters. | Pattern | Successful contract-backed handoffs. | No |
 
 ## Consumers

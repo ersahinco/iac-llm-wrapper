@@ -20,7 +20,9 @@ artifacts:
     - name: accounts-config.yaml
       sha256: bdf64d940cd40f3fc1a502dadd2e144718aa1b15d8b9d09f348b02dd609a676d
     - name: context-manifest.yaml
-      sha256: 45925dff4129f0a0663fd2d9a7c03f575453f5183d6dfbdc3882b595b5d84b14
+      sha256: fc719b97d71601d5b2716d83125388873723911d5628279869ddb82159494682
+    - name: decision-audit.yaml
+      sha256: fcc7eef3736e4828fbbe6fa1dd9a348aaf3a726ef52b9a80e9d69349e60bf3ef
     - name: decision-report.yaml
       sha256: 9decd26fe6537ccbece43f9020a289e371f983fe53f3b80c037508b834f976fe
     - name: deployment-runbook.md

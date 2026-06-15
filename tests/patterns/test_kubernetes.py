@@ -124,6 +124,7 @@ class TestKubernetesPattern:
             "  instanceType: t3.large\n"
         )
         (output / "sample-recommendations.yaml").write_text("recommendations: []\n")
+        (output / "decision-audit.yaml").write_text("auditTrail: []\n")
         (output / "context-manifest.yaml").write_text(
             """schemaVersion: intent-engine/context-manifest/v1
 pattern: kubernetes-cluster
@@ -159,6 +160,7 @@ runtimeContext:
 outputs:
   expectedArtifacts:
     - context-manifest.yaml
+    - decision-audit.yaml
 guardrails:
   - LLM output is not authoritative.
 """
