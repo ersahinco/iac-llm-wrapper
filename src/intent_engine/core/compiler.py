@@ -642,6 +642,119 @@ class LLMContextProvider:
         return result
 
 
+def _validate_and_generate(
+    *,
+    pattern: str,
+    graph,
+    intent: Any,
+    output_dir: Path,
+    source_text: str,
+    source_context: dict[str, Any],
+    llm_result: LLMGraphResult,
+    evidence_store: LLMEvidenceStore | None,
+    raw_evidence_path: Path | None,
+    markdown_decisions: dict[str, Any],
+    markdown_contradictions: list[dict[str, Any]],
+    applied_decisions: dict[str, list[str]],
+    dry_run: bool,
+    design_doc_data: dict[str, Any] | None = None,
+    extra_artifacts: dict[str, Any] | None = None,
+    extra_violations: list[Violation] | None = None,
+) -> None:
+    pattern_obj = GLOBAL_REGISTRY.get(pattern)
+    target_capability_report = build_target_capability_report(
+        pattern_obj.target_capabilities,
+        graph.typed_decisions(),
+        source_text,
+    )
+    violations = validate(intent, graph=graph, extra_validators=pattern_obj.validators)
+    violations.extend(_markdown_contradiction_violations(markdown_contradictions))
+    blocking_llm_result = _llm_result_for_blocking(
+        llm_result,
+        _deterministic_applied_decision_keys(applied_decisions),
+        graph.typed_decisions(),
+    )
+    violations.extend(_llm_result_violations(graph, blocking_llm_result))
+    violations.extend(_target_capability_violations(target_capability_report))
+    violations.extend(_plan_ready_capability_violations(pattern, target_capability_report))
+    violations.extend(extra_violations or [])
+
+    readiness = _build_handoff_readiness(
+        graph,
+        violations,
+        blocking_llm_result,
+        target_capability_report,
+    )
+    extraction_summary = _build_extraction_summary(
+        pattern=pattern,
+        evidence_store=evidence_store,
+        raw_evidence_path=raw_evidence_path,
+        markdown_decisions=markdown_decisions,
+        markdown_contradictions=markdown_contradictions,
+        llm_result=llm_result,
+        readiness=readiness,
+        applied_decisions=applied_decisions,
+        accepted_decisions=graph.typed_decisions(),
+        graph=graph,
+        target_capability_report=target_capability_report,
+        blocking_llm_result=blocking_llm_result,
+    )
+    if violations:
+        _build_failure_artifacts_and_raise(
+            output_dir=output_dir,
+            pattern=pattern,
+            graph=graph,
+            violations=violations,
+            llm_result=llm_result,
+            evidence_store=evidence_store,
+            raw_evidence_path=raw_evidence_path,
+            markdown_decisions=markdown_decisions,
+            markdown_contradictions=markdown_contradictions,
+            applied_decisions=applied_decisions,
+            target_capability_report=target_capability_report,
+            dry_run=dry_run,
+            extra_artifacts=extra_artifacts,
+            blocking_llm_result=blocking_llm_result,
+        )
+
+    if dry_run:
+        return
+
+    payload = _build_payload(
+        intent,
+        pattern,
+        graph.typed_decisions(),
+        design_doc_data,
+        extraction_summary=extraction_summary,
+        handoff_readiness=readiness,
+        target_capability_report=target_capability_report,
+        source_context=source_context,
+    )
+    artifact_violations = _generate_validated_artifacts(
+        payload,
+        output_dir,
+        pattern,
+        extra_artifacts=extra_artifacts,
+    )
+    if artifact_violations:
+        _build_failure_artifacts_and_raise(
+            output_dir=output_dir,
+            pattern=pattern,
+            graph=graph,
+            violations=artifact_violations,
+            llm_result=llm_result,
+            evidence_store=evidence_store,
+            raw_evidence_path=raw_evidence_path,
+            markdown_decisions=markdown_decisions,
+            markdown_contradictions=markdown_contradictions,
+            applied_decisions=applied_decisions,
+            target_capability_report=target_capability_report,
+            dry_run=False,
+            extra_artifacts=extra_artifacts,
+            blocking_llm_result=blocking_llm_result,
+        )
+
+
 def compile_design(
     input_path: Path,
     output_dir: Path,
@@ -741,90 +854,22 @@ def compile_design(
     # Apply graph cascades (topology -> network.topology, etc.)
     graph.apply_to_intent(intent)
 
-    # 2e. Validate fail-closed (graph-driven when available)
-    target_capability_report = build_target_capability_report(
-        pattern_obj.target_capabilities,
-        graph.typed_decisions(),
-        text,
-    )
-    violations = validate(intent, graph=graph, extra_validators=pattern_obj.validators)
-    violations.extend(_markdown_contradiction_violations(markdown_result.contradictions))
-    blocking_llm_result = _llm_result_for_blocking(
-        llm_result,
-        _deterministic_applied_decision_keys(applied_decisions),
-        graph.typed_decisions(),
-    )
-    violations.extend(_llm_result_violations(graph, blocking_llm_result))
-    violations.extend(_target_capability_violations(target_capability_report))
-    violations.extend(_plan_ready_capability_violations(pattern, target_capability_report))
-    readiness = _build_handoff_readiness(
-        graph,
-        violations,
-        blocking_llm_result,
-        target_capability_report,
-    )
-    extraction_summary = _build_extraction_summary(
+    _validate_and_generate(
         pattern=pattern,
+        graph=graph,
+        intent=intent,
+        output_dir=output_dir,
+        source_text=text,
+        source_context=source_context,
+        llm_result=llm_result,
         evidence_store=evidence_store,
         raw_evidence_path=raw_evidence_path,
         markdown_decisions=markdown_decisions,
         markdown_contradictions=markdown_result.contradictions,
-        llm_result=llm_result,
-        readiness=readiness,
         applied_decisions=applied_decisions,
-        accepted_decisions=graph.typed_decisions(),
-        graph=graph,
-        target_capability_report=target_capability_report,
-        blocking_llm_result=blocking_llm_result,
+        dry_run=dry_run,
+        design_doc_data=llm_result.design_doc,
     )
-    if violations:
-        _build_failure_artifacts_and_raise(
-            output_dir=output_dir,
-            pattern=pattern,
-            graph=graph,
-            violations=violations,
-            llm_result=llm_result,
-            evidence_store=evidence_store,
-            raw_evidence_path=raw_evidence_path,
-            markdown_decisions=markdown_decisions,
-            markdown_contradictions=markdown_result.contradictions,
-            applied_decisions=applied_decisions,
-            target_capability_report=target_capability_report,
-            dry_run=dry_run,
-            blocking_llm_result=blocking_llm_result,
-        )
-
-    if dry_run:
-        return
-
-    # 2g. Generate artifacts
-    payload = _build_payload(
-        intent,
-        pattern,
-        graph.typed_decisions(),
-        llm_result.design_doc,
-        extraction_summary=extraction_summary,
-        handoff_readiness=readiness,
-        target_capability_report=target_capability_report,
-        source_context=source_context,
-    )
-    artifact_violations = _generate_validated_artifacts(payload, output_dir, pattern)
-    if artifact_violations:
-        _build_failure_artifacts_and_raise(
-            output_dir=output_dir,
-            pattern=pattern,
-            graph=graph,
-            violations=artifact_violations,
-            llm_result=llm_result,
-            evidence_store=evidence_store,
-            raw_evidence_path=raw_evidence_path,
-            markdown_decisions=markdown_decisions,
-            markdown_contradictions=markdown_result.contradictions,
-            applied_decisions=applied_decisions,
-            target_capability_report=target_capability_report,
-            dry_run=False,
-            blocking_llm_result=blocking_llm_result,
-        )
 
 
 def compile_incremental_design(
@@ -926,21 +971,6 @@ def compile_incremental_design(
     _merge_extracted_entities(intent, markdown_entities)
     graph.apply_to_intent(intent)
 
-    target_capability_report = build_target_capability_report(
-        pattern_obj.target_capabilities,
-        graph.typed_decisions(),
-        changed_text,
-    )
-    violations = validate(intent, graph=graph, extra_validators=pattern_obj.validators)
-    violations.extend(_markdown_contradiction_violations(markdown_result.contradictions))
-    blocking_llm_result = _llm_result_for_blocking(
-        llm_result,
-        _deterministic_applied_decision_keys(applied_decisions),
-        graph.typed_decisions(),
-    )
-    violations.extend(_llm_result_violations(graph, blocking_llm_result))
-    violations.extend(_target_capability_violations(target_capability_report))
-    violations.extend(_plan_ready_capability_violations(pattern, target_capability_report))
     incremental_report = incremental_decision_report(
         baseline_decisions=baseline_decisions,
         final_decisions=graph.typed_decisions(),
@@ -958,91 +988,32 @@ def compile_incremental_design(
             ),
         }
     )
-    violations.extend(_incremental_reconfirmation_violations(graph, incremental_report, input_diff))
-    readiness = _build_handoff_readiness(
-        graph,
-        violations,
-        blocking_llm_result,
-        target_capability_report,
-    )
-    extraction_summary = _build_extraction_summary(
+    extra_artifacts = {
+        "input-diff-report.yaml": input_diff,
+        "incremental-compile-report.yaml": incremental_report,
+    }
+    _validate_and_generate(
         pattern=pattern,
+        graph=graph,
+        intent=intent,
+        output_dir=output_dir,
+        source_text=changed_text,
+        source_context=source_context,
+        llm_result=llm_result,
         evidence_store=evidence_store,
         raw_evidence_path=raw_evidence_path,
         markdown_decisions=markdown_decisions,
         markdown_contradictions=markdown_result.contradictions,
-        llm_result=llm_result,
-        readiness=readiness,
         applied_decisions=applied_decisions,
-        accepted_decisions=graph.typed_decisions(),
-        graph=graph,
-        target_capability_report=target_capability_report,
-        blocking_llm_result=blocking_llm_result,
+        dry_run=dry_run,
+        design_doc_data=llm_result.design_doc,
+        extra_artifacts=extra_artifacts,
+        extra_violations=_incremental_reconfirmation_violations(
+            graph,
+            incremental_report,
+            input_diff,
+        ),
     )
-
-    if violations:
-        _build_failure_artifacts_and_raise(
-            output_dir=output_dir,
-            pattern=pattern,
-            graph=graph,
-            violations=violations,
-            llm_result=llm_result,
-            evidence_store=evidence_store,
-            raw_evidence_path=raw_evidence_path,
-            markdown_decisions=markdown_decisions,
-            markdown_contradictions=markdown_result.contradictions,
-            applied_decisions=applied_decisions,
-            target_capability_report=target_capability_report,
-            dry_run=dry_run,
-            extra_artifacts={
-                "input-diff-report.yaml": input_diff,
-                "incremental-compile-report.yaml": incremental_report,
-            },
-            blocking_llm_result=blocking_llm_result,
-        )
-
-    if dry_run:
-        return
-
-    payload = _build_payload(
-        intent,
-        pattern,
-        graph.typed_decisions(),
-        llm_result.design_doc,
-        extraction_summary=extraction_summary,
-        handoff_readiness=readiness,
-        target_capability_report=target_capability_report,
-        source_context=source_context,
-    )
-    artifact_violations = _generate_validated_artifacts(
-        payload,
-        output_dir,
-        pattern,
-        extra_artifacts={
-            "input-diff-report.yaml": input_diff,
-            "incremental-compile-report.yaml": incremental_report,
-        },
-    )
-    if artifact_violations:
-        _build_failure_artifacts_and_raise(
-            output_dir=output_dir,
-            pattern=pattern,
-            graph=graph,
-            violations=artifact_violations,
-            llm_result=llm_result,
-            evidence_store=evidence_store,
-            raw_evidence_path=raw_evidence_path,
-            markdown_decisions=markdown_decisions,
-            markdown_contradictions=markdown_result.contradictions,
-            applied_decisions=applied_decisions,
-            target_capability_report=target_capability_report,
-            dry_run=False,
-            extra_artifacts={
-                "input-diff-report.yaml": input_diff,
-                "incremental-compile-report.yaml": incremental_report,
-            },
-            blocking_llm_result=blocking_llm_result,
-        )
 
 
 def compile_from_interview(
@@ -1065,76 +1036,23 @@ def compile_from_graph(graph, output_dir: Path, pattern: str = "aws-lza") -> Non
     pattern_obj = GLOBAL_REGISTRY.get(pattern)
     intent = pattern_obj.intent_factory()
     graph.apply_to_intent(intent)
-    violations = validate(intent, graph=graph, extra_validators=pattern_obj.validators)
     llm_result = LLMGraphResult()
-    target_capability_report = build_target_capability_report(
-        pattern_obj.target_capabilities,
-        graph.typed_decisions(),
-    )
-    violations.extend(_target_capability_violations(target_capability_report))
-    violations.extend(_plan_ready_capability_violations(pattern, target_capability_report))
-    readiness = _build_handoff_readiness(
-        graph,
-        violations,
-        llm_result,
-        target_capability_report,
-    )
-    extraction_summary = _build_extraction_summary(
+    applied_decisions = _applied_decisions_from_audit(graph)
+    _validate_and_generate(
         pattern=pattern,
+        graph=graph,
+        intent=intent,
+        output_dir=output_dir,
+        source_text="",
+        source_context=_source_context(mode="interview", text=""),
+        llm_result=llm_result,
         evidence_store=None,
         raw_evidence_path=None,
         markdown_decisions={},
         markdown_contradictions=[],
-        llm_result=llm_result,
-        readiness=readiness,
-        applied_decisions=_applied_decisions_from_audit(graph),
-        accepted_decisions=graph.typed_decisions(),
-        graph=graph,
-        target_capability_report=target_capability_report,
+        applied_decisions=applied_decisions,
+        dry_run=False,
     )
-    if violations:
-        _build_failure_artifacts_and_raise(
-            output_dir=output_dir,
-            pattern=pattern,
-            graph=graph,
-            violations=violations,
-            llm_result=llm_result,
-            evidence_store=None,
-            raw_evidence_path=None,
-            markdown_decisions={},
-            markdown_contradictions=[],
-            applied_decisions=_applied_decisions_from_audit(graph),
-            target_capability_report=target_capability_report,
-            dry_run=False,
-        )
-    artifact_violations = _generate_validated_artifacts(
-        _build_payload(
-            intent,
-            pattern,
-            graph.typed_decisions(),
-            extraction_summary=extraction_summary,
-            handoff_readiness=readiness,
-            target_capability_report=target_capability_report,
-            source_context=_source_context(mode="interview", text=""),
-        ),
-        output_dir,
-        pattern,
-    )
-    if artifact_violations:
-        _build_failure_artifacts_and_raise(
-            output_dir=output_dir,
-            pattern=pattern,
-            graph=graph,
-            violations=artifact_violations,
-            llm_result=llm_result,
-            evidence_store=None,
-            raw_evidence_path=None,
-            markdown_decisions={},
-            markdown_contradictions=[],
-            applied_decisions=_applied_decisions_from_audit(graph),
-            target_capability_report=target_capability_report,
-            dry_run=False,
-        )
 
     # Write decision audit trail for traceability
     audit = graph.audit_log()
