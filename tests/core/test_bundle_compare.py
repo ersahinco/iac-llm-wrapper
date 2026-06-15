@@ -6,7 +6,21 @@ from intent_engine.core.bundle_compare import (
     compare_handoff_bundles,
     render_bundle_comparison_html,
     render_bundle_comparison_text,
+    review_reports,
 )
+
+
+def test_review_reports_keeps_legacy_decision_report_diff(tmp_path: Path):
+    before = tmp_path / "before.yaml"
+    after = tmp_path / "after.yaml"
+    before.write_text("network:\n  cidr: 10.0.0.0/16\n")
+    after.write_text("network:\n  cidr: 10.1.0.0/16\n")
+
+    report = review_reports(before, after)
+
+    assert report["changes"] == [
+        {"key": "network.cidr", "before": "10.0.0.0/16", "after": "10.1.0.0/16"}
+    ]
 
 
 def test_compare_handoff_bundles_reports_blocker_and_sample_deltas(tmp_path: Path):

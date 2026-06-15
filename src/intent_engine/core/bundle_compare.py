@@ -27,6 +27,58 @@ class _BundleSnapshot:
     lineage: list[dict[str, Any]]
 
 
+def review_reports(before_path: Path, after_path: Path) -> dict[str, Any]:
+    """Diff two legacy decision reports and return structured review."""
+    before = _read_yaml(before_path)
+    after = _read_yaml(after_path)
+
+    result: dict[str, Any] = {"changes": [], "added": [], "removed": [], "audit": {}}
+
+    def flatten(data: dict[str, Any], prefix: str = "") -> dict[str, Any]:
+        items: dict[str, Any] = {}
+        for key, value in data.items():
+            flat_key = f"{prefix}.{key}" if prefix else key
+            if isinstance(value, dict) and key not in (
+                "wellArchitectedCoverage",
+                "decisionAuditTrail",
+            ):
+                items.update(flatten(value, flat_key))
+            elif isinstance(value, list):
+                items[flat_key] = (
+                    sorted(value) if value and not isinstance(value[0], dict) else value
+                )
+            elif key not in ("wellArchitectedCoverage", "decisionAuditTrail"):
+                items[flat_key] = value
+        return items
+
+    flat_before = flatten(before)
+    flat_after = flatten(after)
+    for key in sorted(set(flat_before) | set(flat_after)):
+        before_value = flat_before.get(key)
+        after_value = flat_after.get(key)
+        if key not in flat_before:
+            result["added"].append({"key": key, "value": after_value})
+        elif key not in flat_after:
+            result["removed"].append({"key": key, "value": before_value})
+        elif before_value != after_value:
+            result["changes"].append({"key": key, "before": before_value, "after": after_value})
+
+    before_wa = before.get("wellArchitectedCoverage", {}) or {}
+    after_wa = after.get("wellArchitectedCoverage", {}) or {}
+    result["wellArchitectedCoverage"] = {"before": before_wa, "after": after_wa}
+
+    before_audit = before.get("decisionAuditTrail", []) or []
+    after_audit = after.get("decisionAuditTrail", []) or []
+    result["audit"] = {
+        "before_count": len(before_audit),
+        "after_count": len(after_audit),
+        "new_entries": after_audit[len(before_audit) :]
+        if len(after_audit) > len(before_audit)
+        else [],
+    }
+    return result
+
+
 def compare_handoff_bundles(before_dir: Path, after_dir: Path) -> dict[str, Any]:
     """Return a compact comparison report for two generated handoff bundles."""
     before = _load_bundle(before_dir)

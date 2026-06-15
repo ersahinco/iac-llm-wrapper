@@ -13,6 +13,7 @@ from .core.artifact_review import write_review_html
 from .core.bundle_compare import (
     compare_handoff_bundles,
     render_bundle_comparison_text,
+    review_reports,
     write_bundle_comparison,
     write_bundle_comparison_html,
 )
@@ -29,7 +30,6 @@ from .core.compiler import (
     compile_incremental_design,
     explain_report,
     generate_template,
-    review_reports,
     validate_generated,
 )
 from .core.contracts import GLOBAL_CONTRACT_REGISTRY, TargetContract
@@ -1215,6 +1215,10 @@ def review(
         typer.echo(f"Error: after file does not exist: {after}", err=True)
         raise typer.Exit(1)
 
+    typer.echo(
+        "WARNING: review diff is deprecated; use review compare on generated bundles.",
+        err=True,
+    )
     diff = review_reports(before, after)
 
     typer.echo("=== Decision Report Review ===")

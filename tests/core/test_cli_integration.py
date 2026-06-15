@@ -459,6 +459,7 @@ class TestCLIReview:
         after.write_text(data)
         result = runner.invoke(app, ["review", "--before", str(before), "--after", str(after)])
         assert result.exit_code == 0
+        assert "review diff is deprecated" in result.output
         assert "No differences found" in result.output
 
     def test_review_changed_values(self, tmp_path: Path):
@@ -468,6 +469,7 @@ class TestCLIReview:
         after.write_text("homeRegion: eu-west-1\n")
         result = runner.invoke(app, ["review", "--before", str(before), "--after", str(after)])
         assert result.exit_code == 0
+        assert "review diff is deprecated" in result.output
         assert "Changed" in result.output
         assert "eu-central-1" in result.output
         assert "eu-west-1" in result.output

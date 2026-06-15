@@ -1162,64 +1162,6 @@ def validate_generated(input_dir: Path, pattern: str = "aws-lza") -> list[str]:
     return _validate_generated_impl(input_dir, pattern)
 
 
-def review_reports(before_path: Path, after_path: Path) -> dict:
-    """Diff two decision reports and return structured review."""
-    before = read_yaml_mapping(before_path)
-    after = read_yaml_mapping(after_path)
-
-    result: dict = {"changes": [], "added": [], "removed": [], "audit": {}}
-
-    def _flatten(d: dict, prefix: str = "") -> dict[str, Any]:
-        items: dict[str, Any] = {}
-        for k, v in d.items():
-            key = f"{prefix}.{k}" if prefix else k
-            if isinstance(v, dict) and k not in (
-                "wellArchitectedCoverage",
-                "decisionAuditTrail",
-            ):
-                items.update(_flatten(v, key))
-            elif isinstance(v, list):
-                items[key] = sorted(v) if v and not isinstance(v[0], dict) else v
-            elif k == "wellArchitectedCoverage":
-                pass
-            elif k == "decisionAuditTrail":
-                pass
-            else:
-                items[key] = v
-        return items
-
-    flat_before = _flatten(before)
-    flat_after = _flatten(after)
-
-    all_keys = set(flat_before) | set(flat_after)
-
-    for key in sorted(all_keys):
-        b_val = flat_before.get(key)
-        a_val = flat_after.get(key)
-        if key not in flat_before:
-            result["added"].append({"key": key, "value": a_val})
-        elif key not in flat_after:
-            result["removed"].append({"key": key, "value": b_val})
-        elif b_val != a_val:
-            result["changes"].append({"key": key, "before": b_val, "after": a_val})
-
-    # WA coverage diff
-    b_wa = before.get("wellArchitectedCoverage", {}) or {}
-    a_wa = after.get("wellArchitectedCoverage", {}) or {}
-    result["wellArchitectedCoverage"] = {"before": b_wa, "after": a_wa}
-
-    # Audit trail diff
-    b_audit = before.get("decisionAuditTrail", []) or []
-    a_audit = after.get("decisionAuditTrail", []) or []
-    result["audit"] = {
-        "before_count": len(b_audit),
-        "after_count": len(a_audit),
-        "new_entries": a_audit[len(b_audit) :] if len(a_audit) > len(b_audit) else [],
-    }
-
-    return result
-
-
 def _build_section_map(pattern: str, graph) -> dict[str, tuple[str, str | None]]:
     """Build a section map from pattern metadata plus category fallback.
 
