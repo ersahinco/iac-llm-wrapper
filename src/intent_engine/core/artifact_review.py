@@ -444,6 +444,7 @@ def _lza_validation_summary(evidence: dict[str, Any]) -> dict[str, Any]:
     command = _dict(evidence.get("command"))
     source = _dict(evidence.get("lzaSource"))
     input_block = _dict(evidence.get("input"))
+    boundary = _dict(evidence.get("boundary"))
     status = str(evidence.get("status", "unknown"))
     exit_code = _exit_code(command.get("exitCode"), status=status)
     diagnostic = _dict(evidence.get("diagnostic")) or summarize_lza_validation_output(
@@ -466,11 +467,24 @@ def _lza_validation_summary(evidence: dict[str, Any]) -> dict[str, Any]:
         "sourceCwd": str(source.get("commandWorkingDirectory", "")),
         "packageVersion": str(source.get("packageVersion", "unknown")),
         "gitCommit": str(source.get("gitCommit") or "unknown"),
+        "awsLookupBoundary": _aws_lookup_boundary(boundary),
         "diagnosticCategory": str(diagnostic.get("category", "")),
         "diagnosticNextAction": str(diagnostic.get("nextAction", "")),
         "failureExcerpt": failure_excerpt,
         "configFileDigests": _coerce_list(input_block.get("configFileDigests")),
     }
+
+
+def _aws_lookup_boundary(boundary: dict[str, Any]) -> str:
+    explicit = boundary.get("awsAccountLookupBoundary")
+    if explicit:
+        return str(explicit)
+    if boundary.get("readOnlyAwsAccountLookupMayOccur") is True:
+        return (
+            "The official AWS LZA validator may perform read-only account lookup "
+            "through the provided AWS/LZA context."
+        )
+    return ""
 
 
 def _exit_code(value: Any, *, status: str) -> int:

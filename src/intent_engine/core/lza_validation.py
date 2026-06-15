@@ -154,6 +154,11 @@ def _build_evidence(
             "noClone": True,
             "noInstall": True,
             "noAwsMutation": True,
+            "readOnlyAwsAccountLookupMayOccur": True,
+            "awsAccountLookupBoundary": (
+                "The official AWS LZA validator may perform read-only account lookup "
+                "through the provided AWS/LZA context."
+            ),
             "allowedCommand": "yarn validate-config <staged-config-dir>",
             "fallbackCommand": "corepack yarn validate-config <staged-config-dir>",
         },

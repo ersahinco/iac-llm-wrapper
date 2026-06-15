@@ -154,6 +154,13 @@ def _write_review_bundle(
             {
                 "schemaVersion": "intent-engine/aws-lza-validation-evidence/v1",
                 "status": "fail",
+                "boundary": {
+                    "readOnlyAwsAccountLookupMayOccur": True,
+                    "awsAccountLookupBoundary": (
+                        "The official AWS LZA validator may perform read-only account "
+                        "lookup through the provided AWS/LZA context."
+                    ),
+                },
                 "input": {
                     "configFileDigests": [
                         {
@@ -286,6 +293,10 @@ def test_review_context_surfaces_lza_validation_evidence(tmp_path: Path):
         "sourceCwd": "/tmp/landing-zone-accelerator-on-aws/source",
         "packageVersion": "1.15.0",
         "gitCommit": "abcde12",
+        "awsLookupBoundary": (
+            "The official AWS LZA validator may perform read-only account lookup "
+            "through the provided AWS/LZA context."
+        ),
         "diagnosticCategory": "aws-account-lookup-permission",
         "diagnosticNextAction": (
             "Run with an AWS/LZA validation context that can perform the official "

@@ -101,6 +101,8 @@ def test_validate_lza_config_bundle_writes_validation_only_evidence(
     assert evidence["boundary"]["mode"] == "validation-only"
     assert evidence["boundary"]["noDeploy"] is True
     assert evidence["boundary"]["noAwsMutation"] is True
+    assert evidence["boundary"]["readOnlyAwsAccountLookupMayOccur"] is True
+    assert "read-only account lookup" in evidence["boundary"]["awsAccountLookupBoundary"]
     assert evidence["command"]["argv"][0:2] == ["yarn", "validate-config"]
     assert evidence["command"]["exitCode"] == 0
     assert evidence["lzaSource"]["packageVersion"] == "1.2.3"

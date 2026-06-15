@@ -389,6 +389,11 @@ def _lza_validation_section(
         _kv("Package version", str(summary.get("packageVersion", "unknown"))),
         _kv("Git commit", str(summary.get("gitCommit", "unknown"))),
         _kv("Source path", str(summary.get("sourcePath", ""))),
+        *(
+            [_kv("AWS lookup boundary", str(summary.get("awsLookupBoundary", "")))]
+            if summary.get("awsLookupBoundary")
+            else []
+        ),
         _kv("Command", str(summary.get("command", ""))),
         _artifact_link_row("LZA validation evidence", evidence_link),
         _digest_table(_coerce_list(summary.get("configFileDigests"))),

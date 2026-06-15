@@ -109,7 +109,7 @@ T72: Owner validation follow-up
 - **Format**: clean (`ruff format --check .`)
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Continued T72 owner-validation follow-up by aligning public validation wording with observed AWS LZA validator behavior. Docs now say `iac-llm-wrapper lza validate` is validation-only and must not mutate AWS, while the official AWS LZA validator may perform read-only account lookup through the provided AWS/LZA context. No owner validation is claimed.
+- **Last session**: Continued T72 owner-validation follow-up by carrying the no-mutation/read-only lookup boundary into the validation evidence artifact and static review. New `lza-validation-evidence.yaml` files now state that AWS mutation is forbidden while the official AWS LZA validator may perform read-only account lookup through the provided AWS/LZA context. No owner validation is claimed.
 
 ### Done
 
@@ -169,6 +169,7 @@ T72: Owner validation follow-up
 - T72 owner-packet prerequisite hardening: `docs/LZA_DOWNSTREAM_VALIDATION.md` now requires owner-approved account vending emails and an AWS account lookup context/profile before local or owner validation claims. The checklist also treats `AccessDeniedException`, schema output, and pipeline output as concrete blocker evidence rather than acceptance.
 - T72 validation diagnostic hardening: `lza-validation-evidence.yaml` now records a diagnostic category, summary, and next action alongside raw validator stdout/stderr. CLI failure output and static review surface non-pass diagnostic categories and next actions while remaining compatible with older evidence files.
 - T72 validation boundary wording: README, architecture, artifact catalog, and downstream-validation packet now distinguish no AWS mutation from possible read-only AWS account lookup by the official local LZA validator. Product-language tests guard against the old "no AWS API call" wording.
+- T72 validation evidence boundary hardening: `lza-validation-evidence.yaml` now records the no-mutation/read-only account lookup boundary directly, and `handoff-review.html` surfaces that boundary without requiring reviewers to expand raw YAML. Older evidence files remain compatible.
 
 ### Next
 
