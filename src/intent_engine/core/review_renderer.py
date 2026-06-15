@@ -376,6 +376,16 @@ def _lza_validation_section(
             if summary.get("failureExcerpt")
             else []
         ),
+        *(
+            [_kv("Diagnostic", str(summary.get("diagnosticCategory", "")))]
+            if summary.get("diagnosticCategory") and summary.get("diagnosticCategory") != "passed"
+            else []
+        ),
+        *(
+            [_kv("Next action", str(summary.get("diagnosticNextAction", "")))]
+            if summary.get("diagnosticNextAction") and summary.get("diagnosticCategory") != "passed"
+            else []
+        ),
         _kv("Package version", str(summary.get("packageVersion", "unknown"))),
         _kv("Git commit", str(summary.get("gitCommit", "unknown"))),
         _kv("Source path", str(summary.get("sourcePath", ""))),

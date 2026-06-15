@@ -11,7 +11,7 @@ import ruamel.yaml
 
 from .contract_validation import build_contract_validation, write_contract_validation
 from .graph_export import graph_to_json, graph_to_mermaid
-from .lza_validation import LZA_VALIDATION_EVIDENCE
+from .lza_validation import LZA_VALIDATION_EVIDENCE, summarize_lza_validation_output
 from .patterns import GLOBAL_REGISTRY
 from .review_renderer import render_review_html as render_review_html_context
 
@@ -444,19 +444,40 @@ def _lza_validation_summary(evidence: dict[str, Any]) -> dict[str, Any]:
     command = _dict(evidence.get("command"))
     source = _dict(evidence.get("lzaSource"))
     input_block = _dict(evidence.get("input"))
+    status = str(evidence.get("status", "unknown"))
+    exit_code = _exit_code(command.get("exitCode"), status=status)
+    diagnostic = _dict(evidence.get("diagnostic")) or summarize_lza_validation_output(
+        exit_code=exit_code,
+        stdout=str(command.get("stdout", "") or ""),
+        stderr=str(command.get("stderr", "") or ""),
+    )
     argv = command.get("argv")
     command_text = " ".join(str(item) for item in argv) if isinstance(argv, list) else ""
+    failure_excerpt = (
+        str(diagnostic.get("summary") or _lza_validation_failure_excerpt(command))
+        if status != "pass"
+        else ""
+    )
     return {
-        "status": str(evidence.get("status", "unknown")),
+        "status": status,
         "exitCode": str(command.get("exitCode", "unknown")),
         "command": command_text,
         "sourcePath": str(source.get("requestedPath", "")),
         "sourceCwd": str(source.get("commandWorkingDirectory", "")),
         "packageVersion": str(source.get("packageVersion", "unknown")),
         "gitCommit": str(source.get("gitCommit") or "unknown"),
-        "failureExcerpt": _lza_validation_failure_excerpt(command),
+        "diagnosticCategory": str(diagnostic.get("category", "")),
+        "diagnosticNextAction": str(diagnostic.get("nextAction", "")),
+        "failureExcerpt": failure_excerpt,
         "configFileDigests": _coerce_list(input_block.get("configFileDigests")),
     }
+
+
+def _exit_code(value: Any, *, status: str) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0 if status == "pass" else 1
 
 
 def _lza_validation_failure_excerpt(command: dict[str, Any]) -> str:

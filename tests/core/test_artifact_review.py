@@ -286,6 +286,11 @@ def test_review_context_surfaces_lza_validation_evidence(tmp_path: Path):
         "sourceCwd": "/tmp/landing-zone-accelerator-on-aws/source",
         "packageVersion": "1.15.0",
         "gitCommit": "abcde12",
+        "diagnosticCategory": "aws-account-lookup-permission",
+        "diagnosticNextAction": (
+            "Run with an AWS/LZA validation context that can perform the official "
+            "account lookup, or send this failure to the downstream owner."
+        ),
         "failureExcerpt": (
             "AccessDeniedException: You don't have permissions to access this resource. "
             "in accounts-config.yaml config file"

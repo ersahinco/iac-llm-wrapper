@@ -383,11 +383,27 @@ def lza_validate(
                 f"Exit code: {exc.evidence['command']['exitCode']}",
                 err=True,
             )
+            _echo_lza_diagnostic(exc.evidence)
         raise typer.Exit(1) from None
 
     typer.echo("AWS LZA config validation passed.")
     typer.echo(f"Validation evidence written to: {evidence_path}")
     typer.echo(f"Command: {' '.join(evidence['command']['argv'])}")
+
+
+def _echo_lza_diagnostic(evidence: dict[str, Any]) -> None:
+    diagnostic = evidence.get("diagnostic")
+    if not isinstance(diagnostic, dict):
+        return
+    category = diagnostic.get("category")
+    summary = diagnostic.get("summary")
+    next_action = diagnostic.get("nextAction")
+    if category:
+        typer.echo(f"Diagnostic: {category}", err=True)
+    if summary:
+        typer.echo(f"Summary: {summary}", err=True)
+    if next_action:
+        typer.echo(f"Next action: {next_action}", err=True)
 
 
 @app.command()
