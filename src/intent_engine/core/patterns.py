@@ -14,9 +14,9 @@ from .contracts import CORE_CONTRACTS, ContractValidator, TargetContract
 from .module_mapping import ModuleInputs
 from .requirements import RequirementGraph
 from .sample_config import SampleConfig, SampleMatch, find_best_sample_matches, find_samples
-from .target_capabilities import TargetCapability
 
 GeneratorFn = Callable[[Any, Path], None]
+TargetReportBuilder = Callable[[dict[str, Any], str], dict[str, Any]]
 
 
 @dataclass
@@ -55,8 +55,8 @@ class Pattern:
     contracts: list[TargetContract] = field(default_factory=list)
     # Version-pinned reference bundles owned by the pattern.
     samples: list[SampleConfig] = field(default_factory=list)
-    # Downstream target capability graph declarations.
-    target_capabilities: list[TargetCapability] = field(default_factory=list)
+    # Optional pattern-owned target routing/report builder.
+    target_report_builder: TargetReportBuilder | None = None
     # Whether this pattern emits a registered target plan-ready metadata bundle.
     plan_ready: bool = False
 
@@ -75,7 +75,7 @@ class Pattern:
             artifacts.append("handoff-plan.yaml")
         if self.samples:
             artifacts.append("sample-recommendations.yaml")
-        if self.target_capabilities:
+        if self.target_report_builder:
             artifacts.append("target-capability-graph.yaml")
         if self.plan_ready:
             artifacts.extend(["plan-manifest.yaml", "replay-manifest.yaml"])

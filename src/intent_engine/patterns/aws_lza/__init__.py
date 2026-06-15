@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern, PatternGenerator
-from intent_engine.core.target_capabilities import (
-    TargetCapability,
-    TargetCapabilityType,
-    UnsupportedRequest,
-)
 
 from .contracts import AWS_LZA_SAMPLE_CONFIG_CONTRACT
 from .generators import (
@@ -21,10 +18,17 @@ from .generators import (
     gen_lza_organization_config,
     gen_lza_plan_manifest,
     gen_lza_security_config,
+    gen_lza_target_capability_graph,
 )
 from .graph import build_aws_lza_graph
 from .models import AwsLzaIntent
 from .samples import aws_lza_samples
+from .target_capabilities import (
+    TargetCapability,
+    TargetCapabilityType,
+    UnsupportedRequest,
+    build_target_capability_report,
+)
 from .validators import validate_aws_lza_intent
 
 _AWS_LZA_SECTION_MAP: dict[str, tuple[str, str | None]] = {
@@ -174,6 +178,11 @@ _AWS_LZA_TARGET_CAPABILITIES = [
 ]
 
 _AWS_LZA_GENERATORS = [
+    PatternGenerator(
+        "aws-lza-target-capability-graph",
+        gen_lza_target_capability_graph,
+        priority=5,
+    ),
     PatternGenerator("aws-lza-organization", gen_lza_organization_config, priority=20),
     PatternGenerator("aws-lza-accounts", gen_lza_accounts_config, priority=21),
     PatternGenerator("aws-lza-global", gen_lza_global_config, priority=22),
@@ -187,6 +196,17 @@ _AWS_LZA_GENERATORS = [
 ]
 
 
+def _build_aws_lza_target_report(
+    decisions: dict[str, Any],
+    source_text: str,
+) -> dict[str, Any]:
+    return build_target_capability_report(
+        list(_AWS_LZA_TARGET_CAPABILITIES),
+        decisions,
+        source_text,
+    )
+
+
 def _register_pattern() -> None:
     GLOBAL_REGISTRY.register(
         Pattern(
@@ -198,7 +218,7 @@ def _register_pattern() -> None:
             section_map=dict(_AWS_LZA_SECTION_MAP),
             section_order=list(_AWS_LZA_SECTION_ORDER),
             free_form_examples=dict(_AWS_LZA_FREE_FORM_EXAMPLES),
-            target_capabilities=list(_AWS_LZA_TARGET_CAPABILITIES),
+            target_report_builder=_build_aws_lza_target_report,
             generators=list(_AWS_LZA_GENERATORS),
             prompt_context=(
                 "This pattern gathers decisions for AWS Landing Zone Accelerator. "

@@ -1,4 +1,4 @@
-"""Target capability graph for downstream handoff routing.
+"""AWS LZA target capability graph for downstream handoff routing.
 
 The requirement graph answers "what decisions are accepted?". This layer answers
 "what downstream target can safely satisfy those decisions?".

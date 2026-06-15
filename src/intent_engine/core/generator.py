@@ -193,14 +193,6 @@ def gen_model_benchmark(intent: Any, output_dir: Path) -> None:
     _write(output_dir, "model-benchmark.yaml", build_model_benchmark(summary))
 
 
-def gen_target_capability_graph(intent: Any, output_dir: Path) -> None:
-    """Write downstream target capability coverage and routing."""
-    report = getattr(intent, "target_capability_report", None)
-    if not report:
-        return
-    _write(output_dir, "target-capability-graph.yaml", report)
-
-
 def _sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
@@ -302,13 +294,14 @@ def gen_context_manifest(intent: Any, output_dir: Path) -> None:
             ],
             "targetCapabilities": [
                 {
-                    "key": capability.key,
-                    "type": capability.capability_type.value,
-                    "handledDecisions": list(capability.handled_decisions),
-                    "requiredDecisions": list(capability.required_decisions),
-                    "producedArtifacts": list(capability.produced_artifacts),
+                    "key": capability.get("key", ""),
+                    "type": capability.get("type", ""),
+                    "handledDecisions": capability.get("handledDecisions", []),
+                    "requiredDecisions": capability.get("requiredDecisions", []),
+                    "producedArtifacts": capability.get("producedArtifacts", []),
                 }
-                for capability in pattern_obj.target_capabilities
+                for capability in target_capability_report.get("capabilities", [])
+                if isinstance(capability, dict)
             ],
             "planReady": {
                 "declared": pattern_obj.plan_ready,
@@ -517,7 +510,6 @@ CORE_GENERATORS = [
     PatternGenerator("module-inputs", gen_module_inputs, priority=5),
     PatternGenerator("llm-trace-summary", gen_llm_trace_summary, priority=5),
     PatternGenerator("model-benchmark", gen_model_benchmark, priority=5),
-    PatternGenerator("target-capability-graph", gen_target_capability_graph, priority=5),
     PatternGenerator("sample-recommendations", gen_sample_recommendations, priority=5),
     PatternGenerator("handoff-plan", gen_handoff_plan, priority=6),
     PatternGenerator("replay-manifest", gen_replay_manifest, priority=100),

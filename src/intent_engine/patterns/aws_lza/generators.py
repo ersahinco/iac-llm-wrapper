@@ -28,6 +28,13 @@ from .utils import (
 )
 
 
+def gen_lza_target_capability_graph(intent: Any, output_dir: Path) -> None:
+    report = getattr(intent, "target_capability_report", None)
+    if not report:
+        return
+    _write_yaml(output_dir, "target-capability-graph.yaml", report)
+
+
 def gen_lza_organization_config(intent: Any, output_dir: Path) -> None:
     intent = _aws_lza_intent(intent)
     if intent is None:

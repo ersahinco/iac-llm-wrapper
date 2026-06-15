@@ -53,7 +53,6 @@ from .readiness import (
 from .readiness import (
     gap_is_resolved as _gap_is_resolved,
 )
-from .target_capabilities import build_target_capability_report
 from .validator import Violation, validate
 from .yaml_utils import read_yaml_mapping, write_yaml_artifact
 
@@ -282,11 +281,11 @@ def _plan_ready_capability_violations(
     if not pattern_obj.plan_ready:
         return []
     violations: list[Violation] = []
-    if not pattern_obj.target_capabilities:
+    if not target_capability_report:
         return [
             Violation(
                 code="PLAN_READY_TARGET_CAPABILITIES_REQUIRED",
-                message="Plan-ready targets must declare target capabilities.",
+                message="Plan-ready targets must produce a target capability report.",
             )
         ]
     coverage = target_capability_report.get("coverage", {}) if target_capability_report else {}
@@ -302,6 +301,16 @@ def _plan_ready_capability_violations(
             )
         )
     return violations
+
+
+def _build_target_capability_report(
+    pattern_obj: Any,
+    decisions: dict[str, Any],
+    source_text: str,
+) -> dict[str, Any]:
+    if pattern_obj.target_report_builder is None:
+        return {}
+    return pattern_obj.target_report_builder(decisions, source_text)
 
 
 _HIGH_RISK_RECONFIRMATION_CATEGORIES = {
@@ -662,8 +671,8 @@ def _validate_and_generate(
     extra_violations: list[Violation] | None = None,
 ) -> None:
     pattern_obj = GLOBAL_REGISTRY.get(pattern)
-    target_capability_report = build_target_capability_report(
-        pattern_obj.target_capabilities,
+    target_capability_report = _build_target_capability_report(
+        pattern_obj,
         graph.typed_decisions(),
         source_text,
     )

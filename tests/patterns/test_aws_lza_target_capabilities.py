@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from intent_engine.core.target_capabilities import (
+from intent_engine.patterns.aws_lza.target_capabilities import (
     TargetCapability,
     TargetCapabilityType,
     UnsupportedAskFact,
