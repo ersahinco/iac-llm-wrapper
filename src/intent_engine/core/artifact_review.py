@@ -7,8 +7,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .contract_validation import build_contract_validation, write_contract_validation
-from .graph_export import graph_to_json, graph_to_mermaid
+from .contract_validation import build_contract_validation
 from .lza_validation import LZA_VALIDATION_EVIDENCE, summarize_lza_validation_output
 from .patterns import GLOBAL_REGISTRY
 from .review_renderer import render_review_html as render_review_html_context
@@ -20,13 +19,15 @@ _ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 def write_review_html(input_dir: Path, output: Path) -> None:
     """Write a portable static HTML review page for a generated handoff bundle."""
     output.parent.mkdir(parents=True, exist_ok=True)
-    graph_exports = _write_graph_exports(input_dir)
-    contract_validation_path = write_contract_validation(input_dir)
     context = build_review_context(
         input_dir,
         link_base_dir=output.parent,
-        graph_exports=_relative_graph_exports(input_dir, output.parent, graph_exports),
-        contract_validation_path=contract_validation_path,
+        graph_exports=_relative_graph_exports(
+            input_dir,
+            output.parent,
+            _existing_graph_exports(input_dir),
+        ),
+        contract_validation_path=None,
     )
     output.write_text(render_review_html_context(context))
 
@@ -145,23 +146,6 @@ def build_review_context(
             ),
         },
     }
-
-
-def _write_graph_exports(input_dir: Path) -> dict[str, str]:
-    report = _read_yaml(input_dir / "decision-report.yaml")
-    pattern = str(report.get("pattern", "") or "")
-    if not pattern:
-        return _existing_graph_exports(input_dir)
-    try:
-        graph = GLOBAL_REGISTRY.get(pattern).create_graph()
-    except KeyError:
-        return _existing_graph_exports(input_dir)
-
-    json_name = "requirement-graph.json"
-    mermaid_name = "requirement-graph.mmd"
-    (input_dir / json_name).write_text(graph_to_json(graph, pattern))
-    (input_dir / mermaid_name).write_text(graph_to_mermaid(graph, pattern))
-    return {"json": json_name, "mermaid": mermaid_name}
 
 
 def _existing_graph_exports(input_dir: Path) -> dict[str, str]:

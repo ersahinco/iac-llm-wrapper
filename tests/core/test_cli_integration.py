@@ -556,11 +556,12 @@ class TestCLIReview:
         assert "Accepted Decisions" in html
         assert "Graph Decisions" in html
         assert "Requirement Graph" in html
-        assert "requirement-graph.json" in html
-        assert "requirement-graph.mmd" in html
-        assert (output_dir / "requirement-graph.json").exists()
-        assert (output_dir / "requirement-graph.mmd").exists()
-        assert (output_dir / "contract-validation.yaml").exists()
+        assert "No graph export files found." in html
+        assert "requirement-graph.json" not in html
+        assert "requirement-graph.mmd" not in html
+        assert not (output_dir / "requirement-graph.json").exists()
+        assert not (output_dir / "requirement-graph.mmd").exists()
+        assert not (output_dir / "contract-validation.yaml").exists()
         assert "Contract Validation" in html
         assert "aws-lza-sample-configuration" in html
         assert "generic-handoff-plan" in html
@@ -577,7 +578,6 @@ class TestCLIReview:
         )
         assert outside_result.exit_code == 0, outside_result.output
         outside_html = outside_review.read_text()
-        assert f"{output_dir.name}/requirement-graph.json" in outside_html
         assert f"{output_dir.name}/llm-trace-summary.yaml" in outside_html
 
     def test_review_html_requires_input_and_output(self):

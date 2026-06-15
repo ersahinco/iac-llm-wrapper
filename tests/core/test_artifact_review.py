@@ -7,7 +7,11 @@ from typing import Any
 
 import ruamel.yaml
 
-from intent_engine.core.artifact_review import build_review_context, render_review_html
+from intent_engine.core.artifact_review import (
+    build_review_context,
+    render_review_html,
+    write_review_html,
+)
 from intent_engine.patterns import load_builtin_patterns
 
 
@@ -497,6 +501,23 @@ def test_render_review_html_uses_existing_graph_exports(tmp_path: Path):
     assert "AccessDeniedException" in html
     assert "network-config.yaml" in html
     assert "abc123" in html
+
+
+def test_write_review_html_does_not_mutate_input_bundle(tmp_path: Path):
+    input_dir = tmp_path / "out"
+    _write_review_bundle(input_dir)
+    (input_dir / "contract-validation.yaml").unlink()
+    before = {path.name for path in input_dir.iterdir()}
+    review_path = tmp_path / "review" / "handoff-review.html"
+
+    write_review_html(input_dir, review_path)
+
+    assert review_path.exists()
+    assert {path.name for path in input_dir.iterdir()} == before
+    assert "Contract Validation" in review_path.read_text()
+    assert not (input_dir / "requirement-graph.json").exists()
+    assert not (input_dir / "requirement-graph.mmd").exists()
+    assert not (input_dir / "contract-validation.yaml").exists()
 
 
 def test_render_review_html_marks_missing_target_capability_graph_as_not_declared(
