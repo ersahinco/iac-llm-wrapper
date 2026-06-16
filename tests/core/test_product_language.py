@@ -22,6 +22,21 @@ def test_readme_frames_registered_target_configuration_boundary():
     assert "does not synth, deploy, clone, install, or call AWS APIs" not in text
 
 
+def test_readme_states_broader_handoff_layer_goal():
+    text = _read("README.md")
+    normalized = " ".join(text.split())
+
+    assert "model-agnostic, contract-first handoff layer" in normalized
+    assert "approved accelerators, IaC modules, and platform pipelines" in normalized
+    assert "architect/platform/engineer preferences" in normalized
+    assert "requirement graphs, target contracts, sample alignment" in normalized
+    assert "review evidence, and manual gates" in normalized
+    assert "CI/CD, including GitHub Actions" in normalized
+    assert "shift-left checks" in normalized
+    assert "owner-controlled deployment paths" in normalized
+    assert "core should not become the deploy runner" in normalized
+
+
 def test_agents_context_uses_registered_target_language():
     text = _read("AGENTS.md")
 

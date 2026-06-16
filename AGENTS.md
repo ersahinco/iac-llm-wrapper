@@ -103,16 +103,16 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, pytest, ruff, mypy, pyright.
 
 ### Current Goal
 
-T76: Broader product goal positioning
+T77: Non-language goal audit and CI shift-left bundle check
 
 ### Status
 
-- **Tests**: product-language guard passed (5 passing); previous targeted AWS LZA validation/review tests passed (42 passing); previous full gate was 377 passing, 1 skipped
-- **Lint**: clean (`ruff check .`)
-- **Format**: clean (`ruff format --check .`)
+- **Tests**: CI shift-left/product-language guards passed (8 passing); golden journey passed; previous targeted AWS LZA validation/review tests passed (42 passing); previous full gate was 377 passing, 1 skipped
+- **Lint**: touched CI guard test clean (`uv run ruff check tests/core/test_ci_shift_left.py`); previous full `ruff check .` clean
+- **Format**: touched CI guard test clean (`uv run ruff format --check tests/core/test_ci_shift_left.py`); previous full `ruff format --check .` clean
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Added a concise README broader-goal section: model-agnostic, contract-first handoff for approved accelerators, IaC modules, and platform pipelines, with CI/CD as shift-left consumers and deployment still owned downstream. Validation still fails with `aws-account-lookup-permission` / `AccessDeniedException` from the official validator, so no owner validation is claimed.
+- **Last session**: Audited whether the broader goal needed more than product-language. Runtime mechanics already cover requirement graphs, target contracts, sample alignment, review evidence, manual gates, and deploy-runner boundaries. The concrete non-language gap was CI consumption, so GitHub Actions now runs the existing golden-journey reviewed-bundle check and the PR template lists it. Validation still fails with `aws-account-lookup-permission` / `AccessDeniedException` from the official validator, so no owner validation is claimed.
 
 ### Done
 
@@ -131,7 +131,8 @@ T76: Broader product goal positioning
 - T73 high-risk lean cleanup: collapsed duplicated compile validation/generation flow, moved samples/contracts fully onto patterns, made review HTML read-only against input bundles, moved AWS LZA validation and target routing under AWS LZA pattern ownership, made `decision-audit.yaml` a core expected artifact with stable replay hashing, and aligned golden-journey checks with the read-only review contract.
 - T74 owner-validation evidence follow-up: refreshed AWS credentials, compiled the existing banking packet into ignored `tests/results/owner-lza-validation-banking/` with private non-placeholder account emails, regenerated static review, and ran `iac-llm-wrapper lza validate` against the local AWS LZA checkout. Evidence is private/ignored and shows only the remaining read-only account lookup permission blocker.
 - T75 lean owner-validation checklist clarification: `docs/LZA_DOWNSTREAM_VALIDATION.md` now makes the owner-approved account email prerequisite explicit for `Management`, control-plane accounts, network accounts when present, and workload accounts. No CLI, generator, fixture, or private evidence changes were added.
-- T76 broader product goal positioning: README now frames the long-term direction as a model-agnostic, contract-first handoff layer for approved accelerators, IaC modules, and platform pipelines. GitHub Actions/platform CI/CD are positioned as shift-left consumers of reviewed bundles, not as direct deployment run surfaces owned by this core.
+- T76 broader product goal positioning: README now frames the long-term direction as a model-agnostic, contract-first handoff layer for approved accelerators, IaC modules, and platform pipelines. Architect/platform/engineer preferences become requirement graphs, target contracts, sample alignment, review evidence, and manual gates. GitHub Actions/platform CI/CD are positioned as shift-left consumers of reviewed bundles that route into owner-controlled deployment paths, not as direct deployment run surfaces owned by this core. `tests/core/test_product_language.py` guards this wording.
+- T77 non-language goal audit: GitHub Actions CI now runs `scripts/evaluate-golden-journey.py` as a shift-left reviewed-bundle check, `.github/pull_request_template.md` asks contributors to run it, and `tests/core/test_ci_shift_left.py` guards both the CI check and absence of infrastructure apply/deploy commands in workflows.
 - Language: user-facing docs and artifacts use `handoffReadiness`/`handoffAllowed` only. Docs now also state that secrets should travel as secret-store references and expected parameter names, never raw values.
 - Quality gates: Ruff, Ruff format, mypy, Pyright/Pylance, fixture drift, coverage tests, extraction/usability/golden journey checks, Bandit, pip-audit, uv build, and pre-commit are wired into local/CI workflows as applicable.
 - T36 usability: CLI output now points first-time users from discovery and compile results to service-style compile, blocked review generation, `handoff-plan.yaml`, and static review creation. `handoff-review.html` now includes reviewer next actions derived from readiness, contract status, artifacts, and raw evidence state. README and LLM setup now include a concise real customer packet path for Ollama and direct Bedrock runs with `--no-raw-evidence`.

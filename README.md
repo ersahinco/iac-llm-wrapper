@@ -21,14 +21,15 @@ owner-controlled LZA validation and deployment process.
 ## Broader Goal
 
 The broader goal is a model-agnostic, contract-first handoff layer for approved
-accelerators, IaC modules, and platform pipelines. It should let platform teams
-encode architect, engineer, security, and operations preferences as requirement
-graphs, target contracts, sample alignment, review evidence, and manual gates.
+accelerators, IaC modules, and platform pipelines. It should turn
+architect/platform/engineer preferences into requirement graphs, target
+contracts, sample alignment, review evidence, and manual gates.
 
-CI/CD should consume those bundles as shift-left checks: validate decisions,
-compare changes, prove contract readiness, and route reviewed configuration into
-owner-controlled GitHub Actions or platform pipelines for existing or greenfield
-environments. Deployment still belongs to those downstream mechanisms.
+CI/CD, including GitHub Actions, should consume those bundles as shift-left
+checks: validate decisions, compare changes, prove contract readiness, and route
+reviewed configuration into owner-controlled deployment paths for existing or
+greenfield environments. Deployment still belongs to those downstream
+mechanisms; the core should not become the deploy runner.
 
 ## Core Flow
 

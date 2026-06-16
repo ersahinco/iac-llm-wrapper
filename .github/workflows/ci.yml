@@ -45,6 +45,9 @@ jobs:
       - name: Usability trial check
         run: uv run python scripts/evaluate-usability.py
 
+      - name: Golden journey shift-left check
+        run: uv run python scripts/evaluate-golden-journey.py
+
   test:
     runs-on: ubuntu-latest
     strategy:
