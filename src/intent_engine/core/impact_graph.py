@@ -97,6 +97,21 @@ class _ImpactGraph:
     def upstream(self, roots: list[str]) -> set[str]:
         return _walk(roots, self._incoming())
 
+    def shortest_path(self, roots: list[str], target: str) -> list[_ImpactEdge]:
+        outgoing = self._outgoing_edges()
+        queue: deque[tuple[str, list[_ImpactEdge]]] = deque((root, []) for root in roots)
+        seen: set[str] = set(roots)
+        while queue:
+            node, path = queue.popleft()
+            if node == target:
+                return path
+            for edge in outgoing.get(node, []):
+                if edge.target in seen:
+                    continue
+                seen.add(edge.target)
+                queue.append((edge.target, [*path, edge]))
+        return []
+
     def _outgoing(self) -> dict[str, list[str]]:
         graph: dict[str, list[str]] = {}
         for edge in self.edges:
@@ -107,6 +122,12 @@ class _ImpactGraph:
         graph: dict[str, list[str]] = {}
         for edge in self.edges:
             graph.setdefault(edge.target, []).append(edge.source)
+        return graph
+
+    def _outgoing_edges(self) -> dict[str, list[_ImpactEdge]]:
+        graph: dict[str, list[_ImpactEdge]] = {}
+        for edge in self.edges:
+            graph.setdefault(edge.source, []).append(edge)
         return graph
 
 
@@ -132,6 +153,7 @@ def build_impact_report(
     affected_checks = _keys_by_kind(downstream_nodes, "checkov_check")
     affected_variables = _keys_by_kind(downstream_nodes, "module_variable")
     manual_gates = _keys_by_kind(downstream_nodes, "manual_gate")
+    impact_paths = _impact_paths(graph, root_ids, downstream_nodes)
     unmatched = _unmatched_roots(roots, graph, selected_roots)
     if changed_report and not changed_roots:
         unmatched.append({"kind": "changed-report", "key": str(changed_report)})
@@ -160,6 +182,7 @@ def build_impact_report(
         "affectedChecks": affected_checks,
         "affectedModuleVariables": affected_variables,
         "manualGates": manual_gates,
+        "impactPaths": impact_paths,
         "reviewFocus": _review_focus(
             status=status,
             roots=root_nodes,
@@ -223,6 +246,8 @@ def render_impact_report_text(report: dict[str, Any]) -> str:
     lines.extend(_list_or_none(_coerce_list(report.get("affectedModuleVariables"))))
     lines.append("Manual gates:")
     lines.extend(_list_or_none(_coerce_list(report.get("manualGates"))))
+    lines.append("Impact paths:")
+    lines.extend(_path_lines(_coerce_list(report.get("impactPaths"))))
     lines.append("Review focus:")
     lines.extend(_list_or_none(_coerce_list(report.get("reviewFocus"))))
     return "\n".join(lines) + "\n"
@@ -498,6 +523,48 @@ def _keys_by_kind(nodes: list[_ImpactNode], kind: str) -> list[str]:
     return sorted({node.key for node in nodes if node.kind == kind and node.key})
 
 
+def _impact_paths(
+    graph: _ImpactGraph,
+    roots: list[str],
+    downstream_nodes: list[_ImpactNode],
+) -> list[dict[str, Any]]:
+    interesting_kinds = {
+        "artifact",
+        "artifact_path",
+        "checkov_check",
+        "manual_gate",
+        "module_variable",
+        "policy_control",
+        "target_contract",
+        "target_capability",
+    }
+    paths: list[dict[str, Any]] = []
+    for node in downstream_nodes:
+        if node.kind not in interesting_kinds:
+            continue
+        edges = graph.shortest_path(roots, node.id)
+        if not edges:
+            continue
+        root_id = edges[0].source
+        root_node = graph.nodes.get(root_id)
+        paths.append(
+            {
+                "root": root_node.to_dict() if root_node is not None else {"id": root_id},
+                "target": node.to_dict(),
+                "hops": [
+                    {
+                        "from": graph.nodes[edge.source].to_dict(),
+                        "relationship": edge.relationship,
+                        "to": graph.nodes[edge.target].to_dict(),
+                    }
+                    for edge in edges
+                    if edge.source in graph.nodes and edge.target in graph.nodes
+                ],
+            }
+        )
+    return sorted(paths, key=lambda item: str(_dict(item.get("target")).get("id", "")))
+
+
 def _review_focus(
     *,
     status: str,
@@ -534,6 +601,31 @@ def _list_or_none(items: list[Any]) -> list[str]:
     if not items:
         return ["  - None"]
     return [f"  - {item}" for item in items]
+
+
+def _path_lines(paths: list[Any]) -> list[str]:
+    if not paths:
+        return ["  - None"]
+    lines: list[str] = []
+    for path in paths[:8]:
+        if not isinstance(path, dict):
+            continue
+        target = _dict(path.get("target"))
+        hops = _coerce_list(path.get("hops"))
+        rendered_hops = []
+        for hop in hops:
+            if not isinstance(hop, dict):
+                continue
+            source = _dict(hop.get("from"))
+            destination = _dict(hop.get("to"))
+            rendered_hops.append(
+                f"{source.get('id', '')} --{hop.get('relationship', '')}--> "
+                f"{destination.get('id', '')}"
+            )
+        lines.append(f"  - {target.get('id', 'unknown')}: " + " | ".join(rendered_hops))
+    if len(paths) > 8:
+        lines.append(f"  ... {len(paths) - 8} more")
+    return lines or ["  - None"]
 
 
 def _coerce_list(value: Any) -> list[Any]:

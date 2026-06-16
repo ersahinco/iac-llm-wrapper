@@ -62,10 +62,20 @@ def test_decision_impact_traverses_contract_module_and_policy_edges(tmp_path: Pa
     assert "VPC-ATTACHMENT-001" in report["affectedPolicyControls"]
     assert "CKV_CUSTOM_VPC_001" in report["affectedChecks"]
     assert "CKV_CUSTOM_VPC_ATTACHMENT_001" in report["affectedChecks"]
+    path_targets = {item["target"]["id"] for item in report["impactPaths"]}
+    assert "policy_control:VPC-NETWORK-001" in path_targets
+    assert "artifact:decision-report.yaml" in path_targets
+    network_path = next(
+        item
+        for item in report["impactPaths"]
+        if item["target"]["id"] == "policy_control:VPC-NETWORK-001"
+    )
+    assert network_path["hops"][0]["from"]["id"] == "decision:cidr"
+    assert network_path["hops"][-1]["to"]["id"] == "policy_control:VPC-NETWORK-001"
     rendered = render_impact_report_text(report)
     assert "Impact Analysis" in rendered
-    assert "policy_control:VPC-NETWORK-001" not in rendered
-    assert "VPC-NETWORK-001" in rendered
+    assert "Impact paths:" in rendered
+    assert "decision:cidr --mapped-to-control--> policy_control:VPC-NETWORK-001" in rendered
 
 
 def test_policy_control_root_reports_mapped_artifacts_and_checks(tmp_path: Path):
@@ -156,3 +166,4 @@ def test_bundle_compare_includes_impact_traversal(tmp_path: Path):
     rendered = render_bundle_comparison_text(report)
     assert "Impact traversal:" in rendered
     assert "affected policy controls: VPC-ATTACHMENT-001, VPC-NETWORK-001" in rendered
+    assert "impact paths: artifact:decision-report.yaml:" in rendered

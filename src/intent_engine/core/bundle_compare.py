@@ -189,6 +189,10 @@ def render_bundle_comparison_html(report: dict[str, Any]) -> str:
                         "Manual gates",
                         _coerce_list(impact_traversal.get("manualGates")),
                     ),
+                    _html_named_list(
+                        "Impact paths",
+                        _impact_path_summaries(_coerce_list(impact_traversal.get("impactPaths"))),
+                    ),
                     _html_table(
                         [
                             {
@@ -297,6 +301,10 @@ def render_bundle_comparison_text(report: dict[str, Any]) -> str:
                 + _join_or_none(_coerce_list(impact_traversal.get("affectedModuleVariables"))),
                 "  manual gates: "
                 + _join_or_none(_coerce_list(impact_traversal.get("manualGates"))),
+                "  impact paths: "
+                + _join_or_none(
+                    _impact_path_summaries(_coerce_list(impact_traversal.get("impactPaths")))[:5]
+                ),
             ]
         )
 
@@ -362,6 +370,29 @@ def _text_decision_list(title: str, values: list[Any]) -> list[str]:
 
 def _join_or_none(items: list[Any]) -> str:
     return ", ".join(str(item) for item in items) if items else "none"
+
+
+def _impact_path_summaries(paths: list[Any]) -> list[str]:
+    summaries: list[str] = []
+    for path in paths:
+        if not isinstance(path, dict):
+            continue
+        target = _dict(path.get("target"))
+        hops = _coerce_list(path.get("hops"))
+        if not target or not hops:
+            continue
+        rendered_hops: list[str] = []
+        for hop in hops:
+            if not isinstance(hop, dict):
+                continue
+            source = _dict(hop.get("from"))
+            destination = _dict(hop.get("to"))
+            rendered_hops.append(
+                f"{source.get('id', '')} --{hop.get('relationship', '')}--> "
+                f"{destination.get('id', '')}"
+            )
+        summaries.append(f"{target.get('id', 'unknown')}: " + " | ".join(rendered_hops))
+    return summaries
 
 
 def _load_bundle(path: Path) -> _BundleSnapshot:
