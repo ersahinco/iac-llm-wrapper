@@ -222,6 +222,9 @@ def build_impact_report(
     affected_variables = _keys_by_kind(downstream_nodes, "module_variable")
     affected_semantic_entities = _keys_by_kind(downstream_nodes, "semantic_entity")
     affected_semantic_constraints = _keys_by_kind(downstream_nodes, "semantic_constraint")
+    affected_source_contexts = _keys_by_kind(downstream_nodes, "source_context")
+    affected_input_diffs = _keys_by_kind(downstream_nodes, "input_diff")
+    affected_source_changes = _keys_by_kind(downstream_nodes, "source_change")
     affected_readiness = _keys_by_kind(downstream_nodes, "handoff_readiness")
     affected_readiness_blockers = _keys_by_kind(downstream_nodes, "readiness_blocker")
     affected_contract_validation = _keys_by_kind(downstream_nodes, "contract_validation")
@@ -252,6 +255,7 @@ def build_impact_report(
             "affectedPolicyControlCount": len(affected_controls),
             "affectedCheckovFindingCount": len(affected_findings),
             "affectedSemanticConstraintCount": len(affected_semantic_constraints),
+            "affectedSourceChangeCount": len(affected_source_changes),
             "affectedReadinessCount": len(affected_readiness),
             "affectedContractValidationCount": len(affected_contract_validation),
             "affectedValidationViolationCount": len(affected_validation_violations),
@@ -269,6 +273,9 @@ def build_impact_report(
         "affectedModuleVariables": affected_variables,
         "affectedSemanticEntities": affected_semantic_entities,
         "affectedSemanticConstraints": affected_semantic_constraints,
+        "affectedSourceContexts": affected_source_contexts,
+        "affectedInputDiffs": affected_input_diffs,
+        "affectedSourceChanges": affected_source_changes,
         "affectedReadiness": affected_readiness,
         "affectedReadinessBlockers": affected_readiness_blockers,
         "affectedContractValidation": affected_contract_validation,
@@ -285,6 +292,9 @@ def build_impact_report(
             checks=affected_checks,
             findings=affected_findings,
             semantic_constraints=affected_semantic_constraints,
+            source_contexts=affected_source_contexts,
+            input_diffs=affected_input_diffs,
+            source_changes=affected_source_changes,
             readiness=affected_readiness,
             readiness_blockers=affected_readiness_blockers,
             contract_validation=affected_contract_validation,
@@ -332,6 +342,9 @@ def build_bundle_graph_report(bundle: Path) -> dict[str, Any]:
                 "target_contract",
                 "target_capability",
                 "manual_gate",
+                "source_context",
+                "input_diff",
+                "source_change",
                 "handoff_readiness",
                 "readiness_blocker",
                 "contract_validation",
@@ -881,6 +894,12 @@ def render_impact_report_text(report: dict[str, Any]) -> str:
     lines.extend(_list_or_none(_coerce_list(report.get("affectedSemanticEntities"))))
     lines.append("Affected semantic constraints:")
     lines.extend(_list_or_none(_coerce_list(report.get("affectedSemanticConstraints"))))
+    lines.append("Affected source contexts:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedSourceContexts"))))
+    lines.append("Affected input diffs:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedInputDiffs"))))
+    lines.append("Affected source changes:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedSourceChanges"))))
     lines.append("Affected readiness:")
     lines.extend(_list_or_none(_coerce_list(report.get("affectedReadiness"))))
     lines.append("Affected readiness blockers:")
@@ -916,6 +935,8 @@ def _build_graph(bundle: Path) -> tuple[_ImpactGraph, str]:
     report = read_yaml_mapping(bundle / "decision-report.yaml")
     trace = read_yaml_mapping(bundle / "llm-trace-summary.yaml")
     manifest = read_yaml_mapping(bundle / "context-manifest.yaml")
+    replay_manifest = read_yaml_mapping(bundle / "replay-manifest.yaml")
+    input_diff = read_yaml_mapping(bundle / "input-diff-report.yaml")
     module_inputs = read_yaml_mapping(bundle / "module-inputs.yaml")
     policy_graph = read_yaml_mapping(bundle / "policy-graph.yaml")
     shift_left_evidence = read_yaml_mapping(bundle / "shift-left-evidence.yaml")
@@ -969,6 +990,9 @@ def _build_graph(bundle: Path) -> tuple[_ImpactGraph, str]:
     _add_module_nodes(graph, module_inputs)
     _add_policy_nodes(graph, policy_graph)
     _add_shift_left_evidence_nodes(graph, shift_left_evidence)
+    _add_source_nodes(
+        graph, manifest=manifest, replay_manifest=replay_manifest, input_diff=input_diff
+    )
     _add_handoff_nodes(graph, handoff)
     _add_target_capability_nodes(graph, target_capability)
     _add_sample_nodes(graph, samples)
@@ -1283,6 +1307,94 @@ def _add_shift_left_evidence_nodes(
             graph.add_edge(evidence_id, finding_id, "records-finding")
             graph.add_edge(finding_id, evidence_id, "recorded-by-evidence")
         graph.add_edge(finding_id, evidence_id, "unmapped-in-evidence")
+
+
+def _add_source_nodes(
+    graph: _ImpactGraph,
+    *,
+    manifest: dict[str, Any],
+    replay_manifest: dict[str, Any],
+    input_diff: dict[str, Any],
+) -> None:
+    source = _first_mapping(
+        _dict(manifest.get("runtimeContext")).get("source"),
+        replay_manifest.get("source"),
+        _dict(input_diff.get("source")),
+    )
+    source_id = ""
+    if source:
+        source_key = str(source.get("sha256") or source.get("mode") or "source")
+        source_id = graph.add_node(
+            "source_context",
+            source_key,
+            "Source context",
+            mode=source.get("mode"),
+            sha256=source.get("sha256"),
+            baselineDocumentAvailable=source.get("baselineDocumentAvailable"),
+        )
+        for artifact_name in ("context-manifest.yaml", "replay-manifest.yaml"):
+            if artifact_name == "replay-manifest.yaml" and not replay_manifest:
+                continue
+            artifact_id = graph.add_node("artifact", artifact_name, artifact_name)
+            graph.add_edge(source_id, artifact_id, "recorded-in")
+        for node in list(graph.nodes.values()):
+            if node.kind == "decision":
+                graph.add_edge(source_id, node.id, "provides-decision-context")
+
+    if not input_diff:
+        return
+    diff_source = _dict(input_diff.get("source"))
+    diff_id = graph.add_node(
+        "input_diff",
+        "input-diff-report.yaml",
+        "Input diff report",
+        mode=diff_source.get("mode"),
+        baselineDocumentAvailable=diff_source.get("baselineDocumentAvailable"),
+        changedLineCount=input_diff.get("changedLineCount"),
+    )
+    artifact_id = graph.add_node("artifact", "input-diff-report.yaml", "input-diff-report.yaml")
+    graph.add_edge(diff_id, artifact_id, "recorded-in")
+    if source_id:
+        graph.add_edge(source_id, diff_id, "has-input-diff")
+    for item in _coerce_list(input_diff.get("changedStructuredDecisionLines")):
+        if not isinstance(item, dict) or not item.get("key"):
+            continue
+        key = str(item["key"])
+        change_id = graph.add_node(
+            "source_change",
+            f"structured:{key}",
+            key,
+            changeType="structured-decision-line",
+            before=item.get("before"),
+            after=item.get("after"),
+        )
+        decision_id = graph.add_node("decision", key, key)
+        graph.add_edge(diff_id, change_id, "contains-source-change")
+        graph.add_edge(change_id, decision_id, "changes-decision")
+    for item in _coerce_list(input_diff.get("likelyImpactedRequirements")):
+        if not isinstance(item, dict) or not item.get("key"):
+            continue
+        key = str(item["key"])
+        change_id = graph.add_node(
+            "source_change",
+            f"likely-impacted:{key}",
+            str(item.get("label") or key),
+            changeType="likely-impacted-requirement",
+            reason=item.get("reason"),
+        )
+        decision_id = graph.add_node("decision", key, key)
+        graph.add_edge(diff_id, change_id, "contains-source-change")
+        graph.add_edge(change_id, decision_id, "impacts-requirement")
+    for index, heading in enumerate(_coerce_list(input_diff.get("changedHeadings"))):
+        if not heading:
+            continue
+        change_id = graph.add_node(
+            "source_change",
+            f"heading:{index}",
+            str(heading),
+            changeType="changed-heading",
+        )
+        graph.add_edge(diff_id, change_id, "contains-source-change")
 
 
 def _add_checkov_finding_node(
@@ -1760,6 +1872,9 @@ def _impact_paths(
         "scan_file",
         "semantic_constraint",
         "semantic_entity",
+        "source_context",
+        "input_diff",
+        "source_change",
         "shift_left_evidence",
         "target_contract",
         "target_capability",
@@ -1816,6 +1931,9 @@ def _review_focus(
     checks: list[str],
     findings: list[str],
     semantic_constraints: list[str],
+    source_contexts: list[str],
+    input_diffs: list[str],
+    source_changes: list[str],
     readiness: list[str],
     readiness_blockers: list[str],
     contract_validation: list[str],
@@ -1837,6 +1955,12 @@ def _review_focus(
         focus.append(
             "Review affected semantic constraints: " + ", ".join(semantic_constraints) + "."
         )
+    if source_contexts:
+        focus.append("Review affected source context: " + ", ".join(source_contexts) + ".")
+    if input_diffs:
+        focus.append("Review affected input diff reports: " + ", ".join(input_diffs) + ".")
+    if source_changes:
+        focus.append("Review affected source changes: " + ", ".join(source_changes) + ".")
     if readiness:
         focus.append("Review affected handoff readiness state: " + ", ".join(readiness) + ".")
     if readiness_blockers:

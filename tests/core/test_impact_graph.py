@@ -268,6 +268,99 @@ def test_bundle_graph_report_exports_readiness_and_contract_validation_nodes(tmp
     } in report["edges"]
 
 
+def test_bundle_graph_report_exports_source_context_nodes(tmp_path: Path):
+    bundle = _terraform_vpc_bundle(tmp_path / "bundle")
+
+    report = build_bundle_graph_report(bundle)
+
+    source_nodes = [item for item in report["nodes"] if item["kind"] == "source_context"]
+    assert len(source_nodes) == 1
+    source_node = source_nodes[0]
+    assert source_node["properties"]["mode"] == "interview"
+    assert "source_context" in report["queryHints"]["rootKinds"]
+    assert {
+        "from": source_node["id"],
+        "to": "decision:cidr",
+        "relationship": "provides-decision-context",
+    } in report["edges"]
+    assert {
+        "from": source_node["id"],
+        "to": "artifact:context-manifest.yaml",
+        "relationship": "recorded-in",
+    } in report["edges"]
+
+
+def test_source_context_impact_reaches_decisions_and_outputs(tmp_path: Path):
+    bundle = _terraform_vpc_bundle(tmp_path / "bundle")
+    graph_report = build_bundle_graph_report(bundle)
+    source_key = next(
+        item["key"] for item in graph_report["nodes"] if item["kind"] == "source_context"
+    )
+
+    report = build_impact_report(
+        bundle,
+        roots=[ImpactRoot(kind="source_context", key=source_key)],
+    )
+
+    assert report["summary"]["status"] == "matched"
+    assert "cidr" in {item["key"] for item in report["downstreamImpacts"]}
+    assert "module-inputs.yaml" in report["affectedArtifacts"]
+    assert "VPC-NETWORK-001" in report["affectedPolicyControls"]
+    path_targets = {item["target"]["id"] for item in report["impactPaths"]}
+    assert "module_variable:cidr" in path_targets
+
+
+def test_input_diff_node_drives_changed_decision_impact(tmp_path: Path):
+    bundle = _terraform_vpc_bundle(tmp_path / "bundle")
+    (bundle / "input-diff-report.yaml").write_text(
+        "\n".join(
+            [
+                "schemaVersion: intent-engine/input-diff/v1",
+                "source:",
+                "  mode: document-diff",
+                "  baselineDocumentAvailable: true",
+                "changedLineCount: 4",
+                "changedStructuredDecisionLines:",
+                "  - key: cidr",
+                "    before: 10.30.0.0/16",
+                "    after: 10.31.0.0/16",
+                "likelyImpactedRequirements:",
+                "  - key: cidr",
+                "    label: VPC CIDR",
+                "    reason: changed structured decision",
+                "changedHeadings:",
+                "  - Network",
+            ]
+        )
+        + "\n"
+    )
+
+    graph_report = build_bundle_graph_report(bundle)
+    node_ids = {item["id"] for item in graph_report["nodes"]}
+    assert "input_diff:input-diff-report.yaml" in node_ids
+    assert "source_change:structured:cidr" in node_ids
+    assert "source_change:likely-impacted:cidr" in node_ids
+    assert {
+        "from": "source_change:structured:cidr",
+        "to": "decision:cidr",
+        "relationship": "changes-decision",
+    } in graph_report["edges"]
+
+    report = build_impact_report(
+        bundle,
+        roots=[ImpactRoot(kind="input_diff", key="input-diff-report.yaml")],
+    )
+
+    assert report["summary"]["status"] == "matched"
+    assert "structured:cidr" in report["affectedSourceChanges"]
+    assert "cidr" in report["affectedModuleVariables"]
+    assert "module-inputs.yaml" in report["affectedArtifacts"]
+    assert "VPC-NETWORK-001" in report["affectedPolicyControls"]
+    rendered = render_impact_report_text(report)
+    assert "Affected source changes:" in rendered
+    assert "structured:cidr" in rendered
+
+
 def test_decision_impact_reports_readiness_and_contract_validation(tmp_path: Path):
     bundle = _terraform_vpc_validated_bundle(tmp_path / "bundle")
 
