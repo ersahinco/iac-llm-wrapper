@@ -21,7 +21,7 @@ Existing deployment mechanisms remain downstream.
 | `git-incremental-plan.yaml` | Git-changed design docs, skipped paths, baseline availability, output bundle paths, and compile status for explicit git-driven incremental runs. | Core incremental compile | `compile-git --base-ref --doc-root --bundle-root --output-root`. | No |
 | `contract-validation.yaml` | Standalone pass/fail validation of emitted artifacts against target contracts. | Core validation helper | Explicit validation artifact writes; `review html` computes validation in memory. | No |
 | `target-capability-graph.yaml` | Downstream target coverage, selected target path, manual gates, and unsupported asks represented as semantic facts with evidence spans. | Pattern-owned target report builder | AWS LZA today; future patterns only when they own comparable target routing. | No |
-| `bundle-graph.yaml` | Full typed graph export for a generated bundle: source context, input diffs, source changes, requirements, decisions, contracts, artifacts, module variables, policy controls, Checkov refs/findings, shift-left evidence, handoff readiness, readiness blockers, contract validation, downstream validation evidence, target capabilities, samples, manual gates, pattern semantic entities, semantic constraints, edges, and query indexes for nodes by kind plus incoming/outgoing adjacency. | Core graph tooling | `graph bundle --bundle --output`. | No |
+| `bundle-graph.yaml` | Full typed graph export for a generated bundle: source context, input diffs, source changes, requirements, decisions, contracts, artifacts, module variables, policy controls, Checkov refs/findings, shift-left evidence, handoff readiness, readiness blockers, contract validation, downstream validation evidence, target capabilities, samples, manual gates, pattern semantic entities, semantic constraints, edges, query indexes for nodes by kind plus incoming/outgoing adjacency, and a node-kind/relationship catalog for agent traversal. | Core graph tooling | `graph bundle --bundle --output`. | No |
 | `graph-roots.yaml` | Concrete typed graph roots available for traversal, grouped by kind, with copy-pasteable impact/neighborhood commands and recommended review roots for source changes, blockers, findings, and validation evidence. | Core graph tooling | `graph roots --bundle --output`. | No |
 | `graph-find.yaml` | Search results for candidate typed graph roots, including matched node ids, matched fields, kind filters, result counts, and review focus. | Core graph tooling | `graph find --bundle --query --output`. | No |
 | `impact-report.yaml` | Graph traversal impact report showing selected roots, upstream dependencies, downstream affected nodes, review priorities with highest-severity and per-severity summary counts, artifacts, target contracts, target capabilities, sample recommendations, policy controls, checks, module variables, semantic entities, semantic constraints, source context, input diffs, source changes, handoff readiness, readiness blockers, contract validation, downstream validation evidence, manual gates, root-to-target impact paths, and review focus. | Core graph tooling | `graph impact --bundle --root --output`; also embedded in `review compare` output. | No |
@@ -52,8 +52,11 @@ Existing deployment mechanisms remain downstream.
   plan/diff without interpretation. These files do not invoke the plan.
 - Reviewers use `handoff-comparison.yaml` to inspect only the deltas from an
   incremental document or sample-configuration update.
-- Reviewers and agents use `bundle-graph.yaml` as the queryable bundle graph,
-  `graph-roots.yaml` or `graph-find.yaml` to discover candidate roots, then use
+- Reviewers and agents use `bundle-graph.yaml` as the queryable bundle graph.
+  Its catalog describes node kinds, selectable roots, relationship meanings, and
+  observed source/target node-kind pairs so an agent can traverse the graph
+  without reverse-engineering edge labels. Use `graph-roots.yaml` or
+  `graph-find.yaml` to discover candidate roots, then use
   `graph-impact-matrix.yaml` to compare several roots at once. Use
   `graph matrix --recommended` to triage recommended review roots from
   `graph-roots.yaml`, or use `impact-report.yaml`

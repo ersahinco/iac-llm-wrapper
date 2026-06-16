@@ -44,13 +44,14 @@ policy references. That evidence is shift-left input for owner CI/CD gates, not
 compliance attestation or deployment approval.
 
 Graph dependency traversal is available with `graph bundle --bundle ...` for an
-indexed, queryable typed bundle graph, `graph roots --bundle ...` to inventory
-concrete traversal roots, and `graph find --bundle ... --query ...` to discover
-candidate roots by search. Use `graph impact --bundle ...` to inspect the
-blast radius of a changed decision, artifact, module variable, policy control,
-Checkov finding, shift-left evidence, handoff readiness, contract validation,
-downstream validation evidence, source context, input diff, source change,
-semantic entity, or semantic constraint, and use
+indexed, queryable, self-describing typed bundle graph with a node-kind and
+relationship catalog, `graph roots --bundle ...` to inventory concrete
+traversal roots, and `graph find --bundle ... --query ...` to discover candidate
+roots by search. Use `graph impact --bundle ...` to inspect the blast radius of
+a changed decision, artifact, module variable, policy control, Checkov finding,
+shift-left evidence, handoff readiness, contract validation, downstream
+validation evidence, source context, input diff, source change, semantic entity,
+or semantic constraint, and use
 `graph path --bundle ... --from <kind:key> --to <kind:key>` to explain the
 shortest dependency path between two specific graph roots, or
 `graph neighbors --bundle ... --root <kind:key>` to inspect a bounded

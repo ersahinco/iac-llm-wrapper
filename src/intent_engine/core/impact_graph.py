@@ -17,6 +17,94 @@ BOUNDARY = (
 )
 PRIORITY_SEVERITIES = ("critical", "high", "medium", "low")
 
+NODE_KIND_DESCRIPTIONS = {
+    "artifact": "Generated handoff artifact or evidence file in the bundle.",
+    "artifact_path": "Path inside an artifact that is covered by lineage or policy review.",
+    "checkov_check": "Checkov built-in or owner custom policy check reference.",
+    "checkov_finding": "Finding captured from optional shift-left Checkov evidence.",
+    "contract_result": "Result for one target contract inside contract validation evidence.",
+    "contract_validation": "Bundle-level target contract validation evidence.",
+    "decision": "Accepted or expected graph decision value.",
+    "downstream_validation_evidence": "Owner-tool validation evidence captured as review input.",
+    "handoff_readiness": "Bundle readiness state and handoffAllowed status.",
+    "input_diff": "Incremental input diff report.",
+    "manual_gate": "Human or owner-controlled review gate.",
+    "module": "Approved IaC module target represented in module-input handoff metadata.",
+    "module_variable": "Variable handed to an approved IaC module.",
+    "policy_control": "Compliance or client/platform policy control.",
+    "policy_pack": "Registered policy pack grouping related policy controls.",
+    "readiness_blocker": "Missing, conflicting, or blocking condition for handoff readiness.",
+    "requirement": "Requirement graph node that asks for or constrains a decision.",
+    "sample": "Registered sample recommendation used for alignment review.",
+    "scan_file": "Owner IaC file referenced by shift-left scan evidence.",
+    "semantic_constraint": "Typed semantic predicate constraint result.",
+    "semantic_entity": "Typed semantic entity derived from the pattern model.",
+    "shift_left_evidence": "Optional pre-deployment policy/tool evidence artifact.",
+    "source_change": "Changed source document segment or likely impacted requirement.",
+    "source_context": "Source packet context and provenance.",
+    "target_capability": "Registered target capability or routing coverage node.",
+    "target_contract": "Registered target contract that artifacts must satisfy.",
+    "validation_violation": "Target contract validation violation.",
+}
+
+RELATIONSHIP_DESCRIPTIONS = {
+    "accepted-as": "Requirement is satisfied by an accepted decision.",
+    "belongs-to": "Artifact path is part of a generated artifact.",
+    "blocks-readiness": "Blocker prevents handoff readiness.",
+    "changes-decision": "Source change directly changes a decision.",
+    "checked-by-constraint": "Decision is evaluated by a semantic constraint.",
+    "checks-entity": "Semantic constraint evaluates a semantic entity.",
+    "conflict-blocks-readiness": "Decision conflict creates a readiness blocker.",
+    "contains-control": "Policy pack contains a policy control.",
+    "contains-source-change": "Input diff includes a source change.",
+    "contributes-to-readiness": "Decision contributes to handoff readiness state.",
+    "describes-artifact": "Semantic entity describes a generated artifact.",
+    "emitted-in": "Module handoff is emitted in an artifact.",
+    "found-in-file": "Checkov finding was found in an owner scan file.",
+    "handled-by-capability": "Decision is handled by a registered target capability.",
+    "has-blocker": "Readiness includes a blocker.",
+    "has-finding": "Policy control has a mapped Checkov finding.",
+    "has-input-diff": "Source context has an incremental input diff.",
+    "has-violation": "Contract result includes a validation violation.",
+    "impacts-requirement": "Source change likely impacts a requirement decision.",
+    "influences-sample-match": "Decision influences sample recommendation match or rank.",
+    "input-to": "Module variable is an input to an approved module.",
+    "listed-in": "Sample recommendation is listed in an artifact.",
+    "mapped-to-control": "Decision, module variable, or finding maps to a policy control.",
+    "maps-to-module-variable": "Decision maps to a module variable handoff value.",
+    "missing-decision-blocks-readiness": "Missing decision creates a readiness blocker.",
+    "precedes-capability": "Target capability must precede another capability.",
+    "precedes-gate": "Manual gate must precede another manual gate.",
+    "produces": "Target capability produces an artifact.",
+    "provides-decision-context": "Source context provides provenance for a decision.",
+    "recorded-by-evidence": "Finding is recorded by shift-left evidence.",
+    "recorded-in": "Node is recorded in a generated artifact.",
+    "recorded-in-validation": "Validation violation is recorded in contract validation.",
+    "records-finding": "Shift-left evidence records a Checkov finding.",
+    "rendered-in": "Module variable is rendered in an artifact.",
+    "reported-in": "Contract result is reported in validation evidence.",
+    "required-by-contract": "Decision is required by a target contract.",
+    "requires": "Requirement depends on another requirement.",
+    "requires-artifact": "Target contract requires an artifact.",
+    "requires-manual-gate": "Target capability requires a manual gate.",
+    "requires-review-gate": "Artifact must pass a manual review gate.",
+    "references-contract": "Policy control references a target contract.",
+    "reviewed-with-validation-evidence": "Readiness should be reviewed with validation evidence.",
+    "reviews-path": "Policy control reviews a path inside an artifact.",
+    "unmapped-in-evidence": "Finding is present in evidence but unmapped to a policy control.",
+    "validated-by": "Readiness is validated by contract validation evidence.",
+    "validated-by-downstream-evidence": (
+        "Artifact was checked by owner downstream validation evidence."
+    ),
+    "validated-by-result": "Target contract is validated by a contract result.",
+    "validates-contract": "Contract result validates a target contract.",
+    "verified-by": "Policy control is verified by a Checkov check reference.",
+    "violates-check": "Finding violates a Checkov check reference.",
+    "writes": "Decision writes a path in an artifact.",
+}
+
+SEMANTIC_RELATIONSHIP_DESCRIPTION = "Typed relationship emitted by the pattern semantic model."
+
 
 @dataclass(frozen=True)
 class ImpactRoot:
@@ -371,6 +459,7 @@ def build_bundle_graph_report(bundle: Path) -> dict[str, Any]:
         },
         "queryHints": {
             "rootKinds": _root_kinds(),
+            "rootSelectorSyntax": "<kind>:<key>",
             "findCommand": "iac-llm-wrapper graph find --bundle <bundle> --query <text>",
             "rootsCommand": "iac-llm-wrapper graph roots --bundle <bundle>",
             "impactCommand": (
@@ -383,6 +472,7 @@ def build_bundle_graph_report(bundle: Path) -> dict[str, Any]:
                 "iac-llm-wrapper graph neighbors --bundle <bundle> --root <kind:key>"
             ),
         },
+        "catalog": _bundle_graph_catalog(nodes, edges),
         "indexes": _bundle_graph_indexes(nodes, edges),
         "nodes": nodes,
         "edges": edges,
@@ -2208,6 +2298,80 @@ def _bundle_graph_indexes(
         "outgoing": _adjacency_index(edges, source_key="from", target_key="to"),
         "incoming": _adjacency_index(edges, source_key="to", target_key="from"),
     }
+
+
+def _bundle_graph_catalog(
+    nodes: list[dict[str, Any]],
+    edges: list[dict[str, str]],
+) -> dict[str, Any]:
+    return {
+        "rootSelectorSyntax": "<kind>:<key>",
+        "nodeKinds": _node_kind_catalog(nodes),
+        "relationships": _relationship_catalog(nodes, edges),
+    }
+
+
+def _node_kind_catalog(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    counts = _count_by(nodes, "kind")
+    root_kinds = set(_root_kinds())
+    return [
+        {
+            "kind": kind,
+            "description": NODE_KIND_DESCRIPTIONS.get(
+                kind,
+                "Pattern or evidence-specific graph node.",
+            ),
+            "rootSelectable": kind in root_kinds,
+            "nodeCount": count,
+        }
+        for kind, count in sorted(counts.items())
+    ]
+
+
+def _relationship_catalog(
+    nodes: list[dict[str, Any]],
+    edges: list[dict[str, str]],
+) -> list[dict[str, Any]]:
+    nodes_by_id = {str(node.get("id") or ""): node for node in nodes}
+    grouped: dict[str, dict[str, Any]] = {}
+    for edge in edges:
+        relationship = str(edge.get("relationship") or "unknown")
+        source = nodes_by_id.get(str(edge.get("from") or ""), {})
+        target = nodes_by_id.get(str(edge.get("to") or ""), {})
+        item = grouped.setdefault(
+            relationship,
+            {
+                "relationship": relationship,
+                "description": _relationship_description(relationship),
+                "edgeCount": 0,
+                "sourceKinds": set(),
+                "targetKinds": set(),
+            },
+        )
+        item["edgeCount"] += 1
+        if source.get("kind"):
+            item["sourceKinds"].add(str(source["kind"]))
+        if target.get("kind"):
+            item["targetKinds"].add(str(target["kind"]))
+    return [
+        {
+            "relationship": relationship,
+            "description": item["description"],
+            "edgeCount": item["edgeCount"],
+            "sourceKinds": sorted(item["sourceKinds"]),
+            "targetKinds": sorted(item["targetKinds"]),
+        }
+        for relationship, item in sorted(grouped.items())
+    ]
+
+
+def _relationship_description(relationship: str) -> str:
+    if relationship.startswith("semantic:"):
+        return SEMANTIC_RELATIONSHIP_DESCRIPTION
+    return RELATIONSHIP_DESCRIPTIONS.get(
+        relationship,
+        "Pattern or evidence-specific graph relationship.",
+    )
 
 
 def _node_ids_by_kind(nodes: list[dict[str, Any]]) -> dict[str, list[str]]:

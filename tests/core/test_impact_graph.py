@@ -545,6 +545,27 @@ def test_bundle_graph_report_exports_readiness_and_contract_validation_nodes(tmp
     } in report["edges"]
 
 
+def test_bundle_graph_report_exports_catalog_for_agents(tmp_path: Path):
+    bundle = _terraform_vpc_validated_bundle(tmp_path / "bundle")
+
+    report = build_bundle_graph_report(bundle)
+
+    catalog = report["catalog"]
+    assert catalog["rootSelectorSyntax"] == "<kind>:<key>"
+    node_kinds = {item["kind"]: item for item in catalog["nodeKinds"]}
+    assert node_kinds["decision"]["rootSelectable"] is True
+    assert node_kinds["decision"]["description"] == "Accepted or expected graph decision value."
+    assert node_kinds["target_contract"]["nodeCount"] >= 1
+    relationships = {item["relationship"]: item for item in catalog["relationships"]}
+    assert relationships["required-by-contract"]["description"] == (
+        "Decision is required by a target contract."
+    )
+    assert "decision" in relationships["required-by-contract"]["sourceKinds"]
+    assert "target_contract" in relationships["required-by-contract"]["targetKinds"]
+    assert relationships["mapped-to-control"]["edgeCount"] >= 1
+    assert report["queryHints"]["rootSelectorSyntax"] == "<kind>:<key>"
+
+
 def test_bundle_graph_report_exports_source_context_nodes(tmp_path: Path):
     bundle = _terraform_vpc_bundle(tmp_path / "bundle")
 
@@ -696,6 +717,12 @@ def test_bundle_graph_report_exports_semantic_model_nodes_and_edges():
     } in report["edges"]
     assert "semantic_entity" in report["queryHints"]["rootKinds"]
     assert "semantic_constraint" in report["queryHints"]["rootKinds"]
+    semantic_relationships = {
+        item["relationship"]: item for item in report["catalog"]["relationships"]
+    }
+    assert semantic_relationships["semantic:produces_artifact"]["description"] == (
+        "Typed relationship emitted by the pattern semantic model."
+    )
 
 
 def test_graph_find_reports_matching_candidate_roots():
