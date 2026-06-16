@@ -25,6 +25,7 @@ Existing deployment mechanisms remain downstream.
 | `graph-roots.yaml` | Concrete typed graph roots available for traversal, grouped by kind, with copy-pasteable impact/neighborhood commands and recommended review roots for source changes, blockers, findings, and validation evidence. | Core graph tooling | `graph roots --bundle --output`. | No |
 | `graph-find.yaml` | Search results for candidate typed graph roots, including matched node ids, matched fields, kind filters, result counts, and review focus. | Core graph tooling | `graph find --bundle --query --output`. | No |
 | `impact-report.yaml` | Graph traversal impact report showing selected roots, upstream dependencies, downstream affected nodes, review priorities with highest-severity and per-severity summary counts, artifacts, target contracts, target capabilities, sample recommendations, policy controls, checks, module variables, semantic entities, semantic constraints, source context, input diffs, source changes, handoff readiness, readiness blockers, contract validation, downstream validation evidence, manual gates, root-to-target impact paths, and review focus. | Core graph tooling | `graph impact --bundle --root --output`; also embedded in `review compare` output. | No |
+| `graph-impact-matrix.yaml` | Multi-root impact triage matrix comparing selected graph roots by match status, severity, affected artifacts, target contracts, target capabilities, sample recommendations, policy controls, checks, module variables, and manual gates. | Core graph tooling | `graph matrix --bundle --root --output`. | No |
 | `graph-path.yaml` | Shortest-path explanation between two typed bundle graph roots, including hop relationships, traversal direction, unmatched roots, no-path status, and review focus. | Core graph tooling | `graph path --bundle --from --to --output`. | No |
 | `graph-neighborhood.yaml` | Bounded dependency neighborhood around one typed bundle graph root, including neighbor node depths, connecting traversal hops, optional kind filtering, no-match status, and review focus. | Core graph tooling | `graph neighbors --bundle --root --output`. | No |
 | `graph-diff.yaml` | Typed graph delta between two generated bundles, including added/removed/changed nodes, added/removed edges, node-kind counts, and review focus. | Core graph tooling | `graph diff --before --after --output`. | No |
@@ -52,8 +53,9 @@ Existing deployment mechanisms remain downstream.
 - Reviewers use `handoff-comparison.yaml` to inspect only the deltas from an
   incremental document or sample-configuration update.
 - Reviewers and agents use `bundle-graph.yaml` as the queryable bundle graph,
-  `graph-roots.yaml` or `graph-find.yaml` to discover candidate roots, then use `impact-report.yaml`
-  or the `review compare` impact traversal section to see which artifacts,
+  `graph-roots.yaml` or `graph-find.yaml` to discover candidate roots, then use
+  `graph-impact-matrix.yaml` to compare several roots at once, or `impact-report.yaml`
+  and the `review compare` impact traversal section to see which artifacts,
   policy controls, Checkov refs/findings, shift-left evidence, module
   variables, and manual gates are downstream of a changed graph root. When a
   pattern emits a semantic model, these graph artifacts also expose typed

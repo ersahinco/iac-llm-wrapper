@@ -16,12 +16,14 @@ from intent_engine.core.impact_graph import (
     build_bundle_graph_report,
     build_find_report,
     build_graph_diff_report,
+    build_impact_matrix_report,
     build_impact_report,
     build_neighborhood_report,
     build_path_report,
     build_roots_report,
     render_find_report_text,
     render_graph_diff_text,
+    render_impact_matrix_text,
     render_impact_report_text,
     render_neighborhood_report_text,
     render_path_report_text,
@@ -244,6 +246,64 @@ def test_graph_impact_cli_writes_report(tmp_path: Path):
     report = _yaml_load(output)
     assert report["schemaVersion"] == "intent-engine/impact-report/v1"
     assert "module-inputs.yaml" in report["affectedArtifacts"]
+
+
+def test_graph_impact_matrix_compares_multiple_roots(tmp_path: Path):
+    bundle = _terraform_vpc_bundle(tmp_path / "bundle")
+
+    report = build_impact_matrix_report(
+        bundle,
+        roots=[
+            ImpactRoot(kind="decision", key="cidr"),
+            ImpactRoot(kind="policy_control", key="VPC-NETWORK-001"),
+            ImpactRoot(kind="decision", key="missing"),
+        ],
+    )
+
+    assert report["schemaVersion"] == "intent-engine/graph-impact-matrix/v1"
+    assert report["summary"]["rootCount"] == 3
+    assert report["summary"]["matchedRootCount"] == 2
+    assert report["summary"]["highestReviewPrioritySeverity"] == "medium"
+    assert "module-inputs.yaml" in report["affectedArtifacts"]
+    assert "terraform-aws-vpc-module" in report["affectedTargetContracts"]
+    assert "VPC-NETWORK-001" in report["affectedPolicyControls"]
+    assert "CKV_CUSTOM_VPC_001" in report["affectedChecks"]
+    statuses = {row["root"]["id"]: row["summary"]["status"] for row in report["rows"]}
+    assert statuses["decision:cidr"] == "matched"
+    assert statuses["policy_control:VPC-NETWORK-001"] == "matched"
+    assert statuses["decision:missing"] == "no-match"
+    rendered = render_impact_matrix_text(report)
+    assert "Graph Impact Matrix" in rendered
+    assert "decision:cidr" in rendered
+    assert "policy_control:VPC-NETWORK-001" in rendered
+    assert "decision:missing" in rendered
+
+
+def test_graph_impact_matrix_cli_writes_report(tmp_path: Path):
+    bundle = _terraform_vpc_bundle(tmp_path / "bundle")
+    output = tmp_path / "graph-impact-matrix.yaml"
+
+    result = runner.invoke(
+        app,
+        [
+            "graph",
+            "matrix",
+            "--bundle",
+            str(bundle),
+            "--root",
+            "decision:cidr",
+            "--root",
+            "policy_control:VPC-NETWORK-001",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Graph Impact Matrix" in result.output
+    report = _yaml_load(output)
+    assert report["schemaVersion"] == "intent-engine/graph-impact-matrix/v1"
+    assert report["summary"]["matchedRootCount"] == 2
 
 
 def test_bundle_graph_report_exports_queryable_nodes_and_edges(tmp_path: Path):

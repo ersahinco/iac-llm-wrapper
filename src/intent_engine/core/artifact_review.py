@@ -179,6 +179,7 @@ def _existing_graph_exports(input_dir: Path) -> dict[str, str]:
         "bundleGraph": "bundle-graph.yaml",
         "graphRoots": "graph-roots.yaml",
         "impactReport": "impact-report.yaml",
+        "graphImpactMatrix": "graph-impact-matrix.yaml",
         "graphFind": "graph-find.yaml",
         "graphPath": "graph-path.yaml",
         "graphNeighborhood": "graph-neighborhood.yaml",

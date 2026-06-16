@@ -463,6 +463,9 @@ def test_render_review_html_uses_existing_graph_exports(tmp_path: Path):
     (input_dir / "bundle-graph.yaml").write_text("schemaVersion: intent-engine/bundle-graph/v1\n")
     (input_dir / "graph-roots.yaml").write_text("schemaVersion: intent-engine/graph-roots/v1\n")
     (input_dir / "impact-report.yaml").write_text("schemaVersion: intent-engine/impact-report/v1\n")
+    (input_dir / "graph-impact-matrix.yaml").write_text(
+        "schemaVersion: intent-engine/graph-impact-matrix/v1\n"
+    )
 
     html = render_review_html(input_dir)
 
@@ -501,6 +504,7 @@ def test_render_review_html_uses_existing_graph_exports(tmp_path: Path):
     assert "bundle-graph.yaml" in html
     assert "graph-roots.yaml" in html
     assert "impact-report.yaml" in html
+    assert "graph-impact-matrix.yaml" in html
     assert "raw-evidence.yaml" in html
     assert "LZA Validation Evidence" in html
     assert "lza-validation-evidence.yaml" in html

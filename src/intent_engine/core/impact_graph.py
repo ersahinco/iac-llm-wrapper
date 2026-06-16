@@ -624,6 +624,56 @@ def build_roots_report(
     }
 
 
+def build_impact_matrix_report(
+    bundle: Path,
+    *,
+    roots: list[ImpactRoot],
+) -> dict[str, Any]:
+    """Build a compact multi-root impact matrix for reviewer triage."""
+
+    rows = [_impact_matrix_row(build_impact_report(bundle, roots=[root])) for root in roots]
+    severity_counts = _matrix_severity_counts(rows)
+    matched_rows = [row for row in rows if _dict(row.get("summary")).get("status") == "matched"]
+    affected_artifacts = _matrix_union(rows, "affectedArtifacts")
+    affected_contracts = _matrix_union(rows, "affectedTargetContracts")
+    affected_capabilities = _matrix_union(rows, "affectedTargetCapabilities")
+    affected_samples = _matrix_union(rows, "affectedSamples")
+    affected_controls = _matrix_union(rows, "affectedPolicyControls")
+    affected_checks = _matrix_union(rows, "affectedChecks")
+    affected_gates = _matrix_union(rows, "manualGates")
+    graph_summary = _dict(_dict(rows[0].get("graph")) if rows else {})
+    return {
+        "schemaVersion": "intent-engine/graph-impact-matrix/v1",
+        "bundle": str(bundle),
+        "pattern": str(rows[0].get("pattern") or "") if rows else "",
+        "boundary": BOUNDARY,
+        "summary": {
+            "status": "matched" if matched_rows else "no-match",
+            "rootCount": len(rows),
+            "matchedRootCount": len(matched_rows),
+            "highestReviewPrioritySeverity": _highest_priority_severity(severity_counts),
+            "reviewPrioritySeverityCounts": severity_counts,
+            "affectedArtifactCount": len(affected_artifacts),
+            "affectedTargetContractCount": len(affected_contracts),
+            "affectedTargetCapabilityCount": len(affected_capabilities),
+            "affectedSampleCount": len(affected_samples),
+            "affectedPolicyControlCount": len(affected_controls),
+            "affectedCheckCount": len(affected_checks),
+            "manualGateCount": len(affected_gates),
+        },
+        "affectedArtifacts": affected_artifacts,
+        "affectedTargetContracts": affected_contracts,
+        "affectedTargetCapabilities": affected_capabilities,
+        "affectedSamples": affected_samples,
+        "affectedPolicyControls": affected_controls,
+        "affectedChecks": affected_checks,
+        "manualGates": affected_gates,
+        "rows": rows,
+        "reviewFocus": _matrix_review_focus(rows),
+        "graph": graph_summary,
+    }
+
+
 def build_graph_diff_report(before: Path, after: Path) -> dict[str, Any]:
     """Compare two generated bundle graphs as typed nodes and edges."""
 
@@ -717,6 +767,10 @@ def write_path_report(report: dict[str, Any], output: Path) -> None:
 
 
 def write_roots_report(report: dict[str, Any], output: Path) -> None:
+    write_yaml_artifact(output, report, "")
+
+
+def write_impact_matrix_report(report: dict[str, Any], output: Path) -> None:
     write_yaml_artifact(output, report, "")
 
 
@@ -839,6 +893,58 @@ def render_graph_diff_text(report: dict[str, Any]) -> str:
     lines.extend(_node_list_lines(_coerce_list(report.get("addedNodes"))))
     lines.append("Removed nodes:")
     lines.extend(_node_list_lines(_coerce_list(report.get("removedNodes"))))
+    lines.append("Review focus:")
+    lines.extend(_list_or_none(_coerce_list(report.get("reviewFocus"))))
+    return "\n".join(lines) + "\n"
+
+
+def render_impact_matrix_text(report: dict[str, Any]) -> str:
+    summary = _dict(report.get("summary"))
+    lines = [
+        "=== Graph Impact Matrix ===",
+        "",
+        f"Status: {summary.get('status', 'unknown')}",
+        f"Pattern: {report.get('pattern', '')}",
+        f"Bundle: {report.get('bundle', '')}",
+        f"Roots: {summary.get('matchedRootCount', 0)} of {summary.get('rootCount', 0)} matched",
+        f"Review severity: {_priority_severity_summary(summary)}",
+        "",
+        "Rows:",
+    ]
+    rows = _coerce_list(report.get("rows"))
+    if rows:
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            summary_block = _dict(row.get("summary"))
+            lines.append(
+                f"  - {_node_label(_dict(row.get('root')))}: "
+                f"{summary_block.get('status', 'unknown')} "
+                f"severity={summary_block.get('highestReviewPrioritySeverity', 'none')} "
+                f"artifacts={summary_block.get('affectedArtifactCount', 0)} "
+                f"contracts={summary_block.get('affectedTargetContractCount', 0)} "
+                f"capabilities={summary_block.get('affectedTargetCapabilityCount', 0)} "
+                f"samples={summary_block.get('affectedSampleCount', 0)} "
+                f"controls={summary_block.get('affectedPolicyControlCount', 0)} "
+                f"checks={summary_block.get('affectedCheckCount', 0)} "
+                f"gates={summary_block.get('manualGateCount', 0)}"
+            )
+    else:
+        lines.append("  - None")
+    lines.append("Affected artifacts:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedArtifacts"))))
+    lines.append("Affected target contracts:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedTargetContracts"))))
+    lines.append("Affected target capabilities:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedTargetCapabilities"))))
+    lines.append("Affected samples:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedSamples"))))
+    lines.append("Affected policy controls:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedPolicyControls"))))
+    lines.append("Affected checks:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedChecks"))))
+    lines.append("Manual gates:")
+    lines.extend(_list_or_none(_coerce_list(report.get("manualGates"))))
     lines.append("Review focus:")
     lines.extend(_list_or_none(_coerce_list(report.get("reviewFocus"))))
     return "\n".join(lines) + "\n"
@@ -2210,6 +2316,110 @@ def _path_step_to_dict(graph: _ImpactGraph, step: _PathStep) -> dict[str, Any]:
             "relationship": edge.relationship,
         },
     }
+
+
+def _impact_matrix_row(report: dict[str, Any]) -> dict[str, Any]:
+    summary = _dict(report.get("summary"))
+    root = _matrix_root(report)
+    return {
+        "root": root,
+        "unmatchedRoots": _coerce_list(report.get("unmatchedRoots")),
+        "summary": {
+            "status": summary.get("status", "unknown"),
+            "downstreamImpactCount": summary.get("downstreamImpactCount", 0),
+            "upstreamDependencyCount": summary.get("upstreamDependencyCount", 0),
+            "highestReviewPrioritySeverity": summary.get("highestReviewPrioritySeverity", "none"),
+            "reviewPrioritySeverityCounts": _dict(summary.get("reviewPrioritySeverityCounts")),
+            "affectedArtifactCount": len(_coerce_list(report.get("affectedArtifacts"))),
+            "affectedTargetContractCount": len(_coerce_list(report.get("affectedTargetContracts"))),
+            "affectedTargetCapabilityCount": len(
+                _coerce_list(report.get("affectedTargetCapabilities"))
+            ),
+            "affectedSampleCount": len(_coerce_list(report.get("affectedSamples"))),
+            "affectedPolicyControlCount": len(_coerce_list(report.get("affectedPolicyControls"))),
+            "affectedCheckCount": len(_coerce_list(report.get("affectedChecks"))),
+            "affectedCheckovFindingCount": len(_coerce_list(report.get("affectedCheckovFindings"))),
+            "affectedModuleVariableCount": len(_coerce_list(report.get("affectedModuleVariables"))),
+            "manualGateCount": len(_coerce_list(report.get("manualGates"))),
+        },
+        "affectedArtifacts": _coerce_list(report.get("affectedArtifacts")),
+        "affectedTargetContracts": _coerce_list(report.get("affectedTargetContracts")),
+        "affectedTargetCapabilities": _coerce_list(report.get("affectedTargetCapabilities")),
+        "affectedSamples": _coerce_list(report.get("affectedSamples")),
+        "affectedPolicyControls": _coerce_list(report.get("affectedPolicyControls")),
+        "affectedChecks": _coerce_list(report.get("affectedChecks")),
+        "affectedCheckovFindings": _coerce_list(report.get("affectedCheckovFindings")),
+        "affectedModuleVariables": _coerce_list(report.get("affectedModuleVariables")),
+        "manualGates": _coerce_list(report.get("manualGates")),
+        "reviewFocus": _coerce_list(report.get("reviewFocus")),
+        "impactPathCount": len(_coerce_list(report.get("impactPaths"))),
+        "pattern": report.get("pattern", ""),
+        "graph": _dict(report.get("graph")),
+    }
+
+
+def _matrix_root(report: dict[str, Any]) -> dict[str, Any]:
+    selected = _coerce_list(report.get("selectedRoots"))
+    if selected and isinstance(selected[0], dict):
+        return selected[0]
+    unmatched = _coerce_list(report.get("unmatchedRoots"))
+    if unmatched and isinstance(unmatched[0], dict):
+        kind = str(unmatched[0].get("kind", "unknown"))
+        key = str(unmatched[0].get("key", ""))
+        return {
+            "id": f"{kind}:{key}",
+            "kind": kind,
+            "key": key,
+            "label": key,
+            "properties": {},
+        }
+    return {
+        "id": "unknown:",
+        "kind": "unknown",
+        "key": "",
+        "label": "",
+        "properties": {},
+    }
+
+
+def _matrix_union(rows: list[dict[str, Any]], key: str) -> list[str]:
+    values: set[str] = set()
+    for row in rows:
+        values.update(str(item) for item in _coerce_list(row.get(key)) if item)
+    return sorted(values)
+
+
+def _matrix_severity_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
+    counts = {severity: 0 for severity in PRIORITY_SEVERITIES}
+    for row in rows:
+        row_counts = _dict(_dict(row.get("summary")).get("reviewPrioritySeverityCounts"))
+        for severity in PRIORITY_SEVERITIES:
+            counts[severity] += int(row_counts.get(severity, 0) or 0)
+    return counts
+
+
+def _matrix_review_focus(rows: list[dict[str, Any]]) -> list[str]:
+    if not rows:
+        return ["No graph roots were provided for matrix review."]
+    unmatched = [
+        _node_label(_dict(row.get("root")))
+        for row in rows
+        if _dict(row.get("summary")).get("status") != "matched"
+    ]
+    focus = [
+        f"Compare impact across {len(rows)} selected graph root(s) before choosing deeper "
+        "path or neighborhood queries."
+    ]
+    if unmatched:
+        focus.append("Verify unmatched roots: " + ", ".join(unmatched) + ".")
+    high_rows = [
+        _node_label(_dict(row.get("root")))
+        for row in rows
+        if _dict(row.get("summary")).get("highestReviewPrioritySeverity") in {"critical", "high"}
+    ]
+    if high_rows:
+        focus.append("Prioritize high-severity roots: " + ", ".join(high_rows) + ".")
+    return focus
 
 
 def _impact_review_priorities(

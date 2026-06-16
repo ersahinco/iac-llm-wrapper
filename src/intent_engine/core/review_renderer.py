@@ -180,6 +180,10 @@ def render_review_html(context: dict[str, Any]) -> str:
                             ("Bundle graph", str(graph_exports.get("bundleGraph", ""))),
                             ("Graph roots", str(graph_exports.get("graphRoots", ""))),
                             ("Impact report", str(graph_exports.get("impactReport", ""))),
+                            (
+                                "Graph impact matrix",
+                                str(graph_exports.get("graphImpactMatrix", "")),
+                            ),
                             ("Graph find", str(graph_exports.get("graphFind", ""))),
                             ("Graph path", str(graph_exports.get("graphPath", ""))),
                             (

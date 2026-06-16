@@ -52,6 +52,7 @@ from .core.impact_graph import (
     build_bundle_graph_report,
     build_find_report,
     build_graph_diff_report,
+    build_impact_matrix_report,
     build_impact_report,
     build_neighborhood_report,
     build_path_report,
@@ -59,6 +60,7 @@ from .core.impact_graph import (
     render_bundle_graph_text,
     render_find_report_text,
     render_graph_diff_text,
+    render_impact_matrix_text,
     render_impact_report_text,
     render_neighborhood_report_text,
     render_path_report_text,
@@ -66,6 +68,7 @@ from .core.impact_graph import (
     write_bundle_graph_report,
     write_find_report,
     write_graph_diff_report,
+    write_impact_matrix_report,
     write_impact_report,
     write_neighborhood_report,
     write_path_report,
@@ -574,6 +577,37 @@ def graph_impact(
     if output is not None:
         write_impact_report(report, output)
         typer.echo(f"Impact report written to: {output}")
+
+
+@graph_app.command("matrix")
+def graph_matrix(
+    bundle: Path = typer.Option(
+        ...,
+        "--bundle",
+        help="Generated handoff bundle directory to traverse.",
+    ),
+    root: list[str] = typer.Option(
+        ...,
+        "--root",
+        help="Generic typed graph root as <kind>:<key>. Repeatable.",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Optional graph-impact-matrix.yaml output path.",
+    ),
+) -> None:
+    """Compare impact across multiple typed graph roots."""
+    if not bundle.is_dir():
+        typer.echo(f"Error: bundle path is not a directory: {bundle}", err=True)
+        raise typer.Exit(1)
+    roots = [_graph_root_or_exit(item, "--root") for item in root]
+    report = build_impact_matrix_report(bundle, roots=roots)
+    typer.echo(render_impact_matrix_text(report), nl=False)
+    if output is not None:
+        write_impact_matrix_report(report, output)
+        typer.echo(f"Graph impact matrix written to: {output}")
 
 
 @graph_app.command("path")
