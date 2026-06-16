@@ -103,7 +103,7 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, pytest, ruff, mypy, pyright.
 
 ### Current Goal
 
-T75: Lean owner-validation checklist clarification
+T76: Broader product goal positioning
 
 ### Status
 
@@ -112,7 +112,7 @@ T75: Lean owner-validation checklist clarification
 - **Format**: clean (`ruff format --check .`)
 - **Type check**: clean (`mypy` and `pyright`)
 - **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Clarified the downstream AWS LZA validation checklist so owner-approved account email review explicitly includes `Management`. Validation still fails with `aws-account-lookup-permission` / `AccessDeniedException` from the official validator, so no owner validation is claimed.
+- **Last session**: Added a concise README broader-goal section: model-agnostic, contract-first handoff for approved accelerators, IaC modules, and platform pipelines, with CI/CD as shift-left consumers and deployment still owned downstream. Validation still fails with `aws-account-lookup-permission` / `AccessDeniedException` from the official validator, so no owner validation is claimed.
 
 ### Done
 
@@ -131,6 +131,7 @@ T75: Lean owner-validation checklist clarification
 - T73 high-risk lean cleanup: collapsed duplicated compile validation/generation flow, moved samples/contracts fully onto patterns, made review HTML read-only against input bundles, moved AWS LZA validation and target routing under AWS LZA pattern ownership, made `decision-audit.yaml` a core expected artifact with stable replay hashing, and aligned golden-journey checks with the read-only review contract.
 - T74 owner-validation evidence follow-up: refreshed AWS credentials, compiled the existing banking packet into ignored `tests/results/owner-lza-validation-banking/` with private non-placeholder account emails, regenerated static review, and ran `iac-llm-wrapper lza validate` against the local AWS LZA checkout. Evidence is private/ignored and shows only the remaining read-only account lookup permission blocker.
 - T75 lean owner-validation checklist clarification: `docs/LZA_DOWNSTREAM_VALIDATION.md` now makes the owner-approved account email prerequisite explicit for `Management`, control-plane accounts, network accounts when present, and workload accounts. No CLI, generator, fixture, or private evidence changes were added.
+- T76 broader product goal positioning: README now frames the long-term direction as a model-agnostic, contract-first handoff layer for approved accelerators, IaC modules, and platform pipelines. GitHub Actions/platform CI/CD are positioned as shift-left consumers of reviewed bundles, not as direct deployment run surfaces owned by this core.
 - Language: user-facing docs and artifacts use `handoffReadiness`/`handoffAllowed` only. Docs now also state that secrets should travel as secret-store references and expected parameter names, never raw values.
 - Quality gates: Ruff, Ruff format, mypy, Pyright/Pylance, fixture drift, coverage tests, extraction/usability/golden journey checks, Bandit, pip-audit, uv build, and pre-commit are wired into local/CI workflows as applicable.
 - T36 usability: CLI output now points first-time users from discovery and compile results to service-style compile, blocked review generation, `handoff-plan.yaml`, and static review creation. `handoff-review.html` now includes reviewer next actions derived from readiness, contract status, artifacts, and raw evidence state. README and LLM setup now include a concise real customer packet path for Ollama and direct Bedrock runs with `--no-raw-evidence`.

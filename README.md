@@ -18,6 +18,18 @@ AWS Landing Zone Accelerator is the reference path and downstream authority:
 collected and validated inputs become LZA YAML/config files consumed by the
 owner-controlled LZA validation and deployment process.
 
+## Broader Goal
+
+The broader goal is a model-agnostic, contract-first handoff layer for approved
+accelerators, IaC modules, and platform pipelines. It should let platform teams
+encode architect, engineer, security, and operations preferences as requirement
+graphs, target contracts, sample alignment, review evidence, and manual gates.
+
+CI/CD should consume those bundles as shift-left checks: validate decisions,
+compare changes, prove contract readiness, and route reviewed configuration into
+owner-controlled GitHub Actions or platform pipelines for existing or greenfield
+environments. Deployment still belongs to those downstream mechanisms.
+
 ## Core Flow
 
 ```mermaid
