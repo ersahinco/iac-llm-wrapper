@@ -13,9 +13,11 @@ from intent_engine.core.compiler import compile_from_interview
 from intent_engine.core.impact_graph import (
     ImpactRoot,
     build_bundle_graph_report,
+    build_find_report,
     build_impact_report,
     build_neighborhood_report,
     build_path_report,
+    render_find_report_text,
     render_impact_report_text,
     render_neighborhood_report_text,
     render_path_report_text,
@@ -175,6 +177,7 @@ def test_bundle_graph_report_exports_queryable_nodes_and_edges(tmp_path: Path):
     } in report["edges"]
     assert "decision" in report["queryHints"]["rootKinds"]
     assert "graph path" in report["queryHints"]["pathCommand"]
+    assert "graph find" in report["queryHints"]["findCommand"]
 
 
 def test_bundle_graph_report_exports_semantic_model_nodes_and_edges():
@@ -201,6 +204,73 @@ def test_bundle_graph_report_exports_semantic_model_nodes_and_edges():
     } in report["edges"]
     assert "semantic_entity" in report["queryHints"]["rootKinds"]
     assert "semantic_constraint" in report["queryHints"]["rootKinds"]
+
+
+def test_graph_find_reports_matching_candidate_roots():
+    report = build_find_report(
+        Path("fixtures/aws-lza-standard-v1"),
+        query="security hub",
+        kinds=["semantic_entity"],
+    )
+
+    assert report["schemaVersion"] == "intent-engine/graph-find/v1"
+    assert report["summary"]["status"] == "matched"
+    assert report["summary"]["matchCount"] == 1
+    assert report["matches"][0]["node"]["id"] == "semantic_entity:control:security-hub"
+    assert "label" in report["matches"][0]["matchedFields"]
+    rendered = render_find_report_text(report)
+    assert "Graph Find" in rendered
+    assert "semantic_entity:control:security-hub" in rendered
+
+
+def test_graph_find_can_match_properties_and_limit_results():
+    report = build_find_report(
+        Path("fixtures/aws-lza-standard-v1"),
+        query="security",
+        limit=2,
+    )
+
+    assert report["summary"]["status"] == "matched"
+    assert report["summary"]["returnedCount"] == 2
+    assert report["summary"]["matchCount"] > 2
+
+
+def test_graph_find_no_match_is_reported_without_failure():
+    report = build_find_report(
+        Path("fixtures/aws-lza-standard-v1"),
+        query="definitely-missing-node",
+        kinds=["semantic_entity"],
+    )
+
+    assert report["summary"]["status"] == "no-match"
+    assert report["matches"] == []
+    assert "No graph nodes matched" in report["reviewFocus"][0]
+
+
+def test_graph_find_cli_writes_report(tmp_path: Path):
+    output = tmp_path / "graph-find.yaml"
+
+    result = runner.invoke(
+        app,
+        [
+            "graph",
+            "find",
+            "--bundle",
+            "fixtures/aws-lza-standard-v1",
+            "--query",
+            "security hub",
+            "--kind",
+            "semantic_entity",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Graph Find" in result.output
+    report = _yaml_load(output)
+    assert report["summary"]["status"] == "matched"
+    assert report["matches"][0]["node"]["id"] == "semantic_entity:control:security-hub"
 
 
 def test_semantic_entity_root_reports_affected_artifact():

@@ -306,6 +306,7 @@ def build_bundle_graph_report(bundle: Path) -> dict[str, Any]:
                 "semantic_entity",
                 "semantic_constraint",
             ],
+            "findCommand": "iac-llm-wrapper graph find --bundle <bundle> --query <text>",
             "impactCommand": (
                 "iac-llm-wrapper graph impact --bundle <bundle> --decision <key|other-root>"
             ),
@@ -456,7 +457,65 @@ def build_neighborhood_report(
     }
 
 
+def build_find_report(
+    bundle: Path,
+    *,
+    query: str,
+    kinds: list[str] | None = None,
+    limit: int = 20,
+) -> dict[str, Any]:
+    """Find typed graph nodes by id, key, label, kind, or properties."""
+
+    graph, pattern = _build_graph(bundle)
+    kind_filter = sorted({item for item in kinds or [] if item})
+    query_tokens = _query_tokens(query)
+    candidates = [
+        node for node in graph.nodes.values() if not kind_filter or node.kind in kind_filter
+    ]
+    matches: list[dict[str, Any]] = []
+    for node in candidates:
+        match = _find_match(node, query_tokens)
+        if match is not None:
+            matches.append(match)
+    matches = sorted(
+        [match for match in matches if match is not None],
+        key=lambda item: (-int(item["score"]), str(_dict(item.get("node")).get("id", ""))),
+    )
+    limited_matches = matches[: max(limit, 0)]
+    status = "matched" if limited_matches else "no-match"
+    return {
+        "schemaVersion": "intent-engine/graph-find/v1",
+        "bundle": str(bundle),
+        "pattern": pattern,
+        "boundary": BOUNDARY,
+        "summary": {
+            "status": status,
+            "query": query,
+            "kindFilter": kind_filter,
+            "matchCount": len(matches),
+            "returnedCount": len(limited_matches),
+            "limit": max(limit, 0),
+            "nodeKinds": _count_by([_dict(match.get("node")) for match in limited_matches], "kind"),
+        },
+        "matches": limited_matches,
+        "reviewFocus": _find_review_focus(
+            status=status,
+            query=query,
+            returned_count=len(limited_matches),
+            kind_filter=kind_filter,
+        ),
+        "graph": {
+            "nodeCount": len(graph.nodes),
+            "edgeCount": len(graph.edges),
+        },
+    }
+
+
 def write_bundle_graph_report(report: dict[str, Any], output: Path) -> None:
+    write_yaml_artifact(output, report, "")
+
+
+def write_find_report(report: dict[str, Any], output: Path) -> None:
     write_yaml_artifact(output, report, "")
 
 
@@ -488,6 +547,37 @@ def render_bundle_graph_text(report: dict[str, Any]) -> str:
     lines.append("Query roots:")
     for kind in _coerce_list(_dict(report.get("queryHints")).get("rootKinds")):
         lines.append(f"  - {kind}")
+    return "\n".join(lines) + "\n"
+
+
+def render_find_report_text(report: dict[str, Any]) -> str:
+    summary = _dict(report.get("summary"))
+    lines = [
+        "=== Graph Find ===",
+        "",
+        f"Status: {summary.get('status', 'unknown')}",
+        f"Query: {summary.get('query', '')}",
+        f"Pattern: {report.get('pattern', '')}",
+        f"Bundle: {report.get('bundle', '')}",
+        "",
+        f"Matches: {summary.get('returnedCount', 0)} of {summary.get('matchCount', 0)}",
+        "Node kinds:",
+    ]
+    for key, count in sorted(_dict(summary.get("nodeKinds")).items()):
+        lines.append(f"  - {key}: {count}")
+    lines.append("Results:")
+    matches = _coerce_list(report.get("matches"))
+    if matches:
+        for match in matches:
+            if not isinstance(match, dict):
+                continue
+            node = _dict(match.get("node"))
+            fields = ", ".join(str(item) for item in _coerce_list(match.get("matchedFields")))
+            lines.append(f"  - {_node_label(node)} [{fields}]")
+    else:
+        lines.append("  - None")
+    lines.append("Review focus:")
+    lines.extend(_list_or_none(_coerce_list(report.get("reviewFocus"))))
     return "\n".join(lines) + "\n"
 
 
@@ -1081,6 +1171,55 @@ def _count_by(items: list[dict[str, Any]], key: str) -> dict[str, int]:
     return counts
 
 
+def _query_tokens(query: str) -> list[str]:
+    return [token.casefold() for token in query.replace(":", " ").split() if token.strip()]
+
+
+def _find_match(node: _ImpactNode, query_tokens: list[str]) -> dict[str, Any] | None:
+    haystack = _node_search_fields(node)
+    if query_tokens and not all(
+        any(token in value for value in haystack.values()) for token in query_tokens
+    ):
+        return None
+    matched_fields = sorted(
+        {
+            field
+            for token in query_tokens or [""]
+            for field, value in haystack.items()
+            if token in value
+        }
+    )
+    score = sum(1 for field in matched_fields if field in {"id", "key", "label"})
+    score += len(matched_fields)
+    if node.key.casefold() in query_tokens:
+        score += 3
+    if node.label.casefold() in query_tokens:
+        score += 2
+    return {
+        "score": score,
+        "matchedFields": matched_fields,
+        "node": node.to_dict(),
+    }
+
+
+def _node_search_fields(node: _ImpactNode) -> dict[str, str]:
+    return {
+        "id": node.id.casefold(),
+        "kind": node.kind.casefold(),
+        "key": node.key.casefold(),
+        "label": node.label.casefold(),
+        "properties": _stringify(node.properties).casefold(),
+    }
+
+
+def _stringify(value: Any) -> str:
+    if isinstance(value, dict):
+        return " ".join(f"{key} {_stringify(item)}" for key, item in sorted(value.items()))
+    if isinstance(value, list):
+        return " ".join(_stringify(item) for item in value)
+    return str(value)
+
+
 def _impact_paths(
     graph: _ImpactGraph,
     roots: list[str],
@@ -1197,6 +1336,25 @@ def _path_review_focus(
         "Shortest path uses "
         f"{downstream_hops} downstream hop(s) and {upstream_hops} upstream hop(s).",
     ]
+
+
+def _find_review_focus(
+    *,
+    status: str,
+    query: str,
+    returned_count: int,
+    kind_filter: list[str],
+) -> list[str]:
+    if status == "no-match":
+        suffix = f" within {', '.join(kind_filter)}" if kind_filter else ""
+        return [f"No graph nodes matched query '{query}'{suffix}."]
+    focus = [
+        f"Use the returned {returned_count} graph node id(s) as roots "
+        "for impact, path, or neighbors queries."
+    ]
+    if kind_filter:
+        focus.append("Applied node-kind filter: " + ", ".join(kind_filter) + ".")
+    return focus
 
 
 def _neighborhood_review_focus(

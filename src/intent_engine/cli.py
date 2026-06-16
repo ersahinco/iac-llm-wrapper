@@ -50,14 +50,17 @@ from .core.graph_export import graph_to_json, graph_to_mermaid
 from .core.impact_graph import (
     ImpactRoot,
     build_bundle_graph_report,
+    build_find_report,
     build_impact_report,
     build_neighborhood_report,
     build_path_report,
     render_bundle_graph_text,
+    render_find_report_text,
     render_impact_report_text,
     render_neighborhood_report_text,
     render_path_report_text,
     write_bundle_graph_report,
+    write_find_report,
     write_impact_report,
     write_neighborhood_report,
     write_path_report,
@@ -406,6 +409,50 @@ def graph_export(
         typer.echo(f"Graph exported to: {output}")
         return
     typer.echo(rendered, nl=False)
+
+
+@graph_app.command("find")
+def graph_find(
+    bundle: Path = typer.Option(
+        ...,
+        "--bundle",
+        help="Generated handoff bundle directory to search.",
+    ),
+    query: str = typer.Option(
+        ...,
+        "--query",
+        "-q",
+        help="Text to search across graph node id, key, label, kind, and properties.",
+    ),
+    kind: list[str] | None = typer.Option(
+        None,
+        "--kind",
+        help="Optional node kind filter for returned matches. Repeatable.",
+    ),
+    limit: int = typer.Option(
+        20,
+        "--limit",
+        help="Maximum number of matches to return.",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Optional graph-find.yaml output path.",
+    ),
+) -> None:
+    """Find candidate typed graph roots inside a generated handoff bundle."""
+    if not bundle.is_dir():
+        typer.echo(f"Error: bundle path is not a directory: {bundle}", err=True)
+        raise typer.Exit(1)
+    if limit < 0:
+        typer.echo("Error: --limit must be zero or greater.", err=True)
+        raise typer.Exit(1)
+    report = build_find_report(bundle, query=query, kinds=kind, limit=limit)
+    typer.echo(render_find_report_text(report), nl=False)
+    if output is not None:
+        write_find_report(report, output)
+        typer.echo(f"Graph find report written to: {output}")
 
 
 @graph_app.command("impact")
