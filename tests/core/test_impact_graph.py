@@ -1118,6 +1118,12 @@ def test_bundle_compare_includes_impact_traversal(tmp_path: Path):
     assert "affected target contracts: terraform-aws-vpc-module" in rendered
     assert "affected policy controls: VPC-ATTACHMENT-001, VPC-NETWORK-001" in rendered
     assert "impact paths: artifact:decision-report.yaml:" in rendered
+    matrix = report["impactMatrix"]
+    assert matrix["schemaVersion"] == "intent-engine/graph-impact-matrix/v1"
+    assert matrix["summary"]["matchedRootCount"] == 1
+    assert matrix["rows"][0]["root"]["id"] == "decision:cidr"
+    assert "Impact matrix:" in rendered
+    assert "decision:cidr: status=matched" in rendered
     graph_diff = report["graphDiff"]
     assert graph_diff["summary"]["status"] == "changed"
     assert graph_diff["summary"]["nodeChangedCount"] >= 2

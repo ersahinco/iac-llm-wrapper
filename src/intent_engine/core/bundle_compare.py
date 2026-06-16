@@ -8,7 +8,12 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
-from .impact_graph import build_graph_diff_report, build_impact_report, changed_decision_roots
+from .impact_graph import (
+    build_graph_diff_report,
+    build_impact_matrix_report,
+    build_impact_report,
+    changed_decision_roots,
+)
 from .sample_config import SampleConfig
 from .yaml_utils import read_yaml_mapping, write_yaml_artifact
 
@@ -44,13 +49,15 @@ def compare_handoff_bundles(before_dir: Path, after_dir: Path) -> dict[str, Any]
         sample_delta=sample_delta,
         after=after,
     )
+    changed_roots = changed_decision_roots({"decisionDelta": decision_delta})
     impact_traversal = build_impact_report(
         after.path,
-        roots=changed_decision_roots({"decisionDelta": decision_delta}),
+        roots=changed_roots,
         changed_report=after.path / "input-diff-report.yaml"
         if (after.path / "input-diff-report.yaml").exists()
         else None,
     )
+    impact_matrix = build_impact_matrix_report(after.path, roots=changed_roots)
     graph_diff = build_graph_diff_report(before.path, after.path)
     review_focus = _review_focus(
         decision_delta=decision_delta,
@@ -107,6 +114,7 @@ def compare_handoff_bundles(before_dir: Path, after_dir: Path) -> dict[str, Any]
         "inputDelta": _input_delta(before.input_diff, after.input_diff),
         "impactedRequirementMap": impacted_map,
         "impactTraversal": impact_traversal,
+        "impactMatrix": impact_matrix,
         "graphDiff": graph_diff,
         "artifactDelta": artifact_delta,
         "sampleRecommendationDelta": sample_delta,
@@ -134,6 +142,7 @@ def render_bundle_comparison_html(report: dict[str, Any]) -> str:
     samples = _dict(report.get("sampleRecommendationDelta"))
     impacts = _coerce_list(report.get("impactedRequirementMap"))
     impact_traversal = _dict(report.get("impactTraversal"))
+    impact_matrix = _dict(report.get("impactMatrix"))
     graph_diff = _dict(report.get("graphDiff"))
     focus = _coerce_list(summary.get("reviewFocus"))
     return "\n".join(
@@ -213,6 +222,10 @@ def render_bundle_comparison_html(report: dict[str, Any]) -> str:
                         _impact_path_summaries(_coerce_list(impact_traversal.get("impactPaths"))),
                     ),
                     _html_named_list(
+                        "Impact matrix",
+                        _impact_matrix_summaries(impact_matrix),
+                    ),
+                    _html_named_list(
                         "Graph diff",
                         _graph_diff_summaries(graph_diff),
                     ),
@@ -264,6 +277,7 @@ def render_bundle_comparison_text(report: dict[str, Any]) -> str:
     readiness_delta = _dict(report.get("readinessDelta"))
     input_delta = _dict(report.get("inputDelta"))
     impact_traversal = _dict(report.get("impactTraversal"))
+    impact_matrix = _dict(report.get("impactMatrix"))
     graph_diff = _dict(report.get("graphDiff"))
     lines = [
         "=== Handoff Bundle Comparison ===",
@@ -336,6 +350,19 @@ def render_bundle_comparison_text(report: dict[str, Any]) -> str:
                 + _join_or_none(
                     _impact_path_summaries(_coerce_list(impact_traversal.get("impactPaths")))[:5]
                 ),
+            ]
+        )
+
+    if impact_matrix:
+        summary_block = _dict(impact_matrix.get("summary"))
+        lines.extend(
+            [
+                "",
+                "Impact matrix:",
+                f"  roots: {summary_block.get('matchedRootCount', 0)} of "
+                f"{summary_block.get('rootCount', 0)} matched",
+                "  review priority severity: " + _impact_priority_summary(impact_matrix),
+                "  rows: " + _join_or_none(_impact_matrix_summaries(impact_matrix)[:5]),
             ]
         )
 
@@ -449,6 +476,28 @@ def _impact_path_summaries(paths: list[Any]) -> list[str]:
                 f"{destination.get('id', '')}"
             )
         summaries.append(f"{target.get('id', 'unknown')}: " + " | ".join(rendered_hops))
+    return summaries
+
+
+def _impact_matrix_summaries(impact_matrix: dict[str, Any]) -> list[str]:
+    summaries: list[str] = []
+    for row in _coerce_list(impact_matrix.get("rows")):
+        if not isinstance(row, dict):
+            continue
+        root = _dict(row.get("root"))
+        summary = _dict(row.get("summary"))
+        summaries.append(
+            f"{root.get('id', 'unknown')}: "
+            f"status={summary.get('status', 'unknown')}, "
+            f"severity={summary.get('highestReviewPrioritySeverity', 'none')}, "
+            f"artifacts={summary.get('affectedArtifactCount', 0)}, "
+            f"contracts={summary.get('affectedTargetContractCount', 0)}, "
+            f"capabilities={summary.get('affectedTargetCapabilityCount', 0)}, "
+            f"samples={summary.get('affectedSampleCount', 0)}, "
+            f"controls={summary.get('affectedPolicyControlCount', 0)}, "
+            f"checks={summary.get('affectedCheckCount', 0)}, "
+            f"gates={summary.get('manualGateCount', 0)}"
+        )
     return summaries
 
 
