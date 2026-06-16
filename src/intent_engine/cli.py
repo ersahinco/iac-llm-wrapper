@@ -58,6 +58,7 @@ from .core.impact_graph import (
     build_path_report,
     build_recommended_impact_matrix_report,
     build_roots_report,
+    changed_report_roots,
     render_bundle_graph_text,
     render_find_report_text,
     render_graph_diff_text,
@@ -222,6 +223,14 @@ def _graph_root_or_exit(value: str, option_name: str) -> ImpactRoot:
         )
         raise typer.Exit(1)
     return ImpactRoot(kind=kind, key=key)
+
+
+def _matrix_root_source(*, has_explicit: bool, has_changed: bool) -> str:
+    if has_explicit and has_changed:
+        return "changed-report-plus-explicit"
+    if has_changed:
+        return "changed-report"
+    return "explicit"
 
 
 def _parse_decisions_or_exit(raw_decisions: str | None) -> dict[str, Any] | None:
@@ -602,6 +611,11 @@ def graph_matrix(
         "--kind",
         help="Optional node kind filter when --recommended is used. Repeatable.",
     ),
+    changed_report: Path | None = typer.Option(
+        None,
+        "--changed-report",
+        help="input-diff-report.yaml to derive matrix roots from changed requirements.",
+    ),
     output: Path | None = typer.Option(
         None,
         "--output",
@@ -613,18 +627,32 @@ def graph_matrix(
     if not bundle.is_dir():
         typer.echo(f"Error: bundle path is not a directory: {bundle}", err=True)
         raise typer.Exit(1)
+    if changed_report is not None and not changed_report.exists():
+        typer.echo(f"Error: changed report does not exist: {changed_report}", err=True)
+        raise typer.Exit(1)
     roots = [_graph_root_or_exit(item, "--root") for item in (root or [])]
-    if not roots and not recommended:
-        typer.echo("Error: provide --root at least once or use --recommended.", err=True)
+    changed_roots = changed_report_roots(bundle, changed_report)
+    if not roots and not changed_roots and not recommended:
+        typer.echo(
+            "Error: provide --root at least once, use --recommended, or provide --changed-report.",
+            err=True,
+        )
         raise typer.Exit(1)
     if recommended:
         report = build_recommended_impact_matrix_report(
             bundle,
             kinds=kind,
-            extra_roots=roots,
+            extra_roots=[*roots, *changed_roots],
         )
     else:
-        report = build_impact_matrix_report(bundle, roots=roots)
+        report = build_impact_matrix_report(
+            bundle,
+            roots=[*roots, *changed_roots],
+            root_source=_matrix_root_source(
+                has_explicit=bool(roots),
+                has_changed=bool(changed_roots),
+            ),
+        )
     typer.echo(render_impact_matrix_text(report), nl=False)
     if output is not None:
         write_impact_matrix_report(report, output)

@@ -378,6 +378,44 @@ def test_graph_impact_matrix_cli_uses_recommended_roots(tmp_path: Path):
     assert report["rows"][0]["root"]["id"] == "source_change:structured:cidr"
 
 
+def test_graph_impact_matrix_cli_uses_changed_report_roots(tmp_path: Path):
+    bundle = _terraform_vpc_bundle(tmp_path / "bundle")
+    changed_report = tmp_path / "input-diff-report.yaml"
+    changed_report.write_text(
+        "\n".join(
+            [
+                "schemaVersion: intent-engine/input-diff/v1",
+                "likelyImpactedRequirements:",
+                "  - key: enable_dns_hostnames",
+                "    label: DNS hostnames",
+                "    reason: source text changed DNS requirements",
+            ]
+        )
+        + "\n"
+    )
+    output = tmp_path / "graph-impact-matrix.yaml"
+
+    result = runner.invoke(
+        app,
+        [
+            "graph",
+            "matrix",
+            "--bundle",
+            str(bundle),
+            "--changed-report",
+            str(changed_report),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Root source: changed-report" in result.output
+    report = _yaml_load(output)
+    assert report["summary"]["rootSource"] == "changed-report"
+    assert report["rows"][0]["root"]["id"] == "decision:enable_dns_hostnames"
+
+
 def test_bundle_graph_report_exports_queryable_nodes_and_edges(tmp_path: Path):
     bundle = _terraform_vpc_bundle(tmp_path / "bundle")
 
