@@ -57,6 +57,9 @@ A healthy pattern has:
 - target configuration artifacts that match the registered deployment target
 - `context-manifest.yaml` with graph, prompt context, contract, sample, target,
   runtime, and expected-artifact context
+- optional `Pattern.policy_packs` when regulated controls should map to graph
+  requirements, target contracts, artifact paths, module variables, Checkov IDs,
+  and owner custom-policy references
 - `handoff-plan.yaml` with an allowed next action
 - `llm-trace-summary.yaml`, `model-benchmark.yaml`, and `battle-summary.yaml`
   when battle-tested

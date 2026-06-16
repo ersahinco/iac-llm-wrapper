@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from .contracts import CORE_CONTRACTS, ContractValidator, TargetContract
 from .module_mapping import ModuleInputs
+from .policy import PolicyPack
 from .requirements import RequirementGraph
 from .sample_config import SampleConfig, SampleMatch, find_best_sample_matches, find_samples
 
@@ -55,6 +56,8 @@ class Pattern:
     contracts: list[TargetContract] = field(default_factory=list)
     # Version-pinned reference bundles owned by the pattern.
     samples: list[SampleConfig] = field(default_factory=list)
+    # Optional regulated policy graph metadata owned by the pattern.
+    policy_packs: list[PolicyPack] = field(default_factory=list)
     # Optional pattern-owned target routing/report builder.
     target_report_builder: TargetReportBuilder | None = None
     # Whether this pattern emits a registered target plan-ready metadata bundle.
@@ -79,6 +82,8 @@ class Pattern:
             artifacts.append("target-capability-graph.yaml")
         if self.plan_ready:
             artifacts.extend(["plan-manifest.yaml", "replay-manifest.yaml"])
+        if self.policy_packs:
+            artifacts.append("policy-graph.yaml")
         return list(dict.fromkeys(artifacts))
 
 
@@ -133,6 +138,22 @@ class PatternRegistry:
             validator = ContractValidator(contract)
             for violation in validator.validate_contract() + validator.validate_graph(graph):
                 errors.append(f"Contract '{contract.name}': {violation.message}")
+        known_requirements = set(graph._requirements)
+        known_contracts = {contract.name for contract in pattern.contracts}
+        for pack in pattern.policy_packs:
+            for control in pack.controls:
+                for req_key in control.mapping.requirement_keys:
+                    if req_key not in known_requirements:
+                        errors.append(
+                            f"Policy pack '{pack.name}' control '{control.id}': "
+                            f"unknown requirement '{req_key}'"
+                        )
+                for contract_name in control.mapping.target_contracts:
+                    if contract_name not in known_contracts:
+                        errors.append(
+                            f"Policy pack '{pack.name}' control '{control.id}': "
+                            f"unknown target contract '{contract_name}'"
+                        )
         if errors:
             msg = "Pattern '{}' schema validation failed:\n  - {}".format(
                 pattern.name, "\n  - ".join(errors)

@@ -8,6 +8,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from .policy import PolicyPack, map_findings_to_controls
+
 BOUNDARY = (
     "Checkov evidence is a shift-left policy scan for an owner-provided IaC, "
     "module, or pipeline path. iac-llm-wrapper does not deploy, mutate cloud "
@@ -19,11 +21,26 @@ def scan_path_is_tfvars_only(scan_path: Path) -> bool:
     return scan_path.is_file() and scan_path.suffix.lower() == ".tfvars"
 
 
-def build_invalid_scan_path_evidence(*, bundle: Path, scan_path: Path) -> dict[str, Any]:
+def build_invalid_scan_path_evidence(
+    *,
+    bundle: Path,
+    scan_path: Path,
+    policy_packs: list[PolicyPack] | None = None,
+    external_checks_dirs: list[Path] | None = None,
+    iac_kind: str = "",
+    checkov_framework: str = "",
+) -> dict[str, Any]:
     return {
         "schemaVersion": "intent-engine/shift-left-checkov/v1",
         "tool": {"name": "checkov", "available": False, "version": ""},
-        "input": {"bundle": str(bundle), "scanPath": str(scan_path)},
+        "input": _input_block(
+            bundle=bundle,
+            scan_path=scan_path,
+            policy_packs=policy_packs or [],
+            external_checks_dirs=external_checks_dirs or [],
+            iac_kind=iac_kind,
+            checkov_framework=checkov_framework,
+        ),
         "boundary": BOUNDARY,
         "result": {
             "status": "invalid-input",
@@ -34,6 +51,8 @@ def build_invalid_scan_path_evidence(*, bundle: Path, scan_path: Path) -> dict[s
         },
         "summary": _empty_summary(),
         "findings": [],
+        "mappedControls": [],
+        "unmappedFindings": [],
     }
 
 
@@ -42,15 +61,30 @@ def run_checkov_evidence(
     bundle: Path,
     scan_path: Path,
     checkov_bin: str = "checkov",
+    policy_packs: list[PolicyPack] | None = None,
+    external_checks_dirs: list[Path] | None = None,
+    iac_kind: str = "",
+    checkov_framework: str = "",
 ) -> dict[str, Any]:
+    policy_packs = policy_packs or []
+    external_checks_dirs = external_checks_dirs or []
     executable = shutil.which(checkov_bin)
     evidence: dict[str, Any] = {
         "schemaVersion": "intent-engine/shift-left-checkov/v1",
         "tool": {"name": "checkov", "available": bool(executable), "version": ""},
-        "input": {"bundle": str(bundle), "scanPath": str(scan_path)},
+        "input": _input_block(
+            bundle=bundle,
+            scan_path=scan_path,
+            policy_packs=policy_packs,
+            external_checks_dirs=external_checks_dirs,
+            iac_kind=iac_kind,
+            checkov_framework=checkov_framework,
+        ),
         "boundary": BOUNDARY,
         "summary": _empty_summary(),
         "findings": [],
+        "mappedControls": [],
+        "unmappedFindings": [],
     }
     if executable is None:
         evidence["result"] = {
@@ -69,6 +103,10 @@ def run_checkov_evidence(
     evidence["tool"]["version"] = (version_proc.stdout or version_proc.stderr).strip()
 
     argv = [executable, "-d", str(scan_path), "-o", "json"]
+    for checks_dir in external_checks_dirs:
+        argv.extend(["--external-checks-dir", str(checks_dir)])
+    if checkov_framework:
+        argv.extend(["--framework", checkov_framework])
     proc = subprocess.run(
         argv,
         capture_output=True,
@@ -98,6 +136,9 @@ def run_checkov_evidence(
     evidence["result"]["status"] = status
     evidence["summary"] = summary
     evidence["findings"] = findings
+    mapped_controls, unmapped_findings = map_findings_to_controls(findings, policy_packs)
+    evidence["mappedControls"] = mapped_controls
+    evidence["unmappedFindings"] = unmapped_findings
     if proc.stderr.strip():
         evidence["stderr"] = proc.stderr[:4000]
     return evidence
@@ -117,6 +158,33 @@ def _empty_summary() -> dict[str, int]:
         "skipped": 0,
         "parsingErrors": 0,
         "resourceCount": 0,
+    }
+
+
+def _input_block(
+    *,
+    bundle: Path,
+    scan_path: Path,
+    policy_packs: list[PolicyPack],
+    external_checks_dirs: list[Path],
+    iac_kind: str,
+    checkov_framework: str,
+) -> dict[str, Any]:
+    return {
+        "bundle": str(bundle),
+        "scanPath": str(scan_path),
+        "iacKind": iac_kind,
+        "checkovFramework": checkov_framework,
+        "policyPacks": [
+            {
+                "name": pack.name,
+                "version": pack.version,
+                "frameworks": pack.frameworks,
+                "controlCount": len(pack.controls),
+            }
+            for pack in policy_packs
+        ],
+        "ownerPolicyPaths": [str(path) for path in external_checks_dirs],
     }
 
 

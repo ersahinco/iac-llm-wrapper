@@ -572,3 +572,81 @@ def test_review_html_labels_omitted_raw_evidence_as_not_requested(tmp_path: Path
 
     assert "Raw evidence</span><strong>not requested</strong>" in html
     assert "Raw evidence file</span><strong>not requested</strong>" in html
+
+
+def test_review_html_surfaces_policy_evidence_without_changing_readiness(tmp_path: Path):
+    input_dir = tmp_path / "out"
+    validation_path = _write_review_bundle(input_dir)
+    _write_yaml(
+        input_dir / "decision-report.yaml",
+        {
+            "pattern": "terraform-vpc",
+            "handoffReadiness": {
+                "status": "ready",
+                "handoffAllowed": True,
+                "blockers": [],
+                "missingDecisions": [],
+                "conflictingDecisions": [],
+            },
+        },
+    )
+    _write_yaml(
+        input_dir / "handoff-plan.yaml",
+        {
+            "pattern": "terraform-vpc",
+            "readiness": {"status": "ready", "handoffAllowed": True},
+            "allowedNextAction": "Review owner pipeline gates.",
+            "targetContracts": [
+                {
+                    "name": "terraform-aws-vpc-module",
+                    "requiredArtifacts": ["present.yaml", "missing.yaml"],
+                }
+            ],
+        },
+    )
+    _write_yaml(
+        input_dir / "policy-graph.yaml",
+        {
+            "schemaVersion": "intent-engine/policy-graph/v1",
+            "policyPacks": [
+                {
+                    "name": "regulated-vpc-baseline-v1",
+                    "version": "1.0.0",
+                    "frameworks": ["SOC2", "PCI", "HIPAA", "NIST"],
+                    "controls": [{"id": "VPC-NETWORK-001", "title": "CIDR control"}],
+                }
+            ],
+        },
+    )
+    _write_yaml(
+        input_dir / "shift-left-evidence.yaml",
+        {
+            "schemaVersion": "intent-engine/shift-left-checkov/v1",
+            "input": {
+                "iacKind": "terraform",
+                "ownerPolicyPaths": ["/owner/custom-checks"],
+                "checkovFramework": "terraform",
+            },
+            "boundary": "Checkov evidence is shift-left input and does not deploy.",
+            "result": {"status": "fail"},
+            "summary": {"failed": 1},
+            "mappedControls": [{"controlId": "VPC-NETWORK-001"}],
+            "unmappedFindings": [{"checkId": "CKV_OTHER"}],
+        },
+    )
+
+    context = build_review_context(
+        input_dir,
+        link_base_dir=input_dir,
+        graph_exports={},
+        contract_validation_path=validation_path,
+    )
+    html = render_review_html(input_dir)
+
+    assert context["reviewSummary"]["handoffAllowed"] is True
+    assert context["reviewSummary"]["policyEvidenceStatus"] == "fail"
+    assert "Policy Graph And Shift-Left Evidence" in html
+    assert "regulated-vpc-baseline-v1" in html
+    assert "VPC-NETWORK-001" in html
+    assert "Unmapped Checkov findings</span><strong>1</strong>" in html
+    assert "not compliance attestation or deployment approval" in html

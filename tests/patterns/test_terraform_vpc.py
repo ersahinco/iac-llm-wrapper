@@ -64,6 +64,15 @@ class TestTerraformVpcPattern:
         assert "accelerator/module toolchain" not in safe_path
         assert (tmp_path / "terraform.tfvars").exists()
         assert (tmp_path / "sample-recommendations.yaml").exists()
+        policy_graph = _yaml_load(tmp_path / "policy-graph.yaml")
+        assert policy_graph["schemaVersion"] == "intent-engine/policy-graph/v1"
+        assert policy_graph["policyPacks"][0]["name"] == "regulated-vpc-baseline-v1"
+        assert "SOC2" in policy_graph["policyPacks"][0]["frameworks"]
+        context_manifest = _yaml_load(tmp_path / "context-manifest.yaml")
+        assert context_manifest["contextInventory"]["policyPacks"][0]["name"] == (
+            "regulated-vpc-baseline-v1"
+        )
+        assert "policy-graph.yaml" in context_manifest["outputs"]["expectedArtifacts"]
 
     def test_subnet_count_mismatch_fails(self, tmp_path: Path):
         decisions = {

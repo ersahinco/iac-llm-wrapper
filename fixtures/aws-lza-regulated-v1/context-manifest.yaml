@@ -392,6 +392,7 @@ contextInventory:
         - standard
         - control-tower
         - hub-spoke
+  policyPacks: []
   targetCapabilities:
     - key: aws-lza-sample-config
       type: accelerator

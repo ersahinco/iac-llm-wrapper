@@ -64,6 +64,8 @@ def build_review_context(
     benchmark = _read_yaml(input_dir / "model-benchmark.yaml")
     handoff = _read_yaml(input_dir / "handoff-plan.yaml")
     lineage = _read_yaml(input_dir / "lineage-manifest.yaml")
+    policy_graph = _read_yaml(input_dir / "policy-graph.yaml")
+    shift_left_evidence = _read_yaml(input_dir / "shift-left-evidence.yaml")
     target_capabilities = _read_yaml(input_dir / "target-capability-graph.yaml")
     if not target_capabilities:
         target_capabilities = _dict(
@@ -85,6 +87,7 @@ def build_review_context(
     raw_evidence = _raw_evidence(trace)
     lza_validation_evidence = _read_yaml(input_dir / LZA_VALIDATION_EVIDENCE)
     lza_validation_summary = _lza_validation_summary(lza_validation_evidence)
+    policy_evidence_summary = _policy_evidence_summary(policy_graph, shift_left_evidence)
 
     return {
         "pattern": str(report.get("pattern", handoff.get("pattern", "handoff"))),
@@ -103,6 +106,10 @@ def build_review_context(
             "modelParseErrorCount": model_quality.get("parseErrorCount", 0),
             "lzaValidationStatus": lza_validation_summary.get("status", "not-run"),
             "lzaValidationFailure": lza_validation_summary.get("failureExcerpt", ""),
+            "policyPackCount": policy_evidence_summary.get("policyPackCount", 0),
+            "policyEvidenceStatus": policy_evidence_summary.get("status", "not-run"),
+            "failedPolicyControlCount": policy_evidence_summary.get("failedPolicyControlCount", 0),
+            "unmappedCheckovFindingCount": policy_evidence_summary.get("unmappedFindingCount", 0),
             "selectedTargetPath": target_capabilities.get("selectedTargetPath", []),
             "unsupportedTargetGapCount": len(
                 _coerce_list(target_capabilities.get("unsupportedGaps"))
@@ -121,6 +128,9 @@ def build_review_context(
         "contractStatus": contract_status,
         "lzaValidationEvidence": lza_validation_evidence,
         "lzaValidationSummary": lza_validation_summary,
+        "policyGraph": policy_graph,
+        "shiftLeftEvidence": shift_left_evidence,
+        "policyEvidenceSummary": policy_evidence_summary,
         "targetCapabilities": target_capabilities,
         "reviewerNextActions": _reviewer_next_actions(
             readiness=readiness,
@@ -129,6 +139,7 @@ def build_review_context(
             artifacts=artifacts,
             model_quality=model_quality,
             lza_validation_summary=lza_validation_summary,
+            policy_evidence_summary=policy_evidence_summary,
         ),
         "artifacts": artifacts,
         "handoff": handoff,
@@ -143,6 +154,12 @@ def build_review_context(
             if contract_validation_path is not None
             else None,
             "lzaValidation": _artifact_href(input_dir, link_base_dir, LZA_VALIDATION_EVIDENCE),
+            "policyGraph": _artifact_href(input_dir, link_base_dir, "policy-graph.yaml"),
+            "shiftLeftEvidence": _artifact_href(
+                input_dir,
+                link_base_dir,
+                "shift-left-evidence.yaml",
+            ),
             "targetCapabilities": _artifact_href(
                 input_dir,
                 link_base_dir,
@@ -453,6 +470,64 @@ def _lza_validation_summary(evidence: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _policy_evidence_summary(
+    policy_graph: dict[str, Any],
+    shift_left_evidence: dict[str, Any],
+) -> dict[str, Any]:
+    packs = _coerce_list(policy_graph.get("policyPacks"))
+    frameworks = sorted(
+        {
+            str(framework)
+            for pack in packs
+            if isinstance(pack, dict)
+            for framework in _coerce_list(pack.get("frameworks"))
+        }
+    )
+    controls = [
+        control
+        for pack in packs
+        if isinstance(pack, dict)
+        for control in _coerce_list(pack.get("controls"))
+        if isinstance(control, dict)
+    ]
+    evidence_result = _dict(shift_left_evidence.get("result"))
+    evidence_input = _dict(shift_left_evidence.get("input"))
+    status = str(evidence_result.get("status", "not-run")) if shift_left_evidence else "not-run"
+    mapped_controls = _coerce_list(shift_left_evidence.get("mappedControls"))
+    unmapped_findings = _coerce_list(shift_left_evidence.get("unmappedFindings"))
+    failed_control_ids = sorted(
+        {
+            str(item.get("controlId", ""))
+            for item in mapped_controls
+            if isinstance(item, dict) and item.get("controlId")
+        }
+    )
+    return {
+        "status": status,
+        "policyPackCount": len(packs),
+        "policyPacks": [
+            {
+                "name": str(pack.get("name", "")),
+                "version": str(pack.get("version", "")),
+                "frameworks": _coerce_list(pack.get("frameworks")),
+                "controlCount": len(_coerce_list(pack.get("controls"))),
+            }
+            for pack in packs
+            if isinstance(pack, dict)
+        ],
+        "frameworks": frameworks,
+        "controlCount": len(controls),
+        "failedPolicyControlCount": len(failed_control_ids),
+        "failedPolicyControls": failed_control_ids,
+        "unmappedFindingCount": len(unmapped_findings),
+        "ownerPolicyPaths": _coerce_list(evidence_input.get("ownerPolicyPaths")),
+        "iacKind": str(evidence_input.get("iacKind", "")),
+        "checkovFramework": str(evidence_input.get("checkovFramework", "")),
+        "summary": _dict(shift_left_evidence.get("summary")),
+        "boundary": str(shift_left_evidence.get("boundary", "")),
+    }
+
+
 def _aws_lookup_boundary(boundary: dict[str, Any]) -> str:
     explicit = boundary.get("awsAccountLookupBoundary")
     if explicit:
@@ -499,6 +574,7 @@ def _reviewer_next_actions(
     artifacts: list[dict[str, str]],
     model_quality: dict[str, Any],
     lza_validation_summary: dict[str, Any],
+    policy_evidence_summary: dict[str, Any],
 ) -> list[str]:
     status = str(readiness.get("status", "unknown"))
     handoff_allowed = bool(readiness.get("handoffAllowed", False))
@@ -533,6 +609,24 @@ def _reviewer_next_actions(
             "Do not claim downstream AWS LZA validation until lza-validation-evidence.yaml "
             "failures are resolved.",
         )
+    policy_status = str(policy_evidence_summary.get("status", "not-run"))
+    if int(policy_evidence_summary.get("policyPackCount", 0) or 0):
+        if policy_status == "not-run":
+            actions.append(
+                "Policy packs are declared; capture shift-left Checkov evidence before "
+                "owner-controlled pipeline gates require it."
+            )
+        elif policy_status != "pass":
+            actions.append(
+                "Treat shift-left Checkov findings as owner-pipeline evidence, not "
+                "compliance attestation or deployment approval; resolve failed mapped "
+                "controls or document owner acceptance."
+            )
+        else:
+            actions.append(
+                "Use shift-left-evidence.yaml as input to owner-controlled CI/CD gates; "
+                "it is not compliance attestation by itself."
+            )
     raw_evidence_status = _raw_evidence_status_label(raw_evidence)
     if raw_evidence_status in {"captured", "requested"}:
         actions.append(

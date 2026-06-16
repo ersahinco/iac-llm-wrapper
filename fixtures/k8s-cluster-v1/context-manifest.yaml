@@ -159,6 +159,7 @@ contextInventory:
       sourceUrl: https://github.com/terraform-aws-modules/terraform-aws-eks
       sourceContract:
       tags: []
+  policyPacks: []
   targetCapabilities: []
   planReady:
     declared: false

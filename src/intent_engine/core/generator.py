@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from .patterns import PatternGenerator
+from .policy import policy_pack_inventory, policy_packs_to_dict
 from .yaml_utils import write_yaml_artifact
 
 # ---------------------------------------------------------------------------
@@ -318,6 +319,7 @@ def gen_context_manifest(intent: Any, output_dir: Path) -> None:
                 }
                 for sample in samples
             ],
+            "policyPacks": policy_pack_inventory(pattern_obj.policy_packs),
             "targetCapabilities": [
                 {
                     "key": capability.get("key", ""),
@@ -365,6 +367,29 @@ def gen_context_manifest(intent: Any, output_dir: Path) -> None:
         ],
     }
     _write(output_dir, "context-manifest.yaml", data, "intent-engine/context-manifest/v1")
+
+
+def gen_policy_graph(intent: Any, output_dir: Path) -> None:
+    """Write registered policy graph metadata when a pattern declares policy packs."""
+    pattern = getattr(intent, "pattern", "")
+    if not pattern:
+        return
+
+    from .patterns import GLOBAL_REGISTRY as PATTERN_REGISTRY
+
+    pattern_obj = PATTERN_REGISTRY.get(pattern)
+    if not pattern_obj.policy_packs:
+        return
+    data = {
+        "pattern": pattern,
+        "boundary": (
+            "Policy graph metadata connects requirements, target contracts, artifacts, "
+            "module variables, and policy-as-code references. It is not compliance "
+            "attestation, deployment approval, or a deploy runner."
+        ),
+        "policyPacks": policy_packs_to_dict(pattern_obj.policy_packs),
+    }
+    _write(output_dir, "policy-graph.yaml", data, "intent-engine/policy-graph/v1")
 
 
 def _artifact_owner(artifact_name: str) -> str:
@@ -533,6 +558,7 @@ def gen_replay_manifest(intent: Any, output_dir: Path) -> None:
 CORE_GENERATORS = [
     PatternGenerator("design-doc", gen_design_doc, priority=4),
     PatternGenerator("context-manifest", gen_context_manifest, priority=4),
+    PatternGenerator("policy-graph", gen_policy_graph, priority=4),
     PatternGenerator("module-inputs", gen_module_inputs, priority=5),
     PatternGenerator("llm-trace-summary", gen_llm_trace_summary, priority=5),
     PatternGenerator("model-benchmark", gen_model_benchmark, priority=5),

@@ -52,6 +52,7 @@ from .core.llm_caller import LLMEvidenceStore, auto_detect_llm
 from .core.markdown_extractor import extract_from_markdown
 from .core.pattern_check import check_pattern
 from .core.patterns import GLOBAL_REGISTRY, Pattern
+from .core.policy import PolicyPack
 from .core.sample_config import SampleConfig
 from .core.suggestion import SuggestionEngine
 from .core.yaml_utils import read_yaml_mapping, write_yaml_artifact
@@ -132,6 +133,50 @@ def _get_pattern_or_exit(pattern: str) -> Pattern:
         typer.echo(f"Unknown pattern: {pattern}. Available: {_available_patterns()}", err=True)
         raise typer.Exit(1)
     return GLOBAL_REGISTRY.get(pattern)
+
+
+def _bundle_pattern(bundle: Path) -> Pattern | None:
+    report = read_yaml_mapping(bundle / "decision-report.yaml")
+    manifest = read_yaml_mapping(bundle / "context-manifest.yaml")
+    pattern_name = str(report.get("pattern") or manifest.get("pattern") or "")
+    if not pattern_name:
+        return None
+    return _get_pattern_or_exit(pattern_name)
+
+
+def _selected_policy_packs_or_exit(
+    pattern: Pattern | None,
+    names: list[str] | None,
+) -> list[PolicyPack]:
+    requested = names or []
+    if pattern is None:
+        if requested:
+            typer.echo(
+                "Error: --policy-pack requires a bundle with a declared pattern.",
+                err=True,
+            )
+            raise typer.Exit(1)
+        return []
+    packs_by_name = {pack.name: pack for pack in pattern.policy_packs}
+    if not requested:
+        return list(packs_by_name.values())
+    selected = []
+    missing: list[str] = []
+    for name in requested:
+        pack = packs_by_name.get(name)
+        if pack is None:
+            missing.append(name)
+        elif pack not in selected:
+            selected.append(pack)
+    if missing:
+        typer.echo(
+            "Unknown policy pack(s) for pattern "
+            f"{pattern.name}: {', '.join(missing)}. Available: "
+            f"{', '.join(sorted(packs_by_name)) or 'none'}",
+            err=True,
+        )
+        raise typer.Exit(1)
+    return selected
 
 
 def _parse_decisions_or_exit(raw_decisions: str | None) -> dict[str, Any] | None:
@@ -354,6 +399,7 @@ def pattern_check(
     typer.echo(f"  Contracts: {result.contracts}")
     typer.echo(f"  Expected artifacts: {result.expected_artifacts}")
     typer.echo(f"  Samples: {result.samples}")
+    typer.echo(f"  Policy packs: {result.policy_packs}")
     typer.echo(f"  Context rules: {result.context_rules}")
 
 
@@ -437,6 +483,26 @@ def shift_left_checkov(
         "--require-pass",
         help="Exit non-zero when Checkov evidence is not pass.",
     ),
+    policy_pack: list[str] | None = typer.Option(
+        None,
+        "--policy-pack",
+        help="Registered policy pack to map Checkov findings against. Repeatable.",
+    ),
+    external_checks_dir: list[Path] | None = typer.Option(
+        None,
+        "--external-checks-dir",
+        help="Owner-provided Checkov custom checks directory. Repeatable.",
+    ),
+    iac_kind: str = typer.Option(
+        "",
+        "--iac-kind",
+        help="IaC kind for evidence classification: terraform, opentofu, or cloudformation.",
+    ),
+    checkov_framework: str = typer.Option(
+        "",
+        "--checkov-framework",
+        help="Optional Checkov --framework value for owner filtering.",
+    ),
     checkov_bin: str = typer.Option("checkov", "--checkov-bin", help="Checkov executable name."),
 ) -> None:
     """Record optional Checkov shift-left evidence without deploying anything."""
@@ -446,10 +512,30 @@ def shift_left_checkov(
     if not scan_path.exists():
         typer.echo(f"Error: scan path does not exist: {scan_path}", err=True)
         raise typer.Exit(1)
+    external_checks_dirs = external_checks_dir or []
+    for checks_dir in external_checks_dirs:
+        if not checks_dir.is_dir():
+            typer.echo(f"Error: external checks dir is not a directory: {checks_dir}", err=True)
+            raise typer.Exit(1)
+    if iac_kind and iac_kind not in {"terraform", "opentofu", "cloudformation"}:
+        typer.echo(
+            "Error: --iac-kind must be one of terraform, opentofu, cloudformation.",
+            err=True,
+        )
+        raise typer.Exit(1)
+    pattern_obj = _bundle_pattern(bundle)
+    selected_policy_packs = _selected_policy_packs_or_exit(pattern_obj, policy_pack)
 
     evidence_path = output or (bundle / "shift-left-evidence.yaml")
     if scan_path_is_tfvars_only(scan_path):
-        evidence = build_invalid_scan_path_evidence(bundle=bundle, scan_path=scan_path)
+        evidence = build_invalid_scan_path_evidence(
+            bundle=bundle,
+            scan_path=scan_path,
+            policy_packs=selected_policy_packs,
+            external_checks_dirs=external_checks_dirs,
+            iac_kind=iac_kind,
+            checkov_framework=checkov_framework,
+        )
         write_yaml_artifact(evidence_path, evidence, "")
         typer.echo(
             "Checkov evidence written with invalid-input status; "
@@ -462,6 +548,10 @@ def shift_left_checkov(
         bundle=bundle,
         scan_path=scan_path,
         checkov_bin=checkov_bin,
+        policy_packs=selected_policy_packs,
+        external_checks_dirs=external_checks_dirs,
+        iac_kind=iac_kind,
+        checkov_framework=checkov_framework,
     )
     write_yaml_artifact(evidence_path, evidence, "")
     status = str(evidence.get("result", {}).get("status", "unknown"))

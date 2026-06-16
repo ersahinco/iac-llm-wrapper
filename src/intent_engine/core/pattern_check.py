@@ -17,6 +17,7 @@ class PatternCheckResult:
     contracts: int
     expected_artifacts: int
     samples: int
+    policy_packs: int
     context_rules: int
     violations: list[str]
 
@@ -43,6 +44,7 @@ def check_pattern(
             contracts=len(pattern.contracts),
             expected_artifacts=len(pattern.expected_artifacts()),
             samples=len(pattern.samples),
+            policy_packs=len(pattern.policy_packs),
             context_rules=0,
             violations=[f"graph factory failed: {exc}"],
         )
@@ -100,6 +102,34 @@ def check_pattern(
             for violation in validator.validate_contract() + validator.validate_graph(graph)
         )
 
+    known_contracts = {contract.name for contract in pattern.contracts}
+    for pack in pattern.policy_packs:
+        if not pack.controls:
+            violations.append(f"{pack.name}: policy pack has no controls")
+        if not pack.frameworks:
+            violations.append(f"{pack.name}: policy pack has no frameworks")
+        for control in pack.controls:
+            if not control.title:
+                violations.append(f"{pack.name}:{control.id}: policy control has no title")
+            mapping = control.mapping
+            for req_key in mapping.requirement_keys:
+                if req_key not in graph._requirements:
+                    violations.append(f"{pack.name}:{control.id}: unknown requirement {req_key}")
+            for contract_name in mapping.target_contracts:
+                if contract_name not in known_contracts:
+                    violations.append(
+                        f"{pack.name}:{control.id}: unknown target contract {contract_name}"
+                    )
+            if not (
+                mapping.requirement_keys
+                or mapping.target_contracts
+                or mapping.artifact_paths
+                or mapping.module_variables
+                or mapping.checkov_check_ids
+                or mapping.owner_policy_refs
+            ):
+                violations.append(f"{pack.name}:{control.id}: policy control has no mapping")
+
     expected_artifacts = pattern.expected_artifacts()
     for artifact in expected_artifacts:
         if not artifact:
@@ -120,6 +150,7 @@ def check_pattern(
         contracts=len(pattern.contracts),
         expected_artifacts=len(expected_artifacts),
         samples=len(samples),
+        policy_packs=len(pattern.policy_packs),
         context_rules=context_rules,
         violations=violations,
     )

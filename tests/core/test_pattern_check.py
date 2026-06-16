@@ -7,6 +7,7 @@ from pathlib import Path
 from intent_engine.core.contracts import ArtifactContract, TargetContract
 from intent_engine.core.pattern_check import check_pattern
 from intent_engine.core.patterns import Pattern
+from intent_engine.core.policy import PolicyControl, PolicyPack, PolicyRequirementMapping
 from intent_engine.core.requirements import Requirement, RequirementGraph
 from intent_engine.core.sample_config import SampleConfig
 
@@ -72,6 +73,7 @@ def test_check_pattern_passes_for_minimal_valid_pattern(tmp_path: Path):
     assert result.contracts == 1
     assert result.expected_artifacts == 4
     assert result.samples == 0
+    assert result.policy_packs == 0
     assert result.context_rules == 3
 
 
@@ -245,4 +247,50 @@ def test_check_pattern_reports_missing_sample_fixture(tmp_path: Path):
     assert (
         f"sample-missing-fixture: missing fixture dir {tmp_path / 'missing-fixture'}"
         in result.violations
+    )
+
+
+def test_check_pattern_reports_policy_mapping_failures(tmp_path: Path):
+    pattern = Pattern(
+        name="policy-pattern",
+        description="Policy pattern",
+        graph_factory=lambda: _graph(_requirement()),
+        prompt_context=(
+            "This pattern captures approved region handoff context only. "
+            "Extract the region decision for an existing target contract."
+        ),
+        contracts=[
+            TargetContract(
+                name="valid-contract",
+                kind="yaml",
+                source_url="https://example.com",
+                artifacts=[ArtifactContract(name="config.yaml")],
+                required_decisions=["region"],
+            )
+        ],
+        policy_packs=[
+            PolicyPack(
+                name="regulated-test-v1",
+                version="1.0.0",
+                frameworks=["SOC2"],
+                controls=[
+                    PolicyControl(
+                        id="CTRL-001",
+                        title="Invalid mapping",
+                        mapping=PolicyRequirementMapping(
+                            requirement_keys=["missing"],
+                            target_contracts=["missing-contract"],
+                        ),
+                    )
+                ],
+            )
+        ],
+    )
+
+    result = check_pattern(pattern, fixtures_root=tmp_path)
+
+    assert result.policy_packs == 1
+    assert "regulated-test-v1:CTRL-001: unknown requirement missing" in result.violations
+    assert (
+        "regulated-test-v1:CTRL-001: unknown target contract missing-contract" in result.violations
     )

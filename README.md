@@ -37,7 +37,11 @@ owner-controlled deployment pipeline reference. Git-aware incremental runs use
 `compile-git` to rebuild only bundles whose design docs changed. Optional
 Checkov evidence can be captured with `shift-left checkov` against an
 owner-provided IaC/module path; generated `terraform.tfvars` alone is not treated
-as meaningful policy coverage.
+as meaningful policy coverage. Regulated patterns can also declare policy graph
+metadata that maps client/platform controls, framework labels such as SOC 2,
+PCI, HIPAA, and NIST, target contracts, module variables, and owner Checkov
+policy references. That evidence is shift-left input for owner CI/CD gates, not
+compliance attestation or deployment approval.
 
 ## Core Flow
 

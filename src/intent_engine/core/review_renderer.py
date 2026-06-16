@@ -19,6 +19,7 @@ def render_review_html(context: dict[str, Any]) -> str:
     review_summary = _dict(context.get("reviewSummary"))
     model_quality = _dict(context.get("modelQuality"))
     lza_validation_summary = _dict(context.get("lzaValidationSummary"))
+    policy_evidence_summary = _dict(context.get("policyEvidenceSummary"))
     target_capabilities = _dict(context.get("targetCapabilities"))
     target_capabilities_declared = bool(target_capabilities)
     summary_target_path = _target_path_label(
@@ -80,6 +81,19 @@ def render_review_html(context: dict[str, Any]) -> str:
                     _kv(
                         "LZA validation",
                         str(review_summary.get("lzaValidationStatus", "not-run")),
+                    ),
+                    _kv(
+                        "Policy evidence",
+                        str(review_summary.get("policyEvidenceStatus", "not-run")),
+                    ),
+                    _kv("Policy packs", str(review_summary.get("policyPackCount", 0))),
+                    _kv(
+                        "Failed policy controls",
+                        str(review_summary.get("failedPolicyControlCount", 0)),
+                    ),
+                    _kv(
+                        "Unmapped Checkov findings",
+                        str(review_summary.get("unmappedCheckovFindingCount", 0)),
                     ),
                     *(
                         [
@@ -197,6 +211,16 @@ def render_review_html(context: dict[str, Any]) -> str:
                     lza_validation_summary,
                     _dict(context.get("lzaValidationEvidence")),
                     links.get("lzaValidation"),
+                ),
+            ),
+            _section(
+                "Policy Graph And Shift-Left Evidence",
+                _policy_evidence_section(
+                    policy_evidence_summary,
+                    _dict(context.get("policyGraph")),
+                    _dict(context.get("shiftLeftEvidence")),
+                    links.get("policyGraph"),
+                    links.get("shiftLeftEvidence"),
                 ),
             ),
             _section("Target Artifacts", [_artifact_table(_coerce_list(context.get("artifacts")))]),
@@ -398,6 +422,69 @@ def _lza_validation_section(
         _digest_table(_coerce_list(summary.get("configFileDigests"))),
         _details("Raw LZA validation evidence", _yaml_dump(evidence)),
     ]
+
+
+def _policy_evidence_section(
+    summary: dict[str, Any],
+    policy_graph: dict[str, Any],
+    shift_left_evidence: dict[str, Any],
+    policy_graph_link: Any,
+    shift_left_evidence_link: Any,
+) -> list[str]:
+    if not policy_graph:
+        return ['<p class="muted">No policy graph declared for this pattern.</p>']
+    return [
+        _kv("Evidence status", str(summary.get("status", "not-run"))),
+        _kv(
+            "Frameworks",
+            ", ".join(str(item) for item in _coerce_list(summary.get("frameworks"))) or "none",
+        ),
+        _kv("Control count", str(summary.get("controlCount", 0))),
+        _kv("Failed controls", str(summary.get("failedPolicyControlCount", 0))),
+        _list_block(
+            "Failed policy control IDs",
+            _coerce_list(summary.get("failedPolicyControls")),
+        ),
+        _kv("Unmapped Checkov findings", str(summary.get("unmappedFindingCount", 0))),
+        _kv("IaC kind", str(summary.get("iacKind", ""))),
+        _kv("Checkov framework", str(summary.get("checkovFramework", ""))),
+        _list_block("Owner custom-policy paths", _coerce_list(summary.get("ownerPolicyPaths"))),
+        _policy_pack_table(_coerce_list(summary.get("policyPacks"))),
+        _artifact_link_row("Policy graph", policy_graph_link),
+        _artifact_link_row("Shift-left evidence", shift_left_evidence_link),
+        _details("Raw policy graph", _yaml_dump(policy_graph)),
+        *(
+            [_details("Raw shift-left evidence", _yaml_dump(shift_left_evidence))]
+            if shift_left_evidence
+            else []
+        ),
+    ]
+
+
+def _policy_pack_table(packs: list[Any]) -> str:
+    if not packs:
+        return '<p class="muted">No policy packs declared.</p>'
+    rows = []
+    for pack in packs:
+        if not isinstance(pack, dict):
+            continue
+        frameworks = ", ".join(str(item) for item in _coerce_list(pack.get("frameworks")))
+        rows.append(
+            "<tr>"
+            f"<th>{escape(str(pack.get('name', 'unknown')))}</th>"
+            f"<td>{escape(str(pack.get('version', '')))}</td>"
+            f"<td>{escape(frameworks)}</td>"
+            f"<td>{escape(str(pack.get('controlCount', 0)))}</td>"
+            "</tr>"
+        )
+    if not rows:
+        return '<p class="muted">No policy packs declared.</p>'
+    return (
+        "<h3>Policy Packs</h3><table>"
+        "<tr><th>Name</th><th>Version</th><th>Frameworks</th><th>Controls</th></tr>"
+        + "".join(rows)
+        + "</table>"
+    )
 
 
 def _digest_table(digests: list[Any]) -> str:

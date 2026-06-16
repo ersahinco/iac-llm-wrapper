@@ -155,3 +155,58 @@ def test_checkov_evidence_handles_malformed_json(tmp_path: Path):
 
     assert evidence["result"]["status"] == "parse-error"
     assert "rawOutput" in evidence
+
+
+def test_shift_left_checkov_maps_registered_policy_pack_and_owner_checks(tmp_path: Path):
+    bundle = tmp_path / "bundle"
+    scan_path = tmp_path / "owner-module"
+    custom_checks = tmp_path / "custom-checks"
+    bundle.mkdir()
+    scan_path.mkdir()
+    custom_checks.mkdir()
+    (bundle / "decision-report.yaml").write_text("pattern: terraform-vpc\n")
+    checkov = tmp_path / "checkov"
+    _write_checkov_stub(
+        checkov,
+        output=(
+            '{"summary":{"passed":0,"failed":2,"skipped":0,"parsing_errors":0,'
+            '"resource_count":2},"results":{"failed_checks":['
+            '{"check_id":"CKV_CUSTOM_VPC_001","check_name":"CIDR policy",'
+            '"file_path":"/main.tf","resource":"module.vpc"},'
+            '{"check_id":"CKV_OTHER","check_name":"Other policy",'
+            '"file_path":"/main.tf","resource":"module.other"}]}}'
+        ),
+        exit_code=1,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "shift-left",
+            "checkov",
+            "--bundle",
+            str(bundle),
+            "--scan-path",
+            str(scan_path),
+            "--policy-pack",
+            "regulated-vpc-baseline-v1",
+            "--external-checks-dir",
+            str(custom_checks),
+            "--iac-kind",
+            "terraform",
+            "--checkov-framework",
+            "terraform",
+            "--checkov-bin",
+            str(checkov),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    evidence = _yaml_load(bundle / "shift-left-evidence.yaml")
+    assert evidence["input"]["iacKind"] == "terraform"
+    assert evidence["input"]["policyPacks"][0]["name"] == "regulated-vpc-baseline-v1"
+    assert evidence["input"]["ownerPolicyPaths"] == [str(custom_checks)]
+    assert "--external-checks-dir" in evidence["command"]["argv"]
+    assert "--framework" in evidence["command"]["argv"]
+    assert evidence["mappedControls"][0]["controlId"] == "VPC-NETWORK-001"
+    assert evidence["unmappedFindings"][0]["checkId"] == "CKV_OTHER"

@@ -381,6 +381,12 @@ def _trial_existing_account_terraform_vpc(config: TrialConfig) -> TrialResult:
                 str(output_dir),
                 "--scan-path",
                 str(FIXTURES_DIR / "owner-terraform-vpc-module"),
+                "--policy-pack",
+                "regulated-vpc-baseline-v1",
+                "--external-checks-dir",
+                str(FIXTURES_DIR / "owner-checkov-vpc-policies"),
+                "--iac-kind",
+                "terraform",
                 "--output",
                 str(checkov_evidence),
             ],
@@ -397,6 +403,14 @@ def _trial_existing_account_terraform_vpc(config: TrialConfig) -> TrialResult:
                 failures.append("Checkov evidence scanned an invalid input")
             if "does not deploy" not in str(evidence.get("boundary", "")):
                 failures.append("Checkov evidence missing no-deploy boundary")
+            evidence_input = evidence.get("input", {})
+            if evidence_input.get("iacKind") != "terraform":
+                failures.append("Checkov evidence missing Terraform IaC kind")
+            packs = evidence_input.get("policyPacks", [])
+            if not packs or packs[0].get("name") != "regulated-vpc-baseline-v1":
+                failures.append("Checkov evidence missing regulated VPC policy pack")
+            if not evidence_input.get("ownerPolicyPaths"):
+                failures.append("Checkov evidence missing owner custom-policy path")
             evidence_text = checkov_evidence.read_text().lower()
             for forbidden in ("terraform apply", "terragrunt apply", "kubectl apply"):
                 if forbidden in evidence_text:

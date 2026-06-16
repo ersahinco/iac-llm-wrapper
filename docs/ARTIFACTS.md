@@ -8,7 +8,8 @@ Existing deployment mechanisms remain downstream.
 | --- | --- | --- | --- | --- |
 | `decision-report.yaml` | Accepted decisions, handoff readiness, blockers, safe handoff path, and pattern-owned semantic model details when available. | Core + pattern | Every compile, including blocked compiles. | No |
 | `decision-audit.yaml` | Graph audit trail showing each accepted, defaulted, or skipped decision and its reason. | Core generator | Successful pattern-backed compiles. | No |
-| `context-manifest.yaml` | Code-owned context inventory: pattern metadata, prompt context digest/text, requirement graph, target contracts, samples, target capabilities, runtime extraction summary, expected artifacts, and guardrails. | Core | Pattern-backed successful handoffs. | No |
+| `context-manifest.yaml` | Code-owned context inventory: pattern metadata, prompt context digest/text, requirement graph, target contracts, samples, policy packs, target capabilities, runtime extraction summary, expected artifacts, and guardrails. | Core | Pattern-backed successful handoffs. | No |
+| `policy-graph.yaml` | Registered policy pack metadata mapping compliance/client controls to requirements, target contracts, artifacts, module variables, Checkov IDs, and owner custom-policy references. | Core + pattern | Successful handoffs for patterns declaring policy packs. | No |
 | `handoff-plan.yaml` | Ordered review/handoff steps, owners, dependencies, manual gates, rollback, boundary, `handoffAllowed`, and allowed next action. | Core | Contract-backed successful handoffs. | No |
 | `plan-manifest.yaml` | Registered target plan metadata: immutable input artifacts, plan readiness, plan-only command text, expected plan outputs, blockers, and no-apply boundary. | Pattern + core contract | Plan-ready registered targets such as AWS LZA. | No |
 | `replay-manifest.yaml` | Source, target contract, and artifact digests for deterministic replay and bundle comparison. | Core | Plan-ready registered targets. | No |
@@ -21,7 +22,7 @@ Existing deployment mechanisms remain downstream.
 | `contract-validation.yaml` | Standalone pass/fail validation of emitted artifacts against target contracts. | Core validation helper | Explicit validation artifact writes; `review html` computes validation in memory. | No |
 | `target-capability-graph.yaml` | Downstream target coverage, selected target path, manual gates, and unsupported asks represented as semantic facts with evidence spans. | Pattern-owned target report builder | AWS LZA today; future patterns only when they own comparable target routing. | No |
 | `handoff-comparison.yaml` | Compact before/after bundle delta for incremental packet or sample updates: readiness, requirement completeness, decisions, blockers, artifacts, model quality, and sample recommendations. | Core review tooling | `iac-llm-wrapper review compare --output`. | No |
-| `shift-left-evidence.yaml` | Optional Checkov evidence for an owner-provided IaC/module/pipeline path, including tool availability, command, result, summary counts, findings, and no-deploy boundary. | Core shift-left tooling | `shift-left checkov --bundle --scan-path`. | No |
+| `shift-left-evidence.yaml` | Optional Checkov evidence for an owner-provided IaC/module/pipeline path, including tool availability, command, registered policy packs, owner custom-policy paths, IaC kind, result, summary counts, findings, mapped controls, unmapped findings, and no-deploy boundary. | Core shift-left tooling | `shift-left checkov --bundle --scan-path`. | No |
 | `handoff-comparison.html` | Static delta review page for what changed, what stayed stable, and what must be reviewed. | Core review tooling | `iac-llm-wrapper review compare --html-output`. | No |
 | `lza-validation-evidence.yaml` | Validation-only AWS LZA config-validator command, no-mutation/read-only lookup boundary, temporary-staging/replay boundary, source metadata, config digests, exit code, diagnostic summary, and captured stdout/stderr. | AWS LZA validation adapter | `iac-llm-wrapper lza validate`. | No |
 | `battle-summary.yaml` | Battle-test verdict, confidence categories, findings, and improvement items. | Battle harness | `scripts/battle-test.py`. | No |
@@ -43,6 +44,10 @@ Existing deployment mechanisms remain downstream.
   plan/diff without interpretation. These files do not invoke the plan.
 - Reviewers use `handoff-comparison.yaml` to inspect only the deltas from an
   incremental document or sample-configuration update.
+- Regulated-environment reviewers use `policy-graph.yaml` and
+  `shift-left-evidence.yaml` as pre-deployment policy evidence for
+  owner-controlled CI/CD gates. These artifacts are not compliance attestation
+  and do not authorize deployment.
 - Contributors use `context-manifest.yaml`, `llm-trace-summary.yaml`, `model-benchmark.yaml`,
   `battle-summary.yaml`, and eval results to improve extraction and model value.
 - LLM reviewers may keep `raw-evidence.yaml` in local development/debug bundles,
