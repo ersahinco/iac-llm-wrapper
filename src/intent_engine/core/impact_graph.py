@@ -152,6 +152,8 @@ def build_impact_report(
     affected_controls = _keys_by_kind(downstream_nodes, "policy_control")
     affected_checks = _keys_by_kind(downstream_nodes, "checkov_check")
     affected_variables = _keys_by_kind(downstream_nodes, "module_variable")
+    affected_semantic_entities = _keys_by_kind(downstream_nodes, "semantic_entity")
+    affected_semantic_constraints = _keys_by_kind(downstream_nodes, "semantic_constraint")
     manual_gates = _keys_by_kind(downstream_nodes, "manual_gate")
     impact_paths = _impact_paths(graph, root_ids, downstream_nodes)
     unmatched = _unmatched_roots(roots, graph, selected_roots)
@@ -171,6 +173,7 @@ def build_impact_report(
             "upstreamDependencyCount": len(upstream),
             "affectedArtifactCount": len(affected_artifacts),
             "affectedPolicyControlCount": len(affected_controls),
+            "affectedSemanticConstraintCount": len(affected_semantic_constraints),
             "manualGateCount": len(manual_gates),
         },
         "selectedRoots": [node.to_dict() for node in root_nodes],
@@ -181,6 +184,8 @@ def build_impact_report(
         "affectedPolicyControls": affected_controls,
         "affectedChecks": affected_checks,
         "affectedModuleVariables": affected_variables,
+        "affectedSemanticEntities": affected_semantic_entities,
+        "affectedSemanticConstraints": affected_semantic_constraints,
         "manualGates": manual_gates,
         "impactPaths": impact_paths,
         "reviewFocus": _review_focus(
@@ -189,6 +194,7 @@ def build_impact_report(
             artifacts=affected_artifacts,
             controls=affected_controls,
             checks=affected_checks,
+            semantic_constraints=affected_semantic_constraints,
             gates=manual_gates,
         ),
         "graph": {
@@ -231,6 +237,8 @@ def build_bundle_graph_report(bundle: Path) -> dict[str, Any]:
                 "target_contract",
                 "target_capability",
                 "manual_gate",
+                "semantic_entity",
+                "semantic_constraint",
             ],
             "impactCommand": (
                 "iac-llm-wrapper graph impact --bundle <bundle> --decision <key|other-root>"
@@ -313,6 +321,10 @@ def render_impact_report_text(report: dict[str, Any]) -> str:
     lines.extend(_list_or_none(_coerce_list(report.get("affectedChecks"))))
     lines.append("Affected module variables:")
     lines.extend(_list_or_none(_coerce_list(report.get("affectedModuleVariables"))))
+    lines.append("Affected semantic entities:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedSemanticEntities"))))
+    lines.append("Affected semantic constraints:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedSemanticConstraints"))))
     lines.append("Manual gates:")
     lines.extend(_list_or_none(_coerce_list(report.get("manualGates"))))
     lines.append("Impact paths:")
@@ -382,12 +394,155 @@ def _build_graph(bundle: Path) -> tuple[_ImpactGraph, str]:
                 graph.add_edge(decision_id, artifact_path_id, "writes")
                 graph.add_edge(artifact_path_id, artifact_id, "belongs-to")
 
+    _add_semantic_model_nodes(graph, _dict(report.get("semanticModel")))
     _add_module_nodes(graph, module_inputs)
     _add_policy_nodes(graph, policy_graph)
     _add_handoff_nodes(graph, handoff)
     _add_target_capability_nodes(graph, target_capability)
     _add_sample_nodes(graph, samples)
     return graph, pattern
+
+
+def _add_semantic_model_nodes(graph: _ImpactGraph, semantic_model: dict[str, Any]) -> None:
+    entities = {
+        str(entity.get("key")): entity
+        for entity in _coerce_list(semantic_model.get("entities"))
+        if isinstance(entity, dict) and entity.get("key")
+    }
+    for key, entity in entities.items():
+        entity_id = _add_semantic_entity_node(graph, entity)
+        if str(entity.get("kind")) == "Artifact" and key.startswith("artifact:"):
+            artifact_name = key.split(":", 1)[1]
+            artifact_id = graph.add_node("artifact", artifact_name, artifact_name)
+            graph.add_edge(entity_id, artifact_id, "describes-artifact")
+
+    for relationship in _coerce_list(semantic_model.get("relationships")):
+        if not isinstance(relationship, dict):
+            continue
+        source = str(relationship.get("source") or "")
+        target = str(relationship.get("target") or "")
+        if not source or not target:
+            continue
+        source_id = _ensure_semantic_entity_node(graph, entities, source)
+        target_id = _ensure_semantic_entity_node(graph, entities, target)
+        graph.add_edge(
+            source_id,
+            target_id,
+            f"semantic:{relationship.get('relationship') or 'related-to'}",
+        )
+
+    for constraint in _coerce_list(semantic_model.get("constraints")):
+        if not isinstance(constraint, dict):
+            continue
+        key = str(constraint.get("key") or "")
+        if not key:
+            continue
+        constraint_id = graph.add_node(
+            "semantic_constraint",
+            key,
+            str(constraint.get("label") or key),
+            status=constraint.get("status"),
+            violationCode=constraint.get("violationCode"),
+            violationMessage=constraint.get("violationMessage"),
+            evidence=constraint.get("evidence"),
+        )
+        expression = _dict(constraint.get("expression"))
+        for decision in _semantic_expression_decisions(expression):
+            decision_id = graph.add_node("decision", decision, decision)
+            graph.add_edge(decision_id, constraint_id, "checked-by-constraint")
+        for entity_key in _semantic_expression_entities(expression, entities):
+            entity_id = _ensure_semantic_entity_node(graph, entities, entity_key)
+            graph.add_edge(constraint_id, entity_id, "checks-entity")
+
+
+def _add_semantic_entity_node(graph: _ImpactGraph, entity: dict[str, Any]) -> str:
+    key = str(entity.get("key") or "")
+    return graph.add_node(
+        "semantic_entity",
+        key,
+        str(entity.get("label") or key),
+        semanticKind=entity.get("kind"),
+        entityProperties=_dict(entity.get("properties")),
+    )
+
+
+def _ensure_semantic_entity_node(
+    graph: _ImpactGraph,
+    entities: dict[str, dict[str, Any]],
+    key: str,
+) -> str:
+    entity = entities.get(key)
+    if entity is not None:
+        return _add_semantic_entity_node(graph, entity)
+    return graph.add_node("semantic_entity", key, key)
+
+
+def _semantic_expression_decisions(expression: Any) -> list[str]:
+    decisions: set[str] = set()
+
+    def visit(value: Any) -> None:
+        if isinstance(value, dict):
+            decision = value.get("decision")
+            if decision:
+                decisions.add(str(decision))
+            source = value.get("source")
+            if source:
+                decisions.add(str(source))
+            for item in value.values():
+                visit(item)
+        elif isinstance(value, list):
+            for item in value:
+                visit(item)
+
+    visit(expression)
+    return sorted(decisions)
+
+
+def _semantic_expression_entities(
+    expression: Any,
+    entities: dict[str, dict[str, Any]],
+) -> list[str]:
+    matches: set[str] = set()
+
+    def visit(value: Any) -> None:
+        if isinstance(value, dict):
+            required = value.get("requires_entity")
+            if isinstance(required, dict):
+                entity_key = _find_semantic_entity_key(
+                    entities,
+                    kind=str(required.get("kind") or ""),
+                    name=str(required.get("name") or ""),
+                )
+                if entity_key:
+                    matches.add(entity_key)
+            for item in value.values():
+                visit(item)
+        elif isinstance(value, list):
+            for item in value:
+                visit(item)
+
+    visit(expression)
+    return sorted(matches)
+
+
+def _find_semantic_entity_key(
+    entities: dict[str, dict[str, Any]],
+    *,
+    kind: str,
+    name: str,
+) -> str | None:
+    if not kind or not name:
+        return None
+    normalized_name = name.casefold()
+    for key, entity in entities.items():
+        if str(entity.get("kind", "")).casefold() != kind.casefold():
+            continue
+        label = str(entity.get("label", ""))
+        if label.casefold() == normalized_name:
+            return key
+        if key.rsplit(":", 1)[-1].casefold() == normalized_name:
+            return key
+    return None
 
 
 def _add_module_nodes(graph: _ImpactGraph, module_inputs: dict[str, Any]) -> None:
@@ -612,6 +767,8 @@ def _impact_paths(
         "manual_gate",
         "module_variable",
         "policy_control",
+        "semantic_constraint",
+        "semantic_entity",
         "target_contract",
         "target_capability",
     }
@@ -649,6 +806,7 @@ def _review_focus(
     artifacts: list[str],
     controls: list[str],
     checks: list[str],
+    semantic_constraints: list[str],
     gates: list[str],
 ) -> list[str]:
     if status == "no-match":
@@ -661,6 +819,10 @@ def _review_focus(
         focus.append("Review affected artifacts: " + ", ".join(artifacts) + ".")
     if controls:
         focus.append("Review affected policy controls: " + ", ".join(controls) + ".")
+    if semantic_constraints:
+        focus.append(
+            "Review affected semantic constraints: " + ", ".join(semantic_constraints) + "."
+        )
     if checks:
         focus.append(
             "Use affected Checkov refs as shift-left evidence inputs: " + ", ".join(checks) + "."

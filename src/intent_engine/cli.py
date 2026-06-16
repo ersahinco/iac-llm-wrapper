@@ -412,6 +412,16 @@ def graph_impact(
         "--module-variable",
         help="Module variable name to use as an impact root. Repeatable.",
     ),
+    semantic_entity: list[str] | None = typer.Option(
+        None,
+        "--semantic-entity",
+        help="Semantic entity key to use as an impact root. Repeatable.",
+    ),
+    semantic_constraint: list[str] | None = typer.Option(
+        None,
+        "--semantic-constraint",
+        help="Semantic constraint key to use as an impact root. Repeatable.",
+    ),
     changed_report: Path | None = typer.Option(
         None,
         "--changed-report",
@@ -436,11 +446,14 @@ def graph_impact(
         *(ImpactRoot(kind="artifact", key=item) for item in (artifact or [])),
         *(ImpactRoot(kind="policy_control", key=item) for item in (policy_control or [])),
         *(ImpactRoot(kind="module_variable", key=item) for item in (module_variable or [])),
+        *(ImpactRoot(kind="semantic_entity", key=item) for item in (semantic_entity or [])),
+        *(ImpactRoot(kind="semantic_constraint", key=item) for item in (semantic_constraint or [])),
     ]
     if not roots and changed_report is None:
         typer.echo(
             "Error: provide at least one root via --decision, --artifact, "
-            "--policy-control, --module-variable, or --changed-report.",
+            "--policy-control, --module-variable, --semantic-entity, "
+            "--semantic-constraint, or --changed-report.",
             err=True,
         )
         raise typer.Exit(1)

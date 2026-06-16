@@ -46,8 +46,9 @@ compliance attestation or deployment approval.
 Graph dependency traversal is available with `graph bundle --bundle ...` for a
 queryable typed bundle graph and `graph impact --bundle ...` to inspect the
 blast radius of a changed decision, artifact, module variable, policy control,
-or input diff. These are read-only reasoning artifacts for review and owner
-CI/CD routing, not planners or deployment runners.
+semantic entity, semantic constraint, or input diff. These are read-only
+reasoning artifacts for review and owner CI/CD routing, not diagram ingestion,
+planners, or deployment runners.
 
 ## Core Flow
 

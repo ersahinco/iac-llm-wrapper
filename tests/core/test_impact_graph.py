@@ -172,6 +172,82 @@ def test_bundle_graph_report_exports_queryable_nodes_and_edges(tmp_path: Path):
     assert "decision" in report["queryHints"]["rootKinds"]
 
 
+def test_bundle_graph_report_exports_semantic_model_nodes_and_edges():
+    bundle = Path("fixtures/aws-lza-standard-v1")
+
+    report = build_bundle_graph_report(bundle)
+
+    node_ids = {item["id"] for item in report["nodes"]}
+    assert "semantic_entity:account:management" in node_ids
+    assert "semantic_entity:control:security-hub" in node_ids
+    assert "semantic_entity:artifact:security-config.yaml" in node_ids
+    assert "semantic_constraint:security-ou-present" in node_ids
+    assert report["summary"]["nodeKinds"]["semantic_entity"] >= 20
+    assert report["summary"]["nodeKinds"]["semantic_constraint"] >= 10
+    assert {
+        "from": "semantic_entity:control:security-hub",
+        "to": "semantic_entity:artifact:security-config.yaml",
+        "relationship": "semantic:produces_artifact",
+    } in report["edges"]
+    assert {
+        "from": "semantic_entity:artifact:security-config.yaml",
+        "to": "artifact:security-config.yaml",
+        "relationship": "describes-artifact",
+    } in report["edges"]
+    assert "semantic_entity" in report["queryHints"]["rootKinds"]
+    assert "semantic_constraint" in report["queryHints"]["rootKinds"]
+
+
+def test_semantic_entity_root_reports_affected_artifact():
+    bundle = Path("fixtures/aws-lza-standard-v1")
+
+    report = build_impact_report(
+        bundle,
+        roots=[ImpactRoot(kind="semantic_entity", key="control:security-hub")],
+    )
+
+    assert report["summary"]["status"] == "matched"
+    assert "security-config.yaml" in report["affectedArtifacts"]
+    assert "artifact:security-config.yaml" in report["affectedSemanticEntities"]
+    path_targets = {item["target"]["id"] for item in report["impactPaths"]}
+    assert "artifact:security-config.yaml" in path_targets
+    rendered = render_impact_report_text(report)
+    assert "Affected semantic entities:" in rendered
+    assert "semantic_entity:control:security-hub" in rendered
+
+
+def test_semantic_constraint_root_reports_checked_entity():
+    bundle = Path("fixtures/aws-lza-standard-v1")
+
+    report = build_impact_report(
+        bundle,
+        roots=[ImpactRoot(kind="semantic_constraint", key="security-ou-present")],
+    )
+
+    assert report["summary"]["status"] == "matched"
+    assert "ou:security" in report["affectedSemanticEntities"]
+    assert report["affectedArtifacts"] == []
+    assert "semantic_constraint:security-ou-present" in report["reviewFocus"][0]
+
+
+def test_graph_impact_cli_accepts_semantic_roots():
+    result = runner.invoke(
+        app,
+        [
+            "graph",
+            "impact",
+            "--bundle",
+            "fixtures/aws-lza-standard-v1",
+            "--semantic-entity",
+            "control:security-hub",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "security-config.yaml" in result.output
+    assert "Affected semantic entities:" in result.output
+
+
 def test_graph_bundle_cli_writes_queryable_report(tmp_path: Path):
     bundle = _terraform_vpc_bundle(tmp_path / "bundle")
     output = tmp_path / "bundle-graph.yaml"
