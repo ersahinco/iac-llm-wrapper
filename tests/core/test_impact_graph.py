@@ -14,7 +14,9 @@ from intent_engine.core.impact_graph import (
     ImpactRoot,
     build_bundle_graph_report,
     build_impact_report,
+    build_path_report,
     render_impact_report_text,
+    render_path_report_text,
 )
 
 runner = CliRunner()
@@ -170,6 +172,7 @@ def test_bundle_graph_report_exports_queryable_nodes_and_edges(tmp_path: Path):
         "relationship": "mapped-to-control",
     } in report["edges"]
     assert "decision" in report["queryHints"]["rootKinds"]
+    assert "graph path" in report["queryHints"]["pathCommand"]
 
 
 def test_bundle_graph_report_exports_semantic_model_nodes_and_edges():
@@ -246,6 +249,79 @@ def test_graph_impact_cli_accepts_semantic_roots():
     assert result.exit_code == 0, result.output
     assert "security-config.yaml" in result.output
     assert "Affected semantic entities:" in result.output
+
+
+def test_graph_path_reports_semantic_route_to_artifact():
+    report = build_path_report(
+        Path("fixtures/aws-lza-standard-v1"),
+        source=ImpactRoot(kind="semantic_entity", key="control:security-hub"),
+        target=ImpactRoot(kind="artifact", key="security-config.yaml"),
+    )
+
+    assert report["schemaVersion"] == "intent-engine/graph-path/v1"
+    assert report["summary"]["status"] == "matched"
+    assert report["summary"]["hopCount"] == 2
+    assert [item["relationship"] for item in report["path"]] == [
+        "semantic:produces_artifact",
+        "describes-artifact",
+    ]
+    assert [item["direction"] for item in report["path"]] == ["downstream", "downstream"]
+    rendered = render_path_report_text(report)
+    assert "Graph Path" in rendered
+    assert "semantic_entity:control:security-hub --semantic:produces_artifact" in rendered
+
+
+def test_graph_path_can_traverse_reverse_when_direction_is_either():
+    report = build_path_report(
+        Path("fixtures/aws-lza-standard-v1"),
+        source=ImpactRoot(kind="artifact", key="security-config.yaml"),
+        target=ImpactRoot(kind="semantic_entity", key="control:security-hub"),
+        direction="either",
+    )
+
+    assert report["summary"]["status"] == "matched"
+    assert report["summary"]["hopCount"] == 2
+    assert [item["direction"] for item in report["path"]] == ["upstream", "upstream"]
+
+
+def test_graph_path_no_match_is_reported_without_failure():
+    report = build_path_report(
+        Path("fixtures/aws-lza-standard-v1"),
+        source=ImpactRoot(kind="semantic_entity", key="missing"),
+        target=ImpactRoot(kind="artifact", key="security-config.yaml"),
+    )
+
+    assert report["summary"]["status"] == "no-match"
+    assert report["unmatchedRoots"] == [
+        {"role": "source", "kind": "semantic_entity", "key": "missing"}
+    ]
+    assert "not found" in report["reviewFocus"][0]
+
+
+def test_graph_path_cli_writes_report(tmp_path: Path):
+    output = tmp_path / "graph-path.yaml"
+
+    result = runner.invoke(
+        app,
+        [
+            "graph",
+            "path",
+            "--bundle",
+            "fixtures/aws-lza-standard-v1",
+            "--from",
+            "semantic_entity:control:security-hub",
+            "--to",
+            "artifact:security-config.yaml",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Graph Path" in result.output
+    report = _yaml_load(output)
+    assert report["summary"]["status"] == "matched"
+    assert report["summary"]["hopCount"] == 2
 
 
 def test_graph_bundle_cli_writes_queryable_report(tmp_path: Path):

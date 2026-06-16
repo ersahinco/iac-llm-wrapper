@@ -55,6 +55,14 @@ class _ImpactEdge:
         }
 
 
+@dataclass(frozen=True)
+class _PathStep:
+    edge: _ImpactEdge
+    source: str
+    target: str
+    direction: str
+
+
 class _ImpactGraph:
     def __init__(self) -> None:
         self.nodes: dict[str, _ImpactNode] = {}
@@ -112,6 +120,21 @@ class _ImpactGraph:
                 queue.append((edge.target, [*path, edge]))
         return []
 
+    def shortest_steps(self, source: str, target: str, direction: str) -> list[_PathStep]:
+        adjacency = self._path_adjacency(direction)
+        queue: deque[tuple[str, list[_PathStep]]] = deque([(source, [])])
+        seen: set[str] = {source}
+        while queue:
+            node, path = queue.popleft()
+            if node == target:
+                return path
+            for step in adjacency.get(node, []):
+                if step.target in seen:
+                    continue
+                seen.add(step.target)
+                queue.append((step.target, [*path, step]))
+        return []
+
     def _outgoing(self) -> dict[str, list[str]]:
         graph: dict[str, list[str]] = {}
         for edge in self.edges:
@@ -128,6 +151,29 @@ class _ImpactGraph:
         graph: dict[str, list[_ImpactEdge]] = {}
         for edge in self.edges:
             graph.setdefault(edge.source, []).append(edge)
+        return graph
+
+    def _path_adjacency(self, direction: str) -> dict[str, list[_PathStep]]:
+        graph: dict[str, list[_PathStep]] = {}
+        for edge in self.edges:
+            if direction in {"downstream", "either"}:
+                graph.setdefault(edge.source, []).append(
+                    _PathStep(
+                        edge=edge,
+                        source=edge.source,
+                        target=edge.target,
+                        direction="downstream",
+                    )
+                )
+            if direction in {"upstream", "either"}:
+                graph.setdefault(edge.target, []).append(
+                    _PathStep(
+                        edge=edge,
+                        source=edge.target,
+                        target=edge.source,
+                        direction="upstream",
+                    )
+                )
         return graph
 
 
@@ -243,13 +289,79 @@ def build_bundle_graph_report(bundle: Path) -> dict[str, Any]:
             "impactCommand": (
                 "iac-llm-wrapper graph impact --bundle <bundle> --decision <key|other-root>"
             ),
+            "pathCommand": (
+                "iac-llm-wrapper graph path --bundle <bundle> --from <kind:key> --to <kind:key>"
+            ),
         },
         "nodes": nodes,
         "edges": edges,
     }
 
 
+def build_path_report(
+    bundle: Path,
+    *,
+    source: ImpactRoot,
+    target: ImpactRoot,
+    direction: str = "either",
+) -> dict[str, Any]:
+    """Build an explainable shortest-path report between two graph roots."""
+
+    graph, pattern = _build_graph(bundle)
+    source_ids = _roots_from_selectors(graph, [source])
+    target_ids = _roots_from_selectors(graph, [target])
+    source_id = source_ids[0] if source_ids else None
+    target_id = target_ids[0] if target_ids else None
+    status = "matched"
+    steps: list[_PathStep] = []
+    if source_id is None or target_id is None:
+        status = "no-match"
+    elif source_id == target_id:
+        status = "same-root"
+    else:
+        steps = graph.shortest_steps(source_id, target_id, direction)
+        if not steps:
+            status = "no-path"
+
+    unmatched = []
+    if source_id is None:
+        unmatched.append({"role": "source", "kind": source.kind, "key": source.key})
+    if target_id is None:
+        unmatched.append({"role": "target", "kind": target.kind, "key": target.key})
+
+    return {
+        "schemaVersion": "intent-engine/graph-path/v1",
+        "bundle": str(bundle),
+        "pattern": pattern,
+        "boundary": BOUNDARY,
+        "summary": {
+            "status": status,
+            "direction": direction,
+            "hopCount": len(steps),
+        },
+        "source": _node_or_selector(graph, source_id, source),
+        "target": _node_or_selector(graph, target_id, target),
+        "unmatchedRoots": unmatched,
+        "path": [_path_step_to_dict(graph, step) for step in steps],
+        "reviewFocus": _path_review_focus(
+            status=status,
+            source_id=source_id,
+            target_id=target_id,
+            direction=direction,
+            steps=steps,
+        ),
+        "graph": {
+            "nodeCount": len(graph.nodes),
+            "edgeCount": len(graph.edges),
+        },
+    }
+
+
 def write_bundle_graph_report(report: dict[str, Any], output: Path) -> None:
+    write_yaml_artifact(output, report, "")
+
+
+def write_path_report(report: dict[str, Any], output: Path) -> None:
     write_yaml_artifact(output, report, "")
 
 
@@ -273,6 +385,45 @@ def render_bundle_graph_text(report: dict[str, Any]) -> str:
     lines.append("Query roots:")
     for kind in _coerce_list(_dict(report.get("queryHints")).get("rootKinds")):
         lines.append(f"  - {kind}")
+    return "\n".join(lines) + "\n"
+
+
+def render_path_report_text(report: dict[str, Any]) -> str:
+    summary = _dict(report.get("summary"))
+    lines = [
+        "=== Graph Path ===",
+        "",
+        f"Status: {summary.get('status', 'unknown')}",
+        f"Direction: {summary.get('direction', 'either')}",
+        f"Pattern: {report.get('pattern', '')}",
+        f"Bundle: {report.get('bundle', '')}",
+        "",
+        f"Source: {_node_label(_dict(report.get('source')))}",
+        f"Target: {_node_label(_dict(report.get('target')))}",
+    ]
+    unmatched = _coerce_list(report.get("unmatchedRoots"))
+    if unmatched:
+        lines.append("")
+        lines.append("Unmatched roots:")
+        lines.extend(
+            f"  - {item.get('role', 'root')}:{item.get('kind', 'unknown')}:{item.get('key', '')}"
+            for item in unmatched
+            if isinstance(item, dict)
+        )
+    lines.extend(["", f"Hops: {summary.get('hopCount', 0)}", "Path:"])
+    path_lines = []
+    for step in _coerce_list(report.get("path")):
+        if not isinstance(step, dict):
+            continue
+        source = _dict(step.get("from"))
+        target = _dict(step.get("to"))
+        path_lines.append(
+            f"  - {_node_label(source)} --{step.get('relationship', '')} "
+            f"({step.get('direction', '')})--> {_node_label(target)}"
+        )
+    lines.extend(path_lines or ["  - None"])
+    lines.append("Review focus:")
+    lines.extend(_list_or_none(_coerce_list(report.get("reviewFocus"))))
     return "\n".join(lines) + "\n"
 
 
@@ -726,6 +877,22 @@ def _unmatched_roots(
     return unmatched
 
 
+def _node_or_selector(
+    graph: _ImpactGraph,
+    node_id: str | None,
+    selector: ImpactRoot,
+) -> dict[str, Any]:
+    if node_id is not None and node_id in graph.nodes:
+        return graph.nodes[node_id].to_dict()
+    return {
+        "id": f"{selector.kind}:{selector.key}",
+        "kind": selector.kind,
+        "key": selector.key,
+        "label": selector.key,
+        "properties": {},
+    }
+
+
 def _walk(roots: list[str], adjacency: dict[str, list[str]]) -> set[str]:
     seen: set[str] = set()
     queue: deque[str] = deque(roots)
@@ -799,6 +966,21 @@ def _impact_paths(
     return sorted(paths, key=lambda item: str(_dict(item.get("target")).get("id", "")))
 
 
+def _path_step_to_dict(graph: _ImpactGraph, step: _PathStep) -> dict[str, Any]:
+    edge = step.edge
+    return {
+        "from": graph.nodes[step.source].to_dict(),
+        "to": graph.nodes[step.target].to_dict(),
+        "relationship": edge.relationship,
+        "direction": step.direction,
+        "edge": {
+            "from": edge.source,
+            "to": edge.target,
+            "relationship": edge.relationship,
+        },
+    }
+
+
 def _review_focus(
     *,
     status: str,
@@ -830,6 +1012,32 @@ def _review_focus(
     if gates:
         focus.append("Re-run or re-approve manual gates: " + ", ".join(gates) + ".")
     return focus
+
+
+def _path_review_focus(
+    *,
+    status: str,
+    source_id: str | None,
+    target_id: str | None,
+    direction: str,
+    steps: list[_PathStep],
+) -> list[str]:
+    if status == "no-match":
+        return ["One or both selected graph roots were not found in the generated bundle graph."]
+    if status == "same-root":
+        return ["Source and target resolve to the same graph node; no traversal is required."]
+    if status == "no-path":
+        return [
+            "No path was found between the selected graph roots for direction "
+            f"'{direction}'. Try --direction either or inspect graph impact upstream/downstream."
+        ]
+    upstream_hops = len([step for step in steps if step.direction == "upstream"])
+    downstream_hops = len(steps) - upstream_hops
+    return [
+        f"Review graph path from {source_id} to {target_id}.",
+        "Shortest path uses "
+        f"{downstream_hops} downstream hop(s) and {upstream_hops} upstream hop(s).",
+    ]
 
 
 def _node_label(node: dict[str, Any]) -> str:

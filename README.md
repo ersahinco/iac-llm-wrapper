@@ -46,7 +46,9 @@ compliance attestation or deployment approval.
 Graph dependency traversal is available with `graph bundle --bundle ...` for a
 queryable typed bundle graph and `graph impact --bundle ...` to inspect the
 blast radius of a changed decision, artifact, module variable, policy control,
-semantic entity, semantic constraint, or input diff. These are read-only
+semantic entity, semantic constraint, or input diff. Use
+`graph path --bundle ... --from <kind:key> --to <kind:key>` to explain the
+shortest dependency path between two specific graph roots. These are read-only
 reasoning artifacts for review and owner CI/CD routing, not diagram ingestion,
 planners, or deployment runners.
 

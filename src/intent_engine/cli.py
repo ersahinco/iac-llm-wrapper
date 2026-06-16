@@ -51,10 +51,13 @@ from .core.impact_graph import (
     ImpactRoot,
     build_bundle_graph_report,
     build_impact_report,
+    build_path_report,
     render_bundle_graph_text,
     render_impact_report_text,
+    render_path_report_text,
     write_bundle_graph_report,
     write_impact_report,
+    write_path_report,
 )
 from .core.interview import InterviewEngine
 from .core.llm_caller import LLMEvidenceStore, auto_detect_llm
@@ -186,6 +189,23 @@ def _selected_policy_packs_or_exit(
         )
         raise typer.Exit(1)
     return selected
+
+
+def _graph_root_or_exit(value: str, option_name: str) -> ImpactRoot:
+    if ":" not in value:
+        typer.echo(
+            f"Error: {option_name} must use <kind>:<key>, for example decision:cidr.",
+            err=True,
+        )
+        raise typer.Exit(1)
+    kind, key = value.split(":", 1)
+    if not kind or not key:
+        typer.echo(
+            f"Error: {option_name} must use <kind>:<key>, for example decision:cidr.",
+            err=True,
+        )
+        raise typer.Exit(1)
+    return ImpactRoot(kind=kind, key=key)
 
 
 def _parse_decisions_or_exit(raw_decisions: str | None) -> dict[str, Any] | None:
@@ -462,6 +482,57 @@ def graph_impact(
     if output is not None:
         write_impact_report(report, output)
         typer.echo(f"Impact report written to: {output}")
+
+
+@graph_app.command("path")
+def graph_path(
+    bundle: Path = typer.Option(
+        ...,
+        "--bundle",
+        help="Generated handoff bundle directory to traverse.",
+    ),
+    source_root: str = typer.Option(
+        ...,
+        "--from",
+        help="Source graph root as <kind>:<key>, for example decision:cidr.",
+    ),
+    target_root: str = typer.Option(
+        ...,
+        "--to",
+        help="Target graph root as <kind>:<key>, for example artifact:module-inputs.yaml.",
+    ),
+    direction: str = typer.Option(
+        "either",
+        "--direction",
+        help="Traversal direction: downstream, upstream, or either.",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Optional graph-path.yaml output path.",
+    ),
+) -> None:
+    """Explain the shortest graph path between two typed bundle roots."""
+    if not bundle.is_dir():
+        typer.echo(f"Error: bundle path is not a directory: {bundle}", err=True)
+        raise typer.Exit(1)
+    if direction not in {"downstream", "upstream", "either"}:
+        typer.echo(
+            "Error: --direction must be one of downstream, upstream, either.",
+            err=True,
+        )
+        raise typer.Exit(1)
+    report = build_path_report(
+        bundle,
+        source=_graph_root_or_exit(source_root, "--from"),
+        target=_graph_root_or_exit(target_root, "--to"),
+        direction=direction,
+    )
+    typer.echo(render_path_report_text(report), nl=False)
+    if output is not None:
+        write_path_report(report, output)
+        typer.echo(f"Graph path report written to: {output}")
 
 
 @graph_app.command("bundle")
