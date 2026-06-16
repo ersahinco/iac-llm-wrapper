@@ -236,6 +236,18 @@ def build_impact_report(
     )
     manual_gates = _keys_by_kind(downstream_nodes, "manual_gate")
     impact_paths = _impact_paths(graph, root_ids, downstream_nodes)
+    review_priorities = _impact_review_priorities(
+        readiness_blockers=affected_readiness_blockers,
+        validation_violations=affected_validation_violations,
+        downstream_validation=affected_downstream_validation,
+        findings=affected_findings,
+        shift_left_evidence=affected_evidence,
+        source_changes=affected_source_changes,
+        manual_gates=manual_gates,
+        policy_controls=affected_controls,
+        artifacts=affected_artifacts,
+        module_variables=affected_variables,
+    )
     unmatched = _unmatched_roots(roots, graph, selected_roots)
     if changed_report and not changed_roots:
         unmatched.append({"kind": "changed-report", "key": str(changed_report)})
@@ -260,6 +272,7 @@ def build_impact_report(
             "affectedContractValidationCount": len(affected_contract_validation),
             "affectedValidationViolationCount": len(affected_validation_violations),
             "manualGateCount": len(manual_gates),
+            "reviewPriorityCount": len(review_priorities),
         },
         "selectedRoots": [node.to_dict() for node in root_nodes],
         "unmatchedRoots": unmatched,
@@ -284,6 +297,7 @@ def build_impact_report(
         "affectedDownstreamValidationEvidence": affected_downstream_validation,
         "manualGates": manual_gates,
         "impactPaths": impact_paths,
+        "reviewPriorities": review_priorities,
         "reviewFocus": _review_focus(
             status=status,
             roots=root_nodes,
@@ -937,6 +951,26 @@ def render_impact_report_text(report: dict[str, Any]) -> str:
             "",
             f"Downstream impacts: {summary.get('downstreamImpactCount', 0)}",
             f"Upstream dependencies: {summary.get('upstreamDependencyCount', 0)}",
+            "",
+            "Review priorities:",
+        ]
+    )
+    priorities = _coerce_list(report.get("reviewPriorities"))
+    if priorities:
+        for item in priorities[:12]:
+            if not isinstance(item, dict):
+                continue
+            lines.append(
+                f"  - {item.get('severity', 'review')}: "
+                f"{item.get('category', 'unknown')} "
+                f"({item.get('count', 0)}) - {item.get('reason', '')}"
+            )
+        if len(priorities) > 12:
+            lines.append(f"  ... {len(priorities) - 12} more")
+    else:
+        lines.append("  - None")
+    lines.extend(
+        [
             "",
             "Affected artifacts:",
         ]
@@ -2128,6 +2162,101 @@ def _path_step_to_dict(graph: _ImpactGraph, step: _PathStep) -> dict[str, Any]:
             "to": edge.target,
             "relationship": edge.relationship,
         },
+    }
+
+
+def _impact_review_priorities(
+    *,
+    readiness_blockers: list[str],
+    validation_violations: list[str],
+    downstream_validation: list[str],
+    findings: list[str],
+    shift_left_evidence: list[str],
+    source_changes: list[str],
+    manual_gates: list[str],
+    policy_controls: list[str],
+    artifacts: list[str],
+    module_variables: list[str],
+) -> list[dict[str, Any]]:
+    priorities = [
+        _priority(
+            "critical",
+            "readiness-blockers",
+            readiness_blockers,
+            "Resolve or explicitly accept readiness blockers before handoff.",
+        ),
+        _priority(
+            "critical",
+            "validation-violations",
+            validation_violations,
+            "Review target contract validation violations before handoff.",
+        ),
+        _priority(
+            "high",
+            "downstream-validation",
+            downstream_validation,
+            "Review downstream validation evidence before claiming validation.",
+        ),
+        _priority(
+            "high",
+            "checkov-findings",
+            findings,
+            "Review Checkov findings as shift-left policy evidence.",
+        ),
+        _priority(
+            "high",
+            "shift-left-evidence",
+            shift_left_evidence,
+            "Review shift-left evidence status and owner policy gate expectations.",
+        ),
+        _priority(
+            "medium",
+            "source-changes",
+            source_changes,
+            "Confirm source changes are intentional and scoped to affected requirements.",
+        ),
+        _priority(
+            "medium",
+            "manual-gates",
+            manual_gates,
+            "Re-run or re-approve affected manual review gates.",
+        ),
+        _priority(
+            "medium",
+            "policy-controls",
+            policy_controls,
+            "Review affected policy controls and mapped checks.",
+        ),
+        _priority(
+            "low",
+            "module-variables",
+            module_variables,
+            "Review affected module variable handoff values.",
+        ),
+        _priority(
+            "low",
+            "artifacts",
+            artifacts,
+            "Review affected generated handoff artifacts.",
+        ),
+    ]
+    return [item for item in priorities if item]
+
+
+def _priority(
+    severity: str,
+    category: str,
+    items: list[str],
+    reason: str,
+) -> dict[str, Any]:
+    if not items:
+        return {}
+    return {
+        "severity": severity,
+        "category": category,
+        "count": len(items),
+        "items": items,
+        "reason": reason,
     }
 
 

@@ -450,10 +450,15 @@ def test_decision_impact_reports_readiness_and_contract_validation(tmp_path: Pat
     assert report["affectedContractValidation"] == ["contract-validation.yaml"]
     assert "terraform-aws-vpc-module" in report["affectedContractResults"]
     assert "contract-validation.yaml" in report["affectedArtifacts"]
+    priority_categories = {item["category"] for item in report["reviewPriorities"]}
+    assert "module-variables" in priority_categories
+    assert "artifacts" in priority_categories
+    assert "policy-controls" in priority_categories
     path_targets = {item["target"]["id"] for item in report["impactPaths"]}
     assert "handoff_readiness:handoffReadiness" in path_targets
     assert "contract_validation:contract-validation.yaml" in path_targets
     rendered = render_impact_report_text(report)
+    assert "Review priorities:" in rendered
     assert "Affected readiness:" in rendered
     assert "Affected contract validation:" in rendered
 
@@ -589,6 +594,11 @@ def test_policy_control_impact_reports_shift_left_findings(tmp_path: Path):
     assert finding_key in report["affectedCheckovFindings"]
     assert "CKV_CUSTOM_VPC_001" in report["affectedChecks"]
     assert "shift-left-evidence.yaml" in report["affectedArtifacts"]
+    checkov_priority = next(
+        item for item in report["reviewPriorities"] if item["category"] == "checkov-findings"
+    )
+    assert checkov_priority["severity"] == "high"
+    assert finding_key in checkov_priority["items"]
     rendered = render_impact_report_text(report)
     assert "Affected Checkov findings:" in rendered
     assert finding_key in rendered
