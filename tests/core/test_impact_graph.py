@@ -366,6 +366,27 @@ def test_policy_control_impact_reports_shift_left_findings(tmp_path: Path):
     assert finding_key in rendered
 
 
+def test_graph_impact_cli_accepts_generic_typed_root_for_checkov_finding(tmp_path: Path):
+    bundle = _terraform_vpc_bundle_with_checkov_evidence(tmp_path / "bundle")
+
+    result = runner.invoke(
+        app,
+        [
+            "graph",
+            "impact",
+            "--bundle",
+            str(bundle),
+            "--root",
+            "checkov_finding:CKV_CUSTOM_VPC_001|module.vpc|/main.tf",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Impact Analysis" in result.output
+    assert "VPC-NETWORK-001" in result.output
+    assert "shift-left-evidence.yaml" in result.output
+
+
 def test_checkov_finding_path_explains_mapped_policy_control(tmp_path: Path):
     bundle = _terraform_vpc_bundle_with_checkov_evidence(tmp_path / "bundle")
 
