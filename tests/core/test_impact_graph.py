@@ -14,8 +14,10 @@ from intent_engine.core.impact_graph import (
     ImpactRoot,
     build_bundle_graph_report,
     build_impact_report,
+    build_neighborhood_report,
     build_path_report,
     render_impact_report_text,
+    render_neighborhood_report_text,
     render_path_report_text,
 )
 
@@ -322,6 +324,83 @@ def test_graph_path_cli_writes_report(tmp_path: Path):
     report = _yaml_load(output)
     assert report["summary"]["status"] == "matched"
     assert report["summary"]["hopCount"] == 2
+
+
+def test_graph_neighborhood_reports_bounded_semantic_context():
+    report = build_neighborhood_report(
+        Path("fixtures/aws-lza-standard-v1"),
+        root=ImpactRoot(kind="semantic_entity", key="control:security-hub"),
+        depth=2,
+        kinds=["artifact"],
+    )
+
+    assert report["schemaVersion"] == "intent-engine/graph-neighborhood/v1"
+    assert report["summary"]["status"] == "matched"
+    assert report["summary"]["depth"] == 2
+    assert report["summary"]["neighborCount"] == 1
+    assert report["neighbors"][0]["id"] == "artifact:security-config.yaml"
+    assert report["neighbors"][0]["depth"] == 2
+    assert [item["relationship"] for item in report["edges"]] == [
+        "semantic:produces_artifact",
+        "describes-artifact",
+    ]
+    rendered = render_neighborhood_report_text(report)
+    assert "Graph Neighborhood" in rendered
+    assert "depth 2: artifact:security-config.yaml" in rendered
+
+
+def test_graph_neighborhood_depth_limits_results():
+    report = build_neighborhood_report(
+        Path("fixtures/aws-lza-standard-v1"),
+        root=ImpactRoot(kind="semantic_entity", key="control:security-hub"),
+        depth=1,
+    )
+
+    neighbor_ids = {item["id"] for item in report["neighbors"]}
+    assert "semantic_entity:artifact:security-config.yaml" in neighbor_ids
+    assert "artifact:security-config.yaml" not in neighbor_ids
+
+
+def test_graph_neighborhood_no_match_is_reported_without_failure():
+    report = build_neighborhood_report(
+        Path("fixtures/aws-lza-standard-v1"),
+        root=ImpactRoot(kind="semantic_entity", key="missing"),
+        depth=2,
+    )
+
+    assert report["summary"]["status"] == "no-match"
+    assert report["neighbors"] == []
+    assert report["unmatchedRoots"] == [
+        {"role": "root", "kind": "semantic_entity", "key": "missing"}
+    ]
+
+
+def test_graph_neighbors_cli_writes_report(tmp_path: Path):
+    output = tmp_path / "graph-neighborhood.yaml"
+
+    result = runner.invoke(
+        app,
+        [
+            "graph",
+            "neighbors",
+            "--bundle",
+            "fixtures/aws-lza-standard-v1",
+            "--root",
+            "semantic_entity:control:security-hub",
+            "--depth",
+            "2",
+            "--kind",
+            "artifact",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Graph Neighborhood" in result.output
+    report = _yaml_load(output)
+    assert report["summary"]["status"] == "matched"
+    assert report["summary"]["neighborCount"] == 1
 
 
 def test_graph_bundle_cli_writes_queryable_report(tmp_path: Path):

@@ -135,6 +135,26 @@ class _ImpactGraph:
                 queue.append((step.target, [*path, step]))
         return []
 
+    def neighborhood(
+        self, root: str, depth: int, direction: str
+    ) -> tuple[dict[str, int], list[_PathStep]]:
+        adjacency = self._path_adjacency(direction)
+        node_depths: dict[str, int] = {root: 0}
+        discovery_steps: list[_PathStep] = []
+        queue: deque[str] = deque([root])
+        while queue:
+            node = queue.popleft()
+            current_depth = node_depths[node]
+            if current_depth >= depth:
+                continue
+            for step in adjacency.get(node, []):
+                if step.target in node_depths:
+                    continue
+                node_depths[step.target] = current_depth + 1
+                discovery_steps.append(step)
+                queue.append(step.target)
+        return node_depths, discovery_steps
+
     def _outgoing(self) -> dict[str, list[str]]:
         graph: dict[str, list[str]] = {}
         for edge in self.edges:
@@ -292,6 +312,9 @@ def build_bundle_graph_report(bundle: Path) -> dict[str, Any]:
             "pathCommand": (
                 "iac-llm-wrapper graph path --bundle <bundle> --from <kind:key> --to <kind:key>"
             ),
+            "neighborhoodCommand": (
+                "iac-llm-wrapper graph neighbors --bundle <bundle> --root <kind:key>"
+            ),
         },
         "nodes": nodes,
         "edges": edges,
@@ -357,7 +380,87 @@ def build_path_report(
     }
 
 
+def build_neighborhood_report(
+    bundle: Path,
+    *,
+    root: ImpactRoot,
+    depth: int = 1,
+    direction: str = "either",
+    kinds: list[str] | None = None,
+) -> dict[str, Any]:
+    """Build a bounded neighborhood report around one typed graph root."""
+
+    graph, pattern = _build_graph(bundle)
+    root_ids = _roots_from_selectors(graph, [root])
+    root_id = root_ids[0] if root_ids else None
+    kind_filter = sorted({item for item in kinds or [] if item})
+    node_depths: dict[str, int] = {}
+    steps: list[_PathStep] = []
+    if root_id is not None:
+        node_depths, steps = graph.neighborhood(root_id, depth, direction)
+    status = "matched" if root_id is not None else "no-match"
+    neighbor_nodes = [
+        graph.nodes[node_id]
+        for node_id, node_depth in node_depths.items()
+        if node_id != root_id
+        and node_id in graph.nodes
+        and (not kind_filter or graph.nodes[node_id].kind in kind_filter)
+        and node_depth <= depth
+    ]
+    neighbor_ids = {node.id for node in neighbor_nodes}
+    visible_ids = neighbor_ids | {root_id or ""}
+    filtered_steps = (
+        [step for step in steps if step.source in visible_ids or step.target in visible_ids]
+        if kind_filter
+        else steps
+    )
+
+    return {
+        "schemaVersion": "intent-engine/graph-neighborhood/v1",
+        "bundle": str(bundle),
+        "pattern": pattern,
+        "boundary": BOUNDARY,
+        "summary": {
+            "status": status,
+            "direction": direction,
+            "depth": depth,
+            "neighborCount": len(neighbor_nodes),
+            "edgeCount": len(filtered_steps),
+            "kindFilter": kind_filter,
+            "nodeKinds": _count_by([node.to_dict() for node in neighbor_nodes], "kind"),
+        },
+        "root": _node_or_selector(graph, root_id, root),
+        "unmatchedRoots": []
+        if root_id is not None
+        else [{"role": "root", "kind": root.kind, "key": root.key}],
+        "neighbors": [
+            {
+                "depth": node_depths[node.id],
+                **node.to_dict(),
+            }
+            for node in sorted(neighbor_nodes, key=lambda item: (node_depths[item.id], item.id))
+        ],
+        "edges": [_path_step_to_dict(graph, step) for step in filtered_steps],
+        "reviewFocus": _neighborhood_review_focus(
+            status=status,
+            root_id=root_id,
+            depth=depth,
+            direction=direction,
+            neighbor_count=len(neighbor_nodes),
+            kind_filter=kind_filter,
+        ),
+        "graph": {
+            "nodeCount": len(graph.nodes),
+            "edgeCount": len(graph.edges),
+        },
+    }
+
+
 def write_bundle_graph_report(report: dict[str, Any], output: Path) -> None:
+    write_yaml_artifact(output, report, "")
+
+
+def write_neighborhood_report(report: dict[str, Any], output: Path) -> None:
     write_yaml_artifact(output, report, "")
 
 
@@ -385,6 +488,62 @@ def render_bundle_graph_text(report: dict[str, Any]) -> str:
     lines.append("Query roots:")
     for kind in _coerce_list(_dict(report.get("queryHints")).get("rootKinds")):
         lines.append(f"  - {kind}")
+    return "\n".join(lines) + "\n"
+
+
+def render_neighborhood_report_text(report: dict[str, Any]) -> str:
+    summary = _dict(report.get("summary"))
+    lines = [
+        "=== Graph Neighborhood ===",
+        "",
+        f"Status: {summary.get('status', 'unknown')}",
+        f"Direction: {summary.get('direction', 'either')}",
+        f"Depth: {summary.get('depth', 0)}",
+        f"Pattern: {report.get('pattern', '')}",
+        f"Bundle: {report.get('bundle', '')}",
+        "",
+        f"Root: {_node_label(_dict(report.get('root')))}",
+    ]
+    unmatched = _coerce_list(report.get("unmatchedRoots"))
+    if unmatched:
+        lines.append("")
+        lines.append("Unmatched roots:")
+        lines.extend(
+            f"  - {item.get('role', 'root')}:{item.get('kind', 'unknown')}:{item.get('key', '')}"
+            for item in unmatched
+            if isinstance(item, dict)
+        )
+    lines.extend(["", f"Neighbors: {summary.get('neighborCount', 0)}", "Node kinds:"])
+    for key, count in sorted(_dict(summary.get("nodeKinds")).items()):
+        lines.append(f"  - {key}: {count}")
+    lines.append("Neighborhood:")
+    neighbors = _coerce_list(report.get("neighbors"))
+    if neighbors:
+        for node in neighbors[:12]:
+            if isinstance(node, dict):
+                lines.append(f"  - depth {node.get('depth', '?')}: {_node_label(node)}")
+        if len(neighbors) > 12:
+            lines.append(f"  ... {len(neighbors) - 12} more")
+    else:
+        lines.append("  - None")
+    lines.append("Edges:")
+    edges = _coerce_list(report.get("edges"))
+    if edges:
+        for edge in edges[:12]:
+            if not isinstance(edge, dict):
+                continue
+            source = _dict(edge.get("from"))
+            target = _dict(edge.get("to"))
+            lines.append(
+                f"  - {_node_label(source)} --{edge.get('relationship', '')} "
+                f"({edge.get('direction', '')})--> {_node_label(target)}"
+            )
+        if len(edges) > 12:
+            lines.append(f"  ... {len(edges) - 12} more")
+    else:
+        lines.append("  - None")
+    lines.append("Review focus:")
+    lines.extend(_list_or_none(_coerce_list(report.get("reviewFocus"))))
     return "\n".join(lines) + "\n"
 
 
@@ -1038,6 +1197,31 @@ def _path_review_focus(
         "Shortest path uses "
         f"{downstream_hops} downstream hop(s) and {upstream_hops} upstream hop(s).",
     ]
+
+
+def _neighborhood_review_focus(
+    *,
+    status: str,
+    root_id: str | None,
+    depth: int,
+    direction: str,
+    neighbor_count: int,
+    kind_filter: list[str],
+) -> list[str]:
+    if status == "no-match":
+        return ["The selected graph root was not found in the generated bundle graph."]
+    if neighbor_count == 0:
+        suffix = f" matching {', '.join(kind_filter)}" if kind_filter else ""
+        return [
+            f"No{suffix} neighbors were found within depth {depth} for direction '{direction}'."
+        ]
+    focus = [
+        f"Review {neighbor_count} graph neighbor(s) around {root_id} "
+        f"within depth {depth} using direction '{direction}'."
+    ]
+    if kind_filter:
+        focus.append("Applied node-kind filter: " + ", ".join(kind_filter) + ".")
+    return focus
 
 
 def _node_label(node: dict[str, Any]) -> str:

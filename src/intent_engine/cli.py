@@ -51,12 +51,15 @@ from .core.impact_graph import (
     ImpactRoot,
     build_bundle_graph_report,
     build_impact_report,
+    build_neighborhood_report,
     build_path_report,
     render_bundle_graph_text,
     render_impact_report_text,
+    render_neighborhood_report_text,
     render_path_report_text,
     write_bundle_graph_report,
     write_impact_report,
+    write_neighborhood_report,
     write_path_report,
 )
 from .core.interview import InterviewEngine
@@ -533,6 +536,66 @@ def graph_path(
     if output is not None:
         write_path_report(report, output)
         typer.echo(f"Graph path report written to: {output}")
+
+
+@graph_app.command("neighbors")
+def graph_neighbors(
+    bundle: Path = typer.Option(
+        ...,
+        "--bundle",
+        help="Generated handoff bundle directory to traverse.",
+    ),
+    root: str = typer.Option(
+        ...,
+        "--root",
+        help="Root graph node as <kind>:<key>, for example decision:cidr.",
+    ),
+    depth: int = typer.Option(
+        1,
+        "--depth",
+        help="Maximum hop depth to include.",
+    ),
+    direction: str = typer.Option(
+        "either",
+        "--direction",
+        help="Traversal direction: downstream, upstream, or either.",
+    ),
+    kind: list[str] | None = typer.Option(
+        None,
+        "--kind",
+        help="Optional node kind filter for returned neighbors. Repeatable.",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Optional graph-neighborhood.yaml output path.",
+    ),
+) -> None:
+    """Show a bounded dependency neighborhood around one typed graph root."""
+    if not bundle.is_dir():
+        typer.echo(f"Error: bundle path is not a directory: {bundle}", err=True)
+        raise typer.Exit(1)
+    if depth < 0:
+        typer.echo("Error: --depth must be zero or greater.", err=True)
+        raise typer.Exit(1)
+    if direction not in {"downstream", "upstream", "either"}:
+        typer.echo(
+            "Error: --direction must be one of downstream, upstream, either.",
+            err=True,
+        )
+        raise typer.Exit(1)
+    report = build_neighborhood_report(
+        bundle,
+        root=_graph_root_or_exit(root, "--root"),
+        depth=depth,
+        direction=direction,
+        kinds=kind,
+    )
+    typer.echo(render_neighborhood_report_text(report), nl=False)
+    if output is not None:
+        write_neighborhood_report(report, output)
+        typer.echo(f"Graph neighborhood report written to: {output}")
 
 
 @graph_app.command("bundle")

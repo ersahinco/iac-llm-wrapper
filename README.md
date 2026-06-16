@@ -48,9 +48,11 @@ queryable typed bundle graph and `graph impact --bundle ...` to inspect the
 blast radius of a changed decision, artifact, module variable, policy control,
 semantic entity, semantic constraint, or input diff. Use
 `graph path --bundle ... --from <kind:key> --to <kind:key>` to explain the
-shortest dependency path between two specific graph roots. These are read-only
-reasoning artifacts for review and owner CI/CD routing, not diagram ingestion,
-planners, or deployment runners.
+shortest dependency path between two specific graph roots, or
+`graph neighbors --bundle ... --root <kind:key>` to inspect a bounded
+upstream/downstream neighborhood around one root. These are read-only reasoning
+artifacts for review and owner CI/CD routing, not diagram ingestion, planners,
+or deployment runners.
 
 ## Core Flow
 
