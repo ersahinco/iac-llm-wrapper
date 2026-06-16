@@ -199,6 +199,75 @@ def build_impact_report(
     }
 
 
+def build_bundle_graph_report(bundle: Path) -> dict[str, Any]:
+    """Build the full typed graph for a generated handoff bundle."""
+
+    graph, pattern = _build_graph(bundle)
+    nodes = [node.to_dict() for node in sorted(graph.nodes.values(), key=lambda item: item.id)]
+    edges = [
+        edge.to_dict()
+        for edge in sorted(
+            graph.edges,
+            key=lambda item: (item.source, item.relationship, item.target),
+        )
+    ]
+    return {
+        "schemaVersion": "intent-engine/bundle-graph/v1",
+        "bundle": str(bundle),
+        "pattern": pattern,
+        "boundary": BOUNDARY,
+        "summary": {
+            "nodeCount": len(nodes),
+            "edgeCount": len(edges),
+            "nodeKinds": _count_by(nodes, "kind"),
+            "relationships": _count_by(edges, "relationship"),
+        },
+        "queryHints": {
+            "rootKinds": [
+                "decision",
+                "artifact",
+                "policy_control",
+                "module_variable",
+                "target_contract",
+                "target_capability",
+                "manual_gate",
+            ],
+            "impactCommand": (
+                "iac-llm-wrapper graph impact --bundle <bundle> --decision <key|other-root>"
+            ),
+        },
+        "nodes": nodes,
+        "edges": edges,
+    }
+
+
+def write_bundle_graph_report(report: dict[str, Any], output: Path) -> None:
+    write_yaml_artifact(output, report, "")
+
+
+def render_bundle_graph_text(report: dict[str, Any]) -> str:
+    summary = _dict(report.get("summary"))
+    lines = [
+        "=== Bundle Graph ===",
+        "",
+        f"Pattern: {report.get('pattern', '')}",
+        f"Bundle: {report.get('bundle', '')}",
+        f"Nodes: {summary.get('nodeCount', 0)}",
+        f"Edges: {summary.get('edgeCount', 0)}",
+        "",
+        "Node kinds:",
+    ]
+    for key, count in sorted(_dict(summary.get("nodeKinds")).items()):
+        lines.append(f"  - {key}: {count}")
+    lines.append("Relationships:")
+    for key, count in sorted(_dict(summary.get("relationships")).items()):
+        lines.append(f"  - {key}: {count}")
+    lines.append("Query roots:")
+    for kind in _coerce_list(_dict(report.get("queryHints")).get("rootKinds")):
+        lines.append(f"  - {kind}")
+    return "\n".join(lines) + "\n"
+
+
 def write_impact_report(report: dict[str, Any], output: Path) -> None:
     write_yaml_artifact(output, report, "")
 
@@ -521,6 +590,14 @@ def _sorted_nodes(graph: _ImpactGraph, ids: set[str]) -> list[_ImpactNode]:
 
 def _keys_by_kind(nodes: list[_ImpactNode], kind: str) -> list[str]:
     return sorted({node.key for node in nodes if node.kind == kind and node.key})
+
+
+def _count_by(items: list[dict[str, Any]], key: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in items:
+        value = str(item.get(key, "unknown"))
+        counts[value] = counts.get(value, 0) + 1
+    return counts
 
 
 def _impact_paths(

@@ -12,6 +12,7 @@ from intent_engine.core.bundle_compare import compare_handoff_bundles, render_bu
 from intent_engine.core.compiler import compile_from_interview
 from intent_engine.core.impact_graph import (
     ImpactRoot,
+    build_bundle_graph_report,
     build_impact_report,
     render_impact_report_text,
 )
@@ -149,6 +150,50 @@ def test_graph_impact_cli_writes_report(tmp_path: Path):
     report = _yaml_load(output)
     assert report["schemaVersion"] == "intent-engine/impact-report/v1"
     assert "module-inputs.yaml" in report["affectedArtifacts"]
+
+
+def test_bundle_graph_report_exports_queryable_nodes_and_edges(tmp_path: Path):
+    bundle = _terraform_vpc_bundle(tmp_path / "bundle")
+
+    report = build_bundle_graph_report(bundle)
+
+    assert report["schemaVersion"] == "intent-engine/bundle-graph/v1"
+    node_ids = {item["id"] for item in report["nodes"]}
+    assert "decision:cidr" in node_ids
+    assert "module_variable:cidr" in node_ids
+    assert "policy_control:VPC-NETWORK-001" in node_ids
+    assert report["summary"]["nodeKinds"]["decision"] >= 11
+    assert report["summary"]["relationships"]["mapped-to-control"] >= 1
+    assert {
+        "from": "decision:cidr",
+        "to": "policy_control:VPC-NETWORK-001",
+        "relationship": "mapped-to-control",
+    } in report["edges"]
+    assert "decision" in report["queryHints"]["rootKinds"]
+
+
+def test_graph_bundle_cli_writes_queryable_report(tmp_path: Path):
+    bundle = _terraform_vpc_bundle(tmp_path / "bundle")
+    output = tmp_path / "bundle-graph.yaml"
+
+    result = runner.invoke(
+        app,
+        [
+            "graph",
+            "bundle",
+            "--bundle",
+            str(bundle),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Bundle Graph" in result.output
+    assert "Node kinds:" in result.output
+    report = _yaml_load(output)
+    assert report["schemaVersion"] == "intent-engine/bundle-graph/v1"
+    assert "policy_control" in report["summary"]["nodeKinds"]
 
 
 def test_bundle_compare_includes_impact_traversal(tmp_path: Path):

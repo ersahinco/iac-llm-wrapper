@@ -49,8 +49,11 @@ from .core.git_incremental import (
 from .core.graph_export import graph_to_json, graph_to_mermaid
 from .core.impact_graph import (
     ImpactRoot,
+    build_bundle_graph_report,
     build_impact_report,
+    render_bundle_graph_text,
     render_impact_report_text,
+    write_bundle_graph_report,
     write_impact_report,
 )
 from .core.interview import InterviewEngine
@@ -446,6 +449,31 @@ def graph_impact(
     if output is not None:
         write_impact_report(report, output)
         typer.echo(f"Impact report written to: {output}")
+
+
+@graph_app.command("bundle")
+def graph_bundle(
+    bundle: Path = typer.Option(
+        ...,
+        "--bundle",
+        help="Generated handoff bundle directory to export as a typed graph.",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Optional bundle-graph.yaml output path.",
+    ),
+) -> None:
+    """Export the full typed graph derived from a generated handoff bundle."""
+    if not bundle.is_dir():
+        typer.echo(f"Error: bundle path is not a directory: {bundle}", err=True)
+        raise typer.Exit(1)
+    report = build_bundle_graph_report(bundle)
+    typer.echo(render_bundle_graph_text(report), nl=False)
+    if output is not None:
+        write_bundle_graph_report(report, output)
+        typer.echo(f"Bundle graph written to: {output}")
 
 
 @pattern_app.command("check")
