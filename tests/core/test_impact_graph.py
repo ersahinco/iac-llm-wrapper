@@ -31,6 +31,56 @@ def _terraform_vpc_bundle(output: Path) -> Path:
     return output
 
 
+def _terraform_vpc_bundle_with_checkov_evidence(output: Path) -> Path:
+    bundle = _terraform_vpc_bundle(output)
+    (bundle / "shift-left-evidence.yaml").write_text(
+        "\n".join(
+            [
+                "schemaVersion: intent-engine/shift-left-checkov/v1",
+                "tool:",
+                "  name: checkov",
+                "  available: true",
+                "  version: 3.2.0",
+                "input:",
+                "  scanPath: /owner/module",
+                "  iacKind: terraform",
+                "result:",
+                "  status: fail",
+                "  exitCode: 1",
+                "summary:",
+                "  passed: 0",
+                "  failed: 2",
+                "findings:",
+                "  - checkId: CKV_CUSTOM_VPC_001",
+                "    checkName: VPC CIDR policy",
+                "    filePath: /main.tf",
+                "    resource: module.vpc",
+                "    guideline: https://example.test/vpc",
+                "  - checkId: CKV_OTHER",
+                "    checkName: Other policy",
+                "    filePath: /other.tf",
+                "    resource: module.other",
+                "mappedControls:",
+                "  - policyPack: regulated-vpc-baseline-v1",
+                "    controlId: VPC-NETWORK-001",
+                "    controlTitle: VPC network shape",
+                "    frameworks: [SOC2]",
+                "    checkId: CKV_CUSTOM_VPC_001",
+                "    resource: module.vpc",
+                "    filePath: /main.tf",
+                "    status: fail",
+                "unmappedFindings:",
+                "  - checkId: CKV_OTHER",
+                "    checkName: Other policy",
+                "    filePath: /other.tf",
+                "    resource: module.other",
+            ]
+        )
+        + "\n"
+    )
+    return bundle
+
+
 def _compile_terraform_vpc_bundle(output: Path, *, cidr: str) -> None:
     compile_from_interview(
         {
@@ -271,6 +321,66 @@ def test_graph_find_cli_writes_report(tmp_path: Path):
     report = _yaml_load(output)
     assert report["summary"]["status"] == "matched"
     assert report["matches"][0]["node"]["id"] == "semantic_entity:control:security-hub"
+
+
+def test_bundle_graph_report_exports_shift_left_evidence_nodes(tmp_path: Path):
+    bundle = _terraform_vpc_bundle_with_checkov_evidence(tmp_path / "bundle")
+
+    report = build_bundle_graph_report(bundle)
+
+    finding_key = "CKV_CUSTOM_VPC_001|module.vpc|/main.tf"
+    unmapped_key = "CKV_OTHER|module.other|/other.tf"
+    node_ids = {item["id"] for item in report["nodes"]}
+    assert "shift_left_evidence:shift-left-evidence.yaml" in node_ids
+    assert f"checkov_finding:{finding_key}" in node_ids
+    assert f"checkov_finding:{unmapped_key}" in node_ids
+    assert "scan_file:/main.tf" in node_ids
+    assert "checkov_finding" in report["summary"]["nodeKinds"]
+    assert "shift_left_evidence" in report["queryHints"]["rootKinds"]
+    assert {
+        "from": f"checkov_finding:{finding_key}",
+        "to": "policy_control:VPC-NETWORK-001",
+        "relationship": "maps-to-control",
+    } in report["edges"]
+    assert {
+        "from": "policy_control:VPC-NETWORK-001",
+        "to": f"checkov_finding:{finding_key}",
+        "relationship": "has-finding",
+    } in report["edges"]
+
+
+def test_policy_control_impact_reports_shift_left_findings(tmp_path: Path):
+    bundle = _terraform_vpc_bundle_with_checkov_evidence(tmp_path / "bundle")
+
+    report = build_impact_report(
+        bundle,
+        roots=[ImpactRoot(kind="policy_control", key="VPC-NETWORK-001")],
+    )
+
+    finding_key = "CKV_CUSTOM_VPC_001|module.vpc|/main.tf"
+    assert finding_key in report["affectedCheckovFindings"]
+    assert "CKV_CUSTOM_VPC_001" in report["affectedChecks"]
+    assert "shift-left-evidence.yaml" in report["affectedArtifacts"]
+    rendered = render_impact_report_text(report)
+    assert "Affected Checkov findings:" in rendered
+    assert finding_key in rendered
+
+
+def test_checkov_finding_path_explains_mapped_policy_control(tmp_path: Path):
+    bundle = _terraform_vpc_bundle_with_checkov_evidence(tmp_path / "bundle")
+
+    report = build_path_report(
+        bundle,
+        source=ImpactRoot(
+            kind="checkov_finding",
+            key="CKV_CUSTOM_VPC_001|module.vpc|/main.tf",
+        ),
+        target=ImpactRoot(kind="policy_control", key="VPC-NETWORK-001"),
+        direction="downstream",
+    )
+
+    assert report["summary"]["status"] == "matched"
+    assert report["path"][0]["relationship"] == "maps-to-control"
 
 
 def test_semantic_entity_root_reports_affected_artifact():

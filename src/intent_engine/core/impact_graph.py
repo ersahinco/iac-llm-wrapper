@@ -217,6 +217,8 @@ def build_impact_report(
     affected_artifacts = _keys_by_kind(downstream_nodes, "artifact")
     affected_controls = _keys_by_kind(downstream_nodes, "policy_control")
     affected_checks = _keys_by_kind(downstream_nodes, "checkov_check")
+    affected_findings = _keys_by_kind(downstream_nodes, "checkov_finding")
+    affected_evidence = _keys_by_kind(downstream_nodes, "shift_left_evidence")
     affected_variables = _keys_by_kind(downstream_nodes, "module_variable")
     affected_semantic_entities = _keys_by_kind(downstream_nodes, "semantic_entity")
     affected_semantic_constraints = _keys_by_kind(downstream_nodes, "semantic_constraint")
@@ -239,6 +241,7 @@ def build_impact_report(
             "upstreamDependencyCount": len(upstream),
             "affectedArtifactCount": len(affected_artifacts),
             "affectedPolicyControlCount": len(affected_controls),
+            "affectedCheckovFindingCount": len(affected_findings),
             "affectedSemanticConstraintCount": len(affected_semantic_constraints),
             "manualGateCount": len(manual_gates),
         },
@@ -249,6 +252,8 @@ def build_impact_report(
         "affectedArtifacts": affected_artifacts,
         "affectedPolicyControls": affected_controls,
         "affectedChecks": affected_checks,
+        "affectedCheckovFindings": affected_findings,
+        "affectedShiftLeftEvidence": affected_evidence,
         "affectedModuleVariables": affected_variables,
         "affectedSemanticEntities": affected_semantic_entities,
         "affectedSemanticConstraints": affected_semantic_constraints,
@@ -260,6 +265,7 @@ def build_impact_report(
             artifacts=affected_artifacts,
             controls=affected_controls,
             checks=affected_checks,
+            findings=affected_findings,
             semantic_constraints=affected_semantic_constraints,
             gates=manual_gates,
         ),
@@ -305,6 +311,9 @@ def build_bundle_graph_report(bundle: Path) -> dict[str, Any]:
                 "manual_gate",
                 "semantic_entity",
                 "semantic_constraint",
+                "shift_left_evidence",
+                "checkov_finding",
+                "scan_file",
             ],
             "findCommand": "iac-llm-wrapper graph find --bundle <bundle> --query <text>",
             "impactCommand": (
@@ -719,6 +728,10 @@ def render_impact_report_text(report: dict[str, Any]) -> str:
     lines.extend(_list_or_none(_coerce_list(report.get("affectedPolicyControls"))))
     lines.append("Affected checks:")
     lines.extend(_list_or_none(_coerce_list(report.get("affectedChecks"))))
+    lines.append("Affected Checkov findings:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedCheckovFindings"))))
+    lines.append("Affected shift-left evidence:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedShiftLeftEvidence"))))
     lines.append("Affected module variables:")
     lines.extend(_list_or_none(_coerce_list(report.get("affectedModuleVariables"))))
     lines.append("Affected semantic entities:")
@@ -750,6 +763,7 @@ def _build_graph(bundle: Path) -> tuple[_ImpactGraph, str]:
     manifest = read_yaml_mapping(bundle / "context-manifest.yaml")
     module_inputs = read_yaml_mapping(bundle / "module-inputs.yaml")
     policy_graph = read_yaml_mapping(bundle / "policy-graph.yaml")
+    shift_left_evidence = read_yaml_mapping(bundle / "shift-left-evidence.yaml")
     handoff = read_yaml_mapping(bundle / "handoff-plan.yaml")
     target_capability = read_yaml_mapping(bundle / "target-capability-graph.yaml")
     samples = read_yaml_mapping(bundle / "sample-recommendations.yaml")
@@ -797,6 +811,7 @@ def _build_graph(bundle: Path) -> tuple[_ImpactGraph, str]:
     _add_semantic_model_nodes(graph, _dict(report.get("semanticModel")))
     _add_module_nodes(graph, module_inputs)
     _add_policy_nodes(graph, policy_graph)
+    _add_shift_left_evidence_nodes(graph, shift_left_evidence)
     _add_handoff_nodes(graph, handoff)
     _add_target_capability_nodes(graph, target_capability)
     _add_sample_nodes(graph, samples)
@@ -1025,6 +1040,111 @@ def _add_policy_nodes(graph: _ImpactGraph, policy_graph: dict[str, Any]) -> None
                     graph.add_edge(control_id, check_node, "verified-by")
 
 
+def _add_shift_left_evidence_nodes(
+    graph: _ImpactGraph,
+    shift_left_evidence: dict[str, Any],
+) -> None:
+    if not shift_left_evidence:
+        return
+    result = _dict(shift_left_evidence.get("result"))
+    summary = _dict(shift_left_evidence.get("summary"))
+    input_block = _dict(shift_left_evidence.get("input"))
+    evidence_id = graph.add_node(
+        "shift_left_evidence",
+        "shift-left-evidence.yaml",
+        "shift-left-evidence.yaml",
+        tool=_dict(shift_left_evidence.get("tool")).get("name"),
+        status=result.get("status"),
+        exitCode=result.get("exitCode"),
+        scanPath=input_block.get("scanPath"),
+        iacKind=input_block.get("iacKind"),
+        failed=summary.get("failed"),
+        passed=summary.get("passed"),
+    )
+    artifact_id = graph.add_node(
+        "artifact",
+        "shift-left-evidence.yaml",
+        "shift-left-evidence.yaml",
+    )
+    graph.add_edge(evidence_id, artifact_id, "recorded-in")
+
+    findings_by_key: dict[str, str] = {}
+    for finding in _coerce_list(shift_left_evidence.get("findings")):
+        if not isinstance(finding, dict):
+            continue
+        finding_key = _finding_key(finding)
+        findings_by_key[finding_key] = _add_checkov_finding_node(graph, finding, finding_key)
+        graph.add_edge(evidence_id, findings_by_key[finding_key], "records-finding")
+        graph.add_edge(findings_by_key[finding_key], evidence_id, "recorded-by-evidence")
+        check_id = str(finding.get("checkId") or "")
+        if check_id:
+            check_node = graph.add_node("checkov_check", check_id, check_id)
+            graph.add_edge(findings_by_key[finding_key], check_node, "violates-check")
+        file_path = str(finding.get("filePath") or "")
+        if file_path:
+            file_node = graph.add_node("scan_file", file_path, file_path)
+            graph.add_edge(findings_by_key[finding_key], file_node, "found-in-file")
+
+    for mapped in _coerce_list(shift_left_evidence.get("mappedControls")):
+        if not isinstance(mapped, dict):
+            continue
+        finding_key = _finding_key(mapped)
+        finding_id = findings_by_key.get(finding_key)
+        if finding_id is None:
+            finding_id = _add_checkov_finding_node(graph, mapped, finding_key)
+            graph.add_edge(evidence_id, finding_id, "records-finding")
+            graph.add_edge(finding_id, evidence_id, "recorded-by-evidence")
+        control_id = str(mapped.get("controlId") or "")
+        if control_id:
+            control_node = graph.add_node(
+                "policy_control",
+                control_id,
+                str(mapped.get("controlTitle") or control_id),
+                frameworks=mapped.get("frameworks"),
+            )
+            graph.add_edge(finding_id, control_node, "maps-to-control")
+            graph.add_edge(control_node, finding_id, "has-finding")
+        check_id = str(mapped.get("checkId") or "")
+        if check_id:
+            check_node = graph.add_node("checkov_check", check_id, check_id)
+            graph.add_edge(finding_id, check_node, "violates-check")
+
+    for finding in _coerce_list(shift_left_evidence.get("unmappedFindings")):
+        if not isinstance(finding, dict):
+            continue
+        finding_key = _finding_key(finding)
+        finding_id = findings_by_key.get(finding_key)
+        if finding_id is None:
+            finding_id = _add_checkov_finding_node(graph, finding, finding_key)
+            graph.add_edge(evidence_id, finding_id, "records-finding")
+            graph.add_edge(finding_id, evidence_id, "recorded-by-evidence")
+        graph.add_edge(finding_id, evidence_id, "unmapped-in-evidence")
+
+
+def _add_checkov_finding_node(
+    graph: _ImpactGraph,
+    finding: dict[str, Any],
+    key: str,
+) -> str:
+    return graph.add_node(
+        "checkov_finding",
+        key,
+        str(finding.get("checkName") or finding.get("checkId") or key),
+        checkId=finding.get("checkId"),
+        resource=finding.get("resource"),
+        filePath=finding.get("filePath"),
+        guideline=finding.get("guideline"),
+        status=finding.get("status") or "fail",
+    )
+
+
+def _finding_key(finding: dict[str, Any]) -> str:
+    check_id = str(finding.get("checkId") or "unknown-check")
+    resource = str(finding.get("resource") or "unknown-resource")
+    file_path = str(finding.get("filePath") or "")
+    return "|".join([check_id, resource, file_path])
+
+
 def _add_handoff_nodes(graph: _ImpactGraph, handoff: dict[str, Any]) -> None:
     for step in _coerce_list(handoff.get("steps")):
         if not isinstance(step, dict):
@@ -1228,12 +1348,15 @@ def _impact_paths(
     interesting_kinds = {
         "artifact",
         "artifact_path",
+        "checkov_finding",
         "checkov_check",
         "manual_gate",
         "module_variable",
         "policy_control",
+        "scan_file",
         "semantic_constraint",
         "semantic_entity",
+        "shift_left_evidence",
         "target_contract",
         "target_capability",
     }
@@ -1286,6 +1409,7 @@ def _review_focus(
     artifacts: list[str],
     controls: list[str],
     checks: list[str],
+    findings: list[str],
     semantic_constraints: list[str],
     gates: list[str],
 ) -> list[str]:
@@ -1303,6 +1427,8 @@ def _review_focus(
         focus.append(
             "Review affected semantic constraints: " + ", ".join(semantic_constraints) + "."
         )
+    if findings:
+        focus.append("Review affected Checkov findings: " + ", ".join(findings) + ".")
     if checks:
         focus.append(
             "Use affected Checkov refs as shift-left evidence inputs: " + ", ".join(checks) + "."

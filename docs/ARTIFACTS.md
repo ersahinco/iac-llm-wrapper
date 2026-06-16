@@ -21,7 +21,7 @@ Existing deployment mechanisms remain downstream.
 | `git-incremental-plan.yaml` | Git-changed design docs, skipped paths, baseline availability, output bundle paths, and compile status for explicit git-driven incremental runs. | Core incremental compile | `compile-git --base-ref --doc-root --bundle-root --output-root`. | No |
 | `contract-validation.yaml` | Standalone pass/fail validation of emitted artifacts against target contracts. | Core validation helper | Explicit validation artifact writes; `review html` computes validation in memory. | No |
 | `target-capability-graph.yaml` | Downstream target coverage, selected target path, manual gates, and unsupported asks represented as semantic facts with evidence spans. | Pattern-owned target report builder | AWS LZA today; future patterns only when they own comparable target routing. | No |
-| `bundle-graph.yaml` | Full typed graph export for a generated bundle: requirements, decisions, contracts, artifacts, module variables, policy controls, checks, target capabilities, samples, manual gates, pattern semantic entities, semantic constraints, and edges. | Core graph tooling | `graph bundle --bundle --output`. | No |
+| `bundle-graph.yaml` | Full typed graph export for a generated bundle: requirements, decisions, contracts, artifacts, module variables, policy controls, Checkov refs/findings, shift-left evidence, target capabilities, samples, manual gates, pattern semantic entities, semantic constraints, and edges. | Core graph tooling | `graph bundle --bundle --output`. | No |
 | `graph-find.yaml` | Search results for candidate typed graph roots, including matched node ids, matched fields, kind filters, result counts, and review focus. | Core graph tooling | `graph find --bundle --query --output`. | No |
 | `impact-report.yaml` | Graph traversal impact report showing selected roots, upstream dependencies, downstream affected nodes, artifacts, policy controls, checks, module variables, semantic entities, semantic constraints, manual gates, root-to-target impact paths, and review focus. | Core graph tooling | `graph impact --bundle --output`; also embedded in `review compare` output. | No |
 | `graph-path.yaml` | Shortest-path explanation between two typed bundle graph roots, including hop relationships, traversal direction, unmatched roots, no-path status, and review focus. | Core graph tooling | `graph path --bundle --from --to --output`. | No |
@@ -52,15 +52,15 @@ Existing deployment mechanisms remain downstream.
 - Reviewers and agents use `bundle-graph.yaml` as the queryable bundle graph,
   `graph-find.yaml` to discover candidate roots, then use `impact-report.yaml`
   or the `review compare` impact traversal section to see which artifacts,
-  policy controls, Checkov refs, module variables, and manual gates are
-  downstream of a changed graph root. When a pattern emits a semantic model,
-  these graph artifacts also expose typed semantic entities, relationships, and
-  predicate constraints, including the traversal path that explains why each
-  impact is connected. Use `graph-path.yaml` when the review question is
-  narrower: explain how one specific graph root is connected to another. Use
-  `graph-neighborhood.yaml` to inspect the bounded upstream, downstream, or
-  bidirectional context around one graph root before choosing a more precise
-  impact or path query.
+  policy controls, Checkov refs/findings, shift-left evidence, module
+  variables, and manual gates are downstream of a changed graph root. When a
+  pattern emits a semantic model, these graph artifacts also expose typed
+  semantic entities, relationships, and predicate constraints, including the
+  traversal path that explains why each impact is connected. Use
+  `graph-path.yaml` when the review question is narrower: explain how one
+  specific graph root is connected to another. Use `graph-neighborhood.yaml` to
+  inspect the bounded upstream, downstream, or bidirectional context around one
+  graph root before choosing a more precise impact or path query.
 - Regulated-environment reviewers use `policy-graph.yaml` and
   `shift-left-evidence.yaml` as pre-deployment policy evidence for
   owner-controlled CI/CD gates. These artifacts are not compliance attestation
