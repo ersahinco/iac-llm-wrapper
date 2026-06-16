@@ -13,6 +13,7 @@ from .impact_graph import (
     build_impact_matrix_report,
     build_impact_report,
     changed_decision_roots,
+    changed_report_roots,
 )
 from .sample_config import SampleConfig
 from .yaml_utils import read_yaml_mapping, write_yaml_artifact
@@ -49,15 +50,19 @@ def compare_handoff_bundles(before_dir: Path, after_dir: Path) -> dict[str, Any]
         sample_delta=sample_delta,
         after=after,
     )
+    input_diff_report = (
+        after.path / "input-diff-report.yaml"
+        if (after.path / "input-diff-report.yaml").exists()
+        else None
+    )
     changed_roots = changed_decision_roots({"decisionDelta": decision_delta})
+    matrix_roots = [*changed_roots, *changed_report_roots(after.path, input_diff_report)]
     impact_traversal = build_impact_report(
         after.path,
         roots=changed_roots,
-        changed_report=after.path / "input-diff-report.yaml"
-        if (after.path / "input-diff-report.yaml").exists()
-        else None,
+        changed_report=input_diff_report,
     )
-    impact_matrix = build_impact_matrix_report(after.path, roots=changed_roots)
+    impact_matrix = build_impact_matrix_report(after.path, roots=matrix_roots)
     graph_diff = build_graph_diff_report(before.path, after.path)
     review_focus = _review_focus(
         decision_delta=decision_delta,

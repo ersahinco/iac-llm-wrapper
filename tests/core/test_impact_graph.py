@@ -1128,3 +1128,31 @@ def test_bundle_compare_includes_impact_traversal(tmp_path: Path):
     assert graph_diff["summary"]["status"] == "changed"
     assert graph_diff["summary"]["nodeChangedCount"] >= 2
     assert "Graph diff:" in rendered
+
+
+def test_bundle_compare_matrix_includes_input_diff_roots(tmp_path: Path):
+    before = tmp_path / "before"
+    after = tmp_path / "after"
+    _compile_terraform_vpc_bundle(before, cidr="10.30.0.0/16")
+    _compile_terraform_vpc_bundle(after, cidr="10.30.0.0/16")
+    (after / "input-diff-report.yaml").write_text(
+        "\n".join(
+            [
+                "schemaVersion: intent-engine/input-diff/v1",
+                "likelyImpactedRequirements:",
+                "  - key: enable_dns_hostnames",
+                "    label: DNS hostnames",
+                "    reason: source text changed DNS requirements",
+            ]
+        )
+        + "\n"
+    )
+
+    report = compare_handoff_bundles(before, after)
+
+    selected = {item["key"] for item in report["impactTraversal"]["selectedRoots"]}
+    assert "enable_dns_hostnames" in selected
+    matrix_roots = {row["root"]["id"] for row in report["impactMatrix"]["rows"]}
+    assert "decision:enable_dns_hostnames" in matrix_roots
+    rendered = render_bundle_comparison_text(report)
+    assert "decision:enable_dns_hostnames: status=matched" in rendered

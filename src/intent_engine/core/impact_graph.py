@@ -634,6 +634,7 @@ def build_impact_matrix_report(
     """Build a compact multi-root impact matrix for reviewer triage."""
 
     reasons = root_reasons or {}
+    roots = _dedupe_roots(roots)
     rows = [
         _impact_matrix_row(
             build_impact_report(bundle, roots=[root]),
@@ -720,6 +721,19 @@ def build_recommended_impact_matrix_report(
             "to select explicit roots."
         ]
     return report
+
+
+def changed_report_roots(bundle: Path, changed_report: Path | None) -> list[ImpactRoot]:
+    """Return typed decision roots derived from an input-diff report."""
+
+    graph, _pattern = _build_graph(bundle)
+    root_ids = _roots_from_changed_report(graph, changed_report)
+    roots = [
+        ImpactRoot(kind=graph.nodes[node_id].kind, key=graph.nodes[node_id].key)
+        for node_id in root_ids
+        if node_id in graph.nodes
+    ]
+    return _dedupe_roots(roots)
 
 
 def build_graph_diff_report(before: Path, after: Path) -> dict[str, Any]:
