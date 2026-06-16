@@ -334,30 +334,9 @@ def build_bundle_graph_report(bundle: Path) -> dict[str, Any]:
             "relationships": _count_by(edges, "relationship"),
         },
         "queryHints": {
-            "rootKinds": [
-                "decision",
-                "artifact",
-                "policy_control",
-                "module_variable",
-                "target_contract",
-                "target_capability",
-                "manual_gate",
-                "source_context",
-                "input_diff",
-                "source_change",
-                "handoff_readiness",
-                "readiness_blocker",
-                "contract_validation",
-                "contract_result",
-                "validation_violation",
-                "downstream_validation_evidence",
-                "semantic_entity",
-                "semantic_constraint",
-                "shift_left_evidence",
-                "checkov_finding",
-                "scan_file",
-            ],
+            "rootKinds": _root_kinds(),
             "findCommand": "iac-llm-wrapper graph find --bundle <bundle> --query <text>",
+            "rootsCommand": "iac-llm-wrapper graph roots --bundle <bundle>",
             "impactCommand": (
                 "iac-llm-wrapper graph impact --bundle <bundle> --decision <key|other-root>"
             ),
@@ -563,6 +542,52 @@ def build_find_report(
     }
 
 
+def build_roots_report(
+    bundle: Path,
+    *,
+    kinds: list[str] | None = None,
+) -> dict[str, Any]:
+    """Build an inventory of concrete graph roots available for traversal."""
+
+    graph, pattern = _build_graph(bundle)
+    kind_filter = sorted({item for item in kinds or [] if item})
+    root_kinds = set(_root_kinds())
+    nodes = [
+        node
+        for node in sorted(graph.nodes.values(), key=lambda item: item.id)
+        if node.kind in root_kinds and (not kind_filter or node.kind in kind_filter)
+    ]
+    roots = [_root_entry(node) for node in nodes]
+    recommendations = _recommended_review_roots(nodes)
+    status = "matched" if roots else "no-match"
+    return {
+        "schemaVersion": "intent-engine/graph-roots/v1",
+        "bundle": str(bundle),
+        "pattern": pattern,
+        "boundary": BOUNDARY,
+        "summary": {
+            "status": status,
+            "rootCount": len(roots),
+            "recommendedReviewRootCount": len(recommendations),
+            "kindFilter": kind_filter,
+            "nodeKinds": _count_by([entry["node"] for entry in roots], "kind"),
+        },
+        "rootsByKind": _roots_by_kind(roots),
+        "recommendedReviewRoots": recommendations,
+        "roots": roots,
+        "reviewFocus": _roots_review_focus(
+            status=status,
+            root_count=len(roots),
+            recommendation_count=len(recommendations),
+            kind_filter=kind_filter,
+        ),
+        "graph": {
+            "nodeCount": len(graph.nodes),
+            "edgeCount": len(graph.edges),
+        },
+    }
+
+
 def build_graph_diff_report(before: Path, after: Path) -> dict[str, Any]:
     """Compare two generated bundle graphs as typed nodes and edges."""
 
@@ -655,6 +680,10 @@ def write_path_report(report: dict[str, Any], output: Path) -> None:
     write_yaml_artifact(output, report, "")
 
 
+def write_roots_report(report: dict[str, Any], output: Path) -> None:
+    write_yaml_artifact(output, report, "")
+
+
 def render_bundle_graph_text(report: dict[str, Any]) -> str:
     summary = _dict(report.get("summary"))
     lines = [
@@ -675,6 +704,38 @@ def render_bundle_graph_text(report: dict[str, Any]) -> str:
     lines.append("Query roots:")
     for kind in _coerce_list(_dict(report.get("queryHints")).get("rootKinds")):
         lines.append(f"  - {kind}")
+    return "\n".join(lines) + "\n"
+
+
+def render_roots_report_text(report: dict[str, Any]) -> str:
+    summary = _dict(report.get("summary"))
+    lines = [
+        "=== Graph Roots ===",
+        "",
+        f"Status: {summary.get('status', 'unknown')}",
+        f"Pattern: {report.get('pattern', '')}",
+        f"Bundle: {report.get('bundle', '')}",
+        f"Roots: {summary.get('rootCount', 0)}",
+        f"Recommended review roots: {summary.get('recommendedReviewRootCount', 0)}",
+        "",
+        "Root kinds:",
+    ]
+    for key, count in sorted(_dict(summary.get("nodeKinds")).items()):
+        lines.append(f"  - {key}: {count}")
+    lines.append("Recommended review roots:")
+    recommendations = _coerce_list(report.get("recommendedReviewRoots"))
+    if recommendations:
+        for item in recommendations[:12]:
+            if not isinstance(item, dict):
+                continue
+            node = _dict(item.get("node"))
+            lines.append(f"  - {_node_label(node)}: {item.get('reason', '')}")
+        if len(recommendations) > 12:
+            lines.append(f"  ... {len(recommendations) - 12} more")
+    else:
+        lines.append("  - None")
+    lines.append("Review focus:")
+    lines.extend(_list_or_none(_coerce_list(report.get("reviewFocus"))))
     return "\n".join(lines) + "\n"
 
 
@@ -1775,6 +1836,106 @@ def _keys_by_kind(nodes: list[_ImpactNode], kind: str) -> list[str]:
     return sorted({node.key for node in nodes if node.kind == kind and node.key})
 
 
+def _root_kinds() -> list[str]:
+    return [
+        "decision",
+        "artifact",
+        "policy_control",
+        "module_variable",
+        "target_contract",
+        "target_capability",
+        "manual_gate",
+        "source_context",
+        "input_diff",
+        "source_change",
+        "handoff_readiness",
+        "readiness_blocker",
+        "contract_validation",
+        "contract_result",
+        "validation_violation",
+        "downstream_validation_evidence",
+        "semantic_entity",
+        "semantic_constraint",
+        "shift_left_evidence",
+        "checkov_finding",
+        "scan_file",
+    ]
+
+
+def _root_entry(node: _ImpactNode) -> dict[str, Any]:
+    root = f"{node.kind}:{node.key}"
+    return {
+        "root": root,
+        "node": node.to_dict(),
+        "commands": {
+            "impact": f"iac-llm-wrapper graph impact --bundle <bundle> --root {root}",
+            "neighbors": f"iac-llm-wrapper graph neighbors --bundle <bundle> --root {root}",
+        },
+    }
+
+
+def _roots_by_kind(roots: list[dict[str, Any]]) -> dict[str, list[str]]:
+    grouped: dict[str, list[str]] = {}
+    for root in roots:
+        node = _dict(root.get("node"))
+        kind = str(node.get("kind") or "unknown")
+        root_value = str(root.get("root") or "")
+        if root_value:
+            grouped.setdefault(kind, []).append(root_value)
+    return {kind: sorted(items) for kind, items in sorted(grouped.items())}
+
+
+def _recommended_review_roots(nodes: list[_ImpactNode]) -> list[dict[str, Any]]:
+    recommendations = []
+    for node in nodes:
+        reason = _review_root_reason(node)
+        if reason:
+            entry = _root_entry(node)
+            entry["reason"] = reason
+            recommendations.append(entry)
+    return sorted(
+        recommendations,
+        key=lambda item: (_recommendation_rank(_dict(item.get("node"))), str(item.get("root", ""))),
+    )
+
+
+def _review_root_reason(node: _ImpactNode) -> str:
+    status = str(node.properties.get("status") or "").lower()
+    if node.kind == "source_change":
+        return "Source change can affect downstream decisions and emitted handoff artifacts."
+    if node.kind == "readiness_blocker":
+        return "Readiness blocker must be resolved or accepted before handoff."
+    if node.kind == "validation_violation":
+        return "Contract validation violation requires review before handoff."
+    if node.kind == "checkov_finding":
+        return "Checkov finding is shift-left evidence for owner policy review."
+    if node.kind == "downstream_validation_evidence" and status not in {"", "pass"}:
+        return "Downstream validation evidence is not passing."
+    if node.kind == "contract_validation" and status not in {"", "pass"}:
+        return "Contract validation status is not passing."
+    if node.kind == "handoff_readiness" and (
+        status not in {"", "ready"} or node.properties.get("handoffAllowed") is False
+    ):
+        return "Handoff readiness is not ready or not allowed."
+    if node.kind == "shift_left_evidence" and status not in {"", "pass", "skipped"}:
+        return "Shift-left evidence is not passing."
+    return ""
+
+
+def _recommendation_rank(node: dict[str, Any]) -> int:
+    kind = str(node.get("kind") or "")
+    return {
+        "readiness_blocker": 0,
+        "validation_violation": 1,
+        "downstream_validation_evidence": 2,
+        "contract_validation": 3,
+        "checkov_finding": 4,
+        "shift_left_evidence": 5,
+        "source_change": 6,
+        "handoff_readiness": 7,
+    }.get(kind, 20)
+
+
 def _bundle_graph_indexes(
     nodes: list[dict[str, Any]],
     edges: list[dict[str, str]],
@@ -2076,6 +2237,27 @@ def _find_review_focus(
         f"Use the returned {returned_count} graph node id(s) as roots "
         "for impact, path, or neighbors queries."
     ]
+    if kind_filter:
+        focus.append("Applied node-kind filter: " + ", ".join(kind_filter) + ".")
+    return focus
+
+
+def _roots_review_focus(
+    *,
+    status: str,
+    root_count: int,
+    recommendation_count: int,
+    kind_filter: list[str],
+) -> list[str]:
+    if status == "no-match":
+        suffix = f" for {', '.join(kind_filter)}" if kind_filter else ""
+        return [f"No graph traversal roots were found{suffix}."]
+    focus = [f"Use the {root_count} concrete graph root(s) as impact/path/neighborhood inputs."]
+    if recommendation_count:
+        focus.append(
+            f"Start with the {recommendation_count} recommended review root(s) "
+            "for likely blockers, source changes, findings, or validation evidence."
+        )
     if kind_filter:
         focus.append("Applied node-kind filter: " + ", ".join(kind_filter) + ".")
     return focus

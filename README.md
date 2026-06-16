@@ -44,8 +44,9 @@ policy references. That evidence is shift-left input for owner CI/CD gates, not
 compliance attestation or deployment approval.
 
 Graph dependency traversal is available with `graph bundle --bundle ...` for an
-indexed, queryable typed bundle graph and `graph find --bundle ... --query ...`
-to discover candidate roots. Use `graph impact --bundle ...` to inspect the
+indexed, queryable typed bundle graph, `graph roots --bundle ...` to inventory
+concrete traversal roots, and `graph find --bundle ... --query ...` to discover
+candidate roots by search. Use `graph impact --bundle ...` to inspect the
 blast radius of a changed decision, artifact, module variable, policy control,
 Checkov finding, shift-left evidence, handoff readiness, contract validation,
 downstream validation evidence, source context, input diff, source change,

@@ -19,11 +19,13 @@ from intent_engine.core.impact_graph import (
     build_impact_report,
     build_neighborhood_report,
     build_path_report,
+    build_roots_report,
     render_find_report_text,
     render_graph_diff_text,
     render_impact_report_text,
     render_neighborhood_report_text,
     render_path_report_text,
+    render_roots_report_text,
 )
 
 runner = CliRunner()
@@ -246,6 +248,75 @@ def test_bundle_graph_report_exports_queryable_nodes_and_edges(tmp_path: Path):
     assert "decision" in report["queryHints"]["rootKinds"]
     assert "graph path" in report["queryHints"]["pathCommand"]
     assert "graph find" in report["queryHints"]["findCommand"]
+
+
+def test_graph_roots_report_lists_concrete_traversal_roots(tmp_path: Path):
+    bundle = _terraform_vpc_bundle(tmp_path / "bundle")
+
+    report = build_roots_report(bundle)
+
+    assert report["schemaVersion"] == "intent-engine/graph-roots/v1"
+    assert report["summary"]["status"] == "matched"
+    assert "decision:cidr" in report["rootsByKind"]["decision"]
+    assert "policy_control:VPC-NETWORK-001" in report["rootsByKind"]["policy_control"]
+    root = next(item for item in report["roots"] if item["root"] == "decision:cidr")
+    assert root["commands"]["impact"].endswith("--root decision:cidr")
+    assert root["commands"]["neighbors"].endswith("--root decision:cidr")
+    rendered = render_roots_report_text(report)
+    assert "Graph Roots" in rendered
+    assert "Root kinds:" in rendered
+
+
+def test_graph_roots_report_recommends_source_change_roots(tmp_path: Path):
+    bundle = _terraform_vpc_bundle(tmp_path / "bundle")
+    (bundle / "input-diff-report.yaml").write_text(
+        "\n".join(
+            [
+                "schemaVersion: intent-engine/input-diff/v1",
+                "source:",
+                "  mode: document-diff",
+                "  baselineDocumentAvailable: true",
+                "changedStructuredDecisionLines:",
+                "  - key: cidr",
+                "    before: 10.30.0.0/16",
+                "    after: 10.31.0.0/16",
+            ]
+        )
+        + "\n"
+    )
+
+    report = build_roots_report(bundle, kinds=["source_change"])
+
+    assert report["summary"]["kindFilter"] == ["source_change"]
+    assert report["rootsByKind"]["source_change"] == ["source_change:structured:cidr"]
+    assert report["recommendedReviewRoots"][0]["root"] == "source_change:structured:cidr"
+    assert "Source change" in report["recommendedReviewRoots"][0]["reason"]
+
+
+def test_graph_roots_cli_writes_report(tmp_path: Path):
+    bundle = _terraform_vpc_bundle(tmp_path / "bundle")
+    output = tmp_path / "graph-roots.yaml"
+
+    result = runner.invoke(
+        app,
+        [
+            "graph",
+            "roots",
+            "--bundle",
+            str(bundle),
+            "--kind",
+            "decision",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Graph Roots" in result.output
+    report = _yaml_load(output)
+    assert report["schemaVersion"] == "intent-engine/graph-roots/v1"
+    assert "decision:cidr" in report["rootsByKind"]["decision"]
+    assert report["summary"]["kindFilter"] == ["decision"]
 
 
 def test_bundle_graph_report_exports_readiness_and_contract_validation_nodes(tmp_path: Path):

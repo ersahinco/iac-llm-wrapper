@@ -22,6 +22,7 @@ Existing deployment mechanisms remain downstream.
 | `contract-validation.yaml` | Standalone pass/fail validation of emitted artifacts against target contracts. | Core validation helper | Explicit validation artifact writes; `review html` computes validation in memory. | No |
 | `target-capability-graph.yaml` | Downstream target coverage, selected target path, manual gates, and unsupported asks represented as semantic facts with evidence spans. | Pattern-owned target report builder | AWS LZA today; future patterns only when they own comparable target routing. | No |
 | `bundle-graph.yaml` | Full typed graph export for a generated bundle: source context, input diffs, source changes, requirements, decisions, contracts, artifacts, module variables, policy controls, Checkov refs/findings, shift-left evidence, handoff readiness, readiness blockers, contract validation, downstream validation evidence, target capabilities, samples, manual gates, pattern semantic entities, semantic constraints, edges, and query indexes for nodes by kind plus incoming/outgoing adjacency. | Core graph tooling | `graph bundle --bundle --output`. | No |
+| `graph-roots.yaml` | Concrete typed graph roots available for traversal, grouped by kind, with copy-pasteable impact/neighborhood commands and recommended review roots for source changes, blockers, findings, and validation evidence. | Core graph tooling | `graph roots --bundle --output`. | No |
 | `graph-find.yaml` | Search results for candidate typed graph roots, including matched node ids, matched fields, kind filters, result counts, and review focus. | Core graph tooling | `graph find --bundle --query --output`. | No |
 | `impact-report.yaml` | Graph traversal impact report showing selected roots, upstream dependencies, downstream affected nodes, artifacts, policy controls, checks, module variables, semantic entities, semantic constraints, source context, input diffs, source changes, handoff readiness, readiness blockers, contract validation, downstream validation evidence, manual gates, root-to-target impact paths, and review focus. | Core graph tooling | `graph impact --bundle --root --output`; also embedded in `review compare` output. | No |
 | `graph-path.yaml` | Shortest-path explanation between two typed bundle graph roots, including hop relationships, traversal direction, unmatched roots, no-path status, and review focus. | Core graph tooling | `graph path --bundle --from --to --output`. | No |
@@ -51,7 +52,7 @@ Existing deployment mechanisms remain downstream.
 - Reviewers use `handoff-comparison.yaml` to inspect only the deltas from an
   incremental document or sample-configuration update.
 - Reviewers and agents use `bundle-graph.yaml` as the queryable bundle graph,
-  `graph-find.yaml` to discover candidate roots, then use `impact-report.yaml`
+  `graph-roots.yaml` or `graph-find.yaml` to discover candidate roots, then use `impact-report.yaml`
   or the `review compare` impact traversal section to see which artifacts,
   policy controls, Checkov refs/findings, shift-left evidence, module
   variables, and manual gates are downstream of a changed graph root. When a

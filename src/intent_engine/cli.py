@@ -55,18 +55,21 @@ from .core.impact_graph import (
     build_impact_report,
     build_neighborhood_report,
     build_path_report,
+    build_roots_report,
     render_bundle_graph_text,
     render_find_report_text,
     render_graph_diff_text,
     render_impact_report_text,
     render_neighborhood_report_text,
     render_path_report_text,
+    render_roots_report_text,
     write_bundle_graph_report,
     write_find_report,
     write_graph_diff_report,
     write_impact_report,
     write_neighborhood_report,
     write_path_report,
+    write_roots_report,
 )
 from .core.interview import InterviewEngine
 from .core.llm_caller import LLMEvidenceStore, auto_detect_llm
@@ -456,6 +459,36 @@ def graph_find(
     if output is not None:
         write_find_report(report, output)
         typer.echo(f"Graph find report written to: {output}")
+
+
+@graph_app.command("roots")
+def graph_roots(
+    bundle: Path = typer.Option(
+        ...,
+        "--bundle",
+        help="Generated handoff bundle directory to inspect.",
+    ),
+    kind: list[str] | None = typer.Option(
+        None,
+        "--kind",
+        help="Optional node kind filter for returned roots. Repeatable.",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Optional graph-roots.yaml output path.",
+    ),
+) -> None:
+    """List concrete typed graph roots available for traversal."""
+    if not bundle.is_dir():
+        typer.echo(f"Error: bundle path is not a directory: {bundle}", err=True)
+        raise typer.Exit(1)
+    report = build_roots_report(bundle, kinds=kind)
+    typer.echo(render_roots_report_text(report), nl=False)
+    if output is not None:
+        write_roots_report(report, output)
+        typer.echo(f"Graph roots report written to: {output}")
 
 
 @graph_app.command("impact")
