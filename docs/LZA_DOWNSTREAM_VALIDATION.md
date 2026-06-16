@@ -22,8 +22,10 @@ LZA validation or pipeline path after normal manual gates.
 
 ## Before Local Validation
 
-- Replace generated `example.com` account emails in `accounts-config.yaml` with
-  owner-approved account vending email addresses.
+- Replace every generated `example.com` account email in
+  `accounts-config.yaml` with an owner-approved account vending email. This
+  includes `Management`, `Audit`, `LogArchive`, security tooling, network
+  accounts when present, and each workload account.
 - Use an already-prepared local AWS LZA source checkout and toolchain; this
   project must not clone, install, synth, deploy, or mutate AWS.
 - Run the validator with an AWS session that can satisfy the official AWS LZA
@@ -44,7 +46,7 @@ Date:
 LZA repo, pipeline, or validation path:
 LZA version, schema version, or commit if known:
 Generated bundle path or commit:
-Account emails owner-approved by:
+Account emails owner-approved by, including `Management`:
 AWS account lookup context or profile:
 
 ## Decision
@@ -77,8 +79,8 @@ AWS account lookup context or profile:
 
 ## Required Owner Answers
 
-Are all account emails in `accounts-config.yaml` owner-approved account vending
-emails?
+Are all account emails in `accounts-config.yaml`, including `Management`,
+owner-approved account vending emails?
 
 Answer:
 
