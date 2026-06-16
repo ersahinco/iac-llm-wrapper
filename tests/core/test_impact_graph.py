@@ -20,6 +20,7 @@ from intent_engine.core.impact_graph import (
     build_impact_report,
     build_neighborhood_report,
     build_path_report,
+    build_recommended_impact_matrix_report,
     build_roots_report,
     render_find_report_text,
     render_graph_diff_text,
@@ -304,6 +305,74 @@ def test_graph_impact_matrix_cli_writes_report(tmp_path: Path):
     report = _yaml_load(output)
     assert report["schemaVersion"] == "intent-engine/graph-impact-matrix/v1"
     assert report["summary"]["matchedRootCount"] == 2
+
+
+def test_recommended_graph_impact_matrix_uses_review_roots(tmp_path: Path):
+    bundle = _terraform_vpc_bundle(tmp_path / "bundle")
+    (bundle / "input-diff-report.yaml").write_text(
+        "\n".join(
+            [
+                "schemaVersion: intent-engine/input-diff/v1",
+                "source:",
+                "  mode: document-diff",
+                "  baselineDocumentAvailable: true",
+                "changedStructuredDecisionLines:",
+                "  - key: cidr",
+                "    before: 10.30.0.0/16",
+                "    after: 10.31.0.0/16",
+            ]
+        )
+        + "\n"
+    )
+
+    report = build_recommended_impact_matrix_report(bundle, kinds=["source_change"])
+
+    assert report["summary"]["rootSource"] == "recommended"
+    assert report["summary"]["recommendedRootCount"] == 1
+    assert report["rows"][0]["root"]["id"] == "source_change:structured:cidr"
+    assert "Source change" in report["rows"][0]["recommendationReason"]
+    assert "module-inputs.yaml" in report["affectedArtifacts"]
+    rendered = render_impact_matrix_text(report)
+    assert "Root source: recommended" in rendered
+    assert "reason: Source change" in rendered
+
+
+def test_graph_impact_matrix_cli_uses_recommended_roots(tmp_path: Path):
+    bundle = _terraform_vpc_bundle(tmp_path / "bundle")
+    (bundle / "input-diff-report.yaml").write_text(
+        "\n".join(
+            [
+                "schemaVersion: intent-engine/input-diff/v1",
+                "changedStructuredDecisionLines:",
+                "  - key: cidr",
+                "    before: 10.30.0.0/16",
+                "    after: 10.31.0.0/16",
+            ]
+        )
+        + "\n"
+    )
+    output = tmp_path / "graph-impact-matrix.yaml"
+
+    result = runner.invoke(
+        app,
+        [
+            "graph",
+            "matrix",
+            "--bundle",
+            str(bundle),
+            "--recommended",
+            "--kind",
+            "source_change",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Root source: recommended" in result.output
+    report = _yaml_load(output)
+    assert report["summary"]["rootSource"] == "recommended"
+    assert report["rows"][0]["root"]["id"] == "source_change:structured:cidr"
 
 
 def test_bundle_graph_report_exports_queryable_nodes_and_edges(tmp_path: Path):

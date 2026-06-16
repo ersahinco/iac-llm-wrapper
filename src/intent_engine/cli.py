@@ -56,6 +56,7 @@ from .core.impact_graph import (
     build_impact_report,
     build_neighborhood_report,
     build_path_report,
+    build_recommended_impact_matrix_report,
     build_roots_report,
     render_bundle_graph_text,
     render_find_report_text,
@@ -586,10 +587,20 @@ def graph_matrix(
         "--bundle",
         help="Generated handoff bundle directory to traverse.",
     ),
-    root: list[str] = typer.Option(
-        ...,
+    root: list[str] | None = typer.Option(
+        None,
         "--root",
         help="Generic typed graph root as <kind>:<key>. Repeatable.",
+    ),
+    recommended: bool = typer.Option(
+        False,
+        "--recommended",
+        help="Build the matrix from graph roots recommended for review.",
+    ),
+    kind: list[str] | None = typer.Option(
+        None,
+        "--kind",
+        help="Optional node kind filter when --recommended is used. Repeatable.",
     ),
     output: Path | None = typer.Option(
         None,
@@ -602,8 +613,18 @@ def graph_matrix(
     if not bundle.is_dir():
         typer.echo(f"Error: bundle path is not a directory: {bundle}", err=True)
         raise typer.Exit(1)
-    roots = [_graph_root_or_exit(item, "--root") for item in root]
-    report = build_impact_matrix_report(bundle, roots=roots)
+    roots = [_graph_root_or_exit(item, "--root") for item in (root or [])]
+    if not roots and not recommended:
+        typer.echo("Error: provide --root at least once or use --recommended.", err=True)
+        raise typer.Exit(1)
+    if recommended:
+        report = build_recommended_impact_matrix_report(
+            bundle,
+            kinds=kind,
+            extra_roots=roots,
+        )
+    else:
+        report = build_impact_matrix_report(bundle, roots=roots)
     typer.echo(render_impact_matrix_text(report), nl=False)
     if output is not None:
         write_impact_matrix_report(report, output)

@@ -628,10 +628,19 @@ def build_impact_matrix_report(
     bundle: Path,
     *,
     roots: list[ImpactRoot],
+    root_reasons: dict[str, str] | None = None,
+    root_source: str = "explicit",
 ) -> dict[str, Any]:
     """Build a compact multi-root impact matrix for reviewer triage."""
 
-    rows = [_impact_matrix_row(build_impact_report(bundle, roots=[root])) for root in roots]
+    reasons = root_reasons or {}
+    rows = [
+        _impact_matrix_row(
+            build_impact_report(bundle, roots=[root]),
+            recommendation_reason=reasons.get(f"{root.kind}:{root.key}", ""),
+        )
+        for root in roots
+    ]
     severity_counts = _matrix_severity_counts(rows)
     matched_rows = [row for row in rows if _dict(row.get("summary")).get("status") == "matched"]
     affected_artifacts = _matrix_union(rows, "affectedArtifacts")
@@ -649,6 +658,7 @@ def build_impact_matrix_report(
         "boundary": BOUNDARY,
         "summary": {
             "status": "matched" if matched_rows else "no-match",
+            "rootSource": root_source,
             "rootCount": len(rows),
             "matchedRootCount": len(matched_rows),
             "highestReviewPrioritySeverity": _highest_priority_severity(severity_counts),
@@ -672,6 +682,44 @@ def build_impact_matrix_report(
         "reviewFocus": _matrix_review_focus(rows),
         "graph": graph_summary,
     }
+
+
+def build_recommended_impact_matrix_report(
+    bundle: Path,
+    *,
+    kinds: list[str] | None = None,
+    extra_roots: list[ImpactRoot] | None = None,
+) -> dict[str, Any]:
+    """Build an impact matrix from the bundle's recommended review roots."""
+
+    roots_report = build_roots_report(bundle, kinds=kinds)
+    recommended = _coerce_list(roots_report.get("recommendedReviewRoots"))
+    roots: list[ImpactRoot] = []
+    reasons: dict[str, str] = {}
+    for item in recommended:
+        if not isinstance(item, dict):
+            continue
+        root = _impact_root_from_value(str(item.get("root") or ""))
+        if root is None:
+            continue
+        roots.append(root)
+        reasons[f"{root.kind}:{root.key}"] = str(item.get("reason") or "")
+    roots.extend(extra_roots or [])
+    deduped_roots = _dedupe_roots(roots)
+    report = build_impact_matrix_report(
+        bundle,
+        roots=deduped_roots,
+        root_reasons=reasons,
+        root_source="recommended" if not extra_roots else "recommended-plus-explicit",
+    )
+    report["recommendedReviewRoots"] = recommended
+    report["summary"]["recommendedRootCount"] = len(recommended)
+    if not recommended and not extra_roots:
+        report["reviewFocus"] = [
+            "No recommended review roots were found; use graph roots or graph find "
+            "to select explicit roots."
+        ]
+    return report
 
 
 def build_graph_diff_report(before: Path, after: Path) -> dict[str, Any]:
@@ -906,6 +954,7 @@ def render_impact_matrix_text(report: dict[str, Any]) -> str:
         f"Status: {summary.get('status', 'unknown')}",
         f"Pattern: {report.get('pattern', '')}",
         f"Bundle: {report.get('bundle', '')}",
+        f"Root source: {summary.get('rootSource', 'explicit')}",
         f"Roots: {summary.get('matchedRootCount', 0)} of {summary.get('rootCount', 0)} matched",
         f"Review severity: {_priority_severity_summary(summary)}",
         "",
@@ -929,6 +978,9 @@ def render_impact_matrix_text(report: dict[str, Any]) -> str:
                 f"checks={summary_block.get('affectedCheckCount', 0)} "
                 f"gates={summary_block.get('manualGateCount', 0)}"
             )
+            reason = str(row.get("recommendationReason") or "")
+            if reason:
+                lines.append(f"    reason: {reason}")
     else:
         lines.append("  - None")
     lines.append("Affected artifacts:")
@@ -2318,10 +2370,14 @@ def _path_step_to_dict(graph: _ImpactGraph, step: _PathStep) -> dict[str, Any]:
     }
 
 
-def _impact_matrix_row(report: dict[str, Any]) -> dict[str, Any]:
+def _impact_matrix_row(
+    report: dict[str, Any],
+    *,
+    recommendation_reason: str = "",
+) -> dict[str, Any]:
     summary = _dict(report.get("summary"))
     root = _matrix_root(report)
-    return {
+    row = {
         "root": root,
         "unmatchedRoots": _coerce_list(report.get("unmatchedRoots")),
         "summary": {
@@ -2356,6 +2412,30 @@ def _impact_matrix_row(report: dict[str, Any]) -> dict[str, Any]:
         "pattern": report.get("pattern", ""),
         "graph": _dict(report.get("graph")),
     }
+    if recommendation_reason:
+        row["recommendationReason"] = recommendation_reason
+    return row
+
+
+def _impact_root_from_value(value: str) -> ImpactRoot | None:
+    if ":" not in value:
+        return None
+    kind, key = value.split(":", 1)
+    if not kind or not key:
+        return None
+    return ImpactRoot(kind=kind, key=key)
+
+
+def _dedupe_roots(roots: list[ImpactRoot]) -> list[ImpactRoot]:
+    seen: set[tuple[str, str]] = set()
+    deduped: list[ImpactRoot] = []
+    for root in roots:
+        key = (root.kind, root.key)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(root)
+    return deduped
 
 
 def _matrix_root(report: dict[str, Any]) -> dict[str, Any]:
