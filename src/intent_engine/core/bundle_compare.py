@@ -8,7 +8,7 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
-from .impact_graph import build_impact_report, changed_decision_roots
+from .impact_graph import build_graph_diff_report, build_impact_report, changed_decision_roots
 from .sample_config import SampleConfig
 from .yaml_utils import read_yaml_mapping, write_yaml_artifact
 
@@ -51,6 +51,7 @@ def compare_handoff_bundles(before_dir: Path, after_dir: Path) -> dict[str, Any]
         if (after.path / "input-diff-report.yaml").exists()
         else None,
     )
+    graph_diff = build_graph_diff_report(before.path, after.path)
     review_focus = _review_focus(
         decision_delta=decision_delta,
         requirement_delta=requirement_delta,
@@ -106,6 +107,7 @@ def compare_handoff_bundles(before_dir: Path, after_dir: Path) -> dict[str, Any]
         "inputDelta": _input_delta(before.input_diff, after.input_diff),
         "impactedRequirementMap": impacted_map,
         "impactTraversal": impact_traversal,
+        "graphDiff": graph_diff,
         "artifactDelta": artifact_delta,
         "sampleRecommendationDelta": sample_delta,
         "modelDelta": model_delta,
@@ -132,6 +134,7 @@ def render_bundle_comparison_html(report: dict[str, Any]) -> str:
     samples = _dict(report.get("sampleRecommendationDelta"))
     impacts = _coerce_list(report.get("impactedRequirementMap"))
     impact_traversal = _dict(report.get("impactTraversal"))
+    graph_diff = _dict(report.get("graphDiff"))
     focus = _coerce_list(summary.get("reviewFocus"))
     return "\n".join(
         [
@@ -193,6 +196,10 @@ def render_bundle_comparison_html(report: dict[str, Any]) -> str:
                         "Impact paths",
                         _impact_path_summaries(_coerce_list(impact_traversal.get("impactPaths"))),
                     ),
+                    _html_named_list(
+                        "Graph diff",
+                        _graph_diff_summaries(graph_diff),
+                    ),
                     _html_table(
                         [
                             {
@@ -241,6 +248,7 @@ def render_bundle_comparison_text(report: dict[str, Any]) -> str:
     readiness_delta = _dict(report.get("readinessDelta"))
     input_delta = _dict(report.get("inputDelta"))
     impact_traversal = _dict(report.get("impactTraversal"))
+    graph_diff = _dict(report.get("graphDiff"))
     lines = [
         "=== Handoff Bundle Comparison ===",
         "",
@@ -305,6 +313,21 @@ def render_bundle_comparison_text(report: dict[str, Any]) -> str:
                 + _join_or_none(
                     _impact_path_summaries(_coerce_list(impact_traversal.get("impactPaths")))[:5]
                 ),
+            ]
+        )
+
+    if graph_diff:
+        summary_block = _dict(graph_diff.get("summary"))
+        lines.extend(
+            [
+                "",
+                "Graph diff:",
+                f"  status: {summary_block.get('status', 'unknown')}",
+                f"  nodes: added={summary_block.get('nodeAddedCount', 0)} "
+                f"removed={summary_block.get('nodeRemovedCount', 0)} "
+                f"changed={summary_block.get('nodeChangedCount', 0)}",
+                f"  edges: added={summary_block.get('edgeAddedCount', 0)} "
+                f"removed={summary_block.get('edgeRemovedCount', 0)}",
             ]
         )
 
@@ -393,6 +416,22 @@ def _impact_path_summaries(paths: list[Any]) -> list[str]:
             )
         summaries.append(f"{target.get('id', 'unknown')}: " + " | ".join(rendered_hops))
     return summaries
+
+
+def _graph_diff_summaries(graph_diff: dict[str, Any]) -> list[str]:
+    if not graph_diff:
+        return []
+    summary = _dict(graph_diff.get("summary"))
+    return [
+        f"status: {summary.get('status', 'unknown')}",
+        "nodes: "
+        f"added={summary.get('nodeAddedCount', 0)}, "
+        f"removed={summary.get('nodeRemovedCount', 0)}, "
+        f"changed={summary.get('nodeChangedCount', 0)}",
+        "edges: "
+        f"added={summary.get('edgeAddedCount', 0)}, "
+        f"removed={summary.get('edgeRemovedCount', 0)}",
+    ]
 
 
 def _load_bundle(path: Path) -> _BundleSnapshot:

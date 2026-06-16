@@ -706,3 +706,7 @@ def test_bundle_compare_includes_impact_traversal(tmp_path: Path):
     assert "Impact traversal:" in rendered
     assert "affected policy controls: VPC-ATTACHMENT-001, VPC-NETWORK-001" in rendered
     assert "impact paths: artifact:decision-report.yaml:" in rendered
+    graph_diff = report["graphDiff"]
+    assert graph_diff["summary"]["status"] == "changed"
+    assert graph_diff["summary"]["nodeChangedCount"] >= 2
+    assert "Graph diff:" in rendered
