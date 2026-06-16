@@ -10,6 +10,7 @@ from typer.testing import CliRunner
 from intent_engine.cli import app
 from intent_engine.core.bundle_compare import compare_handoff_bundles, render_bundle_comparison_text
 from intent_engine.core.compiler import compile_from_interview
+from intent_engine.core.contract_validation import write_contract_validation
 from intent_engine.core.impact_graph import (
     ImpactRoot,
     build_bundle_graph_report,
@@ -31,6 +32,12 @@ runner = CliRunner()
 def _terraform_vpc_bundle(output: Path) -> Path:
     _compile_terraform_vpc_bundle(output, cidr="10.30.0.0/16")
     return output
+
+
+def _terraform_vpc_validated_bundle(output: Path) -> Path:
+    bundle = _terraform_vpc_bundle(output)
+    write_contract_validation(bundle)
+    return bundle
 
 
 def _terraform_vpc_bundle_with_checkov_evidence(output: Path) -> Path:
@@ -230,6 +237,52 @@ def test_bundle_graph_report_exports_queryable_nodes_and_edges(tmp_path: Path):
     assert "decision" in report["queryHints"]["rootKinds"]
     assert "graph path" in report["queryHints"]["pathCommand"]
     assert "graph find" in report["queryHints"]["findCommand"]
+
+
+def test_bundle_graph_report_exports_readiness_and_contract_validation_nodes(tmp_path: Path):
+    bundle = _terraform_vpc_validated_bundle(tmp_path / "bundle")
+
+    report = build_bundle_graph_report(bundle)
+
+    node_ids = {item["id"] for item in report["nodes"]}
+    assert "handoff_readiness:handoffReadiness" in node_ids
+    assert "contract_validation:contract-validation.yaml" in node_ids
+    assert "contract_result:terraform-aws-vpc-module" in node_ids
+    assert "artifact:contract-validation.yaml" in node_ids
+    assert "handoff_readiness" in report["queryHints"]["rootKinds"]
+    assert "contract_validation" in report["queryHints"]["rootKinds"]
+    assert {
+        "from": "decision:cidr",
+        "to": "handoff_readiness:handoffReadiness",
+        "relationship": "contributes-to-readiness",
+    } in report["edges"]
+    assert {
+        "from": "handoff_readiness:handoffReadiness",
+        "to": "contract_validation:contract-validation.yaml",
+        "relationship": "validated-by",
+    } in report["edges"]
+    assert {
+        "from": "target_contract:terraform-aws-vpc-module",
+        "to": "contract_result:terraform-aws-vpc-module",
+        "relationship": "validated-by-result",
+    } in report["edges"]
+
+
+def test_decision_impact_reports_readiness_and_contract_validation(tmp_path: Path):
+    bundle = _terraform_vpc_validated_bundle(tmp_path / "bundle")
+
+    report = build_impact_report(bundle, roots=[ImpactRoot(kind="decision", key="cidr")])
+
+    assert report["affectedReadiness"] == ["handoffReadiness"]
+    assert report["affectedContractValidation"] == ["contract-validation.yaml"]
+    assert "terraform-aws-vpc-module" in report["affectedContractResults"]
+    assert "contract-validation.yaml" in report["affectedArtifacts"]
+    path_targets = {item["target"]["id"] for item in report["impactPaths"]}
+    assert "handoff_readiness:handoffReadiness" in path_targets
+    assert "contract_validation:contract-validation.yaml" in path_targets
+    rendered = render_impact_report_text(report)
+    assert "Affected readiness:" in rendered
+    assert "Affected contract validation:" in rendered
 
 
 def test_bundle_graph_report_exports_semantic_model_nodes_and_edges():

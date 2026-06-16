@@ -222,6 +222,15 @@ def build_impact_report(
     affected_variables = _keys_by_kind(downstream_nodes, "module_variable")
     affected_semantic_entities = _keys_by_kind(downstream_nodes, "semantic_entity")
     affected_semantic_constraints = _keys_by_kind(downstream_nodes, "semantic_constraint")
+    affected_readiness = _keys_by_kind(downstream_nodes, "handoff_readiness")
+    affected_readiness_blockers = _keys_by_kind(downstream_nodes, "readiness_blocker")
+    affected_contract_validation = _keys_by_kind(downstream_nodes, "contract_validation")
+    affected_contract_results = _keys_by_kind(downstream_nodes, "contract_result")
+    affected_validation_violations = _keys_by_kind(downstream_nodes, "validation_violation")
+    affected_downstream_validation = _keys_by_kind(
+        downstream_nodes,
+        "downstream_validation_evidence",
+    )
     manual_gates = _keys_by_kind(downstream_nodes, "manual_gate")
     impact_paths = _impact_paths(graph, root_ids, downstream_nodes)
     unmatched = _unmatched_roots(roots, graph, selected_roots)
@@ -243,6 +252,9 @@ def build_impact_report(
             "affectedPolicyControlCount": len(affected_controls),
             "affectedCheckovFindingCount": len(affected_findings),
             "affectedSemanticConstraintCount": len(affected_semantic_constraints),
+            "affectedReadinessCount": len(affected_readiness),
+            "affectedContractValidationCount": len(affected_contract_validation),
+            "affectedValidationViolationCount": len(affected_validation_violations),
             "manualGateCount": len(manual_gates),
         },
         "selectedRoots": [node.to_dict() for node in root_nodes],
@@ -257,6 +269,12 @@ def build_impact_report(
         "affectedModuleVariables": affected_variables,
         "affectedSemanticEntities": affected_semantic_entities,
         "affectedSemanticConstraints": affected_semantic_constraints,
+        "affectedReadiness": affected_readiness,
+        "affectedReadinessBlockers": affected_readiness_blockers,
+        "affectedContractValidation": affected_contract_validation,
+        "affectedContractResults": affected_contract_results,
+        "affectedValidationViolations": affected_validation_violations,
+        "affectedDownstreamValidationEvidence": affected_downstream_validation,
         "manualGates": manual_gates,
         "impactPaths": impact_paths,
         "reviewFocus": _review_focus(
@@ -267,6 +285,11 @@ def build_impact_report(
             checks=affected_checks,
             findings=affected_findings,
             semantic_constraints=affected_semantic_constraints,
+            readiness=affected_readiness,
+            readiness_blockers=affected_readiness_blockers,
+            contract_validation=affected_contract_validation,
+            validation_violations=affected_validation_violations,
+            downstream_validation=affected_downstream_validation,
             gates=manual_gates,
         ),
         "graph": {
@@ -309,6 +332,12 @@ def build_bundle_graph_report(bundle: Path) -> dict[str, Any]:
                 "target_contract",
                 "target_capability",
                 "manual_gate",
+                "handoff_readiness",
+                "readiness_blocker",
+                "contract_validation",
+                "contract_result",
+                "validation_violation",
+                "downstream_validation_evidence",
                 "semantic_entity",
                 "semantic_constraint",
                 "shift_left_evidence",
@@ -852,6 +881,18 @@ def render_impact_report_text(report: dict[str, Any]) -> str:
     lines.extend(_list_or_none(_coerce_list(report.get("affectedSemanticEntities"))))
     lines.append("Affected semantic constraints:")
     lines.extend(_list_or_none(_coerce_list(report.get("affectedSemanticConstraints"))))
+    lines.append("Affected readiness:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedReadiness"))))
+    lines.append("Affected readiness blockers:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedReadinessBlockers"))))
+    lines.append("Affected contract validation:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedContractValidation"))))
+    lines.append("Affected contract results:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedContractResults"))))
+    lines.append("Affected validation violations:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedValidationViolations"))))
+    lines.append("Affected downstream validation evidence:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedDownstreamValidationEvidence"))))
     lines.append("Manual gates:")
     lines.extend(_list_or_none(_coerce_list(report.get("manualGates"))))
     lines.append("Impact paths:")
@@ -878,6 +919,8 @@ def _build_graph(bundle: Path) -> tuple[_ImpactGraph, str]:
     module_inputs = read_yaml_mapping(bundle / "module-inputs.yaml")
     policy_graph = read_yaml_mapping(bundle / "policy-graph.yaml")
     shift_left_evidence = read_yaml_mapping(bundle / "shift-left-evidence.yaml")
+    contract_validation = read_yaml_mapping(bundle / "contract-validation.yaml")
+    downstream_validation = read_yaml_mapping(bundle / "lza-validation-evidence.yaml")
     handoff = read_yaml_mapping(bundle / "handoff-plan.yaml")
     target_capability = read_yaml_mapping(bundle / "target-capability-graph.yaml")
     samples = read_yaml_mapping(bundle / "sample-recommendations.yaml")
@@ -929,6 +972,13 @@ def _build_graph(bundle: Path) -> tuple[_ImpactGraph, str]:
     _add_handoff_nodes(graph, handoff)
     _add_target_capability_nodes(graph, target_capability)
     _add_sample_nodes(graph, samples)
+    _add_readiness_and_validation_nodes(
+        graph,
+        report=report,
+        handoff=handoff,
+        contract_validation=contract_validation,
+        downstream_validation=downstream_validation,
+    )
     return graph, pattern
 
 
@@ -1315,6 +1365,221 @@ def _add_sample_nodes(graph: _ImpactGraph, samples: dict[str, Any]) -> None:
         graph.add_edge(sample_id, artifact_id, "listed-in")
 
 
+def _add_readiness_and_validation_nodes(
+    graph: _ImpactGraph,
+    *,
+    report: dict[str, Any],
+    handoff: dict[str, Any],
+    contract_validation: dict[str, Any],
+    downstream_validation: dict[str, Any],
+) -> None:
+    readiness = _first_mapping(
+        report.get("handoffReadiness"),
+        handoff.get("readiness"),
+        contract_validation.get("readiness"),
+    )
+    readiness_id = ""
+    if readiness:
+        readiness_id = graph.add_node(
+            "handoff_readiness",
+            "handoffReadiness",
+            "Handoff readiness",
+            status=readiness.get("status"),
+            handoffAllowed=_readiness_allowed(readiness),
+            summary=readiness.get("summary"),
+            blockerCount=_readiness_blocker_count(readiness),
+        )
+        for artifact_name in ("decision-report.yaml", "handoff-plan.yaml"):
+            artifact_id = graph.add_node("artifact", artifact_name, artifact_name)
+            graph.add_edge(readiness_id, artifact_id, "recorded-in")
+        for node in list(graph.nodes.values()):
+            if node.kind == "decision":
+                graph.add_edge(node.id, readiness_id, "contributes-to-readiness")
+        _add_readiness_blocker_nodes(graph, readiness_id, readiness)
+
+    if contract_validation:
+        validation_summary = _dict(contract_validation.get("summary"))
+        validation_id = graph.add_node(
+            "contract_validation",
+            "contract-validation.yaml",
+            "Contract validation",
+            status=validation_summary.get("status"),
+            contractCount=validation_summary.get("contractCount"),
+            violationCount=validation_summary.get("violationCount"),
+        )
+        artifact_id = graph.add_node(
+            "artifact",
+            "contract-validation.yaml",
+            "contract-validation.yaml",
+        )
+        graph.add_edge(validation_id, artifact_id, "recorded-in")
+        if readiness_id:
+            graph.add_edge(readiness_id, validation_id, "validated-by")
+        for contract in _coerce_list(contract_validation.get("contracts")):
+            if isinstance(contract, dict):
+                _add_contract_result_node(graph, validation_id, contract)
+
+    if downstream_validation:
+        evidence_id = _add_downstream_validation_node(graph, downstream_validation)
+        if readiness_id:
+            graph.add_edge(readiness_id, evidence_id, "reviewed-with-validation-evidence")
+
+
+def _add_readiness_blocker_nodes(
+    graph: _ImpactGraph,
+    readiness_id: str,
+    readiness: dict[str, Any],
+) -> None:
+    for index, blocker in enumerate(_coerce_list(readiness.get("blockers"))):
+        if not isinstance(blocker, dict):
+            continue
+        blocker_id = _add_readiness_blocker_node(graph, blocker, index)
+        graph.add_edge(readiness_id, blocker_id, "has-blocker")
+        graph.add_edge(blocker_id, readiness_id, "blocks-readiness")
+    for item in _coerce_list(readiness.get("missingDecisions")):
+        if not isinstance(item, dict) or not item.get("key"):
+            continue
+        key = str(item["key"])
+        blocker_id = graph.add_node(
+            "readiness_blocker",
+            f"missing:{key}",
+            str(item.get("label") or key),
+            code="MISSING_DECISION",
+            message=item.get("reason") or item.get("suggestion"),
+            question=item.get("question"),
+        )
+        decision_id = graph.add_node("decision", key, key)
+        graph.add_edge(decision_id, blocker_id, "missing-decision-blocks-readiness")
+        graph.add_edge(readiness_id, blocker_id, "has-blocker")
+        graph.add_edge(blocker_id, readiness_id, "blocks-readiness")
+    for index, item in enumerate(_coerce_list(readiness.get("conflictingDecisions"))):
+        if not isinstance(item, dict):
+            continue
+        key = str(item.get("key") or item.get("code") or f"conflict-{index}")
+        blocker_id = graph.add_node(
+            "readiness_blocker",
+            f"conflict:{key}",
+            str(item.get("code") or item.get("key") or key),
+            code=item.get("code"),
+            message=item.get("reason") or item.get("details"),
+        )
+        if item.get("key"):
+            decision_id = graph.add_node("decision", str(item["key"]), str(item["key"]))
+            graph.add_edge(decision_id, blocker_id, "conflict-blocks-readiness")
+        graph.add_edge(readiness_id, blocker_id, "has-blocker")
+        graph.add_edge(blocker_id, readiness_id, "blocks-readiness")
+
+
+def _add_readiness_blocker_node(
+    graph: _ImpactGraph,
+    blocker: dict[str, Any],
+    index: int,
+) -> str:
+    code = str(blocker.get("code") or f"blocker-{index}")
+    key = f"{code}:{index}"
+    return graph.add_node(
+        "readiness_blocker",
+        key,
+        code,
+        code=blocker.get("code"),
+        message=blocker.get("message"),
+    )
+
+
+def _add_contract_result_node(
+    graph: _ImpactGraph,
+    validation_id: str,
+    contract: dict[str, Any],
+) -> None:
+    name = str(contract.get("name") or "")
+    if not name:
+        return
+    result_id = graph.add_node(
+        "contract_result",
+        name,
+        name,
+        contractKind=contract.get("kind"),
+        status=contract.get("status"),
+        violationCount=contract.get("violationCount"),
+    )
+    graph.add_edge(result_id, validation_id, "reported-in")
+    target_contract_id = graph.add_node("target_contract", name, name)
+    graph.add_edge(target_contract_id, result_id, "validated-by-result")
+    graph.add_edge(result_id, target_contract_id, "validates-contract")
+    for index, violation in enumerate(_coerce_list(contract.get("violations"))):
+        if not isinstance(violation, dict):
+            continue
+        code = str(violation.get("code") or f"violation-{index}")
+        violation_id = graph.add_node(
+            "validation_violation",
+            f"{name}:{code}:{index}",
+            code,
+            code=violation.get("code"),
+            message=violation.get("message"),
+        )
+        graph.add_edge(result_id, violation_id, "has-violation")
+        graph.add_edge(violation_id, validation_id, "recorded-in-validation")
+
+
+def _add_downstream_validation_node(
+    graph: _ImpactGraph,
+    downstream_validation: dict[str, Any],
+) -> str:
+    command = _dict(downstream_validation.get("command"))
+    diagnostic = _dict(downstream_validation.get("diagnostic"))
+    evidence_id = graph.add_node(
+        "downstream_validation_evidence",
+        "lza-validation-evidence.yaml",
+        "LZA validation evidence",
+        status=downstream_validation.get("status"),
+        exitCode=command.get("exitCode"),
+        diagnosticCategory=diagnostic.get("category"),
+        diagnosticSummary=diagnostic.get("summary"),
+    )
+    artifact_id = graph.add_node(
+        "artifact",
+        "lza-validation-evidence.yaml",
+        "lza-validation-evidence.yaml",
+    )
+    graph.add_edge(evidence_id, artifact_id, "recorded-in")
+    input_block = _dict(downstream_validation.get("input"))
+    for item in _coerce_list(input_block.get("configFileDigests")):
+        if not isinstance(item, dict) or not item.get("name"):
+            continue
+        artifact_id = graph.add_node("artifact", str(item["name"]), str(item["name"]))
+        graph.add_edge(artifact_id, evidence_id, "validated-by-downstream-evidence")
+    for artifact_name in _coerce_list(input_block.get("configFiles")):
+        artifact_id = graph.add_node("artifact", str(artifact_name), str(artifact_name))
+        graph.add_edge(artifact_id, evidence_id, "validated-by-downstream-evidence")
+    return evidence_id
+
+
+def _first_mapping(*values: Any) -> dict[str, Any]:
+    for value in values:
+        if isinstance(value, dict) and value:
+            return value
+    return {}
+
+
+def _readiness_allowed(readiness: dict[str, Any]) -> bool | None:
+    if "handoffAllowed" in readiness:
+        return bool(readiness["handoffAllowed"])
+    if "deploymentAllowed" in readiness:
+        return bool(readiness["deploymentAllowed"])
+    if "allowed" in readiness:
+        return bool(readiness["allowed"])
+    return None
+
+
+def _readiness_blocker_count(readiness: dict[str, Any]) -> int:
+    if isinstance(readiness.get("blockerCount"), int):
+        return int(readiness["blockerCount"])
+    blocker_count = len(_coerce_list(readiness.get("blockers")))
+    blocker_count += len(_coerce_list(readiness.get("missingDecisions")))
+    blocker_count += len(_coerce_list(readiness.get("conflictingDecisions")))
+    return blocker_count
+
+
 def _roots_from_selectors(graph: _ImpactGraph, roots: list[ImpactRoot]) -> list[str]:
     selected: list[str] = []
     for root in roots:
@@ -1484,15 +1749,21 @@ def _impact_paths(
         "artifact_path",
         "checkov_finding",
         "checkov_check",
+        "contract_validation",
+        "contract_result",
+        "downstream_validation_evidence",
+        "handoff_readiness",
         "manual_gate",
         "module_variable",
         "policy_control",
+        "readiness_blocker",
         "scan_file",
         "semantic_constraint",
         "semantic_entity",
         "shift_left_evidence",
         "target_contract",
         "target_capability",
+        "validation_violation",
     }
     paths: list[dict[str, Any]] = []
     for node in downstream_nodes:
@@ -1545,6 +1816,11 @@ def _review_focus(
     checks: list[str],
     findings: list[str],
     semantic_constraints: list[str],
+    readiness: list[str],
+    readiness_blockers: list[str],
+    contract_validation: list[str],
+    validation_violations: list[str],
+    downstream_validation: list[str],
     gates: list[str],
 ) -> list[str]:
     if status == "no-match":
@@ -1560,6 +1836,22 @@ def _review_focus(
     if semantic_constraints:
         focus.append(
             "Review affected semantic constraints: " + ", ".join(semantic_constraints) + "."
+        )
+    if readiness:
+        focus.append("Review affected handoff readiness state: " + ", ".join(readiness) + ".")
+    if readiness_blockers:
+        focus.append("Review affected readiness blockers: " + ", ".join(readiness_blockers) + ".")
+    if contract_validation:
+        focus.append(
+            "Review affected contract validation evidence: " + ", ".join(contract_validation) + "."
+        )
+    if validation_violations:
+        focus.append(
+            "Review affected validation violations: " + ", ".join(validation_violations) + "."
+        )
+    if downstream_validation:
+        focus.append(
+            "Review downstream validation evidence: " + ", ".join(downstream_validation) + "."
         )
     if findings:
         focus.append("Review affected Checkov findings: " + ", ".join(findings) + ".")

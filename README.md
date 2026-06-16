@@ -47,8 +47,9 @@ Graph dependency traversal is available with `graph bundle --bundle ...` for a
 queryable typed bundle graph and `graph find --bundle ... --query ...` to
 discover candidate roots. Use `graph impact --bundle ...` to inspect the blast
 radius of a changed decision, artifact, module variable, policy control,
-Checkov finding, shift-left evidence, semantic entity, semantic constraint, or
-input diff, and use
+Checkov finding, shift-left evidence, handoff readiness, contract validation,
+downstream validation evidence, semantic entity, semantic constraint, or input
+diff, and use
 `graph path --bundle ... --from <kind:key> --to <kind:key>` to explain the
 shortest dependency path between two specific graph roots, or
 `graph neighbors --bundle ... --root <kind:key>` to inspect a bounded
