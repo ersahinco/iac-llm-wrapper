@@ -234,6 +234,15 @@ def test_bundle_graph_report_exports_queryable_nodes_and_edges(tmp_path: Path):
         "to": "policy_control:VPC-NETWORK-001",
         "relationship": "mapped-to-control",
     } in report["edges"]
+    assert "decision:cidr" in report["indexes"]["nodesByKind"]["decision"]
+    assert {
+        "to": "policy_control:VPC-NETWORK-001",
+        "relationship": "mapped-to-control",
+    } in report["indexes"]["outgoing"]["decision:cidr"]
+    assert {
+        "from": "decision:cidr",
+        "relationship": "mapped-to-control",
+    } in report["indexes"]["incoming"]["policy_control:VPC-NETWORK-001"]
     assert "decision" in report["queryHints"]["rootKinds"]
     assert "graph path" in report["queryHints"]["pathCommand"]
     assert "graph find" in report["queryHints"]["findCommand"]

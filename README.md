@@ -43,10 +43,10 @@ PCI, HIPAA, and NIST, target contracts, module variables, and owner Checkov
 policy references. That evidence is shift-left input for owner CI/CD gates, not
 compliance attestation or deployment approval.
 
-Graph dependency traversal is available with `graph bundle --bundle ...` for a
-queryable typed bundle graph and `graph find --bundle ... --query ...` to
-discover candidate roots. Use `graph impact --bundle ...` to inspect the blast
-radius of a changed decision, artifact, module variable, policy control,
+Graph dependency traversal is available with `graph bundle --bundle ...` for an
+indexed, queryable typed bundle graph and `graph find --bundle ... --query ...`
+to discover candidate roots. Use `graph impact --bundle ...` to inspect the
+blast radius of a changed decision, artifact, module variable, policy control,
 Checkov finding, shift-left evidence, handoff readiness, contract validation,
 downstream validation evidence, source context, input diff, source change,
 semantic entity, or semantic constraint, and use

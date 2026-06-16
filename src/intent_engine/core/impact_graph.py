@@ -368,6 +368,7 @@ def build_bundle_graph_report(bundle: Path) -> dict[str, Any]:
                 "iac-llm-wrapper graph neighbors --bundle <bundle> --root <kind:key>"
             ),
         },
+        "indexes": _bundle_graph_indexes(nodes, edges),
         "nodes": nodes,
         "edges": edges,
     }
@@ -1772,6 +1773,53 @@ def _sorted_nodes(graph: _ImpactGraph, ids: set[str]) -> list[_ImpactNode]:
 
 def _keys_by_kind(nodes: list[_ImpactNode], kind: str) -> list[str]:
     return sorted({node.key for node in nodes if node.kind == kind and node.key})
+
+
+def _bundle_graph_indexes(
+    nodes: list[dict[str, Any]],
+    edges: list[dict[str, str]],
+) -> dict[str, Any]:
+    return {
+        "nodesByKind": _node_ids_by_kind(nodes),
+        "outgoing": _adjacency_index(edges, source_key="from", target_key="to"),
+        "incoming": _adjacency_index(edges, source_key="to", target_key="from"),
+    }
+
+
+def _node_ids_by_kind(nodes: list[dict[str, Any]]) -> dict[str, list[str]]:
+    grouped: dict[str, list[str]] = {}
+    for node in nodes:
+        kind = str(node.get("kind") or "unknown")
+        node_id = str(node.get("id") or "")
+        if not node_id:
+            continue
+        grouped.setdefault(kind, []).append(node_id)
+    return {kind: sorted(ids) for kind, ids in sorted(grouped.items())}
+
+
+def _adjacency_index(
+    edges: list[dict[str, str]],
+    *,
+    source_key: str,
+    target_key: str,
+) -> dict[str, list[dict[str, str]]]:
+    adjacency: dict[str, list[dict[str, str]]] = {}
+    for edge in edges:
+        source = str(edge.get(source_key) or "")
+        target = str(edge.get(target_key) or "")
+        relationship = str(edge.get("relationship") or "")
+        if not source or not target:
+            continue
+        adjacency.setdefault(source, []).append(
+            {
+                target_key: target,
+                "relationship": relationship,
+            }
+        )
+    return {
+        node_id: sorted(items, key=lambda item: (item.get(target_key, ""), item["relationship"]))
+        for node_id, items in sorted(adjacency.items())
+    }
 
 
 def _count_by(items: list[dict[str, Any]], key: str) -> dict[str, int]:
