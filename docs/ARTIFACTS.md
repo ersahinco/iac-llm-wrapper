@@ -26,6 +26,7 @@ Existing deployment mechanisms remain downstream.
 | `impact-report.yaml` | Graph traversal impact report showing selected roots, upstream dependencies, downstream affected nodes, artifacts, policy controls, checks, module variables, semantic entities, semantic constraints, manual gates, root-to-target impact paths, and review focus. | Core graph tooling | `graph impact --bundle --root --output`; also embedded in `review compare` output. | No |
 | `graph-path.yaml` | Shortest-path explanation between two typed bundle graph roots, including hop relationships, traversal direction, unmatched roots, no-path status, and review focus. | Core graph tooling | `graph path --bundle --from --to --output`. | No |
 | `graph-neighborhood.yaml` | Bounded dependency neighborhood around one typed bundle graph root, including neighbor node depths, connecting traversal hops, optional kind filtering, no-match status, and review focus. | Core graph tooling | `graph neighbors --bundle --root --output`. | No |
+| `graph-diff.yaml` | Typed graph delta between two generated bundles, including added/removed/changed nodes, added/removed edges, node-kind counts, and review focus. | Core graph tooling | `graph diff --before --after --output`. | No |
 | `handoff-comparison.yaml` | Compact before/after bundle delta for incremental packet or sample updates: readiness, requirement completeness, decisions, blockers, artifacts, model quality, and sample recommendations. | Core review tooling | `iac-llm-wrapper review compare --output`. | No |
 | `shift-left-evidence.yaml` | Optional Checkov evidence for an owner-provided IaC/module/pipeline path, including tool availability, command, registered policy packs, owner custom-policy paths, IaC kind, result, summary counts, findings, mapped controls, unmapped findings, and no-deploy boundary. | Core shift-left tooling | `shift-left checkov --bundle --scan-path`. | No |
 | `handoff-comparison.html` | Static delta review page for what changed, what stayed stable, and what must be reviewed. | Core review tooling | `iac-llm-wrapper review compare --html-output`. | No |
@@ -61,6 +62,10 @@ Existing deployment mechanisms remain downstream.
   specific graph root is connected to another. Use `graph-neighborhood.yaml` to
   inspect the bounded upstream, downstream, or bidirectional context around one
   graph root before choosing a more precise impact or path query.
+- Use `graph-diff.yaml` when the review question is graph-native: which typed
+  nodes or edges changed between two generated bundles. Use
+  `handoff-comparison.yaml` when the review question spans readiness, decisions,
+  artifacts, samples, and model quality.
 - Regulated-environment reviewers use `policy-graph.yaml` and
   `shift-left-evidence.yaml` as pre-deployment policy evidence for
   owner-controlled CI/CD gates. These artifacts are not compliance attestation

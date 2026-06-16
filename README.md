@@ -52,9 +52,10 @@ input diff, and use
 `graph path --bundle ... --from <kind:key> --to <kind:key>` to explain the
 shortest dependency path between two specific graph roots, or
 `graph neighbors --bundle ... --root <kind:key>` to inspect a bounded
-upstream/downstream neighborhood around one root. These are read-only reasoning
-artifacts for review and owner CI/CD routing, not diagram ingestion, planners,
-or deployment runners.
+upstream/downstream neighborhood around one root. Use
+`graph diff --before ... --after ...` to compare two generated bundles as typed
+graph nodes and edges. These are read-only reasoning artifacts for review and
+owner CI/CD routing, not diagram ingestion, planners, or deployment runners.
 
 ## Core Flow
 

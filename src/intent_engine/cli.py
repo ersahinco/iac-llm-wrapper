@@ -51,16 +51,19 @@ from .core.impact_graph import (
     ImpactRoot,
     build_bundle_graph_report,
     build_find_report,
+    build_graph_diff_report,
     build_impact_report,
     build_neighborhood_report,
     build_path_report,
     render_bundle_graph_text,
     render_find_report_text,
+    render_graph_diff_text,
     render_impact_report_text,
     render_neighborhood_report_text,
     render_path_report_text,
     write_bundle_graph_report,
     write_find_report,
+    write_graph_diff_report,
     write_impact_report,
     write_neighborhood_report,
     write_path_report,
@@ -649,6 +652,39 @@ def graph_neighbors(
     if output is not None:
         write_neighborhood_report(report, output)
         typer.echo(f"Graph neighborhood report written to: {output}")
+
+
+@graph_app.command("diff")
+def graph_diff(
+    before: Path = typer.Option(
+        ...,
+        "--before",
+        help="Previous generated handoff bundle directory.",
+    ),
+    after: Path = typer.Option(
+        ...,
+        "--after",
+        help="Updated generated handoff bundle directory.",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Optional graph-diff.yaml output path.",
+    ),
+) -> None:
+    """Compare two generated bundle graphs as typed nodes and edges."""
+    if not before.is_dir():
+        typer.echo(f"Error: before bundle path is not a directory: {before}", err=True)
+        raise typer.Exit(1)
+    if not after.is_dir():
+        typer.echo(f"Error: after bundle path is not a directory: {after}", err=True)
+        raise typer.Exit(1)
+    report = build_graph_diff_report(before, after)
+    typer.echo(render_graph_diff_text(report), nl=False)
+    if output is not None:
+        write_graph_diff_report(report, output)
+        typer.echo(f"Graph diff written to: {output}")
 
 
 @graph_app.command("bundle")

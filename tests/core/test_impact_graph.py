@@ -14,10 +14,12 @@ from intent_engine.core.impact_graph import (
     ImpactRoot,
     build_bundle_graph_report,
     build_find_report,
+    build_graph_diff_report,
     build_impact_report,
     build_neighborhood_report,
     build_path_report,
     render_find_report_text,
+    render_graph_diff_text,
     render_impact_report_text,
     render_neighborhood_report_text,
     render_path_report_text,
@@ -626,6 +628,66 @@ def test_graph_bundle_cli_writes_queryable_report(tmp_path: Path):
     report = _yaml_load(output)
     assert report["schemaVersion"] == "intent-engine/bundle-graph/v1"
     assert "policy_control" in report["summary"]["nodeKinds"]
+
+
+def test_graph_diff_reports_changed_decision_and_module_nodes(tmp_path: Path):
+    before = tmp_path / "before"
+    after = tmp_path / "after"
+    _compile_terraform_vpc_bundle(before, cidr="10.30.0.0/16")
+    _compile_terraform_vpc_bundle(after, cidr="10.31.0.0/16")
+
+    report = build_graph_diff_report(before, after)
+
+    changed_ids = {item["id"] for item in report["changedNodes"]}
+    assert report["schemaVersion"] == "intent-engine/graph-diff/v1"
+    assert report["summary"]["status"] == "changed"
+    assert "decision:cidr" in changed_ids
+    assert "module_variable:cidr" in changed_ids
+    assert report["summary"]["nodeChangedCount"] >= 2
+    rendered = render_graph_diff_text(report)
+    assert "Graph Diff" in rendered
+    assert "decision:cidr" in rendered
+
+
+def test_graph_diff_reports_added_shift_left_evidence_nodes(tmp_path: Path):
+    before = _terraform_vpc_bundle(tmp_path / "before")
+    after = _terraform_vpc_bundle_with_checkov_evidence(tmp_path / "after")
+
+    report = build_graph_diff_report(before, after)
+
+    added_ids = {item["id"] for item in report["addedNodes"]}
+    assert "shift_left_evidence:shift-left-evidence.yaml" in added_ids
+    assert "checkov_finding:CKV_CUSTOM_VPC_001|module.vpc|/main.tf" in added_ids
+    assert report["summary"]["nodeKindsAdded"]["checkov_finding"] == 2
+    assert report["summary"]["edgeAddedCount"] >= 1
+
+
+def test_graph_diff_cli_writes_report(tmp_path: Path):
+    before = tmp_path / "before"
+    after = tmp_path / "after"
+    output = tmp_path / "graph-diff.yaml"
+    _compile_terraform_vpc_bundle(before, cidr="10.30.0.0/16")
+    _compile_terraform_vpc_bundle(after, cidr="10.31.0.0/16")
+
+    result = runner.invoke(
+        app,
+        [
+            "graph",
+            "diff",
+            "--before",
+            str(before),
+            "--after",
+            str(after),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Graph Diff" in result.output
+    report = _yaml_load(output)
+    assert report["schemaVersion"] == "intent-engine/graph-diff/v1"
+    assert report["summary"]["status"] == "changed"
 
 
 def test_bundle_compare_includes_impact_traversal(tmp_path: Path):

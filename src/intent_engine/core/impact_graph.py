@@ -520,7 +520,83 @@ def build_find_report(
     }
 
 
+def build_graph_diff_report(before: Path, after: Path) -> dict[str, Any]:
+    """Compare two generated bundle graphs as typed nodes and edges."""
+
+    before_graph, before_pattern = _build_graph(before)
+    after_graph, after_pattern = _build_graph(after)
+    before_nodes = before_graph.nodes
+    after_nodes = after_graph.nodes
+    before_node_ids = set(before_nodes)
+    after_node_ids = set(after_nodes)
+    added_node_ids = after_node_ids - before_node_ids
+    removed_node_ids = before_node_ids - after_node_ids
+    shared_node_ids = before_node_ids & after_node_ids
+    changed_nodes = [
+        _node_change(before_nodes[node_id], after_nodes[node_id])
+        for node_id in sorted(shared_node_ids)
+        if before_nodes[node_id].to_dict() != after_nodes[node_id].to_dict()
+    ]
+
+    before_edges = {_edge_key(edge): edge for edge in before_graph.edges}
+    after_edges = {_edge_key(edge): edge for edge in after_graph.edges}
+    before_edge_keys = set(before_edges)
+    after_edge_keys = set(after_edges)
+    added_edges = [after_edges[key].to_dict() for key in sorted(after_edge_keys - before_edge_keys)]
+    removed_edges = [
+        before_edges[key].to_dict() for key in sorted(before_edge_keys - after_edge_keys)
+    ]
+    status = (
+        "changed"
+        if added_node_ids or removed_node_ids or changed_nodes or added_edges or removed_edges
+        else "unchanged"
+    )
+    return {
+        "schemaVersion": "intent-engine/graph-diff/v1",
+        "before": str(before),
+        "after": str(after),
+        "patternBefore": before_pattern,
+        "patternAfter": after_pattern,
+        "boundary": BOUNDARY,
+        "summary": {
+            "status": status,
+            "nodeAddedCount": len(added_node_ids),
+            "nodeRemovedCount": len(removed_node_ids),
+            "nodeChangedCount": len(changed_nodes),
+            "edgeAddedCount": len(added_edges),
+            "edgeRemovedCount": len(removed_edges),
+            "nodeKindsAdded": _count_by(
+                [after_nodes[node_id].to_dict() for node_id in added_node_ids], "kind"
+            ),
+            "nodeKindsRemoved": _count_by(
+                [before_nodes[node_id].to_dict() for node_id in removed_node_ids], "kind"
+            ),
+        },
+        "addedNodes": [after_nodes[node_id].to_dict() for node_id in sorted(added_node_ids)],
+        "removedNodes": [before_nodes[node_id].to_dict() for node_id in sorted(removed_node_ids)],
+        "changedNodes": changed_nodes,
+        "addedEdges": added_edges,
+        "removedEdges": removed_edges,
+        "reviewFocus": _graph_diff_review_focus(
+            status=status,
+            changed_nodes=changed_nodes,
+            added_edges=added_edges,
+            removed_edges=removed_edges,
+        ),
+        "graph": {
+            "beforeNodeCount": len(before_graph.nodes),
+            "afterNodeCount": len(after_graph.nodes),
+            "beforeEdgeCount": len(before_graph.edges),
+            "afterEdgeCount": len(after_graph.edges),
+        },
+    }
+
+
 def write_bundle_graph_report(report: dict[str, Any], output: Path) -> None:
+    write_yaml_artifact(output, report, "")
+
+
+def write_graph_diff_report(report: dict[str, Any], output: Path) -> None:
     write_yaml_artifact(output, report, "")
 
 
@@ -585,6 +661,44 @@ def render_find_report_text(report: dict[str, Any]) -> str:
             lines.append(f"  - {_node_label(node)} [{fields}]")
     else:
         lines.append("  - None")
+    lines.append("Review focus:")
+    lines.extend(_list_or_none(_coerce_list(report.get("reviewFocus"))))
+    return "\n".join(lines) + "\n"
+
+
+def render_graph_diff_text(report: dict[str, Any]) -> str:
+    summary = _dict(report.get("summary"))
+    lines = [
+        "=== Graph Diff ===",
+        "",
+        f"Status: {summary.get('status', 'unknown')}",
+        f"Before: {report.get('before', '')}",
+        f"After:  {report.get('after', '')}",
+        f"Pattern: {report.get('patternBefore', '')} -> {report.get('patternAfter', '')}",
+        "",
+        "Counts:",
+        f"  nodes added={summary.get('nodeAddedCount', 0)} "
+        f"removed={summary.get('nodeRemovedCount', 0)} "
+        f"changed={summary.get('nodeChangedCount', 0)}",
+        f"  edges added={summary.get('edgeAddedCount', 0)} "
+        f"removed={summary.get('edgeRemovedCount', 0)}",
+        "",
+        "Changed nodes:",
+    ]
+    changed_nodes = _coerce_list(report.get("changedNodes"))
+    if changed_nodes:
+        for item in changed_nodes[:12]:
+            if isinstance(item, dict):
+                after = _dict(item.get("after"))
+                lines.append(f"  - {_node_label(after)}")
+        if len(changed_nodes) > 12:
+            lines.append(f"  ... {len(changed_nodes) - 12} more")
+    else:
+        lines.append("  - None")
+    lines.append("Added nodes:")
+    lines.extend(_node_list_lines(_coerce_list(report.get("addedNodes"))))
+    lines.append("Removed nodes:")
+    lines.extend(_node_list_lines(_coerce_list(report.get("removedNodes"))))
     lines.append("Review focus:")
     lines.extend(_list_or_none(_coerce_list(report.get("reviewFocus"))))
     return "\n".join(lines) + "\n"
@@ -1291,6 +1405,26 @@ def _count_by(items: list[dict[str, Any]], key: str) -> dict[str, int]:
     return counts
 
 
+def _edge_key(edge: _ImpactEdge) -> tuple[str, str, str]:
+    return (edge.source, edge.target, edge.relationship)
+
+
+def _node_change(before: _ImpactNode, after: _ImpactNode) -> dict[str, Any]:
+    before_dict = before.to_dict()
+    after_dict = after.to_dict()
+    changed_fields = [
+        field
+        for field in ("kind", "key", "label", "properties")
+        if before_dict.get(field) != after_dict.get(field)
+    ]
+    return {
+        "id": after.id,
+        "changedFields": changed_fields,
+        "before": before_dict,
+        "after": after_dict,
+    }
+
+
 def _query_tokens(query: str) -> list[str]:
     return [token.casefold() for token in query.replace(":", " ").split() if token.strip()]
 
@@ -1483,6 +1617,29 @@ def _find_review_focus(
     return focus
 
 
+def _graph_diff_review_focus(
+    *,
+    status: str,
+    changed_nodes: list[dict[str, Any]],
+    added_edges: list[dict[str, Any]],
+    removed_edges: list[dict[str, Any]],
+) -> list[str]:
+    if status == "unchanged":
+        return ["No typed graph node or edge changes were detected."]
+    focus = ["Review typed graph node and edge deltas before downstream handoff."]
+    if changed_nodes:
+        focus.append(
+            "Changed graph nodes: "
+            + ", ".join(str(item.get("id", "")) for item in changed_nodes[:8])
+            + "."
+        )
+    if added_edges:
+        focus.append(f"Review {len(added_edges)} added graph edge(s).")
+    if removed_edges:
+        focus.append(f"Review {len(removed_edges)} removed graph edge(s).")
+    return focus
+
+
 def _neighborhood_review_focus(
     *,
     status: str,
@@ -1516,6 +1673,18 @@ def _list_or_none(items: list[Any]) -> list[str]:
     if not items:
         return ["  - None"]
     return [f"  - {item}" for item in items]
+
+
+def _node_list_lines(nodes: list[Any]) -> list[str]:
+    if not nodes:
+        return ["  - None"]
+    lines = []
+    for node in nodes[:12]:
+        if isinstance(node, dict):
+            lines.append(f"  - {_node_label(node)}")
+    if len(nodes) > 12:
+        lines.append(f"  ... {len(nodes) - 12} more")
+    return lines or ["  - None"]
 
 
 def _path_lines(paths: list[Any]) -> list[str]:
