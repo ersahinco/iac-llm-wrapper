@@ -651,6 +651,8 @@ def build_impact_matrix_report(
     affected_controls = _matrix_union(rows, "affectedPolicyControls")
     affected_checks = _matrix_union(rows, "affectedChecks")
     affected_gates = _matrix_union(rows, "manualGates")
+    upstream_source_changes = _matrix_union(rows, "upstreamSourceChanges")
+    upstream_input_diffs = _matrix_union(rows, "upstreamInputDiffs")
     graph_summary = _dict(_dict(rows[0].get("graph")) if rows else {})
     return {
         "schemaVersion": "intent-engine/graph-impact-matrix/v1",
@@ -671,6 +673,8 @@ def build_impact_matrix_report(
             "affectedPolicyControlCount": len(affected_controls),
             "affectedCheckCount": len(affected_checks),
             "manualGateCount": len(affected_gates),
+            "upstreamSourceChangeCount": len(upstream_source_changes),
+            "upstreamInputDiffCount": len(upstream_input_diffs),
         },
         "affectedArtifacts": affected_artifacts,
         "affectedTargetContracts": affected_contracts,
@@ -679,6 +683,8 @@ def build_impact_matrix_report(
         "affectedPolicyControls": affected_controls,
         "affectedChecks": affected_checks,
         "manualGates": affected_gates,
+        "upstreamSourceChanges": upstream_source_changes,
+        "upstreamInputDiffs": upstream_input_diffs,
         "rows": rows,
         "reviewFocus": _matrix_review_focus(rows),
         "graph": graph_summary,
@@ -990,7 +996,8 @@ def render_impact_matrix_text(report: dict[str, Any]) -> str:
                 f"samples={summary_block.get('affectedSampleCount', 0)} "
                 f"controls={summary_block.get('affectedPolicyControlCount', 0)} "
                 f"checks={summary_block.get('affectedCheckCount', 0)} "
-                f"gates={summary_block.get('manualGateCount', 0)}"
+                f"gates={summary_block.get('manualGateCount', 0)} "
+                f"sourceChanges={summary_block.get('upstreamSourceChangeCount', 0)}"
             )
             reason = str(row.get("recommendationReason") or "")
             if reason:
@@ -1011,6 +1018,10 @@ def render_impact_matrix_text(report: dict[str, Any]) -> str:
     lines.extend(_list_or_none(_coerce_list(report.get("affectedChecks"))))
     lines.append("Manual gates:")
     lines.extend(_list_or_none(_coerce_list(report.get("manualGates"))))
+    lines.append("Upstream source changes:")
+    lines.extend(_list_or_none(_coerce_list(report.get("upstreamSourceChanges"))))
+    lines.append("Upstream input diffs:")
+    lines.extend(_list_or_none(_coerce_list(report.get("upstreamInputDiffs"))))
     lines.append("Review focus:")
     lines.extend(_list_or_none(_coerce_list(report.get("reviewFocus"))))
     return "\n".join(lines) + "\n"
@@ -2391,6 +2402,8 @@ def _impact_matrix_row(
 ) -> dict[str, Any]:
     summary = _dict(report.get("summary"))
     root = _matrix_root(report)
+    upstream_source_changes = _matrix_upstream_keys(report, root, "source_change")
+    upstream_input_diffs = _matrix_upstream_keys(report, root, "input_diff")
     row = {
         "root": root,
         "unmatchedRoots": _coerce_list(report.get("unmatchedRoots")),
@@ -2411,6 +2424,8 @@ def _impact_matrix_row(
             "affectedCheckovFindingCount": len(_coerce_list(report.get("affectedCheckovFindings"))),
             "affectedModuleVariableCount": len(_coerce_list(report.get("affectedModuleVariables"))),
             "manualGateCount": len(_coerce_list(report.get("manualGates"))),
+            "upstreamSourceChangeCount": len(upstream_source_changes),
+            "upstreamInputDiffCount": len(upstream_input_diffs),
         },
         "affectedArtifacts": _coerce_list(report.get("affectedArtifacts")),
         "affectedTargetContracts": _coerce_list(report.get("affectedTargetContracts")),
@@ -2421,6 +2436,8 @@ def _impact_matrix_row(
         "affectedCheckovFindings": _coerce_list(report.get("affectedCheckovFindings")),
         "affectedModuleVariables": _coerce_list(report.get("affectedModuleVariables")),
         "manualGates": _coerce_list(report.get("manualGates")),
+        "upstreamSourceChanges": upstream_source_changes,
+        "upstreamInputDiffs": upstream_input_diffs,
         "reviewFocus": _coerce_list(report.get("reviewFocus")),
         "impactPathCount": len(_coerce_list(report.get("impactPaths"))),
         "pattern": report.get("pattern", ""),
@@ -2429,6 +2446,17 @@ def _impact_matrix_row(
     if recommendation_reason:
         row["recommendationReason"] = recommendation_reason
     return row
+
+
+def _matrix_upstream_keys(report: dict[str, Any], root: dict[str, Any], kind: str) -> list[str]:
+    keys = {
+        str(node.get("key"))
+        for node in _coerce_list(report.get("upstreamDependencies"))
+        if isinstance(node, dict) and node.get("kind") == kind and node.get("key")
+    }
+    if root.get("kind") == kind and root.get("key"):
+        keys.add(str(root["key"]))
+    return sorted(keys)
 
 
 def _impact_root_from_value(value: str) -> ImpactRoot | None:

@@ -331,10 +331,13 @@ def test_recommended_graph_impact_matrix_uses_review_roots(tmp_path: Path):
     assert report["summary"]["recommendedRootCount"] == 1
     assert report["rows"][0]["root"]["id"] == "source_change:structured:cidr"
     assert "Source change" in report["rows"][0]["recommendationReason"]
+    assert report["rows"][0]["upstreamSourceChanges"] == ["structured:cidr"]
+    assert report["upstreamSourceChanges"] == ["structured:cidr"]
     assert "module-inputs.yaml" in report["affectedArtifacts"]
     rendered = render_impact_matrix_text(report)
     assert "Root source: recommended" in rendered
     assert "reason: Source change" in rendered
+    assert "sourceChanges=1" in rendered
 
 
 def test_graph_impact_matrix_cli_uses_recommended_roots(tmp_path: Path):
@@ -1154,5 +1157,15 @@ def test_bundle_compare_matrix_includes_input_diff_roots(tmp_path: Path):
     assert "enable_dns_hostnames" in selected
     matrix_roots = {row["root"]["id"] for row in report["impactMatrix"]["rows"]}
     assert "decision:enable_dns_hostnames" in matrix_roots
+    row = next(
+        item
+        for item in report["impactMatrix"]["rows"]
+        if item["root"]["id"] == "decision:enable_dns_hostnames"
+    )
+    assert row["upstreamSourceChanges"] == ["likely-impacted:enable_dns_hostnames"]
+    assert report["impactMatrix"]["upstreamSourceChanges"] == [
+        "likely-impacted:enable_dns_hostnames"
+    ]
     rendered = render_bundle_comparison_text(report)
     assert "decision:enable_dns_hostnames: status=matched" in rendered
+    assert "sourceChanges=1" in rendered

@@ -501,7 +501,8 @@ def _impact_matrix_summaries(impact_matrix: dict[str, Any]) -> list[str]:
             f"samples={summary.get('affectedSampleCount', 0)}, "
             f"controls={summary.get('affectedPolicyControlCount', 0)}, "
             f"checks={summary.get('affectedCheckCount', 0)}, "
-            f"gates={summary.get('manualGateCount', 0)}"
+            f"gates={summary.get('manualGateCount', 0)}, "
+            f"sourceChanges={summary.get('upstreamSourceChangeCount', 0)}"
         )
     return summaries
 
