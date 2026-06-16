@@ -125,6 +125,7 @@ def test_decision_impact_traverses_contract_module_and_policy_edges(tmp_path: Pa
     assert report["summary"]["status"] == "matched"
     assert "decision-report.yaml" in report["affectedArtifacts"]
     assert "module-inputs.yaml" in report["affectedArtifacts"]
+    assert "terraform-aws-vpc-module" in report["affectedTargetContracts"]
     assert "cidr" in report["affectedModuleVariables"]
     assert "VPC-NETWORK-001" in report["affectedPolicyControls"]
     assert "VPC-ATTACHMENT-001" in report["affectedPolicyControls"]
@@ -142,6 +143,7 @@ def test_decision_impact_traverses_contract_module_and_policy_edges(tmp_path: Pa
     assert network_path["hops"][-1]["to"]["id"] == "policy_control:VPC-NETWORK-001"
     rendered = render_impact_report_text(report)
     assert "Impact Analysis" in rendered
+    assert "Affected target contracts:" in rendered
     assert "Impact paths:" in rendered
     assert "decision:cidr --mapped-to-control--> policy_control:VPC-NETWORK-001" in rendered
 
@@ -158,6 +160,31 @@ def test_policy_control_root_reports_mapped_artifacts_and_checks(tmp_path: Path)
     assert "decision-report.yaml" in report["affectedArtifacts"]
     assert "module-inputs.yaml" in report["affectedArtifacts"]
     assert "CKV_CUSTOM_VPC_001" in report["affectedChecks"]
+
+
+def test_decision_impact_reports_target_capabilities_and_samples():
+    bundle = Path("fixtures/aws-lza-standard-v1")
+
+    report = build_impact_report(
+        bundle,
+        roots=[ImpactRoot(kind="decision", key="network_account")],
+    )
+
+    assert report["summary"]["status"] == "matched"
+    assert "aws-lza-sample-config" in report["affectedTargetCapabilities"]
+    assert "approved-workload-modules" in report["affectedTargetCapabilities"]
+    assert "aws-lza-standard-v1" in report["affectedSamples"]
+    assert "sample-recommendations.yaml" in report["affectedArtifacts"]
+    assert report["summary"]["affectedTargetCapabilityCount"] >= 2
+    assert report["summary"]["affectedSampleCount"] >= 1
+    assert any("Review affected target capabilities:" in item for item in report["reviewFocus"])
+    assert any("Review affected sample recommendations:" in item for item in report["reviewFocus"])
+    path_targets = {item["target"]["id"] for item in report["impactPaths"]}
+    assert "target_capability:aws-lza-sample-config" in path_targets
+    assert "sample:aws-lza-standard-v1" in path_targets
+    rendered = render_impact_report_text(report)
+    assert "Affected target capabilities:" in rendered
+    assert "Affected samples:" in rendered
 
 
 def test_unknown_root_returns_no_match_report(tmp_path: Path):
@@ -435,6 +462,7 @@ def test_input_diff_node_drives_changed_decision_impact(tmp_path: Path):
     assert "structured:cidr" in report["affectedSourceChanges"]
     assert "cidr" in report["affectedModuleVariables"]
     assert "module-inputs.yaml" in report["affectedArtifacts"]
+    assert "terraform-aws-vpc-module" in report["affectedTargetContracts"]
     assert "VPC-NETWORK-001" in report["affectedPolicyControls"]
     rendered = render_impact_report_text(report)
     assert "Affected source changes:" in rendered
@@ -447,6 +475,7 @@ def test_decision_impact_reports_readiness_and_contract_validation(tmp_path: Pat
     report = build_impact_report(bundle, roots=[ImpactRoot(kind="decision", key="cidr")])
 
     assert report["affectedReadiness"] == ["handoffReadiness"]
+    assert "terraform-aws-vpc-module" in report["affectedTargetContracts"]
     assert report["affectedContractValidation"] == ["contract-validation.yaml"]
     assert "terraform-aws-vpc-module" in report["affectedContractResults"]
     assert "contract-validation.yaml" in report["affectedArtifacts"]
@@ -950,12 +979,14 @@ def test_bundle_compare_includes_impact_traversal(tmp_path: Path):
     traversal = report["impactTraversal"]
     assert traversal["summary"]["status"] == "matched"
     assert "decision-report.yaml" in traversal["affectedArtifacts"]
+    assert "terraform-aws-vpc-module" in traversal["affectedTargetContracts"]
     assert "VPC-NETWORK-001" in traversal["affectedPolicyControls"]
     assert traversal["summary"]["highestReviewPrioritySeverity"] == "medium"
     assert traversal["summary"]["reviewPrioritySeverityCounts"]["medium"] >= 1
     rendered = render_bundle_comparison_text(report)
     assert "Impact traversal:" in rendered
     assert "review priority severity: highest=medium" in rendered
+    assert "affected target contracts: terraform-aws-vpc-module" in rendered
     assert "affected policy controls: VPC-ATTACHMENT-001, VPC-NETWORK-001" in rendered
     assert "impact paths: artifact:decision-report.yaml:" in rendered
     graph_diff = report["graphDiff"]

@@ -83,6 +83,9 @@ def test_compare_handoff_bundles_reports_blocker_and_sample_deltas(tmp_path: Pat
     assert "    - target.yaml" in rendered
     assert "Graph diff:" in rendered
     assert "review priority severity:" in rendered
+    assert "affected target contracts:" in rendered
+    assert "affected target capabilities:" in rendered
+    assert "affected samples:" in rendered
     html = render_bundle_comparison_html(report)
     assert "Added: new_decision: new-value" in html
     assert "Removed: legacy_decision: old-value" in html
@@ -92,6 +95,9 @@ def test_compare_handoff_bundles_reports_blocker_and_sample_deltas(tmp_path: Pat
     assert "target.yaml" in html
     assert "Graph diff" in html
     assert "Review priority severity" in html
+    assert "Affected target contracts" in html
+    assert "Affected target capabilities" in html
+    assert "Affected samples" in html
 
 
 def _write_bundle(

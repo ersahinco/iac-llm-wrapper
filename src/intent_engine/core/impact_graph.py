@@ -216,6 +216,9 @@ def build_impact_report(
     upstream_nodes = _sorted_nodes(graph, upstream)
     root_nodes = _sorted_nodes(graph, set(root_ids))
     affected_artifacts = _keys_by_kind(downstream_nodes, "artifact")
+    affected_target_contracts = _keys_by_kind(downstream_nodes, "target_contract")
+    affected_target_capabilities = _keys_by_kind(downstream_nodes, "target_capability")
+    affected_samples = _keys_by_kind(downstream_nodes, "sample")
     affected_controls = _keys_by_kind(downstream_nodes, "policy_control")
     affected_checks = _keys_by_kind(downstream_nodes, "checkov_check")
     affected_findings = _keys_by_kind(downstream_nodes, "checkov_finding")
@@ -245,6 +248,9 @@ def build_impact_report(
         shift_left_evidence=affected_evidence,
         source_changes=affected_source_changes,
         manual_gates=manual_gates,
+        target_contracts=affected_target_contracts,
+        target_capabilities=affected_target_capabilities,
+        samples=affected_samples,
         policy_controls=affected_controls,
         artifacts=affected_artifacts,
         module_variables=affected_variables,
@@ -266,6 +272,9 @@ def build_impact_report(
             "downstreamImpactCount": len(downstream),
             "upstreamDependencyCount": len(upstream),
             "affectedArtifactCount": len(affected_artifacts),
+            "affectedTargetContractCount": len(affected_target_contracts),
+            "affectedTargetCapabilityCount": len(affected_target_capabilities),
+            "affectedSampleCount": len(affected_samples),
             "affectedPolicyControlCount": len(affected_controls),
             "affectedCheckovFindingCount": len(affected_findings),
             "affectedSemanticConstraintCount": len(affected_semantic_constraints),
@@ -286,6 +295,9 @@ def build_impact_report(
         "upstreamDependencies": [node.to_dict() for node in upstream_nodes],
         "downstreamImpacts": [node.to_dict() for node in downstream_nodes],
         "affectedArtifacts": affected_artifacts,
+        "affectedTargetContracts": affected_target_contracts,
+        "affectedTargetCapabilities": affected_target_capabilities,
+        "affectedSamples": affected_samples,
         "affectedPolicyControls": affected_controls,
         "affectedChecks": affected_checks,
         "affectedCheckovFindings": affected_findings,
@@ -309,6 +321,9 @@ def build_impact_report(
             status=status,
             roots=root_nodes,
             artifacts=affected_artifacts,
+            target_contracts=affected_target_contracts,
+            target_capabilities=affected_target_capabilities,
+            samples=affected_samples,
             controls=affected_controls,
             checks=affected_checks,
             findings=affected_findings,
@@ -984,6 +999,12 @@ def render_impact_report_text(report: dict[str, Any]) -> str:
         ]
     )
     lines.extend(_list_or_none(_coerce_list(report.get("affectedArtifacts"))))
+    lines.append("Affected target contracts:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedTargetContracts"))))
+    lines.append("Affected target capabilities:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedTargetCapabilities"))))
+    lines.append("Affected samples:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedSamples"))))
     lines.append("Affected policy controls:")
     lines.extend(_list_or_none(_coerce_list(report.get("affectedPolicyControls"))))
     lines.append("Affected checks:")
@@ -1563,6 +1584,12 @@ def _add_target_capability_nodes(graph: _ImpactGraph, target_capability: dict[st
         for gate in _coerce_list(capability.get("manualGates")):
             gate_id = graph.add_node("manual_gate", str(gate), str(gate))
             graph.add_edge(cap_id, gate_id, "requires-manual-gate")
+        for dependency in _coerce_list(capability.get("dependsOn")):
+            dep_key = str(dependency)
+            if not dep_key:
+                continue
+            dep_id = graph.add_node("target_capability", dep_key, dep_key)
+            graph.add_edge(dep_id, cap_id, "precedes-capability")
 
 
 def _add_sample_nodes(graph: _ImpactGraph, samples: dict[str, Any]) -> None:
@@ -1579,6 +1606,17 @@ def _add_sample_nodes(graph: _ImpactGraph, samples: dict[str, Any]) -> None:
             continue
         sample_id = graph.add_node("sample", sample_name, sample_name)
         graph.add_edge(sample_id, artifact_id, "listed-in")
+        for decision_key in _sample_decision_keys(sample):
+            decision_id = graph.add_node("decision", decision_key, decision_key)
+            graph.add_edge(decision_id, sample_id, "influences-sample-match")
+
+
+def _sample_decision_keys(sample: dict[str, Any]) -> list[str]:
+    keys: set[str] = set()
+    keys.update(str(item) for item in _coerce_list(sample.get("sameDecisions")) if item)
+    for sample_field in ("differentDecisions", "missingDecisions", "extraCurrentDecisions"):
+        keys.update(str(key) for key in _dict(sample.get(sample_field)) if key)
+    return sorted(keys)
 
 
 def _add_readiness_and_validation_nodes(
@@ -2121,6 +2159,7 @@ def _impact_paths(
         "policy_control",
         "readiness_blocker",
         "scan_file",
+        "sample",
         "semantic_constraint",
         "semantic_entity",
         "source_context",
@@ -2182,6 +2221,9 @@ def _impact_review_priorities(
     shift_left_evidence: list[str],
     source_changes: list[str],
     manual_gates: list[str],
+    target_contracts: list[str],
+    target_capabilities: list[str],
+    samples: list[str],
     policy_controls: list[str],
     artifacts: list[str],
     module_variables: list[str],
@@ -2231,9 +2273,27 @@ def _impact_review_priorities(
         ),
         _priority(
             "medium",
+            "target-contracts",
+            target_contracts,
+            "Review affected target contracts before treating the handoff as covered.",
+        ),
+        _priority(
+            "medium",
+            "target-capabilities",
+            target_capabilities,
+            "Review affected target capability routing and coverage.",
+        ),
+        _priority(
+            "medium",
             "policy-controls",
             policy_controls,
             "Review affected policy controls and mapped checks.",
+        ),
+        _priority(
+            "low",
+            "samples",
+            samples,
+            "Review sample alignment and recommendation changes.",
         ),
         _priority(
             "low",
@@ -2305,6 +2365,9 @@ def _review_focus(
     status: str,
     roots: list[_ImpactNode],
     artifacts: list[str],
+    target_contracts: list[str],
+    target_capabilities: list[str],
+    samples: list[str],
     controls: list[str],
     checks: list[str],
     findings: list[str],
@@ -2327,6 +2390,12 @@ def _review_focus(
     focus = [f"Review impact from {', '.join(node.id for node in roots)}."]
     if artifacts:
         focus.append("Review affected artifacts: " + ", ".join(artifacts) + ".")
+    if target_contracts:
+        focus.append("Review affected target contracts: " + ", ".join(target_contracts) + ".")
+    if target_capabilities:
+        focus.append("Review affected target capabilities: " + ", ".join(target_capabilities) + ".")
+    if samples:
+        focus.append("Review affected sample recommendations: " + ", ".join(samples) + ".")
     if controls:
         focus.append("Review affected policy controls: " + ", ".join(controls) + ".")
     if semantic_constraints:

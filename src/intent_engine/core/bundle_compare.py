@@ -177,6 +177,18 @@ def render_bundle_comparison_html(report: dict[str, Any]) -> str:
                         _coerce_list(impact_traversal.get("affectedArtifacts")),
                     ),
                     _html_named_list(
+                        "Affected target contracts",
+                        _coerce_list(impact_traversal.get("affectedTargetContracts")),
+                    ),
+                    _html_named_list(
+                        "Affected target capabilities",
+                        _coerce_list(impact_traversal.get("affectedTargetCapabilities")),
+                    ),
+                    _html_named_list(
+                        "Affected samples",
+                        _coerce_list(impact_traversal.get("affectedSamples")),
+                    ),
+                    _html_named_list(
                         "Affected policy controls",
                         _coerce_list(impact_traversal.get("affectedPolicyControls")),
                     ),
@@ -306,6 +318,12 @@ def render_bundle_comparison_text(report: dict[str, Any]) -> str:
                 "  review priority severity: " + _impact_priority_summary(impact_traversal),
                 "  affected artifacts: "
                 + _join_or_none(_coerce_list(impact_traversal.get("affectedArtifacts"))),
+                "  affected target contracts: "
+                + _join_or_none(_coerce_list(impact_traversal.get("affectedTargetContracts"))),
+                "  affected target capabilities: "
+                + _join_or_none(_coerce_list(impact_traversal.get("affectedTargetCapabilities"))),
+                "  affected samples: "
+                + _join_or_none(_coerce_list(impact_traversal.get("affectedSamples"))),
                 "  affected policy controls: "
                 + _join_or_none(_coerce_list(impact_traversal.get("affectedPolicyControls"))),
                 "  affected checks: "
