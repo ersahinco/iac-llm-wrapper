@@ -21,6 +21,7 @@ Existing deployment mechanisms remain downstream.
 | `git-incremental-plan.yaml` | Git-changed design docs, skipped paths, baseline availability, output bundle paths, and compile status for explicit git-driven incremental runs. | Core incremental compile | `compile-git --base-ref --doc-root --bundle-root --output-root`. | No |
 | `contract-validation.yaml` | Standalone pass/fail validation of emitted artifacts against target contracts. | Core validation helper | Explicit validation artifact writes; `review html` computes validation in memory. | No |
 | `target-capability-graph.yaml` | Downstream target coverage, selected target path, manual gates, and unsupported asks represented as semantic facts with evidence spans. | Pattern-owned target report builder | AWS LZA today; future patterns only when they own comparable target routing. | No |
+| `impact-report.yaml` | Graph traversal impact report showing selected roots, upstream dependencies, downstream affected nodes, artifacts, policy controls, checks, module variables, manual gates, and review focus. | Core graph tooling | `graph impact --bundle --output`; also embedded in `review compare` output. | No |
 | `handoff-comparison.yaml` | Compact before/after bundle delta for incremental packet or sample updates: readiness, requirement completeness, decisions, blockers, artifacts, model quality, and sample recommendations. | Core review tooling | `iac-llm-wrapper review compare --output`. | No |
 | `shift-left-evidence.yaml` | Optional Checkov evidence for an owner-provided IaC/module/pipeline path, including tool availability, command, registered policy packs, owner custom-policy paths, IaC kind, result, summary counts, findings, mapped controls, unmapped findings, and no-deploy boundary. | Core shift-left tooling | `shift-left checkov --bundle --scan-path`. | No |
 | `handoff-comparison.html` | Static delta review page for what changed, what stayed stable, and what must be reviewed. | Core review tooling | `iac-llm-wrapper review compare --html-output`. | No |
@@ -44,6 +45,9 @@ Existing deployment mechanisms remain downstream.
   plan/diff without interpretation. These files do not invoke the plan.
 - Reviewers use `handoff-comparison.yaml` to inspect only the deltas from an
   incremental document or sample-configuration update.
+- Reviewers use `impact-report.yaml` or the `review compare` impact traversal
+  section to see which artifacts, policy controls, Checkov refs, module
+  variables, and manual gates are downstream of a changed graph root.
 - Regulated-environment reviewers use `policy-graph.yaml` and
   `shift-left-evidence.yaml` as pre-deployment policy evidence for
   owner-controlled CI/CD gates. These artifacts are not compliance attestation

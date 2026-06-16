@@ -8,6 +8,7 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
+from .impact_graph import build_impact_report, changed_decision_roots
 from .sample_config import SampleConfig
 from .yaml_utils import read_yaml_mapping, write_yaml_artifact
 
@@ -42,6 +43,13 @@ def compare_handoff_bundles(before_dir: Path, after_dir: Path) -> dict[str, Any]
         artifact_delta=artifact_delta,
         sample_delta=sample_delta,
         after=after,
+    )
+    impact_traversal = build_impact_report(
+        after.path,
+        roots=changed_decision_roots({"decisionDelta": decision_delta}),
+        changed_report=after.path / "input-diff-report.yaml"
+        if (after.path / "input-diff-report.yaml").exists()
+        else None,
     )
     review_focus = _review_focus(
         decision_delta=decision_delta,
@@ -97,6 +105,7 @@ def compare_handoff_bundles(before_dir: Path, after_dir: Path) -> dict[str, Any]
         "decisionDelta": decision_delta,
         "inputDelta": _input_delta(before.input_diff, after.input_diff),
         "impactedRequirementMap": impacted_map,
+        "impactTraversal": impact_traversal,
         "artifactDelta": artifact_delta,
         "sampleRecommendationDelta": sample_delta,
         "modelDelta": model_delta,
@@ -122,6 +131,7 @@ def render_bundle_comparison_html(report: dict[str, Any]) -> str:
     artifacts = _dict(report.get("artifactDelta"))
     samples = _dict(report.get("sampleRecommendationDelta"))
     impacts = _coerce_list(report.get("impactedRequirementMap"))
+    impact_traversal = _dict(report.get("impactTraversal"))
     focus = _coerce_list(summary.get("reviewFocus"))
     return "\n".join(
         [
@@ -159,6 +169,26 @@ def render_bundle_comparison_html(report: dict[str, Any]) -> str:
                 "What Must Be Reviewed",
                 [
                     _html_list(_decision_review_lines(decisions)),
+                    _html_named_list(
+                        "Affected artifacts",
+                        _coerce_list(impact_traversal.get("affectedArtifacts")),
+                    ),
+                    _html_named_list(
+                        "Affected policy controls",
+                        _coerce_list(impact_traversal.get("affectedPolicyControls")),
+                    ),
+                    _html_named_list(
+                        "Affected checks",
+                        _coerce_list(impact_traversal.get("affectedChecks")),
+                    ),
+                    _html_named_list(
+                        "Affected module variables",
+                        _coerce_list(impact_traversal.get("affectedModuleVariables")),
+                    ),
+                    _html_named_list(
+                        "Manual gates",
+                        _coerce_list(impact_traversal.get("manualGates")),
+                    ),
                     _html_table(
                         [
                             {
@@ -206,6 +236,7 @@ def render_bundle_comparison_text(report: dict[str, Any]) -> str:
     sample_delta = _dict(report.get("sampleRecommendationDelta"))
     readiness_delta = _dict(report.get("readinessDelta"))
     input_delta = _dict(report.get("inputDelta"))
+    impact_traversal = _dict(report.get("impactTraversal"))
     lines = [
         "=== Handoff Bundle Comparison ===",
         "",
@@ -247,6 +278,27 @@ def render_bundle_comparison_text(report: dict[str, Any]) -> str:
     lines.extend(_text_decision_list("Added", _coerce_list(decision_delta.get("added"))))
     lines.extend(_text_decision_list("Changed", _coerce_list(decision_delta.get("changed"))))
     lines.extend(_text_decision_list("Removed", _coerce_list(decision_delta.get("removed"))))
+
+    if impact_traversal:
+        summary_block = _dict(impact_traversal.get("summary"))
+        lines.extend(
+            [
+                "",
+                "Impact traversal:",
+                f"  status: {summary_block.get('status', 'unknown')}",
+                f"  downstream impacts: {summary_block.get('downstreamImpactCount', 0)}",
+                "  affected artifacts: "
+                + _join_or_none(_coerce_list(impact_traversal.get("affectedArtifacts"))),
+                "  affected policy controls: "
+                + _join_or_none(_coerce_list(impact_traversal.get("affectedPolicyControls"))),
+                "  affected checks: "
+                + _join_or_none(_coerce_list(impact_traversal.get("affectedChecks"))),
+                "  affected module variables: "
+                + _join_or_none(_coerce_list(impact_traversal.get("affectedModuleVariables"))),
+                "  manual gates: "
+                + _join_or_none(_coerce_list(impact_traversal.get("manualGates"))),
+            ]
+        )
 
     if input_delta.get("available"):
         lines.extend(
@@ -306,6 +358,10 @@ def _text_decision_list(title: str, values: list[Any]) -> list[str]:
     if len(values) > 12:
         lines.append(f"    ... {len(values) - 12} more")
     return lines
+
+
+def _join_or_none(items: list[Any]) -> str:
+    return ", ".join(str(item) for item in items) if items else "none"
 
 
 def _load_bundle(path: Path) -> _BundleSnapshot:

@@ -47,6 +47,12 @@ from .core.git_incremental import (
     git_show_text,
 )
 from .core.graph_export import graph_to_json, graph_to_mermaid
+from .core.impact_graph import (
+    ImpactRoot,
+    build_impact_report,
+    render_impact_report_text,
+    write_impact_report,
+)
 from .core.interview import InterviewEngine
 from .core.llm_caller import LLMEvidenceStore, auto_detect_llm
 from .core.markdown_extractor import extract_from_markdown
@@ -374,6 +380,72 @@ def graph_export(
         typer.echo(f"Graph exported to: {output}")
         return
     typer.echo(rendered, nl=False)
+
+
+@graph_app.command("impact")
+def graph_impact(
+    bundle: Path = typer.Option(
+        ...,
+        "--bundle",
+        help="Generated handoff bundle directory to traverse.",
+    ),
+    decision: list[str] | None = typer.Option(
+        None,
+        "--decision",
+        help="Decision key to use as an impact root. Repeatable.",
+    ),
+    artifact: list[str] | None = typer.Option(
+        None,
+        "--artifact",
+        help="Artifact filename to use as an impact root. Repeatable.",
+    ),
+    policy_control: list[str] | None = typer.Option(
+        None,
+        "--policy-control",
+        help="Policy control ID to use as an impact root. Repeatable.",
+    ),
+    module_variable: list[str] | None = typer.Option(
+        None,
+        "--module-variable",
+        help="Module variable name to use as an impact root. Repeatable.",
+    ),
+    changed_report: Path | None = typer.Option(
+        None,
+        "--changed-report",
+        help="input-diff-report.yaml to derive impact roots from changed requirements.",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Optional impact-report.yaml output path.",
+    ),
+) -> None:
+    """Traverse bundle graph dependencies and report downstream impact."""
+    if not bundle.is_dir():
+        typer.echo(f"Error: bundle path is not a directory: {bundle}", err=True)
+        raise typer.Exit(1)
+    if changed_report is not None and not changed_report.exists():
+        typer.echo(f"Error: changed report does not exist: {changed_report}", err=True)
+        raise typer.Exit(1)
+    roots = [
+        *(ImpactRoot(kind="decision", key=item) for item in (decision or [])),
+        *(ImpactRoot(kind="artifact", key=item) for item in (artifact or [])),
+        *(ImpactRoot(kind="policy_control", key=item) for item in (policy_control or [])),
+        *(ImpactRoot(kind="module_variable", key=item) for item in (module_variable or [])),
+    ]
+    if not roots and changed_report is None:
+        typer.echo(
+            "Error: provide at least one root via --decision, --artifact, "
+            "--policy-control, --module-variable, or --changed-report.",
+            err=True,
+        )
+        raise typer.Exit(1)
+    report = build_impact_report(bundle, roots=roots, changed_report=changed_report)
+    typer.echo(render_impact_report_text(report), nl=False)
+    if output is not None:
+        write_impact_report(report, output)
+        typer.echo(f"Impact report written to: {output}")
 
 
 @pattern_app.command("check")

@@ -43,6 +43,11 @@ PCI, HIPAA, and NIST, target contracts, module variables, and owner Checkov
 policy references. That evidence is shift-left input for owner CI/CD gates, not
 compliance attestation or deployment approval.
 
+Graph dependency traversal is available with `graph impact --bundle ...` to
+inspect the blast radius of a changed decision, artifact, module variable,
+policy control, or input diff. It is read-only impact evidence for review and
+owner CI/CD routing, not a planner or deployment runner.
+
 ## Core Flow
 
 ```mermaid
