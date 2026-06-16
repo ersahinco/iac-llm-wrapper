@@ -184,6 +184,10 @@ def render_bundle_comparison_html(report: dict[str, Any]) -> str:
                         "Affected checks",
                         _coerce_list(impact_traversal.get("affectedChecks")),
                     ),
+                    _html_kv(
+                        "Review priority severity",
+                        _impact_priority_summary(impact_traversal),
+                    ),
                     _html_named_list(
                         "Affected module variables",
                         _coerce_list(impact_traversal.get("affectedModuleVariables")),
@@ -299,6 +303,7 @@ def render_bundle_comparison_text(report: dict[str, Any]) -> str:
                 "Impact traversal:",
                 f"  status: {summary_block.get('status', 'unknown')}",
                 f"  downstream impacts: {summary_block.get('downstreamImpactCount', 0)}",
+                "  review priority severity: " + _impact_priority_summary(impact_traversal),
                 "  affected artifacts: "
                 + _join_or_none(_coerce_list(impact_traversal.get("affectedArtifacts"))),
                 "  affected policy controls: "
@@ -393,6 +398,17 @@ def _text_decision_list(title: str, values: list[Any]) -> list[str]:
 
 def _join_or_none(items: list[Any]) -> str:
     return ", ".join(str(item) for item in items) if items else "none"
+
+
+def _impact_priority_summary(impact_traversal: dict[str, Any]) -> str:
+    summary = _dict(impact_traversal.get("summary"))
+    counts = _dict(summary.get("reviewPrioritySeverityCounts"))
+    highest = str(summary.get("highestReviewPrioritySeverity") or "none")
+    parts = [
+        f"{severity}={int(counts.get(severity, 0) or 0)}"
+        for severity in ("critical", "high", "medium", "low")
+    ]
+    return f"highest={highest} {' '.join(parts)}"
 
 
 def _impact_path_summaries(paths: list[Any]) -> list[str]:

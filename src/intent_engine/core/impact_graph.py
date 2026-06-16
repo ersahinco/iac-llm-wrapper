@@ -15,6 +15,7 @@ BOUNDARY = (
     "artifact, and review metadata. It does not deploy, mutate cloud resources, "
     "run policy tools, or provide compliance attestation."
 )
+PRIORITY_SEVERITIES = ("critical", "high", "medium", "low")
 
 
 @dataclass(frozen=True)
@@ -253,6 +254,7 @@ def build_impact_report(
         unmatched.append({"kind": "changed-report", "key": str(changed_report)})
 
     status = "matched" if root_ids else "no-match"
+    priority_severity_counts = _priority_severity_counts(review_priorities)
     return {
         "schemaVersion": "intent-engine/impact-report/v1",
         "bundle": str(bundle),
@@ -273,6 +275,11 @@ def build_impact_report(
             "affectedValidationViolationCount": len(affected_validation_violations),
             "manualGateCount": len(manual_gates),
             "reviewPriorityCount": len(review_priorities),
+            "highestReviewPrioritySeverity": _highest_priority_severity(priority_severity_counts),
+            "reviewPrioritySeverityCounts": priority_severity_counts,
+            "reviewPriorityItemCountsBySeverity": _priority_item_counts_by_severity(
+                review_priorities
+            ),
         },
         "selectedRoots": [node.to_dict() for node in root_nodes],
         "unmatchedRoots": unmatched,
@@ -951,6 +958,7 @@ def render_impact_report_text(report: dict[str, Any]) -> str:
             "",
             f"Downstream impacts: {summary.get('downstreamImpactCount', 0)}",
             f"Upstream dependencies: {summary.get('upstreamDependencyCount', 0)}",
+            f"Review severity: {_priority_severity_summary(summary)}",
             "",
             "Review priorities:",
         ]
@@ -2241,6 +2249,38 @@ def _impact_review_priorities(
         ),
     ]
     return [item for item in priorities if item]
+
+
+def _priority_severity_counts(priorities: list[dict[str, Any]]) -> dict[str, int]:
+    counts = {severity: 0 for severity in PRIORITY_SEVERITIES}
+    for item in priorities:
+        severity = str(item.get("severity") or "unknown")
+        counts[severity] = counts.get(severity, 0) + 1
+    return counts
+
+
+def _priority_item_counts_by_severity(priorities: list[dict[str, Any]]) -> dict[str, int]:
+    counts = {severity: 0 for severity in PRIORITY_SEVERITIES}
+    for item in priorities:
+        severity = str(item.get("severity") or "unknown")
+        counts[severity] = counts.get(severity, 0) + int(item.get("count", 0) or 0)
+    return counts
+
+
+def _highest_priority_severity(counts: dict[str, int]) -> str:
+    for severity in PRIORITY_SEVERITIES:
+        if counts.get(severity, 0) > 0:
+            return severity
+    return "none"
+
+
+def _priority_severity_summary(summary: dict[str, Any]) -> str:
+    counts = _dict(summary.get("reviewPrioritySeverityCounts"))
+    highest = str(summary.get("highestReviewPrioritySeverity") or "none")
+    detail = " ".join(
+        f"{severity}={int(counts.get(severity, 0) or 0)}" for severity in PRIORITY_SEVERITIES
+    )
+    return f"highest={highest} {detail}"
 
 
 def _priority(

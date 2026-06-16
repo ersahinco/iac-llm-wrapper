@@ -454,11 +454,21 @@ def test_decision_impact_reports_readiness_and_contract_validation(tmp_path: Pat
     assert "module-variables" in priority_categories
     assert "artifacts" in priority_categories
     assert "policy-controls" in priority_categories
+    assert report["summary"]["highestReviewPrioritySeverity"] == "medium"
+    severity_counts = report["summary"]["reviewPrioritySeverityCounts"]
+    assert severity_counts["critical"] == 0
+    assert severity_counts["high"] == 0
+    assert severity_counts["medium"] >= 1
+    assert severity_counts["low"] >= 2
+    item_counts = report["summary"]["reviewPriorityItemCountsBySeverity"]
+    assert item_counts["medium"] >= len(report["affectedPolicyControls"])
+    assert item_counts["low"] >= len(report["affectedArtifacts"])
     path_targets = {item["target"]["id"] for item in report["impactPaths"]}
     assert "handoff_readiness:handoffReadiness" in path_targets
     assert "contract_validation:contract-validation.yaml" in path_targets
     rendered = render_impact_report_text(report)
     assert "Review priorities:" in rendered
+    assert "Review severity: highest=medium" in rendered
     assert "Affected readiness:" in rendered
     assert "Affected contract validation:" in rendered
 
@@ -599,7 +609,10 @@ def test_policy_control_impact_reports_shift_left_findings(tmp_path: Path):
     )
     assert checkov_priority["severity"] == "high"
     assert finding_key in checkov_priority["items"]
+    assert report["summary"]["highestReviewPrioritySeverity"] == "high"
+    assert report["summary"]["reviewPrioritySeverityCounts"]["high"] >= 1
     rendered = render_impact_report_text(report)
+    assert "Review severity: highest=high" in rendered
     assert "Affected Checkov findings:" in rendered
     assert finding_key in rendered
 
@@ -938,8 +951,11 @@ def test_bundle_compare_includes_impact_traversal(tmp_path: Path):
     assert traversal["summary"]["status"] == "matched"
     assert "decision-report.yaml" in traversal["affectedArtifacts"]
     assert "VPC-NETWORK-001" in traversal["affectedPolicyControls"]
+    assert traversal["summary"]["highestReviewPrioritySeverity"] == "medium"
+    assert traversal["summary"]["reviewPrioritySeverityCounts"]["medium"] >= 1
     rendered = render_bundle_comparison_text(report)
     assert "Impact traversal:" in rendered
+    assert "review priority severity: highest=medium" in rendered
     assert "affected policy controls: VPC-ATTACHMENT-001, VPC-NETWORK-001" in rendered
     assert "impact paths: artifact:decision-report.yaml:" in rendered
     graph_diff = report["graphDiff"]
