@@ -175,6 +175,17 @@ def _existing_graph_exports(input_dir: Path) -> dict[str, str]:
         exports["json"] = "requirement-graph.json"
     if (input_dir / "requirement-graph.mmd").exists():
         exports["mermaid"] = "requirement-graph.mmd"
+    for key, name in {
+        "bundleGraph": "bundle-graph.yaml",
+        "graphRoots": "graph-roots.yaml",
+        "impactReport": "impact-report.yaml",
+        "graphFind": "graph-find.yaml",
+        "graphPath": "graph-path.yaml",
+        "graphNeighborhood": "graph-neighborhood.yaml",
+        "graphDiff": "graph-diff.yaml",
+    }.items():
+        if (input_dir / name).exists():
+            exports[key] = name
     return exports
 
 

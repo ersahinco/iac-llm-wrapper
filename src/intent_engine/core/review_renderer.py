@@ -173,6 +173,25 @@ def render_review_html(context: dict[str, Any]) -> str:
                 ],
             ),
             _section(
+                "Graph Review Artifacts",
+                [
+                    _link_list(
+                        [
+                            ("Bundle graph", str(graph_exports.get("bundleGraph", ""))),
+                            ("Graph roots", str(graph_exports.get("graphRoots", ""))),
+                            ("Impact report", str(graph_exports.get("impactReport", ""))),
+                            ("Graph find", str(graph_exports.get("graphFind", ""))),
+                            ("Graph path", str(graph_exports.get("graphPath", ""))),
+                            (
+                                "Graph neighborhood",
+                                str(graph_exports.get("graphNeighborhood", "")),
+                            ),
+                            ("Graph diff", str(graph_exports.get("graphDiff", ""))),
+                        ]
+                    ),
+                ],
+            ),
+            _section(
                 "Target Capability Graph",
                 _target_capability_section(
                     target_capabilities,
