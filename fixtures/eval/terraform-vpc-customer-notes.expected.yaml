@@ -20,6 +20,8 @@ expect:
     vpc.enableNatGateway: true
     vpc.singleNatGateway: false
     vpc.enableDnsHostnames: true
+    delivery.targetAccountId: "222233334444"
+    delivery.deploymentPipelineRef: github://payments-platform/networking-vpc
   artifacts:
     - decision-report.yaml
     - module-inputs.yaml

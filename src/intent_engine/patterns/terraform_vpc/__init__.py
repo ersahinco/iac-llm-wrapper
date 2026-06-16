@@ -143,6 +143,36 @@ def _graph_factory() -> RequirementGraph:
             category="network",
         )
     )
+    graph.add(
+        Requirement(
+            key="target_account_id",
+            target_field="target_account_id",
+            target_type="string",
+            label="Target Account ID",
+            question="Which existing AWS account ID should receive this VPC handoff?",
+            category="delivery",
+            required_when_applicable=True,
+            violation_code="TERRAFORM_VPC_TARGET_ACCOUNT_REQUIRED",
+            violation_message=(
+                "Terraform VPC handoff requires the existing target AWS account ID."
+            ),
+        )
+    )
+    graph.add(
+        Requirement(
+            key="deployment_pipeline_ref",
+            target_field="deployment_pipeline_ref",
+            target_type="string",
+            label="Deployment Pipeline Reference",
+            question="Which owner-controlled deployment pipeline will consume these inputs?",
+            category="delivery",
+            required_when_applicable=True,
+            violation_code="TERRAFORM_VPC_PIPELINE_REQUIRED",
+            violation_message=(
+                "Terraform VPC handoff requires an owner-controlled deployment pipeline reference."
+            ),
+        )
+    )
     return graph
 
 
@@ -155,6 +185,8 @@ _CONTRACT = TargetContract(
         "cidr",
         "public_subnet_cidrs",
         "private_subnet_cidrs",
+        "target_account_id",
+        "deployment_pipeline_ref",
     ],
     artifacts=[
         ArtifactContract(
@@ -165,6 +197,8 @@ _CONTRACT = TargetContract(
                 "vpc.cidr",
                 "vpc.publicSubnetCidrs[]",
                 "vpc.privateSubnetCidrs[]",
+                "delivery.targetAccountId",
+                "delivery.deploymentPipelineRef",
             ],
         ),
         ArtifactContract(
@@ -204,6 +238,16 @@ _CONTRACT = TargetContract(
             decision="private_subnet_cidrs",
             artifact="decision-report.yaml",
             path="vpc.privateSubnetCidrs",
+        ),
+        DecisionLineage(
+            decision="target_account_id",
+            artifact="decision-report.yaml",
+            path="delivery.targetAccountId",
+        ),
+        DecisionLineage(
+            decision="deployment_pipeline_ref",
+            artifact="decision-report.yaml",
+            path="delivery.deploymentPipelineRef",
         ),
     ],
 )
@@ -279,6 +323,14 @@ def gen_decision_report(intent: Any, output_dir: Path) -> None:
             "name": "terraform-aws-vpc",
             "source": "terraform-aws-modules/vpc/aws",
         },
+        "delivery": {
+            "targetAccountId": model.target_account_id,
+            "deploymentPipelineRef": model.deployment_pipeline_ref,
+            "boundary": (
+                "Account and pipeline routing are handoff metadata for owner-controlled "
+                "automation; generated module inputs do not invoke deployment."
+            ),
+        },
     }
     if readiness:
         data["handoffReadiness"] = readiness
@@ -295,6 +347,8 @@ SECTION_MAP: dict[str, tuple[str, str | None]] = {
     "enable_nat_gateway": ("Egress", "enable_nat_gateway"),
     "single_nat_gateway": ("Egress", "single_nat_gateway"),
     "enable_dns_hostnames": ("DNS", "enable_dns_hostnames"),
+    "target_account_id": ("Delivery", "target_account_id"),
+    "deployment_pipeline_ref": ("Delivery", "deployment_pipeline_ref"),
 }
 
 GLOBAL_REGISTRY.register(
@@ -304,12 +358,13 @@ GLOBAL_REGISTRY.register(
         graph_factory=_graph_factory,
         intent_factory=TerraformVpcIntent,
         section_map=SECTION_MAP,
-        section_order=["VPC Module", "Subnets", "Egress", "DNS"],
+        section_order=["VPC Module", "Subnets", "Egress", "DNS", "Delivery"],
         prompt_context=(
             "This pattern gathers handoff inputs for an existing approved Terraform AWS "
             "VPC module. Extract exact module variables such as CIDR, subnets, NAT "
-            "settings, and DNS flags only. Do not generate root Terraform scaffolding "
-            "from prose."
+            "settings, and DNS flags, plus the existing target AWS account ID and "
+            "owner-controlled deployment pipeline reference. Do not generate root "
+            "Terraform scaffolding from prose."
         ),
         module_mapper=map_terraform_vpc_modules,
         generators=[
@@ -339,6 +394,8 @@ GLOBAL_REGISTRY.register(
                     "enable_nat_gateway": "true",
                     "single_nat_gateway": "false",
                     "enable_dns_hostnames": "true",
+                    "target_account_id": "111122223333",
+                    "deployment_pipeline_ref": "github://platform-networking/vpc-deploy",
                 },
                 module_refs=[
                     ModuleRef(

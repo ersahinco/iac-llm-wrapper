@@ -314,6 +314,121 @@ def _trial_byom_terraform_vpc(config: TrialConfig) -> TrialResult:
     )
 
 
+def _trial_existing_account_terraform_vpc(config: TrialConfig) -> TrialResult:
+    failures: list[str] = []
+    evidence_files: list[Path] = []
+    with tempfile.TemporaryDirectory() as temp_dir:
+        output_dir = Path(temp_dir)
+        evidence_path = _trial_evidence_path(
+            config,
+            "existing-account-terraform-vpc",
+            output_dir,
+        )
+        compile_proc = _run(
+            [
+                "compile",
+                "--input",
+                str(FIXTURES_DIR / "byom-terraform-vpc-existing-account.md"),
+                "--output",
+                str(output_dir),
+                "--pattern",
+                "terraform-vpc",
+            ],
+            config,
+            evidence_path,
+        )
+        if evidence_path is not None:
+            evidence_files.append(evidence_path)
+        if compile_proc.returncode != 0:
+            failures.append("compile command failed")
+            failures.append((compile_proc.stderr or compile_proc.stdout).strip())
+            return TrialResult(
+                "byom",
+                "existing-account-terraform-vpc",
+                config.mode,
+                "FAIL",
+                failures,
+                evidence_files,
+            )
+
+        validate_proc = _run(
+            ["validate", "--input", str(output_dir), "--pattern", "terraform-vpc"],
+            config,
+        )
+        if validate_proc.returncode != 0:
+            failures.append("validate command failed")
+
+        review_proc = _run(
+            [
+                "review",
+                "html",
+                "--input",
+                str(output_dir),
+                "--output",
+                str(output_dir / "handoff-review.html"),
+            ],
+            config,
+        )
+        if review_proc.returncode != 0:
+            failures.append("review html command failed")
+
+        checkov_evidence = output_dir / "shift-left-evidence.yaml"
+        checkov_proc = _run(
+            [
+                "shift-left",
+                "checkov",
+                "--bundle",
+                str(output_dir),
+                "--scan-path",
+                str(FIXTURES_DIR / "owner-terraform-vpc-module"),
+                "--output",
+                str(checkov_evidence),
+            ],
+            config,
+        )
+        if checkov_proc.returncode != 0:
+            failures.append("checkov evidence command failed")
+        if not checkov_evidence.exists():
+            failures.append("missing Checkov shift-left evidence")
+        else:
+            evidence = _yaml_load(checkov_evidence)
+            status = evidence.get("result", {}).get("status")
+            if status == "invalid-input":
+                failures.append("Checkov evidence scanned an invalid input")
+            if "does not deploy" not in str(evidence.get("boundary", "")):
+                failures.append("Checkov evidence missing no-deploy boundary")
+            evidence_text = checkov_evidence.read_text().lower()
+            for forbidden in ("terraform apply", "terragrunt apply", "kubectl apply"):
+                if forbidden in evidence_text:
+                    failures.append(f"Checkov evidence includes forbidden command: {forbidden}")
+
+        report = _yaml_load(output_dir / "decision-report.yaml")
+        delivery = report.get("delivery", {})
+        if delivery.get("targetAccountId") != "444455556666":
+            failures.append("delivery target account missing")
+        if delivery.get("deploymentPipelineRef") != (
+            "github://workload-networking/reporting-vpc-deploy"
+        ):
+            failures.append("delivery pipeline reference missing")
+        inputs = _module_inputs(output_dir)
+        variables = inputs[0].get("variables", {}) if inputs else {}
+        if "target_account_id" in variables or "deployment_pipeline_ref" in variables:
+            failures.append("delivery metadata leaked into module variables")
+        for unexpected_file in ("main.tf", "terragrunt.hcl", "template.yaml", "stack.yaml"):
+            if (output_dir / unexpected_file).exists():
+                failures.append(f"unexpected deployable artifact {unexpected_file}")
+        failures.extend(_evidence_failures(config, evidence_path))
+
+    return TrialResult(
+        "byom",
+        "existing-account-terraform-vpc",
+        config.mode,
+        "PASS" if not failures else "FAIL",
+        failures,
+        evidence_files,
+    )
+
+
 def _trial_byom_cloudformation_parameters(config: TrialConfig) -> TrialResult:
     failures: list[str] = []
     evidence_files: list[Path] = []
@@ -713,6 +828,7 @@ def main() -> int:
         _trial_architect_gap,
         _trial_engineer_handoff,
         _trial_byom_terraform_vpc,
+        _trial_existing_account_terraform_vpc,
         _trial_byom_cloudformation_parameters,
         _trial_static_review_stakeholders,
         _trial_end_user_handoff_confidence,

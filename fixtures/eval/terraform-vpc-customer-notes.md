@@ -36,6 +36,11 @@ Finance operations rejected a single shared NAT gateway for production.
 
 - enable_dns_hostnames: true
 
+## Delivery
+
+- target_account_id: 222233334444
+- deployment_pipeline_ref: github://payments-platform/networking-vpc
+
 ## Review Notes
 
 - Platform networking reviews `module-inputs.yaml`.

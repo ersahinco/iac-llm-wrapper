@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import ruamel.yaml
@@ -10,6 +11,17 @@ from typer.testing import CliRunner
 from intent_engine.cli import app
 
 runner = CliRunner()
+
+
+def _git(repo: Path, *args: str) -> str:
+    proc = subprocess.run(
+        ["git", "-C", str(repo), *args],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+    return proc.stdout.strip()
 
 
 class TestCLIDiscover:
@@ -198,6 +210,126 @@ class TestCLICompile:
         incremental_report = (after_dir / "incremental-compile-report.yaml").read_text()
         assert "workload_accounts" in incremental_report
         assert "validationBoundary" in incremental_report
+
+    def test_compile_git_recompiles_only_changed_design_docs(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setenv("INTENT_ENGINE_DISABLE_LLM", "1")
+        repo = tmp_path / "repo"
+        docs = repo / "docs"
+        docs.mkdir(parents=True)
+        source = Path("fixtures/usability/byom-terraform-vpc.md").read_text()
+        changed_doc = docs / "service.md"
+        unchanged_doc = docs / "unchanged.md"
+        changed_doc.write_text(source)
+        unchanged_doc.write_text(source.replace("orders-vpc", "unchanged-vpc"))
+        _git(repo, "init")
+        _git(repo, "add", ".")
+        _git(
+            repo,
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "base",
+        )
+        base_ref = _git(repo, "rev-parse", "HEAD")
+
+        bundle_root = tmp_path / "bundles"
+        baseline_bundle = bundle_root / "service"
+        baseline = runner.invoke(
+            app,
+            [
+                "compile",
+                "--input",
+                str(changed_doc),
+                "--output",
+                str(baseline_bundle),
+                "--pattern",
+                "terraform-vpc",
+                "--no-raw-evidence",
+            ],
+        )
+        assert baseline.exit_code == 0, baseline.output
+        changed_doc.write_text(source.replace("orders-vpc", "orders-vpc-v2"))
+
+        output_root = tmp_path / "out"
+        result = runner.invoke(
+            app,
+            [
+                "compile-git",
+                "--base-ref",
+                base_ref,
+                "--doc-root",
+                str(docs),
+                "--bundle-root",
+                str(bundle_root),
+                "--output-root",
+                str(output_root),
+                "--pattern",
+                "terraform-vpc",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert (output_root / "service" / "incremental-compile-report.yaml").exists()
+        assert not (output_root / "unchanged").exists()
+        yaml = ruamel.yaml.YAML(typ="safe")
+        plan = yaml.load((output_root / "git-incremental-plan.yaml").read_text())
+        assert plan["summary"]["changedDocumentCount"] == 1
+        assert plan["changedDocuments"][0]["status"] == "compiled-incremental"
+        assert plan["changedDocuments"][0]["baselineBundleAvailable"] is True
+
+    def test_compile_git_dry_run_writes_plan_without_outputs(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setenv("INTENT_ENGINE_DISABLE_LLM", "1")
+        repo = tmp_path / "repo"
+        docs = repo / "docs"
+        docs.mkdir(parents=True)
+        source = Path("fixtures/usability/byom-terraform-vpc.md").read_text()
+        changed_doc = docs / "service.md"
+        changed_doc.write_text(source)
+        _git(repo, "init")
+        _git(repo, "add", ".")
+        _git(
+            repo,
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "base",
+        )
+        base_ref = _git(repo, "rev-parse", "HEAD")
+        changed_doc.write_text(source.replace("orders-vpc", "orders-vpc-v2"))
+        bundle_root = tmp_path / "bundles"
+        (bundle_root / "service").mkdir(parents=True)
+        output_root = tmp_path / "out"
+
+        result = runner.invoke(
+            app,
+            [
+                "compile-git",
+                "--base-ref",
+                base_ref,
+                "--doc-root",
+                str(docs),
+                "--bundle-root",
+                str(bundle_root),
+                "--output-root",
+                str(output_root),
+                "--pattern",
+                "terraform-vpc",
+                "--dry-run",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        yaml = ruamel.yaml.YAML(typ="safe")
+        plan = yaml.load((output_root / "git-incremental-plan.yaml").read_text())
+        assert plan["summary"]["dryRun"] is True
+        assert plan["changedDocuments"][0]["status"] == "planned-incremental"
+        assert not (output_root / "service" / "decision-report.yaml").exists()
 
     def test_compile_incremental_blocks_unconfirmed_high_risk_prose_change(
         self,

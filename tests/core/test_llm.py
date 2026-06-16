@@ -490,6 +490,8 @@ availability zones, per-AZ NAT for resilience, and DNS hostnames enabled.
 - enable_nat_gateway: true
 - single_nat_gateway: false
 - enable_dns_hostnames: true
+- target_account_id: 222233334444
+- deployment_pipeline_ref: github://payments-platform/networking-vpc
 """
         )
         response = json.dumps(

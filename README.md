@@ -31,6 +31,14 @@ reviewed configuration into owner-controlled deployment paths for existing or
 greenfield environments. Deployment still belongs to those downstream
 mechanisms; the core should not become the deploy runner.
 
+For smaller workload practice, the `terraform-vpc` pattern captures inputs for
+an approved Terraform VPC module in an existing AWS account, including the
+owner-controlled deployment pipeline reference. Git-aware incremental runs use
+`compile-git` to rebuild only bundles whose design docs changed. Optional
+Checkov evidence can be captured with `shift-left checkov` against an
+owner-provided IaC/module path; generated `terraform.tfvars` alone is not treated
+as meaningful policy coverage.
+
 ## Core Flow
 
 ```mermaid
@@ -122,7 +130,7 @@ Recommended product paths stay thin and contract-backed:
 | `aws-lza` | Contract-backed AWS Landing Zone Accelerator registered-target configuration using official-style LZA YAML artifacts |
 | `cloudformation-parameters` | BYOM CloudFormation parameter handoff for an existing template |
 | `kubernetes-cluster` | Kubernetes cluster handoff with optional Terraform EKS module input references |
-| `terraform-vpc` | BYOM Terraform AWS VPC module input capture |
+| `terraform-vpc` | BYOM Terraform AWS VPC module input capture for existing accounts/pipelines |
 
 ## Why Not Terraform, CDK, Or CloudFormation?
 

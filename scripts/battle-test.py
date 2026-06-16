@@ -20,6 +20,7 @@ from intent_engine.core.battle_summary import (
     summarize_battle_artifacts,
     write_battle_summary,
 )
+from intent_engine.core.contract_validation import write_contract_validation
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EVAL_DIR = REPO_ROOT / "fixtures" / "eval"
@@ -154,6 +155,8 @@ def main() -> int:
     if compile_proc.returncode != 0 and case.expected_compile != "fail":
         _print_proc_failure(compile_proc)
         return compile_proc.returncode
+
+    write_contract_validation(output_dir)
 
     review_proc = _run(
         [

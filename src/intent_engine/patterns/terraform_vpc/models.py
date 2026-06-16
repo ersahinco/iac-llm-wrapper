@@ -17,3 +17,5 @@ class TerraformVpcIntent(BaseModel):
     enable_nat_gateway: bool = True
     single_nat_gateway: bool = True
     enable_dns_hostnames: bool = True
+    target_account_id: str = ""
+    deployment_pipeline_ref: str = ""

@@ -23,3 +23,8 @@ Architects only need to capture decisions. Engineers need exact variables.
 ## DNS
 
 - enable_dns_hostnames: true
+
+## Delivery
+
+- target_account_id: 111122223333
+- deployment_pipeline_ref: github://platform-networking/vpc-deploy

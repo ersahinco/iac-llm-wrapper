@@ -127,14 +127,14 @@ def _changed_structured_decisions(
 ) -> list[dict[str, Any]]:
     changed: list[dict[str, Any]] = []
     for key in sorted(after_decisions):
-        after_value = after_decisions[key]
-        before_value = baseline_decisions.get(key)
+        after_value = _report_value(graph, key, after_decisions[key])
+        before_value = _report_value(graph, key, baseline_decisions.get(key))
         if key not in baseline_decisions:
             changed.append(
                 {
                     "key": key,
                     "before": None,
-                    "after": _report_value(graph, key, after_value),
+                    "after": after_value,
                     "change": "added",
                 }
             )
@@ -142,8 +142,8 @@ def _changed_structured_decisions(
             changed.append(
                 {
                     "key": key,
-                    "before": _report_value(graph, key, before_value),
-                    "after": _report_value(graph, key, after_value),
+                    "before": before_value,
+                    "after": after_value,
                     "change": "changed",
                 }
             )

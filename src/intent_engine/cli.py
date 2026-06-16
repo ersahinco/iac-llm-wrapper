@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,12 @@ from .core.bundle_compare import (
     render_bundle_comparison_text,
     write_bundle_comparison,
     write_bundle_comparison_html,
+)
+from .core.checkov_evidence import (
+    build_invalid_scan_path_evidence,
+    checkov_status_is_failure,
+    run_checkov_evidence,
+    scan_path_is_tfvars_only,
 )
 from .core.cli_guidance import (
     blocked_next_step_lines,
@@ -34,6 +41,11 @@ from .core.compiler import (
 from .core.contracts import TargetContract
 from .core.discovery import DiscoveryEngine, generate_clarifying_questions
 from .core.extractor import Extractor
+from .core.git_incremental import (
+    bundle_path_for_doc,
+    git_changed_design_paths,
+    git_show_text,
+)
 from .core.graph_export import graph_to_json, graph_to_mermaid
 from .core.interview import InterviewEngine
 from .core.llm_caller import LLMEvidenceStore, auto_detect_llm
@@ -65,6 +77,8 @@ pattern_app = typer.Typer(help="Inspect and validate registered patterns")
 app.add_typer(pattern_app, name="pattern")
 lza_app = typer.Typer(help="AWS LZA validation-only evidence helpers")
 app.add_typer(lza_app, name="lza")
+shift_left_app = typer.Typer(help="Shift-left evidence helpers")
+app.add_typer(shift_left_app, name="shift-left")
 
 DEFAULT_PATTERN = "aws-lza"
 
@@ -403,6 +417,209 @@ def _echo_lza_diagnostic(evidence: dict[str, Any]) -> None:
         typer.echo(f"Summary: {summary}", err=True)
     if next_action:
         typer.echo(f"Next action: {next_action}", err=True)
+
+
+@shift_left_app.command("checkov")
+def shift_left_checkov(
+    bundle: Path = typer.Option(..., "--bundle", help="Generated handoff bundle directory."),
+    scan_path: Path = typer.Option(
+        ...,
+        "--scan-path",
+        help="Owner-provided IaC, module, or pipeline path to scan with Checkov.",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        help="Evidence output path. Defaults to <bundle>/shift-left-evidence.yaml.",
+    ),
+    require_pass: bool = typer.Option(
+        False,
+        "--require-pass",
+        help="Exit non-zero when Checkov evidence is not pass.",
+    ),
+    checkov_bin: str = typer.Option("checkov", "--checkov-bin", help="Checkov executable name."),
+) -> None:
+    """Record optional Checkov shift-left evidence without deploying anything."""
+    if not bundle.is_dir():
+        typer.echo(f"Error: bundle is not a directory: {bundle}", err=True)
+        raise typer.Exit(1)
+    if not scan_path.exists():
+        typer.echo(f"Error: scan path does not exist: {scan_path}", err=True)
+        raise typer.Exit(1)
+
+    evidence_path = output or (bundle / "shift-left-evidence.yaml")
+    if scan_path_is_tfvars_only(scan_path):
+        evidence = build_invalid_scan_path_evidence(bundle=bundle, scan_path=scan_path)
+        write_yaml_artifact(evidence_path, evidence, "")
+        typer.echo(
+            "Checkov evidence written with invalid-input status; "
+            "provide an owner IaC/module path instead of terraform.tfvars.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    evidence = run_checkov_evidence(
+        bundle=bundle,
+        scan_path=scan_path,
+        checkov_bin=checkov_bin,
+    )
+    write_yaml_artifact(evidence_path, evidence, "")
+    status = str(evidence.get("result", {}).get("status", "unknown"))
+    typer.echo(f"Checkov evidence written to: {evidence_path}")
+    typer.echo(f"Checkov status: {status}")
+    if require_pass and checkov_status_is_failure(evidence):
+        raise typer.Exit(1)
+
+
+@app.command("compile-git")
+def compile_git(
+    base_ref: str = typer.Option(..., "--base-ref", help="Git ref for the previous design state."),
+    doc_root: Path = typer.Option(..., "--doc-root", help="Directory containing design docs."),
+    bundle_root: Path = typer.Option(
+        ...,
+        "--bundle-root",
+        help="Directory containing baseline bundles, mirroring doc relative paths.",
+    ),
+    output_root: Path = typer.Option(
+        ...,
+        "--output-root",
+        help="Directory for regenerated bundles and git-incremental-plan.yaml.",
+    ),
+    pattern: str = typer.Option(
+        DEFAULT_PATTERN,
+        "--pattern",
+        "-p",
+        help=f"Pattern to use. Available: {_available_patterns()}",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Plan affected bundles without compiling them.",
+    ),
+) -> None:
+    """Compile only git-changed Markdown design docs into affected bundles."""
+    if not doc_root.is_dir():
+        typer.echo(f"Error: doc root is not a directory: {doc_root}", err=True)
+        raise typer.Exit(1)
+    if not bundle_root.is_dir():
+        typer.echo(f"Error: bundle root is not a directory: {bundle_root}", err=True)
+        raise typer.Exit(1)
+    _get_pattern_or_exit(pattern)
+
+    try:
+        discovered = git_changed_design_paths(base_ref, doc_root)
+    except RuntimeError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+    llm_caller = auto_detect_llm(
+        provider=os.environ.get("INTENT_ENGINE_PROVIDER", "openai"),
+        api_key=os.environ.get("OPENAI_API_KEY", ""),
+        base_url=os.environ.get("INTENT_ENGINE_BASE_URL", ""),
+        model=os.environ.get("INTENT_ENGINE_MODEL", ""),
+    )
+    output_root.mkdir(parents=True, exist_ok=True)
+    repo_root = Path(str(discovered["repoRoot"]))
+    plan: dict[str, Any] = {
+        "schemaVersion": "intent-engine/git-incremental-plan/v1",
+        "baseRef": base_ref,
+        "pattern": pattern,
+        "repoRoot": str(repo_root),
+        "docRoot": str(Path(str(discovered["docRoot"]))),
+        "bundleRoot": str(bundle_root),
+        "outputRoot": str(output_root),
+        "changedDocuments": [],
+        "skippedDocuments": discovered["skippedDocuments"],
+    }
+    failure_count = 0
+    for doc in discovered["changedDocuments"]:
+        doc_path = Path(str(doc["path"]))
+        relative_path = str(doc["relativePath"])
+        baseline_bundle = bundle_path_for_doc(bundle_root, relative_path)
+        output_bundle = bundle_path_for_doc(output_root, relative_path)
+        baseline_text = git_show_text(repo_root, base_ref, str(doc["repoRelativePath"]))
+        entry: dict[str, Any] = {
+            "path": str(doc_path),
+            "relativePath": relative_path,
+            "repoRelativePath": str(doc["repoRelativePath"]),
+            "baselineDocumentAvailable": baseline_text is not None,
+            "baselineBundle": str(baseline_bundle),
+            "baselineBundleAvailable": baseline_bundle.is_dir(),
+            "outputBundle": str(output_bundle),
+            "status": "planned",
+            "mode": "incremental" if baseline_text is not None else "full",
+        }
+        if not doc_path.exists():
+            entry["status"] = "skipped"
+            entry["reason"] = "changed document is not present in the working tree"
+            failure_count += 1
+        elif dry_run:
+            entry["status"] = (
+                "planned-incremental"
+                if baseline_text is not None and baseline_bundle.is_dir()
+                else "planned-full"
+                if baseline_text is None
+                else "planned-skip"
+            )
+        elif baseline_text is None:
+            try:
+                compile_design(
+                    doc_path,
+                    output_bundle,
+                    pattern=pattern,
+                    llm_caller=llm_caller,
+                    evidence_store=LLMEvidenceStore(),
+                )
+                entry["status"] = "compiled-full"
+            except CompileError as exc:
+                entry["status"] = "blocked"
+                entry["violations"] = [
+                    {"code": violation.code, "message": violation.message}
+                    for violation in exc.violations
+                ]
+                failure_count += 1
+        elif not baseline_bundle.is_dir():
+            entry["status"] = "skipped"
+            entry["reason"] = "baseline bundle is missing"
+            failure_count += 1
+        else:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                baseline_doc = Path(temp_dir) / doc_path.name
+                baseline_doc.write_text(baseline_text)
+                try:
+                    compile_incremental_design(
+                        baseline_bundle=baseline_bundle,
+                        changed_doc=doc_path,
+                        output_dir=output_bundle,
+                        baseline_doc=baseline_doc,
+                        pattern=pattern,
+                        llm_caller=llm_caller,
+                        evidence_store=LLMEvidenceStore(),
+                    )
+                    entry["status"] = "compiled-incremental"
+                except CompileError as exc:
+                    entry["status"] = "blocked"
+                    entry["violations"] = [
+                        {"code": violation.code, "message": violation.message}
+                        for violation in exc.violations
+                    ]
+                    failure_count += 1
+        plan["changedDocuments"].append(entry)
+
+    plan["summary"] = {
+        "changedDocumentCount": len(plan["changedDocuments"]),
+        "skippedDocumentCount": len(plan["skippedDocuments"])
+        + sum(1 for item in plan["changedDocuments"] if item.get("status") == "skipped"),
+        "failureCount": failure_count,
+        "dryRun": dry_run,
+    }
+    plan_path = output_root / "git-incremental-plan.yaml"
+    write_yaml_artifact(plan_path, plan, "")
+    typer.echo(f"Git incremental plan written to: {plan_path}")
+    typer.echo(f"Changed documents: {plan['summary']['changedDocumentCount']}")
+    if failure_count:
+        typer.echo(f"Failures/skips: {failure_count}", err=True)
+        raise typer.Exit(1)
 
 
 @app.command()
