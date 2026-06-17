@@ -906,10 +906,16 @@ def _changed_graph_diff_root_entries(
 def _graph_diff_root_reason(section: str, item: Any) -> str:
     if section == "addedNodes":
         return "Graph node was added between compared bundles."
+    changed_properties = ", ".join(
+        str(_dict(change).get("path", ""))
+        for change in _coerce_list(_dict(item).get("changedProperties"))
+        if _dict(change).get("path")
+    )
     changed_fields = ", ".join(
         str(field) for field in _coerce_list(_dict(item).get("changedFields"))
     )
-    suffix = f": {changed_fields}" if changed_fields else ""
+    changed = changed_properties or changed_fields
+    suffix = f": {changed}" if changed else ""
     return f"Graph node changed between compared bundles{suffix}."
 
 
@@ -958,6 +964,7 @@ def build_graph_diff_report(before: Path, after: Path) -> dict[str, Any]:
             "nodeChangedCount": len(changed_nodes),
             "edgeAddedCount": len(added_edges),
             "edgeRemovedCount": len(removed_edges),
+            "changedPropertyPaths": _changed_property_paths(changed_nodes),
             "nodeKindsAdded": _count_by(
                 [after_nodes[node_id].to_dict() for node_id in added_node_ids], "kind"
             ),
@@ -1125,7 +1132,13 @@ def render_graph_diff_text(report: dict[str, Any]) -> str:
         for item in changed_nodes[:12]:
             if isinstance(item, dict):
                 after = _dict(item.get("after"))
-                lines.append(f"  - {_node_label(after)}")
+                changed_properties = ", ".join(
+                    str(_dict(change).get("path", ""))
+                    for change in _coerce_list(item.get("changedProperties"))
+                    if _dict(change).get("path")
+                )
+                suffix = f" ({changed_properties})" if changed_properties else ""
+                lines.append(f"  - {_node_label(after)}{suffix}")
         if len(changed_nodes) > 12:
             lines.append(f"  ... {len(changed_nodes) - 12} more")
     else:
@@ -2674,12 +2687,42 @@ def _node_change(before: _ImpactNode, after: _ImpactNode) -> dict[str, Any]:
         for field in ("kind", "key", "label", "properties")
         if before_dict.get(field) != after_dict.get(field)
     ]
+    changed_properties = _changed_value_paths(before_dict, after_dict)
     return {
         "id": after.id,
         "changedFields": changed_fields,
+        "changedProperties": changed_properties,
         "before": before_dict,
         "after": after_dict,
     }
+
+
+def _changed_property_paths(changed_nodes: list[dict[str, Any]]) -> list[str]:
+    paths = {
+        str(_dict(change).get("path"))
+        for node in changed_nodes
+        for change in _coerce_list(node.get("changedProperties"))
+        if _dict(change).get("path")
+    }
+    return sorted(paths)
+
+
+def _changed_value_paths(
+    before: dict[str, Any],
+    after: dict[str, Any],
+    *,
+    prefix: str = "",
+) -> list[dict[str, Any]]:
+    changes: list[dict[str, Any]] = []
+    for key in sorted(set(before) | set(after)):
+        path = f"{prefix}.{key}" if prefix else str(key)
+        before_value = before.get(key)
+        after_value = after.get(key)
+        if isinstance(before_value, dict) and isinstance(after_value, dict):
+            changes.extend(_changed_value_paths(before_value, after_value, prefix=path))
+        elif before_value != after_value:
+            changes.append({"path": path, "before": before_value, "after": after_value})
+    return changes
 
 
 def _query_tokens(query: str) -> list[str]:

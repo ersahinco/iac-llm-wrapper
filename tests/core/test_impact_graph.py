@@ -1208,10 +1208,17 @@ def test_graph_diff_reports_changed_decision_and_module_nodes(tmp_path: Path):
     assert "decision:cidr" in changed_ids
     assert "module_variable:cidr" in changed_ids
     assert "artifact:module-inputs.yaml" in changed_ids
+    decision_change = next(item for item in report["changedNodes"] if item["id"] == "decision:cidr")
+    decision_paths = {item["path"] for item in decision_change["changedProperties"]}
+    assert "properties.value" in decision_paths
     artifact_change = next(
         item for item in report["changedNodes"] if item["id"] == "artifact:module-inputs.yaml"
     )
     assert "properties" in artifact_change["changedFields"]
+    artifact_paths = {item["path"] for item in artifact_change["changedProperties"]}
+    assert "properties.sha256" in artifact_paths
+    assert "properties.value" in report["summary"]["changedPropertyPaths"]
+    assert "properties.sha256" in report["summary"]["changedPropertyPaths"]
     assert (
         artifact_change["before"]["properties"]["sha256"]
         != artifact_change["after"]["properties"]["sha256"]
@@ -1220,6 +1227,7 @@ def test_graph_diff_reports_changed_decision_and_module_nodes(tmp_path: Path):
     rendered = render_graph_diff_text(report)
     assert "Graph Diff" in rendered
     assert "decision:cidr" in rendered
+    assert "properties.value" in rendered
     graph_roots = changed_graph_diff_roots(report, kinds=["artifact", "module_variable"])
     assert ImpactRoot(kind="artifact", key="module-inputs.yaml") in graph_roots
     assert ImpactRoot(kind="module_variable", key="cidr") in graph_roots
@@ -1229,7 +1237,7 @@ def test_graph_diff_reports_changed_decision_and_module_nodes(tmp_path: Path):
         kinds=["artifact", "module_variable"],
     )
     assert graph_root_reasons["artifact:module-inputs.yaml"] == (
-        "Graph node changed between compared bundles: properties."
+        "Graph node changed between compared bundles: properties.sha256."
     )
 
 
@@ -1306,7 +1314,7 @@ def test_bundle_compare_includes_impact_traversal(tmp_path: Path):
     reasons = {row["root"]["id"]: row.get("recommendationReason") for row in matrix["rows"]}
     assert reasons["decision:cidr"] == "Accepted decision was changed between compared bundles."
     assert reasons["artifact:module-inputs.yaml"] == (
-        "Graph node changed between compared bundles: properties."
+        "Graph node changed between compared bundles: properties.sha256."
     )
     assert "Impact matrix:" in rendered
     assert "decision:cidr: status=matched" in rendered
