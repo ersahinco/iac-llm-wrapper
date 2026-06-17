@@ -543,11 +543,14 @@ def build_path_report(
             "status": status,
             "direction": direction,
             "hopCount": len(steps),
+            "relationshipCounts": _path_relationship_counts(steps),
+            "nodeKindCounts": _path_node_kind_counts(graph, source_id, target_id, steps),
         },
         "source": _node_or_selector(graph, source_id, source),
         "target": _node_or_selector(graph, target_id, target),
         "unmatchedRoots": unmatched,
         "path": [_path_step_to_dict(graph, step) for step in steps],
+        "pathSummary": _path_steps_summary(graph, steps),
         "reviewFocus": _path_review_focus(
             status=status,
             source_id=source_id,
@@ -1344,7 +1347,18 @@ def render_path_report_text(report: dict[str, Any]) -> str:
         lines.append("")
         lines.append("Unmatched roots:")
         lines.extend(_unmatched_root_lines(unmatched, include_role=True))
-    lines.extend(["", f"Hops: {summary.get('hopCount', 0)}", "Path:"])
+    lines.extend(
+        [
+            "",
+            f"Hops: {summary.get('hopCount', 0)}",
+            f"Path summary: {report.get('pathSummary', '') or 'None'}",
+            "Relationship counts:",
+        ]
+    )
+    lines.extend(_count_lines(_dict(summary.get("relationshipCounts"))))
+    lines.append("Node kind counts:")
+    lines.extend(_count_lines(_dict(summary.get("nodeKindCounts"))))
+    lines.append("Path:")
     path_lines = []
     for step in _coerce_list(report.get("path")):
         if not isinstance(step, dict):
@@ -3036,6 +3050,40 @@ def _path_step_to_dict(graph: _ImpactGraph, step: _PathStep) -> dict[str, Any]:
             "relationshipDescription": _relationship_description(edge.relationship),
         },
     }
+
+
+def _path_relationship_counts(steps: list[_PathStep]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for step in steps:
+        relationship = step.edge.relationship
+        counts[relationship] = counts.get(relationship, 0) + 1
+    return {relationship: counts[relationship] for relationship in sorted(counts)}
+
+
+def _path_node_kind_counts(
+    graph: _ImpactGraph,
+    source_id: str | None,
+    target_id: str | None,
+    steps: list[_PathStep],
+) -> dict[str, int]:
+    node_ids = {step.source for step in steps} | {step.target for step in steps}
+    if source_id:
+        node_ids.add(source_id)
+    if target_id:
+        node_ids.add(target_id)
+    nodes = [graph.nodes[node_id] for node_id in sorted(node_ids) if node_id in graph.nodes]
+    return _node_kind_counts(nodes)
+
+
+def _path_steps_summary(graph: _ImpactGraph, steps: list[_PathStep]) -> str:
+    rendered = []
+    for step in steps:
+        source = graph.nodes.get(step.source)
+        target = graph.nodes.get(step.target)
+        if source is None or target is None:
+            continue
+        rendered.append(f"{source.id} --{step.edge.relationship}--> {target.id}")
+    return " | ".join(rendered)
 
 
 def _impact_matrix_row(

@@ -1089,6 +1089,18 @@ def test_graph_path_reports_semantic_route_to_artifact():
     assert report["schemaVersion"] == "intent-engine/graph-path/v1"
     assert report["summary"]["status"] == "matched"
     assert report["summary"]["hopCount"] == 2
+    assert report["summary"]["relationshipCounts"] == {
+        "describes-artifact": 1,
+        "semantic:produces_artifact": 1,
+    }
+    assert report["summary"]["nodeKindCounts"] == {
+        "artifact": 1,
+        "semantic_entity": 2,
+    }
+    assert (
+        "semantic_entity:control:security-hub --semantic:produces_artifact--> "
+        "semantic_entity:artifact:security-config.yaml"
+    ) in report["pathSummary"]
     assert [item["relationship"] for item in report["path"]] == [
         "semantic:produces_artifact",
         "describes-artifact",
@@ -1099,6 +1111,9 @@ def test_graph_path_reports_semantic_route_to_artifact():
     assert [item["direction"] for item in report["path"]] == ["downstream", "downstream"]
     rendered = render_path_report_text(report)
     assert "Graph Path" in rendered
+    assert "Path summary:" in rendered
+    assert "Relationship counts:" in rendered
+    assert "Node kind counts:" in rendered
     assert "semantic_entity:control:security-hub --semantic:produces_artifact" in rendered
     assert "Typed relationship emitted by the pattern semantic model." in rendered
 
