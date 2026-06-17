@@ -468,6 +468,7 @@ def build_bundle_graph_report(bundle: Path) -> dict[str, Any]:
             "edgeCount": len(edges),
             "nodeKinds": _count_by(nodes, "kind"),
             "relationships": _count_by(edges, "relationship"),
+            "topology": _bundle_graph_topology_summary(nodes, edges),
         },
         "queryHints": {
             "rootKinds": _root_kinds(),
@@ -1042,8 +1043,25 @@ def render_bundle_graph_text(report: dict[str, Any]) -> str:
         f"Nodes: {summary.get('nodeCount', 0)}",
         f"Edges: {summary.get('edgeCount', 0)}",
         "",
-        "Node kinds:",
+        "Topology:",
     ]
+    topology = _dict(summary.get("topology"))
+    for key in [
+        "rootSelectableNodeCount",
+        "connectedNodeCount",
+        "isolatedNodeCount",
+        "sourceNodeCount",
+        "sinkNodeCount",
+        "branchingNodeCount",
+        "joinNodeCount",
+    ]:
+        lines.append(f"  - {key}: {topology.get(key, 0)}")
+    lines.extend(
+        [
+            "",
+            "Node kinds:",
+        ]
+    )
     for key, count in sorted(_dict(summary.get("nodeKinds")).items()):
         lines.append(f"  - {key}: {count}")
     lines.append("Relationships:")
@@ -2559,6 +2577,60 @@ def _bundle_graph_indexes(
         "incoming": _adjacency_index(edges, source_key="to", target_key="from"),
         "edgesByRelationship": _edges_by_relationship(edges),
         "rootSelectorsByKind": _root_selectors_by_kind(nodes),
+    }
+
+
+def _bundle_graph_topology_summary(
+    nodes: list[dict[str, Any]],
+    edges: list[dict[str, str]],
+) -> dict[str, Any]:
+    node_ids = {str(node.get("id") or "") for node in nodes if node.get("id")}
+    root_kinds = set(_root_kinds())
+    root_selectable = {
+        str(node.get("id"))
+        for node in nodes
+        if str(node.get("kind") or "") in root_kinds
+        and str(node.get("key") or "")
+        and node.get("id")
+    }
+    incoming: dict[str, int] = {node_id: 0 for node_id in node_ids}
+    outgoing: dict[str, int] = {node_id: 0 for node_id in node_ids}
+    for edge in edges:
+        source = str(edge.get("from") or "")
+        target = str(edge.get("to") or "")
+        if source in outgoing and target in incoming:
+            outgoing[source] += 1
+            incoming[target] += 1
+    connected = {
+        node_id for node_id in node_ids if incoming.get(node_id, 0) or outgoing.get(node_id, 0)
+    }
+    isolated = sorted(node_ids - connected)
+    sources = sorted(
+        node_id
+        for node_id in node_ids
+        if outgoing.get(node_id, 0) > 0 and incoming.get(node_id, 0) == 0
+    )
+    sinks = sorted(
+        node_id
+        for node_id in node_ids
+        if incoming.get(node_id, 0) > 0 and outgoing.get(node_id, 0) == 0
+    )
+    branching = sorted(node_id for node_id in node_ids if outgoing.get(node_id, 0) > 1)
+    joins = sorted(node_id for node_id in node_ids if incoming.get(node_id, 0) > 1)
+    return {
+        "rootSelectableNodeCount": len(root_selectable),
+        "nonRootSelectableNodeCount": len(node_ids - root_selectable),
+        "connectedNodeCount": len(connected),
+        "isolatedNodeCount": len(isolated),
+        "sourceNodeCount": len(sources),
+        "sinkNodeCount": len(sinks),
+        "branchingNodeCount": len(branching),
+        "joinNodeCount": len(joins),
+        "isolatedNodes": isolated,
+        "sourceNodes": sources,
+        "sinkNodes": sinks,
+        "branchingNodes": branching,
+        "joinNodes": joins,
     }
 
 

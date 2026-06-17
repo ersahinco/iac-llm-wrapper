@@ -29,6 +29,7 @@ from intent_engine.core.impact_graph import (
     build_roots_report,
     changed_graph_diff_root_reasons,
     changed_graph_diff_roots,
+    render_bundle_graph_text,
     render_find_report_text,
     render_graph_diff_text,
     render_impact_matrix_text,
@@ -477,6 +478,15 @@ def test_bundle_graph_report_exports_queryable_nodes_and_edges(tmp_path: Path):
     assert "policy_control:VPC-NETWORK-001" in node_ids
     assert report["summary"]["nodeKinds"]["decision"] >= 11
     assert report["summary"]["relationships"]["mapped-to-control"] >= 1
+    topology = report["summary"]["topology"]
+    assert topology["rootSelectableNodeCount"] >= report["summary"]["nodeKinds"]["decision"]
+    assert topology["connectedNodeCount"] == report["summary"]["nodeCount"] - 1
+    assert topology["isolatedNodeCount"] == 1
+    assert topology["isolatedNodes"] == ["manual_gate:Confirm captured decisions and blockers"]
+    assert any(node.startswith("source_context:") for node in topology["sourceNodes"])
+    assert "artifact:decision-report.yaml" in topology["sinkNodes"]
+    assert "decision:cidr" in topology["branchingNodes"]
+    assert "policy_control:VPC-NETWORK-001" in topology["joinNodes"]
     assert {
         "from": "decision:cidr",
         "to": "policy_control:VPC-NETWORK-001",
@@ -503,6 +513,10 @@ def test_bundle_graph_report_exports_queryable_nodes_and_edges(tmp_path: Path):
     assert "graph matrix" in report["queryHints"]["matrixCommand"]
     assert "--recommended" in report["queryHints"]["recommendedMatrixCommand"]
     assert "graph diff" in report["queryHints"]["diffCommand"]
+    rendered = render_bundle_graph_text(report)
+    assert "Topology:" in rendered
+    assert "rootSelectableNodeCount:" in rendered
+    assert "isolatedNodeCount: 1" in rendered
 
 
 def test_graph_roots_report_lists_concrete_traversal_roots(tmp_path: Path):
