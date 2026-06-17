@@ -52,6 +52,7 @@ from .core.impact_graph import (
     build_bundle_graph_report,
     build_find_report,
     build_graph_diff_report,
+    build_hotspot_impact_matrix_report,
     build_impact_matrix_report,
     build_impact_report,
     build_neighborhood_report,
@@ -606,10 +607,15 @@ def graph_matrix(
         "--recommended",
         help="Build the matrix from graph roots recommended for review.",
     ),
+    hotspots: bool = typer.Option(
+        False,
+        "--hotspots",
+        help="Build the matrix from high-degree topology hotspot roots.",
+    ),
     kind: list[str] | None = typer.Option(
         None,
         "--kind",
-        help="Optional node kind filter when --recommended is used. Repeatable.",
+        help="Optional node kind filter when --recommended or --hotspots is used. Repeatable.",
     ),
     changed_report: Path | None = typer.Option(
         None,
@@ -632,14 +638,24 @@ def graph_matrix(
         raise typer.Exit(1)
     roots = [_graph_root_or_exit(item, "--root") for item in (root or [])]
     changed_roots = changed_report_roots(bundle, changed_report)
-    if not roots and not changed_roots and not recommended:
+    if recommended and hotspots:
+        typer.echo("Error: choose only one of --recommended or --hotspots.", err=True)
+        raise typer.Exit(1)
+    if not roots and not changed_roots and not recommended and not hotspots:
         typer.echo(
-            "Error: provide --root at least once, use --recommended, or provide --changed-report.",
+            "Error: provide --root at least once, use --recommended, use --hotspots, "
+            "or provide --changed-report.",
             err=True,
         )
         raise typer.Exit(1)
     if recommended:
         report = build_recommended_impact_matrix_report(
+            bundle,
+            kinds=kind,
+            extra_roots=[*roots, *changed_roots],
+        )
+    elif hotspots:
+        report = build_hotspot_impact_matrix_report(
             bundle,
             kinds=kind,
             extra_roots=[*roots, *changed_roots],

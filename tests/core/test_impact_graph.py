@@ -21,6 +21,7 @@ from intent_engine.core.impact_graph import (
     build_bundle_graph_report,
     build_find_report,
     build_graph_diff_report,
+    build_hotspot_impact_matrix_report,
     build_impact_matrix_report,
     build_impact_report,
     build_neighborhood_report,
@@ -461,6 +462,72 @@ def test_graph_impact_matrix_cli_uses_recommended_roots(tmp_path: Path):
     assert report["rows"][0]["recommendationCategory"] == "source-changes"
 
 
+def test_hotspot_graph_impact_matrix_uses_topology_roots(tmp_path: Path):
+    bundle = _terraform_vpc_bundle(tmp_path / "bundle")
+
+    report = build_hotspot_impact_matrix_report(bundle, kinds=["decision"])
+
+    assert report["summary"]["rootSource"] == "topology-hotspots"
+    assert report["summary"]["topologyHotspotRootCount"] >= 1
+    assert report["summary"]["recommendationCategories"] == ["topology-hotspots"]
+    assert report["summary"]["recommendationCategoryCounts"]["topology-hotspots"] >= 1
+    matrix_roots = {row["root"]["id"] for row in report["rows"]}
+    assert "decision:cidr" in matrix_roots
+    cidr_row = next(row for row in report["rows"] if row["root"]["id"] == "decision:cidr")
+    assert cidr_row["recommendationCategory"] == "topology-hotspots"
+    assert "High-degree graph node" in cidr_row["recommendationReason"]
+    assert report["topologyHotspotRoots"]
+    rendered = render_impact_matrix_text(report)
+    assert "Root source: topology-hotspots" in rendered
+    assert "topology-hotspots:" in rendered
+
+
+def test_graph_impact_matrix_cli_uses_hotspot_roots(tmp_path: Path):
+    bundle = _terraform_vpc_bundle(tmp_path / "bundle")
+    output = tmp_path / "graph-impact-matrix.yaml"
+
+    result = runner.invoke(
+        app,
+        [
+            "graph",
+            "matrix",
+            "--bundle",
+            str(bundle),
+            "--hotspots",
+            "--kind",
+            "decision",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Root source: topology-hotspots" in result.output
+    report = _yaml_load(output)
+    assert report["summary"]["rootSource"] == "topology-hotspots"
+    assert report["summary"]["topologyHotspotRootCount"] >= 1
+    assert all(row["root"]["kind"] == "decision" for row in report["rows"])
+
+
+def test_graph_impact_matrix_cli_rejects_recommended_with_hotspots(tmp_path: Path):
+    bundle = _terraform_vpc_bundle(tmp_path / "bundle")
+
+    result = runner.invoke(
+        app,
+        [
+            "graph",
+            "matrix",
+            "--bundle",
+            str(bundle),
+            "--recommended",
+            "--hotspots",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "choose only one of --recommended or --hotspots" in result.output
+
+
 def test_graph_impact_matrix_cli_uses_changed_report_roots(tmp_path: Path):
     bundle = _terraform_vpc_bundle(tmp_path / "bundle")
     changed_report = tmp_path / "input-diff-report.yaml"
@@ -557,6 +624,7 @@ def test_bundle_graph_report_exports_queryable_nodes_and_edges(tmp_path: Path):
     assert "graph find" in report["queryHints"]["findCommand"]
     assert "graph matrix" in report["queryHints"]["matrixCommand"]
     assert "--recommended" in report["queryHints"]["recommendedMatrixCommand"]
+    assert "--hotspots" in report["queryHints"]["hotspotMatrixCommand"]
     assert "graph diff" in report["queryHints"]["diffCommand"]
     rendered = render_bundle_graph_text(report)
     assert "Topology:" in rendered

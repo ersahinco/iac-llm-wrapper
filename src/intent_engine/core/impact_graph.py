@@ -492,6 +492,7 @@ def build_bundle_graph_report(bundle: Path) -> dict[str, Any]:
             "recommendedMatrixCommand": (
                 "iac-llm-wrapper graph matrix --bundle <bundle> --recommended"
             ),
+            "hotspotMatrixCommand": "iac-llm-wrapper graph matrix --bundle <bundle> --hotspots",
             "diffCommand": (
                 "iac-llm-wrapper graph diff --before <bundle-before> --after <bundle-after>"
             ),
@@ -877,6 +878,48 @@ def build_recommended_impact_matrix_report(
     if not recommended and not extra_roots:
         report["reviewFocus"] = [
             "No recommended review roots were found; use graph roots or graph find "
+            "to select explicit roots."
+        ]
+    return report
+
+
+def build_hotspot_impact_matrix_report(
+    bundle: Path,
+    *,
+    kinds: list[str] | None = None,
+    extra_roots: list[ImpactRoot] | None = None,
+) -> dict[str, Any]:
+    """Build an impact matrix from topology hotspot roots."""
+
+    roots_report = build_roots_report(bundle, kinds=kinds)
+    hotspots = _coerce_list(roots_report.get("topologyHotspotRoots"))
+    roots: list[ImpactRoot] = []
+    reasons: dict[str, str] = {}
+    categories: dict[str, str] = {}
+    for item in hotspots:
+        if not isinstance(item, dict):
+            continue
+        root = _impact_root_from_value(str(item.get("root") or ""))
+        if root is None:
+            continue
+        roots.append(root)
+        root_id = f"{root.kind}:{root.key}"
+        reasons[root_id] = str(item.get("reason") or "")
+        categories[root_id] = "topology-hotspots"
+    roots.extend(extra_roots or [])
+    deduped_roots = _dedupe_roots(roots)
+    report = build_impact_matrix_report(
+        bundle,
+        roots=deduped_roots,
+        root_reasons=reasons,
+        root_categories=categories,
+        root_source="topology-hotspots" if not extra_roots else "topology-hotspots-plus-explicit",
+    )
+    report["topologyHotspotRoots"] = hotspots
+    report["summary"]["topologyHotspotRootCount"] = len(hotspots)
+    if not hotspots and not extra_roots:
+        report["reviewFocus"] = [
+            "No topology hotspot roots were found; use graph roots or graph find "
             "to select explicit roots."
         ]
     return report
