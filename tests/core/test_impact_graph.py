@@ -399,13 +399,19 @@ def test_recommended_graph_impact_matrix_uses_review_roots(tmp_path: Path):
 
     assert report["summary"]["rootSource"] == "recommended"
     assert report["summary"]["recommendedRootCount"] == 1
+    assert report["summary"]["recommendationCategories"] == ["source-changes"]
+    assert report["summary"]["recommendationCategoryCounts"] == {"source-changes": 1}
     assert report["rows"][0]["root"]["id"] == "source_change:structured:cidr"
+    assert report["rows"][0]["recommendationCategory"] == "source-changes"
     assert "Source change" in report["rows"][0]["recommendationReason"]
     assert report["rows"][0]["upstreamSourceChanges"] == ["structured:cidr"]
     assert report["upstreamSourceChanges"] == ["structured:cidr"]
     assert "module-inputs.yaml" in report["affectedArtifacts"]
     rendered = render_impact_matrix_text(report)
     assert "Root source: recommended" in rendered
+    assert "Recommendation categories:" in rendered
+    assert "source-changes: 1" in rendered
+    assert "recommendationCategory: source-changes" in rendered
     assert "reason: Source change" in rendered
     assert "sourceChanges=1" in rendered
 
@@ -443,9 +449,11 @@ def test_graph_impact_matrix_cli_uses_recommended_roots(tmp_path: Path):
 
     assert result.exit_code == 0, result.output
     assert "Root source: recommended" in result.output
+    assert "source-changes: 1" in result.output
     report = _yaml_load(output)
     assert report["summary"]["rootSource"] == "recommended"
     assert report["rows"][0]["root"]["id"] == "source_change:structured:cidr"
+    assert report["rows"][0]["recommendationCategory"] == "source-changes"
 
 
 def test_graph_impact_matrix_cli_uses_changed_report_roots(tmp_path: Path):

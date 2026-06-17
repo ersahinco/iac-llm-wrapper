@@ -754,16 +754,19 @@ def build_impact_matrix_report(
     *,
     roots: list[ImpactRoot],
     root_reasons: dict[str, str] | None = None,
+    root_categories: dict[str, str] | None = None,
     root_source: str = "explicit",
 ) -> dict[str, Any]:
     """Build a compact multi-root impact matrix for reviewer triage."""
 
     reasons = root_reasons or {}
+    categories = root_categories or {}
     roots = _dedupe_roots(roots)
     rows = [
         _impact_matrix_row(
             build_impact_report(bundle, roots=[root]),
             recommendation_reason=reasons.get(f"{root.kind}:{root.key}", ""),
+            recommendation_category=categories.get(f"{root.kind}:{root.key}", ""),
         )
         for root in roots
     ]
@@ -782,6 +785,7 @@ def build_impact_matrix_report(
     upstream_input_diffs = _matrix_union(rows, "upstreamInputDiffs")
     checklist_category_counts = _matrix_checklist_category_counts(rows)
     upstream_dependency_kind_counts = _matrix_upstream_dependency_kind_counts(rows)
+    recommendation_category_counts = _matrix_recommendation_category_counts(rows)
     graph_summary = _dict(_dict(rows[0].get("graph")) if rows else {})
     return {
         "schemaVersion": "intent-engine/graph-impact-matrix/v1",
@@ -806,6 +810,8 @@ def build_impact_matrix_report(
             "manualGateCount": len(affected_gates),
             "upstreamSourceChangeCount": len(upstream_source_changes),
             "upstreamInputDiffCount": len(upstream_input_diffs),
+            "recommendationCategoryCounts": recommendation_category_counts,
+            "recommendationCategories": sorted(recommendation_category_counts),
             "reviewChecklistCategoryCounts": checklist_category_counts,
             "reviewChecklistCategories": sorted(checklist_category_counts),
             "upstreamDependencyKindCounts": upstream_dependency_kind_counts,
@@ -840,6 +846,7 @@ def build_recommended_impact_matrix_report(
     recommended = _coerce_list(roots_report.get("recommendedReviewRoots"))
     roots: list[ImpactRoot] = []
     reasons: dict[str, str] = {}
+    categories: dict[str, str] = {}
     for item in recommended:
         if not isinstance(item, dict):
             continue
@@ -847,13 +854,16 @@ def build_recommended_impact_matrix_report(
         if root is None:
             continue
         roots.append(root)
-        reasons[f"{root.kind}:{root.key}"] = str(item.get("reason") or "")
+        root_id = f"{root.kind}:{root.key}"
+        reasons[root_id] = str(item.get("reason") or "")
+        categories[root_id] = str(item.get("category") or "")
     roots.extend(extra_roots or [])
     deduped_roots = _dedupe_roots(roots)
     report = build_impact_matrix_report(
         bundle,
         roots=deduped_roots,
         root_reasons=reasons,
+        root_categories=categories,
         root_source="recommended" if not extra_roots else "recommended-plus-explicit",
     )
     report["recommendedReviewRoots"] = recommended
@@ -1217,8 +1227,20 @@ def render_impact_matrix_text(report: dict[str, Any]) -> str:
         f"Roots: {summary.get('matchedRootCount', 0)} of {summary.get('rootCount', 0)} matched",
         f"Review severity: {_priority_severity_summary(summary)}",
         "",
-        "Rows:",
+        "Recommendation categories:",
     ]
+    recommendation_counts = _dict(summary.get("recommendationCategoryCounts"))
+    lines.extend(
+        _list_or_none(
+            [f"{category}: {count}" for category, count in sorted(recommendation_counts.items())]
+        )
+    )
+    lines.extend(
+        [
+            "",
+            "Rows:",
+        ]
+    )
     rows = _coerce_list(report.get("rows"))
     if rows:
         for row in rows:
@@ -1242,6 +1264,8 @@ def render_impact_matrix_text(report: dict[str, Any]) -> str:
             )
             reason = str(row.get("recommendationReason") or "")
             if reason:
+                category = str(row.get("recommendationCategory") or "uncategorized")
+                lines.append(f"    recommendationCategory: {category}")
                 lines.append(f"    reason: {reason}")
     else:
         lines.append("  - None")
@@ -3145,6 +3169,7 @@ def _impact_matrix_row(
     report: dict[str, Any],
     *,
     recommendation_reason: str = "",
+    recommendation_category: str = "",
 ) -> dict[str, Any]:
     summary = _dict(report.get("summary"))
     root = _matrix_root(report)
@@ -3192,6 +3217,8 @@ def _impact_matrix_row(
         "pattern": report.get("pattern", ""),
         "graph": _dict(report.get("graph")),
     }
+    if recommendation_category:
+        row["recommendationCategory"] = recommendation_category
     if recommendation_reason:
         row["recommendationReason"] = recommendation_reason
     return row
@@ -3283,6 +3310,15 @@ def _matrix_upstream_dependency_kind_counts(rows: list[dict[str, Any]]) -> dict[
         for kind, count in row_counts.items():
             counts[str(kind)] = counts.get(str(kind), 0) + int(count or 0)
     return {kind: counts[kind] for kind in sorted(counts)}
+
+
+def _matrix_recommendation_category_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        category = str(row.get("recommendationCategory") or "")
+        if category:
+            counts[category] = counts.get(category, 0) + 1
+    return {category: counts[category] for category in sorted(counts)}
 
 
 def _neighborhood_root_edge_summary(
