@@ -343,6 +343,8 @@ def test_graph_impact_matrix_compares_multiple_roots(tmp_path: Path):
     assert cidr_row["reviewChecklist"][0]["category"] == "target-contracts"
     assert cidr_row["summary"]["upstreamDependencyPathCount"] >= 1
     assert cidr_row["summary"]["upstreamDependencyKindCounts"]["source_context"] >= 1
+    assert cidr_row["rootCommands"]["impact"].endswith("--root decision:cidr")
+    assert cidr_row["rootCommands"]["neighbors"].endswith("--root decision:cidr")
     rendered = render_impact_matrix_text(report)
     assert "Graph Impact Matrix" in rendered
     assert "Review checklist categories:" in rendered
@@ -354,6 +356,8 @@ def test_graph_impact_matrix_compares_multiple_roots(tmp_path: Path):
     assert "decision:cidr" in rendered
     assert "policy_control:VPC-NETWORK-001" in rendered
     assert "decision:missing" in rendered
+    assert "follow-up queries: impact=" in rendered
+    assert "graph neighbors --bundle <bundle> --root decision:cidr" in rendered
 
 
 def test_graph_impact_matrix_cli_writes_report(tmp_path: Path):
@@ -476,6 +480,8 @@ def test_hotspot_graph_impact_matrix_uses_topology_roots(tmp_path: Path):
     cidr_row = next(row for row in report["rows"] if row["root"]["id"] == "decision:cidr")
     assert cidr_row["recommendationCategory"] == "topology-hotspots"
     assert "High-degree graph node" in cidr_row["recommendationReason"]
+    assert cidr_row["rootCommands"]["impact"].endswith("--root decision:cidr")
+    assert cidr_row["rootCommands"]["neighbors"].endswith("--root decision:cidr")
     assert report["topologyHotspotRoots"]
     rendered = render_impact_matrix_text(report)
     assert "Root source: topology-hotspots" in rendered

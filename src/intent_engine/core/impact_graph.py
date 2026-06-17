@@ -1355,6 +1355,15 @@ def render_impact_matrix_text(report: dict[str, Any]) -> str:
                 category = str(row.get("recommendationCategory") or "uncategorized")
                 lines.append(f"    recommendationCategory: {category}")
                 lines.append(f"    reason: {reason}")
+            commands = _dict(row.get("rootCommands"))
+            if commands:
+                impact = str(commands.get("impact") or "")
+                neighbors = str(commands.get("neighbors") or "")
+                if impact or neighbors:
+                    lines.append(
+                        f"    follow-up queries: impact={impact or 'n/a'} "
+                        f"neighbors={neighbors or 'n/a'}"
+                    )
     else:
         lines.append("  - None")
     lines.append("Affected artifacts:")
@@ -3398,6 +3407,7 @@ def _impact_matrix_row(
     upstream_input_diffs = _matrix_upstream_keys(report, root, "input_diff")
     row = {
         "root": root,
+        "rootCommands": _matrix_root_commands(root),
         "unmatchedRoots": _coerce_list(report.get("unmatchedRoots")),
         "summary": {
             "status": summary.get("status", "unknown"),
@@ -3443,6 +3453,18 @@ def _impact_matrix_row(
     if recommendation_reason:
         row["recommendationReason"] = recommendation_reason
     return row
+
+
+def _matrix_root_commands(root: dict[str, Any]) -> dict[str, str]:
+    kind = str(root.get("kind") or "")
+    key = str(root.get("key") or "")
+    if not kind or not key:
+        return {}
+    selector = f"{kind}:{key}"
+    return {
+        "impact": f"iac-llm-wrapper graph impact --bundle <bundle> --root {selector}",
+        "neighbors": f"iac-llm-wrapper graph neighbors --bundle <bundle> --root {selector}",
+    }
 
 
 def _matrix_upstream_keys(report: dict[str, Any], root: dict[str, Any], kind: str) -> list[str]:
