@@ -1419,6 +1419,10 @@ def test_bundle_compare_includes_impact_traversal(tmp_path: Path):
     assert matrix["schemaVersion"] == "intent-engine/graph-impact-matrix/v1"
     assert matrix["summary"]["rootSource"] == "bundle-compare"
     assert matrix["summary"]["matchedRootCount"] >= 3
+    assert "decision-deltas" in matrix["summary"]["recommendationCategories"]
+    assert "graph-diff-roots" in matrix["summary"]["recommendationCategories"]
+    assert matrix["summary"]["recommendationCategoryCounts"]["decision-deltas"] >= 1
+    assert matrix["summary"]["recommendationCategoryCounts"]["graph-diff-roots"] >= 1
     matrix_roots = {row["root"]["id"] for row in matrix["rows"]}
     assert "decision:cidr" in matrix_roots
     assert "artifact:module-inputs.yaml" in matrix_roots
@@ -1428,12 +1432,20 @@ def test_bundle_compare_includes_impact_traversal(tmp_path: Path):
     assert reasons["artifact:module-inputs.yaml"] == (
         "Graph node changed between compared bundles: properties.sha256."
     )
+    categories = {row["root"]["id"]: row.get("recommendationCategory") for row in matrix["rows"]}
+    assert categories["decision:cidr"] == "decision-deltas"
+    assert categories["artifact:module-inputs.yaml"] == "graph-diff-roots"
     assert "Impact matrix:" in rendered
+    assert "recommendation categories: decision-deltas:" in rendered
     assert "decision:cidr: status=matched" in rendered
+    assert "category=decision-deltas" in rendered
     assert "reason=Accepted decision was changed between compared bundles." in rendered
     assert "artifact:module-inputs.yaml: status=matched" in rendered
+    assert "category=graph-diff-roots" in rendered
     assert "reason=Graph node changed between compared bundles: properties." in rendered
     html = render_bundle_comparison_html(report)
+    assert "category=decision-deltas" in html
+    assert "category=graph-diff-roots" in html
     assert "reason=Accepted decision was changed between compared bundles." in html
     assert "reason=Graph node changed between compared bundles: properties." in html
     graph_diff = report["graphDiff"]
@@ -1474,10 +1486,15 @@ def test_bundle_compare_matrix_includes_input_diff_roots(tmp_path: Path):
     assert row["recommendationReason"] == (
         "Input diff report identified this requirement as changed or likely impacted."
     )
+    assert row["recommendationCategory"] == "input-diff-roots"
+    assert (
+        report["impactMatrix"]["summary"]["recommendationCategoryCounts"]["input-diff-roots"] == 1
+    )
     assert row["upstreamSourceChanges"] == ["likely-impacted:enable_dns_hostnames"]
     assert report["impactMatrix"]["upstreamSourceChanges"] == [
         "likely-impacted:enable_dns_hostnames"
     ]
     rendered = render_bundle_comparison_text(report)
     assert "decision:enable_dns_hostnames: status=matched" in rendered
+    assert "category=input-diff-roots" in rendered
     assert "sourceChanges=1" in rendered

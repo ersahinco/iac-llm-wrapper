@@ -82,13 +82,21 @@ def compare_handoff_bundles(before_dir: Path, after_dir: Path) -> dict[str, Any]
         graph_diff,
         kinds=COMPARE_GRAPH_DIFF_ROOT_KINDS,
     )
+    changed_report_reasons = _changed_report_root_reasons(after.path, input_diff_report)
+    graph_diff_reasons = changed_graph_diff_root_reasons(
+        graph_diff,
+        kinds=COMPARE_GRAPH_DIFF_ROOT_KINDS,
+    )
+    changed_decision_reasons = _changed_decision_root_reasons(decision_delta)
     root_reasons = {
-        **_changed_report_root_reasons(after.path, input_diff_report),
-        **changed_graph_diff_root_reasons(
-            graph_diff,
-            kinds=COMPARE_GRAPH_DIFF_ROOT_KINDS,
-        ),
-        **_changed_decision_root_reasons(decision_delta),
+        **changed_report_reasons,
+        **graph_diff_reasons,
+        **changed_decision_reasons,
+    }
+    root_categories = {
+        **_root_category_map(changed_report_reasons, "input-diff-roots"),
+        **_root_category_map(graph_diff_reasons, "graph-diff-roots"),
+        **_root_category_map(changed_decision_reasons, "decision-deltas"),
     }
     impact_roots = [
         *changed_roots,
@@ -107,6 +115,7 @@ def compare_handoff_bundles(before_dir: Path, after_dir: Path) -> dict[str, Any]
         after.path,
         roots=matrix_roots,
         root_reasons=root_reasons,
+        root_categories=root_categories,
         root_source="bundle-compare",
     )
     review_focus = _review_focus(
@@ -412,6 +421,8 @@ def render_bundle_comparison_text(report: dict[str, Any]) -> str:
                 f"  roots: {summary_block.get('matchedRootCount', 0)} of "
                 f"{summary_block.get('rootCount', 0)} matched",
                 "  review priority severity: " + _impact_priority_summary(impact_matrix),
+                "  recommendation categories: "
+                + _join_or_none(_category_count_summaries(impact_matrix)),
                 "  rows: " + _join_or_none(_impact_matrix_summaries(impact_matrix)[:5]),
             ]
         )
@@ -506,6 +517,11 @@ def _impact_priority_summary(impact_traversal: dict[str, Any]) -> str:
     return f"highest={highest} {' '.join(parts)}"
 
 
+def _category_count_summaries(report: dict[str, Any]) -> list[str]:
+    counts = _dict(_dict(report.get("summary")).get("recommendationCategoryCounts"))
+    return [f"{category}: {count}" for category, count in sorted(counts.items())]
+
+
 def _impact_path_summaries(paths: list[Any]) -> list[str]:
     summaries: list[str] = []
     for path in paths:
@@ -551,6 +567,9 @@ def _impact_matrix_summaries(impact_matrix: dict[str, Any]) -> list[str]:
         )
         reason = str(row.get("recommendationReason") or "")
         if reason:
+            category = str(row.get("recommendationCategory") or "")
+            if category:
+                line += f", category={category}"
             line += f", reason={reason}"
         summaries.append(line)
     return summaries
@@ -836,6 +855,10 @@ def _changed_decision_root_reasons(decision_delta: dict[str, Any]) -> dict[str, 
                     f"Accepted decision was {action} between compared bundles."
                 )
     return reasons
+
+
+def _root_category_map(root_reasons: dict[str, str], category: str) -> dict[str, str]:
+    return {root: category for root in root_reasons}
 
 
 def _changed_report_root_reasons(
