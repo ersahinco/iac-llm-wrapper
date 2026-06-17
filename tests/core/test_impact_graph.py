@@ -157,6 +157,9 @@ def test_decision_impact_traverses_contract_module_and_policy_edges(tmp_path: Pa
         "iac-llm-wrapper graph path --bundle <bundle> --from decision:cidr "
         "--to policy_control:VPC-NETWORK-001"
     ) in policy_step["pathQueries"]
+    assert (
+        "iac-llm-wrapper graph neighbors --bundle <bundle> --root policy_control:VPC-NETWORK-001"
+    ) in policy_step["neighborhoodQueries"]
     network_preview = next(
         item
         for item in policy_step["representativePaths"]
@@ -189,6 +192,8 @@ def test_decision_impact_traverses_contract_module_and_policy_edges(tmp_path: Pa
     )
     assert network_path["hops"][-1]["to"]["id"] == "policy_control:VPC-NETWORK-001"
     rendered = render_impact_report_text(report)
+    assert "follow-up queries: path=" in rendered
+    assert "neighbors=" in rendered
     assert "Impact Analysis" in rendered
     assert "Review checklist:" in rendered
     assert "Selected root kinds:" in rendered

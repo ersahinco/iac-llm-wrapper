@@ -1498,6 +1498,13 @@ def render_impact_report_text(report: dict[str, Any]) -> str:
                 f"  - {item.get('step', '?')}. {item.get('severity', 'review')}: "
                 f"{item.get('category', 'unknown')} - {item.get('action', '')}"
             )
+            path_query_count = len(_coerce_list(item.get("pathQueries")))
+            neighborhood_query_count = len(_coerce_list(item.get("neighborhoodQueries")))
+            if path_query_count or neighborhood_query_count:
+                lines.append(
+                    f"    follow-up queries: path={path_query_count} "
+                    f"neighbors={neighborhood_query_count}"
+                )
         if len(checklist) > 12:
             lines.append(f"  ... {len(checklist) - 12} more")
     else:
@@ -3545,6 +3552,10 @@ def _impact_review_checklist(
             entry["pathQueries"] = [
                 f"iac-llm-wrapper graph path --bundle <bundle> --from {root_id} "
                 f"--to {node_kind}:{item}"
+                for item in items[:5]
+            ]
+            entry["neighborhoodQueries"] = [
+                f"iac-llm-wrapper graph neighbors --bundle <bundle> --root {node_kind}:{item}"
                 for item in items[:5]
             ]
         checklist.append(entry)
