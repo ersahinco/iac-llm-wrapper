@@ -522,9 +522,9 @@ def build_path_report(
 
     unmatched = []
     if source_id is None:
-        unmatched.append({"role": "source", "kind": source.kind, "key": source.key})
+        unmatched.append(_unmatched_root_entry(graph, source, role="source"))
     if target_id is None:
-        unmatched.append({"role": "target", "kind": target.kind, "key": target.key})
+        unmatched.append(_unmatched_root_entry(graph, target, role="target"))
 
     return {
         "schemaVersion": "intent-engine/graph-path/v1",
@@ -606,7 +606,7 @@ def build_neighborhood_report(
         "root": _node_or_selector(graph, root_id, root),
         "unmatchedRoots": []
         if root_id is not None
-        else [{"role": "root", "kind": root.kind, "key": root.key}],
+        else [_unmatched_root_entry(graph, root, role="root")],
         "neighbors": [
             {
                 "depth": node_depths[node.id],
@@ -1214,11 +1214,7 @@ def render_neighborhood_report_text(report: dict[str, Any]) -> str:
     if unmatched:
         lines.append("")
         lines.append("Unmatched roots:")
-        lines.extend(
-            f"  - {item.get('role', 'root')}:{item.get('kind', 'unknown')}:{item.get('key', '')}"
-            for item in unmatched
-            if isinstance(item, dict)
-        )
+        lines.extend(_unmatched_root_lines(unmatched, include_role=True))
     lines.extend(["", f"Neighbors: {summary.get('neighborCount', 0)}", "Node kinds:"])
     for key, count in sorted(_dict(summary.get("nodeKinds")).items()):
         lines.append(f"  - {key}: {count}")
@@ -1271,11 +1267,7 @@ def render_path_report_text(report: dict[str, Any]) -> str:
     if unmatched:
         lines.append("")
         lines.append("Unmatched roots:")
-        lines.extend(
-            f"  - {item.get('role', 'root')}:{item.get('kind', 'unknown')}:{item.get('key', '')}"
-            for item in unmatched
-            if isinstance(item, dict)
-        )
+        lines.extend(_unmatched_root_lines(unmatched, include_role=True))
     lines.extend(["", f"Hops: {summary.get('hopCount', 0)}", "Path:"])
     path_lines = []
     for step in _coerce_list(report.get("path")):
@@ -1318,11 +1310,7 @@ def render_impact_report_text(report: dict[str, Any]) -> str:
     if unmatched:
         lines.append("")
         lines.append("Unmatched roots:")
-        lines.extend(
-            f"  - {item.get('kind', 'unknown')}:{item.get('key', '')}"
-            for item in unmatched
-            if isinstance(item, dict)
-        )
+        lines.extend(_unmatched_root_lines(unmatched))
     lines.extend(
         [
             "",
@@ -2306,9 +2294,9 @@ def _unmatched_roots(
     roots: list[ImpactRoot],
     graph: _ImpactGraph,
     matched_ids: list[str],
-) -> list[dict[str, str]]:
+) -> list[dict[str, Any]]:
     matched = set(matched_ids)
-    unmatched: list[dict[str, str]] = []
+    unmatched: list[dict[str, Any]] = []
     for root in roots:
         exact = f"{root.kind}:{root.key}"
         if exact in matched:
@@ -2316,8 +2304,62 @@ def _unmatched_roots(
         if not any(
             node.kind == root.kind and node.key == root.key for node in graph.nodes.values()
         ):
-            unmatched.append({"kind": root.kind, "key": root.key})
+            unmatched.append(_unmatched_root_entry(graph, root))
     return unmatched
+
+
+def _unmatched_root_entry(
+    graph: _ImpactGraph,
+    selector: ImpactRoot,
+    *,
+    role: str = "",
+) -> dict[str, Any]:
+    entry: dict[str, Any] = {"kind": selector.kind, "key": selector.key}
+    if role:
+        entry["role"] = role
+    suggestions = _root_suggestions(graph, selector)
+    if suggestions:
+        entry["suggestedRoots"] = suggestions
+    return entry
+
+
+def _root_suggestions(
+    graph: _ImpactGraph,
+    selector: ImpactRoot,
+    *,
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    query = selector.key.casefold()
+    root_kinds = set(_root_kinds())
+    scored: list[tuple[int, str, _ImpactNode, str]] = []
+    for node in graph.nodes.values():
+        if node.kind not in root_kinds or not node.key:
+            continue
+        fields = _node_search_fields(node)
+        same_kind = node.kind == selector.kind
+        if query and query == node.key.casefold():
+            score = 0 if same_kind else 2
+            reason = "same key"
+        elif query and (
+            query in fields["key"] or query in fields["id"] or query in fields["label"]
+        ):
+            score = 1 if same_kind else 3
+            reason = "partial key or label match"
+        elif query and query in fields["properties"]:
+            score = 4 if same_kind else 5
+            reason = "property match"
+        elif same_kind:
+            score = 6
+            reason = "same kind"
+        else:
+            continue
+        scored.append((score, node.id, node, reason))
+    suggestions = []
+    for _, _, node, reason in sorted(scored, key=lambda item: (item[0], item[1]))[:limit]:
+        suggestion = _root_entry(node)
+        suggestion["reason"] = reason
+        suggestions.append(suggestion)
+    return suggestions
 
 
 def _node_or_selector(
@@ -3336,6 +3378,20 @@ def _list_or_none(items: list[Any]) -> list[str]:
     if not items:
         return ["  - None"]
     return [f"  - {item}" for item in items]
+
+
+def _unmatched_root_lines(items: list[Any], *, include_role: bool = False) -> list[str]:
+    lines: list[str] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        role = f"{item.get('role', 'root')}:" if include_role else ""
+        lines.append(f"  - {role}{item.get('kind', 'unknown')}:{item.get('key', '')}")
+        suggestions = _coerce_list(item.get("suggestedRoots"))
+        if suggestions:
+            roots = [str(suggestion.get("root") or "") for suggestion in suggestions[:5]]
+            lines.append("    suggested roots: " + ", ".join(root for root in roots if root))
+    return lines or ["  - None"]
 
 
 def _node_list_lines(nodes: list[Any]) -> list[str]:

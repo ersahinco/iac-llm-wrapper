@@ -215,11 +215,15 @@ def test_decision_impact_reports_target_capabilities_and_samples():
 def test_unknown_root_returns_no_match_report(tmp_path: Path):
     bundle = _terraform_vpc_bundle(tmp_path / "bundle")
 
-    report = build_impact_report(bundle, roots=[ImpactRoot(kind="decision", key="missing")])
+    report = build_impact_report(bundle, roots=[ImpactRoot(kind="decision", key="cid")])
 
     assert report["summary"]["status"] == "no-match"
-    assert report["unmatchedRoots"] == [{"kind": "decision", "key": "missing"}]
+    assert report["unmatchedRoots"][0]["kind"] == "decision"
+    assert report["unmatchedRoots"][0]["key"] == "cid"
+    assert report["unmatchedRoots"][0]["suggestedRoots"][0]["root"] == "decision:cidr"
     assert "No matching graph roots" in report["reviewFocus"][0]
+    rendered = render_impact_report_text(report)
+    assert "suggested roots: decision:cidr" in rendered
 
 
 def test_changed_report_roots_drive_impact(tmp_path: Path):
@@ -1044,9 +1048,10 @@ def test_graph_path_no_match_is_reported_without_failure():
     )
 
     assert report["summary"]["status"] == "no-match"
-    assert report["unmatchedRoots"] == [
-        {"role": "source", "kind": "semantic_entity", "key": "missing"}
-    ]
+    assert report["unmatchedRoots"][0]["role"] == "source"
+    assert report["unmatchedRoots"][0]["kind"] == "semantic_entity"
+    assert report["unmatchedRoots"][0]["key"] == "missing"
+    assert report["unmatchedRoots"][0]["suggestedRoots"]
     assert "not found" in report["reviewFocus"][0]
 
 
@@ -1123,9 +1128,10 @@ def test_graph_neighborhood_no_match_is_reported_without_failure():
 
     assert report["summary"]["status"] == "no-match"
     assert report["neighbors"] == []
-    assert report["unmatchedRoots"] == [
-        {"role": "root", "kind": "semantic_entity", "key": "missing"}
-    ]
+    assert report["unmatchedRoots"][0]["role"] == "root"
+    assert report["unmatchedRoots"][0]["kind"] == "semantic_entity"
+    assert report["unmatchedRoots"][0]["key"] == "missing"
+    assert report["unmatchedRoots"][0]["suggestedRoots"]
 
 
 def test_graph_neighbors_cli_writes_report(tmp_path: Path):
