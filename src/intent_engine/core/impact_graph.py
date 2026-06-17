@@ -473,6 +473,13 @@ def build_bundle_graph_report(bundle: Path) -> dict[str, Any]:
             "neighborhoodCommand": (
                 "iac-llm-wrapper graph neighbors --bundle <bundle> --root <kind:key>"
             ),
+            "matrixCommand": ("iac-llm-wrapper graph matrix --bundle <bundle> --root <kind:key>"),
+            "recommendedMatrixCommand": (
+                "iac-llm-wrapper graph matrix --bundle <bundle> --recommended"
+            ),
+            "diffCommand": (
+                "iac-llm-wrapper graph diff --before <bundle-before> --after <bundle-after>"
+            ),
         },
         "catalog": _bundle_graph_catalog(nodes, edges),
         "indexes": _bundle_graph_indexes(nodes, edges),

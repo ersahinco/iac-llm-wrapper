@@ -452,6 +452,9 @@ def test_bundle_graph_report_exports_queryable_nodes_and_edges(tmp_path: Path):
     assert "decision" in report["queryHints"]["rootKinds"]
     assert "graph path" in report["queryHints"]["pathCommand"]
     assert "graph find" in report["queryHints"]["findCommand"]
+    assert "graph matrix" in report["queryHints"]["matrixCommand"]
+    assert "--recommended" in report["queryHints"]["recommendedMatrixCommand"]
+    assert "graph diff" in report["queryHints"]["diffCommand"]
 
 
 def test_graph_roots_report_lists_concrete_traversal_roots(tmp_path: Path):
