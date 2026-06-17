@@ -1063,8 +1063,20 @@ def build_graph_diff_report(before: Path, after: Path) -> dict[str, Any]:
             "edgeRelationshipsAdded": _count_by(added_edges, "relationship"),
             "edgeRelationshipsRemoved": _count_by(removed_edges, "relationship"),
         },
-        "addedNodes": [after_nodes[node_id].to_dict() for node_id in sorted(added_node_ids)],
-        "removedNodes": [before_nodes[node_id].to_dict() for node_id in sorted(removed_node_ids)],
+        "addedNodes": [
+            _graph_diff_node_with_followups(
+                after_nodes[node_id].to_dict(),
+                bundle_placeholder="<bundle-after>",
+            )
+            for node_id in sorted(added_node_ids)
+        ],
+        "removedNodes": [
+            _graph_diff_node_with_followups(
+                before_nodes[node_id].to_dict(),
+                bundle_placeholder="<bundle-before>",
+            )
+            for node_id in sorted(removed_node_ids)
+        ],
         "changedNodes": changed_nodes,
         "addedEdges": added_edges,
         "removedEdges": removed_edges,
@@ -1290,6 +1302,7 @@ def render_graph_diff_text(report: dict[str, Any]) -> str:
                 )
                 suffix = f" ({changed_properties})" if changed_properties else ""
                 lines.append(f"  - {_node_label(after)}{suffix}")
+                lines.extend(_followup_command_lines(_dict(item.get("followUpCommands"))))
         if len(changed_nodes) > 12:
             lines.append(f"  ... {len(changed_nodes) - 12} more")
     else:
@@ -3108,12 +3121,46 @@ def _node_change(before: _ImpactNode, after: _ImpactNode) -> dict[str, Any]:
         if before_dict.get(field) != after_dict.get(field)
     ]
     changed_properties = _changed_value_paths(before_dict, after_dict)
-    return {
+    change = {
         "id": after.id,
         "changedFields": changed_fields,
         "changedProperties": changed_properties,
         "before": before_dict,
         "after": after_dict,
+    }
+    commands = _graph_diff_followup_commands(after_dict, bundle_placeholder="<bundle-after>")
+    if commands:
+        change["followUpCommands"] = commands
+    return change
+
+
+def _graph_diff_node_with_followups(
+    node: dict[str, Any],
+    *,
+    bundle_placeholder: str,
+) -> dict[str, Any]:
+    item = dict(node)
+    commands = _graph_diff_followup_commands(item, bundle_placeholder=bundle_placeholder)
+    if commands:
+        item["followUpCommands"] = commands
+    return item
+
+
+def _graph_diff_followup_commands(
+    node: dict[str, Any],
+    *,
+    bundle_placeholder: str,
+) -> dict[str, str]:
+    kind = str(node.get("kind") or "")
+    key = str(node.get("key") or "")
+    if not kind or not key or kind not in set(_root_kinds()):
+        return {}
+    selector = f"{kind}:{key}"
+    return {
+        "impact": f"iac-llm-wrapper graph impact --bundle {bundle_placeholder} --root {selector}",
+        "neighbors": (
+            f"iac-llm-wrapper graph neighbors --bundle {bundle_placeholder} --root {selector}"
+        ),
     }
 
 
@@ -4119,9 +4166,23 @@ def _node_list_lines(nodes: list[Any]) -> list[str]:
     for node in nodes[:12]:
         if isinstance(node, dict):
             lines.append(f"  - {_node_label(node)}")
+            lines.extend(_followup_command_lines(_dict(node.get("followUpCommands"))))
     if len(nodes) > 12:
         lines.append(f"  ... {len(nodes) - 12} more")
     return lines or ["  - None"]
+
+
+def _followup_command_lines(commands: dict[str, Any]) -> list[str]:
+    if not commands:
+        return []
+    lines: list[str] = []
+    impact = str(commands.get("impact") or "")
+    neighbors = str(commands.get("neighbors") or "")
+    if impact:
+        lines.append(f"    impact: {impact}")
+    if neighbors:
+        lines.append(f"    neighbors: {neighbors}")
+    return lines
 
 
 def _dependency_path_lines(paths: list[Any]) -> list[str]:

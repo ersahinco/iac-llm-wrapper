@@ -1445,6 +1445,12 @@ def test_graph_diff_reports_changed_decision_and_module_nodes(tmp_path: Path):
     decision_change = next(item for item in report["changedNodes"] if item["id"] == "decision:cidr")
     decision_paths = {item["path"] for item in decision_change["changedProperties"]}
     assert "properties.value" in decision_paths
+    assert decision_change["followUpCommands"]["impact"].endswith(
+        "--bundle <bundle-after> --root decision:cidr"
+    )
+    assert decision_change["followUpCommands"]["neighbors"].endswith(
+        "--bundle <bundle-after> --root decision:cidr"
+    )
     artifact_change = next(
         item for item in report["changedNodes"] if item["id"] == "artifact:module-inputs.yaml"
     )
@@ -1469,6 +1475,8 @@ def test_graph_diff_reports_changed_decision_and_module_nodes(tmp_path: Path):
     assert "properties:" in rendered
     assert "decision:cidr" in rendered
     assert "properties.value" in rendered
+    assert "graph impact --bundle <bundle-after> --root decision:cidr" in rendered
+    assert "graph neighbors --bundle <bundle-after> --root decision:cidr" in rendered
     graph_roots = changed_graph_diff_roots(report, kinds=["artifact", "module_variable"])
     assert ImpactRoot(kind="artifact", key="module-inputs.yaml") in graph_roots
     assert ImpactRoot(kind="module_variable", key="cidr") in graph_roots
@@ -1526,6 +1534,14 @@ def test_graph_diff_reports_added_shift_left_evidence_nodes(tmp_path: Path):
     assert "checkov_finding:CKV_CUSTOM_VPC_001|module.vpc|/main.tf" in added_ids
     assert report["summary"]["nodeKindsAdded"]["checkov_finding"] == 2
     assert report["summary"]["edgeAddedCount"] >= 1
+    evidence_node = next(
+        item
+        for item in report["addedNodes"]
+        if item["id"] == "shift_left_evidence:shift-left-evidence.yaml"
+    )
+    assert evidence_node["followUpCommands"]["impact"].endswith(
+        "--bundle <bundle-after> --root shift_left_evidence:shift-left-evidence.yaml"
+    )
 
 
 def test_graph_diff_cli_writes_report(tmp_path: Path):
@@ -1551,6 +1567,7 @@ def test_graph_diff_cli_writes_report(tmp_path: Path):
 
     assert result.exit_code == 0, result.output
     assert "Graph Diff" in result.output
+    assert "graph impact --bundle <bundle-after> --root decision:cidr" in result.output
     report = _yaml_load(output)
     assert report["schemaVersion"] == "intent-engine/graph-diff/v1"
     assert report["summary"]["status"] == "changed"
