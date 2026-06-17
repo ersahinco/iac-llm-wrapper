@@ -98,6 +98,7 @@ def test_compare_handoff_bundles_reports_blocker_and_sample_deltas(tmp_path: Pat
     assert "Graph diff" in html
     assert "Impact matrix" in html
     assert "Review priority severity" in html
+    assert "follow-up queries" in html
     assert "Affected target contracts" in html
     assert "Affected target capabilities" in html
     assert "Affected samples" in html

@@ -571,6 +571,17 @@ def _impact_matrix_summaries(impact_matrix: dict[str, Any]) -> list[str]:
             if category:
                 line += f", category={category}"
             line += f", reason={reason}"
+        commands = _dict(row.get("rootCommands"))
+        command_parts = [
+            f"{name}={command}"
+            for name, command in (
+                ("impact", str(commands.get("impact") or "")),
+                ("neighbors", str(commands.get("neighbors") or "")),
+            )
+            if command
+        ]
+        if command_parts:
+            line += ", follow-up queries: " + "; ".join(command_parts)
         summaries.append(line)
     return summaries
 

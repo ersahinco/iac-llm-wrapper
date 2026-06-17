@@ -1602,6 +1602,8 @@ def test_bundle_compare_includes_impact_traversal(tmp_path: Path):
     assert "decision:cidr: status=matched" in rendered
     assert "category=decision-deltas" in rendered
     assert "reason=Accepted decision was changed between compared bundles." in rendered
+    assert "follow-up queries: impact=iac-llm-wrapper graph impact" in rendered
+    assert "neighbors=iac-llm-wrapper graph neighbors" in rendered
     assert "artifact:module-inputs.yaml: status=matched" in rendered
     assert "category=graph-diff-roots" in rendered
     assert "reason=Graph node changed between compared bundles: properties." in rendered
