@@ -13,11 +13,31 @@ from .impact_graph import (
     build_impact_matrix_report,
     build_impact_report,
     changed_decision_roots,
+    changed_graph_diff_root_reasons,
     changed_graph_diff_roots,
     changed_report_roots,
 )
 from .sample_config import SampleConfig
 from .yaml_utils import read_yaml_mapping, write_yaml_artifact
+
+COMPARE_GRAPH_DIFF_ROOT_KINDS = [
+    "artifact",
+    "policy_control",
+    "module_variable",
+    "target_contract",
+    "target_capability",
+    "manual_gate",
+    "handoff_readiness",
+    "contract_validation",
+    "contract_result",
+    "validation_violation",
+    "downstream_validation_evidence",
+    "semantic_entity",
+    "semantic_constraint",
+    "shift_left_evidence",
+    "checkov_finding",
+    "scan_file",
+]
 
 
 @dataclass(frozen=True)
@@ -60,25 +80,16 @@ def compare_handoff_bundles(before_dir: Path, after_dir: Path) -> dict[str, Any]
     changed_roots = changed_decision_roots({"decisionDelta": decision_delta})
     graph_diff_roots = changed_graph_diff_roots(
         graph_diff,
-        kinds=[
-            "artifact",
-            "policy_control",
-            "module_variable",
-            "target_contract",
-            "target_capability",
-            "manual_gate",
-            "handoff_readiness",
-            "contract_validation",
-            "contract_result",
-            "validation_violation",
-            "downstream_validation_evidence",
-            "semantic_entity",
-            "semantic_constraint",
-            "shift_left_evidence",
-            "checkov_finding",
-            "scan_file",
-        ],
+        kinds=COMPARE_GRAPH_DIFF_ROOT_KINDS,
     )
+    root_reasons = {
+        **_changed_report_root_reasons(after.path, input_diff_report),
+        **changed_graph_diff_root_reasons(
+            graph_diff,
+            kinds=COMPARE_GRAPH_DIFF_ROOT_KINDS,
+        ),
+        **_changed_decision_root_reasons(decision_delta),
+    }
     impact_roots = [
         *changed_roots,
         *graph_diff_roots,
@@ -92,7 +103,12 @@ def compare_handoff_bundles(before_dir: Path, after_dir: Path) -> dict[str, Any]
         roots=impact_roots,
         changed_report=input_diff_report,
     )
-    impact_matrix = build_impact_matrix_report(after.path, roots=matrix_roots)
+    impact_matrix = build_impact_matrix_report(
+        after.path,
+        roots=matrix_roots,
+        root_reasons=root_reasons,
+        root_source="bundle-compare",
+    )
     review_focus = _review_focus(
         decision_delta=decision_delta,
         requirement_delta=requirement_delta,
@@ -801,6 +817,33 @@ def _model_delta(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any
         if before.get(key, "unknown") != after.get(key, "unknown")
     ]
     return {"before": before, "after": after, "changed": changed}
+
+
+def _changed_decision_root_reasons(decision_delta: dict[str, Any]) -> dict[str, str]:
+    reasons: dict[str, str] = {}
+    for section, action in (
+        ("added", "added"),
+        ("changed", "changed"),
+        ("removed", "removed"),
+    ):
+        for item in _coerce_list(decision_delta.get(section)):
+            if isinstance(item, dict) and item.get("key"):
+                reasons[f"decision:{item['key']}"] = (
+                    f"Accepted decision was {action} between compared bundles."
+                )
+    return reasons
+
+
+def _changed_report_root_reasons(
+    after_path: Path,
+    input_diff_report: Path | None,
+) -> dict[str, str]:
+    return {
+        f"{root.kind}:{root.key}": (
+            "Input diff report identified this requirement as changed or likely impacted."
+        )
+        for root in changed_report_roots(after_path, input_diff_report)
+    }
 
 
 def _input_delta(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:

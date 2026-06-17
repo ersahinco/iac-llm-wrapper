@@ -841,9 +841,29 @@ def changed_graph_diff_roots(
 ) -> list[ImpactRoot]:
     """Return root-selectable nodes that changed or were added in a graph diff."""
 
+    return [root for root, _reason in _changed_graph_diff_root_entries(graph_diff_report, kinds)]
+
+
+def changed_graph_diff_root_reasons(
+    graph_diff_report: dict[str, Any],
+    *,
+    kinds: list[str] | None = None,
+) -> dict[str, str]:
+    """Return reason text for root-selectable graph-diff nodes."""
+
+    return {
+        f"{root.kind}:{root.key}": reason
+        for root, reason in _changed_graph_diff_root_entries(graph_diff_report, kinds)
+    }
+
+
+def _changed_graph_diff_root_entries(
+    graph_diff_report: dict[str, Any],
+    kinds: list[str] | None,
+) -> list[tuple[ImpactRoot, str]]:
     root_kinds = set(_root_kinds())
     kind_filter = {item for item in kinds or [] if item}
-    roots: list[ImpactRoot] = []
+    roots: list[tuple[ImpactRoot, str]] = []
     for section in ("changedNodes", "addedNodes"):
         for item in _coerce_list(graph_diff_report.get(section)):
             node = _dict(item.get("after")) if section == "changedNodes" else _dict(item)
@@ -853,8 +873,27 @@ def changed_graph_diff_roots(
                 continue
             if kind_filter and kind not in kind_filter:
                 continue
-            roots.append(ImpactRoot(kind=kind, key=key))
-    return _dedupe_roots(roots)
+            root = ImpactRoot(kind=kind, key=key)
+            roots.append((root, _graph_diff_root_reason(section, item)))
+    deduped: list[tuple[ImpactRoot, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for root, reason in roots:
+        root_key = (root.kind, root.key)
+        if root_key in seen:
+            continue
+        seen.add(root_key)
+        deduped.append((root, reason))
+    return deduped
+
+
+def _graph_diff_root_reason(section: str, item: Any) -> str:
+    if section == "addedNodes":
+        return "Graph node was added between compared bundles."
+    changed_fields = ", ".join(
+        str(field) for field in _coerce_list(_dict(item).get("changedFields"))
+    )
+    suffix = f": {changed_fields}" if changed_fields else ""
+    return f"Graph node changed between compared bundles{suffix}."
 
 
 def build_graph_diff_report(before: Path, after: Path) -> dict[str, Any]:

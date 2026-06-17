@@ -23,6 +23,7 @@ from intent_engine.core.impact_graph import (
     build_path_report,
     build_recommended_impact_matrix_report,
     build_roots_report,
+    changed_graph_diff_root_reasons,
     changed_graph_diff_roots,
     render_find_report_text,
     render_graph_diff_text,
@@ -1164,6 +1165,13 @@ def test_graph_diff_reports_changed_decision_and_module_nodes(tmp_path: Path):
     assert ImpactRoot(kind="artifact", key="module-inputs.yaml") in graph_roots
     assert ImpactRoot(kind="module_variable", key="cidr") in graph_roots
     assert ImpactRoot(kind="decision", key="cidr") not in graph_roots
+    graph_root_reasons = changed_graph_diff_root_reasons(
+        report,
+        kinds=["artifact", "module_variable"],
+    )
+    assert graph_root_reasons["artifact:module-inputs.yaml"] == (
+        "Graph node changed between compared bundles: properties."
+    )
 
 
 def test_graph_diff_reports_added_shift_left_evidence_nodes(tmp_path: Path):
@@ -1230,11 +1238,17 @@ def test_bundle_compare_includes_impact_traversal(tmp_path: Path):
     assert "affected artifacts: decision-report.yaml" in rendered
     matrix = report["impactMatrix"]
     assert matrix["schemaVersion"] == "intent-engine/graph-impact-matrix/v1"
+    assert matrix["summary"]["rootSource"] == "bundle-compare"
     assert matrix["summary"]["matchedRootCount"] >= 3
     matrix_roots = {row["root"]["id"] for row in matrix["rows"]}
     assert "decision:cidr" in matrix_roots
     assert "artifact:module-inputs.yaml" in matrix_roots
     assert "module_variable:cidr" in matrix_roots
+    reasons = {row["root"]["id"]: row.get("recommendationReason") for row in matrix["rows"]}
+    assert reasons["decision:cidr"] == "Accepted decision was changed between compared bundles."
+    assert reasons["artifact:module-inputs.yaml"] == (
+        "Graph node changed between compared bundles: properties."
+    )
     assert "Impact matrix:" in rendered
     assert "decision:cidr: status=matched" in rendered
     assert "artifact:module-inputs.yaml: status=matched" in rendered
@@ -1272,6 +1286,9 @@ def test_bundle_compare_matrix_includes_input_diff_roots(tmp_path: Path):
         item
         for item in report["impactMatrix"]["rows"]
         if item["root"]["id"] == "decision:enable_dns_hostnames"
+    )
+    assert row["recommendationReason"] == (
+        "Input diff report identified this requirement as changed or likely impacted."
     )
     assert row["upstreamSourceChanges"] == ["likely-impacted:enable_dns_hostnames"]
     assert report["impactMatrix"]["upstreamSourceChanges"] == [
