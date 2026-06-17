@@ -3322,6 +3322,13 @@ def _impact_review_checklist(
         }
         if node_kind:
             entry["targetRootKind"] = node_kind
+            representative_paths = _representative_paths_for_items(
+                impact_paths,
+                node_kind=node_kind,
+                items=items,
+            )
+            if representative_paths:
+                entry["representativePaths"] = representative_paths
             entry["pathQueries"] = [
                 f"iac-llm-wrapper graph path --bundle <bundle> --from {root_id} "
                 f"--to {node_kind}:{item}"
@@ -3347,6 +3354,38 @@ def _impact_review_checklist(
             }
         )
     return checklist
+
+
+def _representative_paths_for_items(
+    impact_paths: list[dict[str, Any]],
+    *,
+    node_kind: str,
+    items: list[str],
+    limit: int = 3,
+) -> list[dict[str, Any]]:
+    item_set = set(items)
+    paths: list[dict[str, Any]] = []
+    for path in impact_paths:
+        if not isinstance(path, dict):
+            continue
+        target = _dict(path.get("target"))
+        if target.get("kind") != node_kind or str(target.get("key") or "") not in item_set:
+            continue
+        paths.append(
+            {
+                "target": target.get("id"),
+                "hopCount": len(_coerce_list(path.get("hops"))),
+                "relationships": [
+                    str(_dict(hop).get("relationship") or "")
+                    for hop in _coerce_list(path.get("hops"))
+                    if _dict(hop).get("relationship")
+                ],
+                "path": _path_summary(path),
+            }
+        )
+        if len(paths) >= limit:
+            break
+    return paths
 
 
 def _review_category_node_kind(category: str) -> str:
@@ -3654,18 +3693,7 @@ def _dependency_path_lines(paths: list[Any]) -> list[str]:
         if not isinstance(path, dict):
             continue
         root = _dict(path.get("root"))
-        hops = _coerce_list(path.get("hops"))
-        rendered_hops = []
-        for hop in hops:
-            if not isinstance(hop, dict):
-                continue
-            source = _dict(hop.get("from"))
-            destination = _dict(hop.get("to"))
-            rendered_hops.append(
-                f"{source.get('id', '')} --{hop.get('relationship', '')}--> "
-                f"{destination.get('id', '')}{_relationship_description_suffix(hop)}"
-            )
-        lines.append(f"  - {root.get('id', 'unknown')}: " + " | ".join(rendered_hops))
+        lines.append(f"  - {root.get('id', 'unknown')}: " + _path_summary(path))
     if len(paths) > 8:
         lines.append(f"  ... {len(paths) - 8} more")
     return lines or ["  - None"]
@@ -3679,21 +3707,25 @@ def _path_lines(paths: list[Any]) -> list[str]:
         if not isinstance(path, dict):
             continue
         target = _dict(path.get("target"))
-        hops = _coerce_list(path.get("hops"))
-        rendered_hops = []
-        for hop in hops:
-            if not isinstance(hop, dict):
-                continue
-            source = _dict(hop.get("from"))
-            destination = _dict(hop.get("to"))
-            rendered_hops.append(
-                f"{source.get('id', '')} --{hop.get('relationship', '')}--> "
-                f"{destination.get('id', '')}{_relationship_description_suffix(hop)}"
-            )
-        lines.append(f"  - {target.get('id', 'unknown')}: " + " | ".join(rendered_hops))
+        lines.append(f"  - {target.get('id', 'unknown')}: " + _path_summary(path))
     if len(paths) > 8:
         lines.append(f"  ... {len(paths) - 8} more")
     return lines or ["  - None"]
+
+
+def _path_summary(path: dict[str, Any]) -> str:
+    hops = _coerce_list(path.get("hops"))
+    rendered_hops = []
+    for hop in hops:
+        if not isinstance(hop, dict):
+            continue
+        source = _dict(hop.get("from"))
+        destination = _dict(hop.get("to"))
+        rendered_hops.append(
+            f"{source.get('id', '')} --{hop.get('relationship', '')}--> "
+            f"{destination.get('id', '')}{_relationship_description_suffix(hop)}"
+        )
+    return " | ".join(rendered_hops)
 
 
 def _coerce_list(value: Any) -> list[Any]:

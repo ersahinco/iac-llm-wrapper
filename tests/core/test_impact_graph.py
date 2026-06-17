@@ -152,6 +152,17 @@ def test_decision_impact_traverses_contract_module_and_policy_edges(tmp_path: Pa
         "iac-llm-wrapper graph path --bundle <bundle> --from decision:cidr "
         "--to policy_control:VPC-NETWORK-001"
     ) in policy_step["pathQueries"]
+    network_preview = next(
+        item
+        for item in policy_step["representativePaths"]
+        if item["target"] == "policy_control:VPC-NETWORK-001"
+    )
+    assert network_preview["hopCount"] == 1
+    assert network_preview["relationships"] == ["mapped-to-control"]
+    assert (
+        "decision:cidr --mapped-to-control--> policy_control:VPC-NETWORK-001"
+        in network_preview["path"]
+    )
     assert report["summary"]["reviewChecklistCount"] == len(report["reviewChecklist"])
     assert report["summary"]["upstreamDependencyPathCount"] == len(report["dependencyPaths"])
     source_dependency_path = next(
