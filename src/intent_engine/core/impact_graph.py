@@ -368,6 +368,10 @@ def build_impact_report(
             "downstreamImpactCount": len(downstream),
             "upstreamDependencyCount": len(upstream),
             "upstreamDependencyPathCount": len(dependency_paths),
+            "selectedRootKindCounts": _node_kind_counts(root_nodes),
+            "downstreamImpactKindCounts": _node_kind_counts(downstream_nodes),
+            "upstreamDependencyKindCounts": _node_kind_counts(upstream_nodes),
+            "affectedNodeKindCounts": _node_kind_counts(affected_nodes),
             "affectedArtifactCount": len(affected_artifacts),
             "affectedTargetContractCount": len(affected_target_contracts),
             "affectedTargetCapabilityCount": len(affected_target_capabilities),
@@ -1383,6 +1387,19 @@ def render_impact_report_text(report: dict[str, Any]) -> str:
             f"Downstream impacts: {summary.get('downstreamImpactCount', 0)}",
             f"Upstream dependencies: {summary.get('upstreamDependencyCount', 0)}",
             f"Review severity: {_priority_severity_summary(summary)}",
+            "",
+            "Selected root kinds:",
+        ]
+    )
+    lines.extend(_count_lines(_dict(summary.get("selectedRootKindCounts"))))
+    lines.append("Downstream impact kinds:")
+    lines.extend(_count_lines(_dict(summary.get("downstreamImpactKindCounts"))))
+    lines.append("Upstream dependency kinds:")
+    lines.extend(_count_lines(_dict(summary.get("upstreamDependencyKindCounts"))))
+    lines.append("Affected node kinds:")
+    lines.extend(_count_lines(_dict(summary.get("affectedNodeKindCounts"))))
+    lines.extend(
+        [
             "",
             "Review priorities:",
         ]
@@ -2461,6 +2478,13 @@ def _walk(roots: list[str], adjacency: dict[str, list[str]]) -> set[str]:
 
 def _sorted_nodes(graph: _ImpactGraph, ids: set[str]) -> list[_ImpactNode]:
     return [graph.nodes[node_id] for node_id in sorted(ids) if node_id in graph.nodes]
+
+
+def _node_kind_counts(nodes: list[_ImpactNode]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for node in nodes:
+        counts[node.kind] = counts.get(node.kind, 0) + 1
+    return {kind: counts[kind] for kind in sorted(counts)}
 
 
 def _keys_by_kind(nodes: list[_ImpactNode], kind: str) -> list[str]:
@@ -3657,6 +3681,12 @@ def _list_or_none(items: list[Any]) -> list[str]:
     if not items:
         return ["  - None"]
     return [f"  - {item}" for item in items]
+
+
+def _count_lines(counts: dict[str, Any]) -> list[str]:
+    if not counts:
+        return ["  - None"]
+    return [f"  - {key}: {counts[key]}" for key in sorted(counts)]
 
 
 def _unmatched_root_lines(items: list[Any], *, include_role: bool = False) -> list[str]:

@@ -142,6 +142,11 @@ def test_decision_impact_traverses_contract_module_and_policy_edges(tmp_path: Pa
     assert "VPC-ATTACHMENT-001" in report["affectedPolicyControls"]
     assert "CKV_CUSTOM_VPC_001" in report["affectedChecks"]
     assert "CKV_CUSTOM_VPC_ATTACHMENT_001" in report["affectedChecks"]
+    assert report["summary"]["selectedRootKindCounts"] == {"decision": 1}
+    assert report["summary"]["downstreamImpactKindCounts"]["artifact"] >= 2
+    assert report["summary"]["upstreamDependencyKindCounts"]["source_context"] >= 1
+    assert report["summary"]["affectedNodeKindCounts"]["decision"] == 1
+    assert report["summary"]["affectedNodeKindCounts"]["policy_control"] >= 2
     checklist_categories = [item["category"] for item in report["reviewChecklist"]]
     assert checklist_categories[:2] == ["target-contracts", "policy-controls"]
     policy_step = next(
@@ -186,6 +191,10 @@ def test_decision_impact_traverses_contract_module_and_policy_edges(tmp_path: Pa
     rendered = render_impact_report_text(report)
     assert "Impact Analysis" in rendered
     assert "Review checklist:" in rendered
+    assert "Selected root kinds:" in rendered
+    assert "Downstream impact kinds:" in rendered
+    assert "Upstream dependency kinds:" in rendered
+    assert "Affected node kinds:" in rendered
     assert "Dependency paths:" in rendered
     assert "Affected target contracts:" in rendered
     assert "Impact paths:" in rendered
