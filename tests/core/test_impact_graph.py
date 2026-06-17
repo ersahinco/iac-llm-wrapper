@@ -9,7 +9,11 @@ import ruamel.yaml
 from typer.testing import CliRunner
 
 from intent_engine.cli import app
-from intent_engine.core.bundle_compare import compare_handoff_bundles, render_bundle_comparison_text
+from intent_engine.core.bundle_compare import (
+    compare_handoff_bundles,
+    render_bundle_comparison_html,
+    render_bundle_comparison_text,
+)
 from intent_engine.core.compiler import compile_from_interview
 from intent_engine.core.contract_validation import write_contract_validation
 from intent_engine.core.impact_graph import (
@@ -1251,7 +1255,12 @@ def test_bundle_compare_includes_impact_traversal(tmp_path: Path):
     )
     assert "Impact matrix:" in rendered
     assert "decision:cidr: status=matched" in rendered
+    assert "reason=Accepted decision was changed between compared bundles." in rendered
     assert "artifact:module-inputs.yaml: status=matched" in rendered
+    assert "reason=Graph node changed between compared bundles: properties." in rendered
+    html = render_bundle_comparison_html(report)
+    assert "reason=Accepted decision was changed between compared bundles." in html
+    assert "reason=Graph node changed between compared bundles: properties." in html
     graph_diff = report["graphDiff"]
     assert graph_diff["summary"]["status"] == "changed"
     assert graph_diff["summary"]["nodeChangedCount"] >= 2

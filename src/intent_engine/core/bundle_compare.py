@@ -536,7 +536,7 @@ def _impact_matrix_summaries(impact_matrix: dict[str, Any]) -> list[str]:
             continue
         root = _dict(row.get("root"))
         summary = _dict(row.get("summary"))
-        summaries.append(
+        line = (
             f"{root.get('id', 'unknown')}: "
             f"status={summary.get('status', 'unknown')}, "
             f"severity={summary.get('highestReviewPrioritySeverity', 'none')}, "
@@ -549,6 +549,10 @@ def _impact_matrix_summaries(impact_matrix: dict[str, Any]) -> list[str]:
             f"gates={summary.get('manualGateCount', 0)}, "
             f"sourceChanges={summary.get('upstreamSourceChangeCount', 0)}"
         )
+        reason = str(row.get("recommendationReason") or "")
+        if reason:
+            line += f", reason={reason}"
+        summaries.append(line)
     return summaries
 
 
