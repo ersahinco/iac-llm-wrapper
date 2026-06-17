@@ -306,6 +306,8 @@ def test_graph_impact_matrix_compares_multiple_roots(tmp_path: Path):
     assert "terraform-aws-vpc-module" in report["affectedTargetContracts"]
     assert "VPC-NETWORK-001" in report["affectedPolicyControls"]
     assert "CKV_CUSTOM_VPC_001" in report["affectedChecks"]
+    assert "cidr" in report["affectedModuleVariables"]
+    assert report["summary"]["affectedModuleVariableCount"] >= 1
     statuses = {row["root"]["id"]: row["summary"]["status"] for row in report["rows"]}
     assert statuses["decision:cidr"] == "matched"
     assert statuses["policy_control:VPC-NETWORK-001"] == "matched"
@@ -320,6 +322,8 @@ def test_graph_impact_matrix_compares_multiple_roots(tmp_path: Path):
     assert "target-contracts:" in rendered
     assert "Upstream dependency kinds:" in rendered
     assert "source_context:" in rendered
+    assert "Affected module variables:" in rendered
+    assert "cidr" in rendered
     assert "decision:cidr" in rendered
     assert "policy_control:VPC-NETWORK-001" in rendered
     assert "decision:missing" in rendered
@@ -930,6 +934,27 @@ def test_policy_control_impact_reports_shift_left_findings(tmp_path: Path):
     assert "Review severity: highest=high" in rendered
     assert "Affected Checkov findings:" in rendered
     assert finding_key in rendered
+
+
+def test_graph_impact_matrix_rolls_up_shift_left_findings(tmp_path: Path):
+    bundle = _terraform_vpc_bundle_with_checkov_evidence(tmp_path / "bundle")
+
+    report = build_impact_matrix_report(
+        bundle,
+        roots=[ImpactRoot(kind="policy_control", key="VPC-NETWORK-001")],
+    )
+
+    finding_key = "CKV_CUSTOM_VPC_001|module.vpc|/main.tf"
+    unmapped_key = "CKV_OTHER|module.other|/other.tf"
+    assert report["summary"]["status"] == "matched"
+    assert report["summary"]["affectedCheckovFindingCount"] == 2
+    assert finding_key in report["affectedCheckovFindings"]
+    assert unmapped_key in report["affectedCheckovFindings"]
+    rendered = render_impact_matrix_text(report)
+    assert "Affected Checkov findings:" in rendered
+    assert finding_key in rendered
+    assert unmapped_key in rendered
+    assert "findings=2" in rendered
 
 
 def test_graph_impact_cli_accepts_generic_typed_root_for_checkov_finding(tmp_path: Path):

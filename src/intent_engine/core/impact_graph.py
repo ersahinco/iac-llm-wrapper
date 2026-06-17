@@ -759,6 +759,8 @@ def build_impact_matrix_report(
     affected_samples = _matrix_union(rows, "affectedSamples")
     affected_controls = _matrix_union(rows, "affectedPolicyControls")
     affected_checks = _matrix_union(rows, "affectedChecks")
+    affected_findings = _matrix_union(rows, "affectedCheckovFindings")
+    affected_variables = _matrix_union(rows, "affectedModuleVariables")
     affected_gates = _matrix_union(rows, "manualGates")
     upstream_source_changes = _matrix_union(rows, "upstreamSourceChanges")
     upstream_input_diffs = _matrix_union(rows, "upstreamInputDiffs")
@@ -783,6 +785,8 @@ def build_impact_matrix_report(
             "affectedSampleCount": len(affected_samples),
             "affectedPolicyControlCount": len(affected_controls),
             "affectedCheckCount": len(affected_checks),
+            "affectedCheckovFindingCount": len(affected_findings),
+            "affectedModuleVariableCount": len(affected_variables),
             "manualGateCount": len(affected_gates),
             "upstreamSourceChangeCount": len(upstream_source_changes),
             "upstreamInputDiffCount": len(upstream_input_diffs),
@@ -797,6 +801,8 @@ def build_impact_matrix_report(
         "affectedSamples": affected_samples,
         "affectedPolicyControls": affected_controls,
         "affectedChecks": affected_checks,
+        "affectedCheckovFindings": affected_findings,
+        "affectedModuleVariables": affected_variables,
         "manualGates": affected_gates,
         "upstreamSourceChanges": upstream_source_changes,
         "upstreamInputDiffs": upstream_input_diffs,
@@ -1188,6 +1194,8 @@ def render_impact_matrix_text(report: dict[str, Any]) -> str:
                 f"samples={summary_block.get('affectedSampleCount', 0)} "
                 f"controls={summary_block.get('affectedPolicyControlCount', 0)} "
                 f"checks={summary_block.get('affectedCheckCount', 0)} "
+                f"findings={summary_block.get('affectedCheckovFindingCount', 0)} "
+                f"moduleVars={summary_block.get('affectedModuleVariableCount', 0)} "
                 f"gates={summary_block.get('manualGateCount', 0)} "
                 f"sourceChanges={summary_block.get('upstreamSourceChangeCount', 0)}"
             )
@@ -1208,6 +1216,10 @@ def render_impact_matrix_text(report: dict[str, Any]) -> str:
     lines.extend(_list_or_none(_coerce_list(report.get("affectedPolicyControls"))))
     lines.append("Affected checks:")
     lines.extend(_list_or_none(_coerce_list(report.get("affectedChecks"))))
+    lines.append("Affected Checkov findings:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedCheckovFindings"))))
+    lines.append("Affected module variables:")
+    lines.extend(_list_or_none(_coerce_list(report.get("affectedModuleVariables"))))
     lines.append("Manual gates:")
     lines.extend(_list_or_none(_coerce_list(report.get("manualGates"))))
     lines.append("Review checklist categories:")
