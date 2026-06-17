@@ -854,6 +854,9 @@ def test_graph_find_reports_matching_candidate_roots():
     assert report["schemaVersion"] == "intent-engine/graph-find/v1"
     assert report["summary"]["status"] == "matched"
     assert report["summary"]["matchCount"] == 1
+    assert report["summary"]["rootSelectableCount"] == 1
+    assert report["summary"]["nonRootSelectableCount"] == 0
+    assert report["summary"]["matchedFieldCounts"]["label"] == 1
     assert report["matches"][0]["node"]["id"] == "semantic_entity:control:security-hub"
     assert "label" in report["matches"][0]["matchedFields"]
     assert report["matches"][0]["root"]["root"] == "semantic_entity:control:security-hub"
@@ -865,6 +868,9 @@ def test_graph_find_reports_matching_candidate_roots():
     )
     rendered = render_find_report_text(report)
     assert "Graph Find" in rendered
+    assert "Root-selectable matches: 1" in rendered
+    assert "Context-only matches: 0" in rendered
+    assert "Matched fields:" in rendered
     assert "semantic_entity:control:security-hub" in rendered
     assert "root=semantic_entity:control:security-hub" in rendered
 

@@ -669,6 +669,7 @@ def build_find_report(
     )
     limited_matches = matches[: max(limit, 0)]
     status = "matched" if limited_matches else "no-match"
+    root_selectable_count = sum(1 for match in limited_matches if match.get("root"))
     return {
         "schemaVersion": "intent-engine/graph-find/v1",
         "bundle": str(bundle),
@@ -682,6 +683,9 @@ def build_find_report(
             "returnedCount": len(limited_matches),
             "limit": max(limit, 0),
             "nodeKinds": _count_by([_dict(match.get("node")) for match in limited_matches], "kind"),
+            "matchedFieldCounts": _matched_field_counts(limited_matches),
+            "rootSelectableCount": root_selectable_count,
+            "nonRootSelectableCount": len(limited_matches) - root_selectable_count,
         },
         "matches": limited_matches,
         "reviewFocus": _find_review_focus(
@@ -1125,9 +1129,14 @@ def render_find_report_text(report: dict[str, Any]) -> str:
         f"Bundle: {report.get('bundle', '')}",
         "",
         f"Matches: {summary.get('returnedCount', 0)} of {summary.get('matchCount', 0)}",
+        f"Root-selectable matches: {summary.get('rootSelectableCount', 0)}",
+        f"Context-only matches: {summary.get('nonRootSelectableCount', 0)}",
         "Node kinds:",
     ]
     for key, count in sorted(_dict(summary.get("nodeKinds")).items()):
+        lines.append(f"  - {key}: {count}")
+    lines.append("Matched fields:")
+    for key, count in sorted(_dict(summary.get("matchedFieldCounts")).items()):
         lines.append(f"  - {key}: {count}")
     lines.append("Results:")
     matches = _coerce_list(report.get("matches"))
@@ -2907,6 +2916,16 @@ def _find_match(node: _ImpactNode, query_tokens: list[str]) -> dict[str, Any] | 
     else:
         match["rootSelectable"] = False
     return match
+
+
+def _matched_field_counts(matches: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for match in matches:
+        for matched_field in _coerce_list(match.get("matchedFields")):
+            key = str(matched_field)
+            if key:
+                counts[key] = counts.get(key, 0) + 1
+    return {field: counts[field] for field in sorted(counts)}
 
 
 def _node_search_fields(node: _ImpactNode) -> dict[str, str]:
