@@ -1336,8 +1336,15 @@ def test_graph_diff_reports_changed_decision_and_module_nodes(tmp_path: Path):
         != artifact_change["after"]["properties"]["sha256"]
     )
     assert report["summary"]["nodeChangedCount"] >= 2
+    assert report["summary"]["changedNodeKinds"]["decision"] >= 1
+    assert report["summary"]["changedNodeKinds"]["module_variable"] >= 1
+    assert report["summary"]["changedNodeFields"]["properties"] >= 1
     rendered = render_graph_diff_text(report)
     assert "Graph Diff" in rendered
+    assert "Changed node kinds:" in rendered
+    assert "decision:" in rendered
+    assert "Changed fields:" in rendered
+    assert "properties:" in rendered
     assert "decision:cidr" in rendered
     assert "properties.value" in rendered
     graph_roots = changed_graph_diff_roots(report, kinds=["artifact", "module_variable"])
@@ -1351,6 +1358,39 @@ def test_graph_diff_reports_changed_decision_and_module_nodes(tmp_path: Path):
     assert graph_root_reasons["artifact:module-inputs.yaml"] == (
         "Graph node changed between compared bundles: properties.sha256."
     )
+
+
+def test_graph_diff_rolls_up_added_edge_relationships(tmp_path: Path):
+    before = tmp_path / "before"
+    after = tmp_path / "after"
+    _compile_terraform_vpc_bundle(before, cidr="10.30.0.0/16")
+    _compile_terraform_vpc_bundle(after, cidr="10.30.0.0/16")
+    (after / "input-diff-report.yaml").write_text(
+        "\n".join(
+            [
+                "schemaVersion: intent-engine/input-diff/v1",
+                "source:",
+                "  mode: document-diff",
+                "  baselineDocumentAvailable: true",
+                "changedStructuredDecisionLines:",
+                "  - key: cidr",
+                "    before: 10.30.0.0/16",
+                "    after: 10.31.0.0/16",
+            ]
+        )
+        + "\n"
+    )
+
+    report = build_graph_diff_report(before, after)
+
+    assert report["summary"]["nodeKindsAdded"]["input_diff"] == 1
+    assert report["summary"]["nodeKindsAdded"]["source_change"] == 1
+    assert report["summary"]["edgeRelationshipsAdded"]["contains-source-change"] == 1
+    assert report["summary"]["edgeRelationshipsAdded"]["changes-decision"] == 1
+    rendered = render_graph_diff_text(report)
+    assert "Added edge relationships:" in rendered
+    assert "contains-source-change: 1" in rendered
+    assert "changes-decision: 1" in rendered
 
 
 def test_graph_diff_reports_added_shift_left_evidence_nodes(tmp_path: Path):

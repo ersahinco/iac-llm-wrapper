@@ -1003,12 +1003,16 @@ def build_graph_diff_report(before: Path, after: Path) -> dict[str, Any]:
             "edgeAddedCount": len(added_edges),
             "edgeRemovedCount": len(removed_edges),
             "changedPropertyPaths": _changed_property_paths(changed_nodes),
+            "changedNodeKinds": _changed_node_kind_counts(changed_nodes),
+            "changedNodeFields": _changed_node_field_counts(changed_nodes),
             "nodeKindsAdded": _count_by(
                 [after_nodes[node_id].to_dict() for node_id in added_node_ids], "kind"
             ),
             "nodeKindsRemoved": _count_by(
                 [before_nodes[node_id].to_dict() for node_id in removed_node_ids], "kind"
             ),
+            "edgeRelationshipsAdded": _count_by(added_edges, "relationship"),
+            "edgeRelationshipsRemoved": _count_by(removed_edges, "relationship"),
         },
         "addedNodes": [after_nodes[node_id].to_dict() for node_id in sorted(added_node_ids)],
         "removedNodes": [before_nodes[node_id].to_dict() for node_id in sorted(removed_node_ids)],
@@ -1188,8 +1192,16 @@ def render_graph_diff_text(report: dict[str, Any]) -> str:
         f"  edges added={summary.get('edgeAddedCount', 0)} "
         f"removed={summary.get('edgeRemovedCount', 0)}",
         "",
-        "Changed nodes:",
+        "Changed node kinds:",
     ]
+    lines.extend(_count_lines(_dict(summary.get("changedNodeKinds"))))
+    lines.append("Changed fields:")
+    lines.extend(_count_lines(_dict(summary.get("changedNodeFields"))))
+    lines.append("Added edge relationships:")
+    lines.extend(_count_lines(_dict(summary.get("edgeRelationshipsAdded"))))
+    lines.append("Removed edge relationships:")
+    lines.extend(_count_lines(_dict(summary.get("edgeRelationshipsRemoved"))))
+    lines.append("Changed nodes:")
     changed_nodes = _coerce_list(report.get("changedNodes"))
     if changed_nodes:
         for item in changed_nodes[:12]:
@@ -2922,6 +2934,21 @@ def _changed_property_paths(changed_nodes: list[dict[str, Any]]) -> list[str]:
         if _dict(change).get("path")
     }
     return sorted(paths)
+
+
+def _changed_node_kind_counts(changed_nodes: list[dict[str, Any]]) -> dict[str, int]:
+    nodes = [_dict(node.get("after")) for node in changed_nodes]
+    return _count_by(nodes, "kind")
+
+
+def _changed_node_field_counts(changed_nodes: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for node in changed_nodes:
+        for changed_field in _coerce_list(node.get("changedFields")):
+            key = str(changed_field)
+            if key:
+                counts[key] = counts.get(key, 0) + 1
+    return {field: counts[field] for field in sorted(counts)}
 
 
 def _changed_value_paths(
