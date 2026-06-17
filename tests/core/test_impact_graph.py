@@ -520,6 +520,18 @@ def test_bundle_graph_report_exports_queryable_nodes_and_edges(tmp_path: Path):
     assert "artifact:decision-report.yaml" in topology["sinkNodes"]
     assert "decision:cidr" in topology["branchingNodes"]
     assert "policy_control:VPC-NETWORK-001" in topology["joinNodes"]
+    assert topology["hotspotNodeCount"] >= 1
+    hotspots = {item["id"]: item for item in topology["hotspotNodes"]}
+    assert "decision:cidr" in hotspots
+    cidr_hotspot = hotspots["decision:cidr"]
+    assert cidr_hotspot["incomingDegree"] >= 1
+    assert cidr_hotspot["outgoingDegree"] >= 1
+    assert cidr_hotspot["totalDegree"] == (
+        cidr_hotspot["incomingDegree"] + cidr_hotspot["outgoingDegree"]
+    )
+    assert cidr_hotspot["rootSelectable"] is True
+    assert cidr_hotspot["commands"]["impact"].endswith("--root decision:cidr")
+    assert cidr_hotspot["commands"]["neighbors"].endswith("--root decision:cidr")
     assert {
         "from": "decision:cidr",
         "to": "policy_control:VPC-NETWORK-001",
@@ -550,6 +562,8 @@ def test_bundle_graph_report_exports_queryable_nodes_and_edges(tmp_path: Path):
     assert "Topology:" in rendered
     assert "rootSelectableNodeCount:" in rendered
     assert "isolatedNodeCount: 1" in rendered
+    assert "Hotspot nodes:" in rendered
+    assert "decision:cidr" in rendered
 
 
 def test_graph_roots_report_lists_concrete_traversal_roots(tmp_path: Path):

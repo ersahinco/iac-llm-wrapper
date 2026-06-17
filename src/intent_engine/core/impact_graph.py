@@ -1085,8 +1085,19 @@ def render_bundle_graph_text(report: dict[str, Any]) -> str:
         "sinkNodeCount",
         "branchingNodeCount",
         "joinNodeCount",
+        "hotspotNodeCount",
     ]:
         lines.append(f"  - {key}: {topology.get(key, 0)}")
+    lines.append("Hotspot nodes:")
+    for item in _coerce_list(topology.get("hotspotNodes"))[:8]:
+        if not isinstance(item, dict):
+            continue
+        lines.append(
+            f"  - {item.get('id', '')}: total={item.get('totalDegree', 0)} "
+            f"in={item.get('incomingDegree', 0)} out={item.get('outgoingDegree', 0)}"
+        )
+    if not _coerce_list(topology.get("hotspotNodes")):
+        lines.append("  - None")
     lines.extend(
         [
             "",
@@ -2761,6 +2772,7 @@ def _bundle_graph_topology_summary(
     )
     branching = sorted(node_id for node_id in node_ids if outgoing.get(node_id, 0) > 1)
     joins = sorted(node_id for node_id in node_ids if incoming.get(node_id, 0) > 1)
+    hotspots = _bundle_graph_hotspots(nodes, incoming=incoming, outgoing=outgoing)
     return {
         "rootSelectableNodeCount": len(root_selectable),
         "nonRootSelectableNodeCount": len(node_ids - root_selectable),
@@ -2770,12 +2782,64 @@ def _bundle_graph_topology_summary(
         "sinkNodeCount": len(sinks),
         "branchingNodeCount": len(branching),
         "joinNodeCount": len(joins),
+        "hotspotNodeCount": len(hotspots["all"]),
         "isolatedNodes": isolated,
         "sourceNodes": sources,
         "sinkNodes": sinks,
         "branchingNodes": branching,
         "joinNodes": joins,
+        "hotspotNodes": hotspots["top"],
     }
+
+
+def _bundle_graph_hotspots(
+    nodes: list[dict[str, Any]],
+    *,
+    incoming: dict[str, int],
+    outgoing: dict[str, int],
+    limit: int = 12,
+) -> dict[str, list[dict[str, Any]]]:
+    root_kinds = set(_root_kinds())
+    entries: list[dict[str, Any]] = []
+    for node in nodes:
+        node_id = str(node.get("id") or "")
+        if not node_id:
+            continue
+        incoming_degree = incoming.get(node_id, 0)
+        outgoing_degree = outgoing.get(node_id, 0)
+        total_degree = incoming_degree + outgoing_degree
+        if total_degree <= 1:
+            continue
+        kind = str(node.get("kind") or "")
+        key = str(node.get("key") or "")
+        root_selectable = kind in root_kinds and bool(key)
+        entry: dict[str, Any] = {
+            "id": node_id,
+            "kind": kind,
+            "key": key,
+            "label": node.get("label") or key,
+            "incomingDegree": incoming_degree,
+            "outgoingDegree": outgoing_degree,
+            "totalDegree": total_degree,
+            "rootSelectable": root_selectable,
+        }
+        if root_selectable:
+            root = f"{kind}:{key}"
+            entry["root"] = root
+            entry["commands"] = {
+                "impact": f"iac-llm-wrapper graph impact --bundle <bundle> --root {root}",
+                "neighbors": (f"iac-llm-wrapper graph neighbors --bundle <bundle> --root {root}"),
+            }
+        entries.append(entry)
+    ordered = sorted(
+        entries,
+        key=lambda item: (
+            -int(item["totalDegree"]),
+            -int(item["outgoingDegree"]),
+            str(item["id"]),
+        ),
+    )
+    return {"all": ordered, "top": ordered[:limit]}
 
 
 def _edges_by_relationship(edges: list[dict[str, str]]) -> dict[str, list[dict[str, str]]]:
