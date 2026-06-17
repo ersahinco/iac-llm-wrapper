@@ -161,6 +161,9 @@ def test_decision_impact_traverses_contract_module_and_policy_edges(tmp_path: Pa
         if item["target"]["id"] == "policy_control:VPC-NETWORK-001"
     )
     assert network_path["hops"][0]["from"]["id"] == "decision:cidr"
+    assert network_path["hops"][0]["relationshipDescription"] == (
+        "Decision, module variable, or finding maps to a policy control."
+    )
     assert network_path["hops"][-1]["to"]["id"] == "policy_control:VPC-NETWORK-001"
     rendered = render_impact_report_text(report)
     assert "Impact Analysis" in rendered
@@ -1010,10 +1013,14 @@ def test_graph_path_reports_semantic_route_to_artifact():
         "semantic:produces_artifact",
         "describes-artifact",
     ]
+    assert report["path"][0]["relationshipDescription"] == (
+        "Typed relationship emitted by the pattern semantic model."
+    )
     assert [item["direction"] for item in report["path"]] == ["downstream", "downstream"]
     rendered = render_path_report_text(report)
     assert "Graph Path" in rendered
     assert "semantic_entity:control:security-hub --semantic:produces_artifact" in rendered
+    assert "Typed relationship emitted by the pattern semantic model." in rendered
 
 
 def test_graph_path_can_traverse_reverse_when_direction_is_either():
@@ -1087,6 +1094,9 @@ def test_graph_neighborhood_reports_bounded_semantic_context():
         "semantic:produces_artifact",
         "describes-artifact",
     ]
+    assert report["edges"][1]["relationshipDescription"] == (
+        "Semantic entity describes a generated artifact."
+    )
     rendered = render_neighborhood_report_text(report)
     assert "Graph Neighborhood" in rendered
     assert "depth 2: artifact:security-config.yaml" in rendered

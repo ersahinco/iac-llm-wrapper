@@ -1243,6 +1243,7 @@ def render_neighborhood_report_text(report: dict[str, Any]) -> str:
             lines.append(
                 f"  - {_node_label(source)} --{edge.get('relationship', '')} "
                 f"({edge.get('direction', '')})--> {_node_label(target)}"
+                f"{_relationship_description_suffix(edge)}"
             )
         if len(edges) > 12:
             lines.append(f"  ... {len(edges) - 12} more")
@@ -1285,6 +1286,7 @@ def render_path_report_text(report: dict[str, Any]) -> str:
         path_lines.append(
             f"  - {_node_label(source)} --{step.get('relationship', '')} "
             f"({step.get('direction', '')})--> {_node_label(target)}"
+            f"{_relationship_description_suffix(step)}"
         )
     lines.extend(path_lines or ["  - None"])
     lines.append("Review focus:")
@@ -2734,6 +2736,7 @@ def _impact_paths(
                     {
                         "from": graph.nodes[edge.source].to_dict(),
                         "relationship": edge.relationship,
+                        "relationshipDescription": _relationship_description(edge.relationship),
                         "to": graph.nodes[edge.target].to_dict(),
                     }
                     for edge in edges
@@ -2750,11 +2753,13 @@ def _path_step_to_dict(graph: _ImpactGraph, step: _PathStep) -> dict[str, Any]:
         "from": graph.nodes[step.source].to_dict(),
         "to": graph.nodes[step.target].to_dict(),
         "relationship": edge.relationship,
+        "relationshipDescription": _relationship_description(edge.relationship),
         "direction": step.direction,
         "edge": {
             "from": edge.source,
             "to": edge.target,
             "relationship": edge.relationship,
+            "relationshipDescription": _relationship_description(edge.relationship),
         },
     }
 
@@ -3322,6 +3327,11 @@ def _node_label(node: dict[str, Any]) -> str:
     return f"{node.get('kind', 'unknown')}:{node.get('key', '')}"
 
 
+def _relationship_description_suffix(edge: dict[str, Any]) -> str:
+    description = str(edge.get("relationshipDescription") or "")
+    return f" [{description}]" if description else ""
+
+
 def _list_or_none(items: list[Any]) -> list[str]:
     if not items:
         return ["  - None"]
@@ -3357,7 +3367,7 @@ def _path_lines(paths: list[Any]) -> list[str]:
             destination = _dict(hop.get("to"))
             rendered_hops.append(
                 f"{source.get('id', '')} --{hop.get('relationship', '')}--> "
-                f"{destination.get('id', '')}"
+                f"{destination.get('id', '')}{_relationship_description_suffix(hop)}"
             )
         lines.append(f"  - {target.get('id', 'unknown')}: " + " | ".join(rendered_hops))
     if len(paths) > 8:
