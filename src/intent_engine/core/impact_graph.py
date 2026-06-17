@@ -763,6 +763,7 @@ def build_impact_matrix_report(
     upstream_source_changes = _matrix_union(rows, "upstreamSourceChanges")
     upstream_input_diffs = _matrix_union(rows, "upstreamInputDiffs")
     checklist_category_counts = _matrix_checklist_category_counts(rows)
+    upstream_dependency_kind_counts = _matrix_upstream_dependency_kind_counts(rows)
     graph_summary = _dict(_dict(rows[0].get("graph")) if rows else {})
     return {
         "schemaVersion": "intent-engine/graph-impact-matrix/v1",
@@ -787,6 +788,8 @@ def build_impact_matrix_report(
             "upstreamInputDiffCount": len(upstream_input_diffs),
             "reviewChecklistCategoryCounts": checklist_category_counts,
             "reviewChecklistCategories": sorted(checklist_category_counts),
+            "upstreamDependencyKindCounts": upstream_dependency_kind_counts,
+            "upstreamDependencyKinds": sorted(upstream_dependency_kind_counts),
         },
         "affectedArtifacts": affected_artifacts,
         "affectedTargetContracts": affected_contracts,
@@ -1212,6 +1215,13 @@ def render_impact_matrix_text(report: dict[str, Any]) -> str:
     lines.extend(
         _list_or_none(
             [f"{category}: {count}" for category, count in sorted(checklist_counts.items())]
+        )
+    )
+    lines.append("Upstream dependency kinds:")
+    dependency_kind_counts = _dict(summary.get("upstreamDependencyKindCounts"))
+    lines.extend(
+        _list_or_none(
+            [f"{kind}: {count}" for kind, count in sorted(dependency_kind_counts.items())]
         )
     )
     lines.append("Upstream source changes:")
@@ -2946,6 +2956,7 @@ def _impact_matrix_row(
             "manualGateCount": len(_coerce_list(report.get("manualGates"))),
             "upstreamSourceChangeCount": len(upstream_source_changes),
             "upstreamInputDiffCount": len(upstream_input_diffs),
+            "upstreamDependencyKindCounts": _upstream_dependency_kind_counts(report),
         },
         "affectedArtifacts": _coerce_list(report.get("affectedArtifacts")),
         "affectedTargetContracts": _coerce_list(report.get("affectedTargetContracts")),
@@ -3044,6 +3055,28 @@ def _matrix_checklist_category_counts(rows: list[dict[str, Any]]) -> dict[str, i
             if category:
                 counts[category] = counts.get(category, 0) + 1
     return {category: counts[category] for category in sorted(counts)}
+
+
+def _matrix_upstream_dependency_kind_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        if _dict(row.get("summary")).get("status") != "matched":
+            continue
+        row_counts = _dict(_dict(row.get("summary")).get("upstreamDependencyKindCounts"))
+        for kind, count in row_counts.items():
+            counts[str(kind)] = counts.get(str(kind), 0) + int(count or 0)
+    return {kind: counts[kind] for kind in sorted(counts)}
+
+
+def _upstream_dependency_kind_counts(report: dict[str, Any]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for node in _coerce_list(report.get("upstreamDependencies")):
+        if not isinstance(node, dict):
+            continue
+        kind = str(node.get("kind") or "")
+        if kind:
+            counts[kind] = counts.get(kind, 0) + 1
+    return {kind: counts[kind] for kind in sorted(counts)}
 
 
 def _matrix_severity_counts(rows: list[dict[str, Any]]) -> dict[str, int]:

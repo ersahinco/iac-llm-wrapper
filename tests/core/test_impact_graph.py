@@ -300,6 +300,8 @@ def test_graph_impact_matrix_compares_multiple_roots(tmp_path: Path):
     assert report["summary"]["highestReviewPrioritySeverity"] == "medium"
     assert "policy-controls" in report["summary"]["reviewChecklistCategories"]
     assert report["summary"]["reviewChecklistCategoryCounts"]["target-contracts"] >= 1
+    assert "source_context" in report["summary"]["upstreamDependencyKinds"]
+    assert report["summary"]["upstreamDependencyKindCounts"]["source_context"] >= 1
     assert "module-inputs.yaml" in report["affectedArtifacts"]
     assert "terraform-aws-vpc-module" in report["affectedTargetContracts"]
     assert "VPC-NETWORK-001" in report["affectedPolicyControls"]
@@ -311,10 +313,13 @@ def test_graph_impact_matrix_compares_multiple_roots(tmp_path: Path):
     cidr_row = next(row for row in report["rows"] if row["root"]["id"] == "decision:cidr")
     assert cidr_row["reviewChecklist"][0]["category"] == "target-contracts"
     assert cidr_row["summary"]["upstreamDependencyPathCount"] >= 1
+    assert cidr_row["summary"]["upstreamDependencyKindCounts"]["source_context"] >= 1
     rendered = render_impact_matrix_text(report)
     assert "Graph Impact Matrix" in rendered
     assert "Review checklist categories:" in rendered
     assert "target-contracts:" in rendered
+    assert "Upstream dependency kinds:" in rendered
+    assert "source_context:" in rendered
     assert "decision:cidr" in rendered
     assert "policy_control:VPC-NETWORK-001" in rendered
     assert "decision:missing" in rendered
