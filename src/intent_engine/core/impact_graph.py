@@ -345,6 +345,11 @@ def build_impact_report(
         artifacts=affected_artifacts,
         module_variables=affected_variables,
     )
+    review_checklist = _impact_review_checklist(
+        roots=root_nodes,
+        priorities=review_priorities,
+        impact_paths=impact_paths,
+    )
     unmatched = _unmatched_roots(roots, graph, selected_roots)
     if changed_report and not changed_roots:
         unmatched.append({"kind": "changed-report", "key": str(changed_report)})
@@ -374,6 +379,7 @@ def build_impact_report(
             "affectedValidationViolationCount": len(affected_validation_violations),
             "manualGateCount": len(manual_gates),
             "reviewPriorityCount": len(review_priorities),
+            "reviewChecklistCount": len(review_checklist),
             "highestReviewPrioritySeverity": _highest_priority_severity(priority_severity_counts),
             "reviewPrioritySeverityCounts": priority_severity_counts,
             "reviewPriorityItemCountsBySeverity": _priority_item_counts_by_severity(
@@ -407,6 +413,7 @@ def build_impact_report(
         "manualGates": manual_gates,
         "impactPaths": impact_paths,
         "reviewPriorities": review_priorities,
+        "reviewChecklist": review_checklist,
         "reviewFocus": _review_focus(
             status=status,
             roots=root_nodes,
@@ -1336,6 +1343,20 @@ def render_impact_report_text(report: dict[str, Any]) -> str:
             )
         if len(priorities) > 12:
             lines.append(f"  ... {len(priorities) - 12} more")
+    else:
+        lines.append("  - None")
+    lines.extend(["", "Review checklist:"])
+    checklist = _coerce_list(report.get("reviewChecklist"))
+    if checklist:
+        for item in checklist[:12]:
+            if not isinstance(item, dict):
+                continue
+            lines.append(
+                f"  - {item.get('step', '?')}. {item.get('severity', 'review')}: "
+                f"{item.get('category', 'unknown')} - {item.get('action', '')}"
+            )
+        if len(checklist) > 12:
+            lines.append(f"  ... {len(checklist) - 12} more")
     else:
         lines.append("  - None")
     lines.extend(
@@ -2782,6 +2803,7 @@ def _impact_matrix_row(
         "upstreamSourceChanges": upstream_source_changes,
         "upstreamInputDiffs": upstream_input_diffs,
         "reviewFocus": _coerce_list(report.get("reviewFocus")),
+        "reviewChecklist": _coerce_list(report.get("reviewChecklist")),
         "impactPathCount": len(_coerce_list(report.get("impactPaths"))),
         "pattern": report.get("pattern", ""),
         "graph": _dict(report.get("graph")),
@@ -2984,6 +3006,78 @@ def _impact_review_priorities(
         ),
     ]
     return [item for item in priorities if item]
+
+
+def _impact_review_checklist(
+    *,
+    roots: list[_ImpactNode],
+    priorities: list[dict[str, Any]],
+    impact_paths: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if not roots:
+        return []
+    root_ids = [node.id for node in roots]
+    root_id = root_ids[0]
+    checklist: list[dict[str, Any]] = []
+    for priority in priorities:
+        category = str(priority.get("category") or "")
+        items = [str(item) for item in _coerce_list(priority.get("items")) if item]
+        if not category or not items:
+            continue
+        node_kind = _review_category_node_kind(category)
+        entry: dict[str, Any] = {
+            "step": len(checklist) + 1,
+            "severity": str(priority.get("severity") or "review"),
+            "category": category,
+            "action": str(priority.get("reason") or ""),
+            "items": items,
+            "source": "reviewPriorities",
+        }
+        if node_kind:
+            entry["targetRootKind"] = node_kind
+            entry["pathQueries"] = [
+                f"iac-llm-wrapper graph path --bundle <bundle> --from {root_id} "
+                f"--to {node_kind}:{item}"
+                for item in items[:5]
+            ]
+        checklist.append(entry)
+    if impact_paths:
+        targets = [
+            str(_dict(item.get("target")).get("id") or "")
+            for item in impact_paths[:5]
+            if isinstance(item, dict)
+        ]
+        checklist.append(
+            {
+                "step": len(checklist) + 1,
+                "severity": "info",
+                "category": "impact-paths",
+                "action": (
+                    "Inspect representative root-to-target graph paths before closing review."
+                ),
+                "items": [item for item in targets if item],
+                "source": "impactPaths",
+            }
+        )
+    return checklist
+
+
+def _review_category_node_kind(category: str) -> str:
+    return {
+        "readiness-blockers": "readiness_blocker",
+        "validation-violations": "validation_violation",
+        "downstream-validation": "downstream_validation_evidence",
+        "checkov-findings": "checkov_finding",
+        "shift-left-evidence": "shift_left_evidence",
+        "source-changes": "source_change",
+        "manual-gates": "manual_gate",
+        "target-contracts": "target_contract",
+        "target-capabilities": "target_capability",
+        "policy-controls": "policy_control",
+        "samples": "sample",
+        "module-variables": "module_variable",
+        "artifacts": "artifact",
+    }.get(category, "")
 
 
 def _priority_severity_counts(priorities: list[dict[str, Any]]) -> dict[str, int]:

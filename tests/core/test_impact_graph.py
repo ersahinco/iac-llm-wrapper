@@ -141,6 +141,17 @@ def test_decision_impact_traverses_contract_module_and_policy_edges(tmp_path: Pa
     assert "VPC-ATTACHMENT-001" in report["affectedPolicyControls"]
     assert "CKV_CUSTOM_VPC_001" in report["affectedChecks"]
     assert "CKV_CUSTOM_VPC_ATTACHMENT_001" in report["affectedChecks"]
+    checklist_categories = [item["category"] for item in report["reviewChecklist"]]
+    assert checklist_categories[:2] == ["target-contracts", "policy-controls"]
+    policy_step = next(
+        item for item in report["reviewChecklist"] if item["category"] == "policy-controls"
+    )
+    assert policy_step["targetRootKind"] == "policy_control"
+    assert (
+        "iac-llm-wrapper graph path --bundle <bundle> --from decision:cidr "
+        "--to policy_control:VPC-NETWORK-001"
+    ) in policy_step["pathQueries"]
+    assert report["summary"]["reviewChecklistCount"] == len(report["reviewChecklist"])
     path_targets = {item["target"]["id"] for item in report["impactPaths"]}
     assert "policy_control:VPC-NETWORK-001" in path_targets
     assert "artifact:decision-report.yaml" in path_targets
@@ -153,6 +164,7 @@ def test_decision_impact_traverses_contract_module_and_policy_edges(tmp_path: Pa
     assert network_path["hops"][-1]["to"]["id"] == "policy_control:VPC-NETWORK-001"
     rendered = render_impact_report_text(report)
     assert "Impact Analysis" in rendered
+    assert "Review checklist:" in rendered
     assert "Affected target contracts:" in rendered
     assert "Impact paths:" in rendered
     assert "decision:cidr --mapped-to-control--> policy_control:VPC-NETWORK-001" in rendered
@@ -280,6 +292,8 @@ def test_graph_impact_matrix_compares_multiple_roots(tmp_path: Path):
     assert statuses["decision:cidr"] == "matched"
     assert statuses["policy_control:VPC-NETWORK-001"] == "matched"
     assert statuses["decision:missing"] == "no-match"
+    cidr_row = next(row for row in report["rows"] if row["root"]["id"] == "decision:cidr")
+    assert cidr_row["reviewChecklist"][0]["category"] == "target-contracts"
     rendered = render_impact_matrix_text(report)
     assert "Graph Impact Matrix" in rendered
     assert "decision:cidr" in rendered
