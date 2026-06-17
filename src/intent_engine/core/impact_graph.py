@@ -614,6 +614,7 @@ def build_neighborhood_report(
             "edgeCount": len(filtered_steps),
             "kindFilter": kind_filter,
             "nodeKinds": _count_by([node.to_dict() for node in neighbor_nodes], "kind"),
+            "relationshipCounts": _path_relationship_counts(filtered_steps),
             "rootEdgeSummary": root_edge_summary,
         },
         "root": _node_or_selector(graph, root_id, root),
@@ -1345,8 +1346,9 @@ def render_neighborhood_report_text(report: dict[str, Any]) -> str:
     for key in ["incoming", "outgoing", "bridging", "total"]:
         lines.append(f"  - {key}: {root_edge_summary.get(key, 0)}")
     lines.append("Node kinds:")
-    for key, count in sorted(_dict(summary.get("nodeKinds")).items()):
-        lines.append(f"  - {key}: {count}")
+    lines.extend(_count_lines(_dict(summary.get("nodeKinds"))))
+    lines.append("Relationship counts:")
+    lines.extend(_count_lines(_dict(summary.get("relationshipCounts"))))
     lines.append("Neighborhood:")
     neighbors = _coerce_list(report.get("neighbors"))
     if neighbors:

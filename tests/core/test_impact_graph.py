@@ -1215,6 +1215,10 @@ def test_graph_neighborhood_reports_bounded_semantic_context():
         "bridging": 1,
         "total": 2,
     }
+    assert report["summary"]["relationshipCounts"] == {
+        "describes-artifact": 1,
+        "semantic:produces_artifact": 1,
+    }
     assert report["neighbors"][0]["id"] == "artifact:security-config.yaml"
     assert report["neighbors"][0]["depth"] == 2
     assert [item["relationship"] for item in report["edges"]] == [
@@ -1229,6 +1233,8 @@ def test_graph_neighborhood_reports_bounded_semantic_context():
     assert "Root edge summary:" in rendered
     assert "outgoing: 1" in rendered
     assert "bridging: 1" in rendered
+    assert "Relationship counts:" in rendered
+    assert "semantic:produces_artifact: 1" in rendered
     assert "depth 2: artifact:security-config.yaml" in rendered
 
 
