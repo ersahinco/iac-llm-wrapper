@@ -304,30 +304,31 @@ def build_impact_report(
     downstream_nodes = _sorted_nodes(graph, downstream)
     upstream_nodes = _sorted_nodes(graph, upstream)
     root_nodes = _sorted_nodes(graph, set(root_ids))
-    affected_artifacts = _keys_by_kind(downstream_nodes, "artifact")
-    affected_target_contracts = _keys_by_kind(downstream_nodes, "target_contract")
-    affected_target_capabilities = _keys_by_kind(downstream_nodes, "target_capability")
-    affected_samples = _keys_by_kind(downstream_nodes, "sample")
-    affected_controls = _keys_by_kind(downstream_nodes, "policy_control")
-    affected_checks = _keys_by_kind(downstream_nodes, "checkov_check")
-    affected_findings = _keys_by_kind(downstream_nodes, "checkov_finding")
-    affected_evidence = _keys_by_kind(downstream_nodes, "shift_left_evidence")
-    affected_variables = _keys_by_kind(downstream_nodes, "module_variable")
-    affected_semantic_entities = _keys_by_kind(downstream_nodes, "semantic_entity")
-    affected_semantic_constraints = _keys_by_kind(downstream_nodes, "semantic_constraint")
-    affected_source_contexts = _keys_by_kind(downstream_nodes, "source_context")
-    affected_input_diffs = _keys_by_kind(downstream_nodes, "input_diff")
-    affected_source_changes = _keys_by_kind(downstream_nodes, "source_change")
-    affected_readiness = _keys_by_kind(downstream_nodes, "handoff_readiness")
-    affected_readiness_blockers = _keys_by_kind(downstream_nodes, "readiness_blocker")
-    affected_contract_validation = _keys_by_kind(downstream_nodes, "contract_validation")
-    affected_contract_results = _keys_by_kind(downstream_nodes, "contract_result")
-    affected_validation_violations = _keys_by_kind(downstream_nodes, "validation_violation")
+    affected_nodes = [*root_nodes, *downstream_nodes]
+    affected_artifacts = _keys_by_kind(affected_nodes, "artifact")
+    affected_target_contracts = _keys_by_kind(affected_nodes, "target_contract")
+    affected_target_capabilities = _keys_by_kind(affected_nodes, "target_capability")
+    affected_samples = _keys_by_kind(affected_nodes, "sample")
+    affected_controls = _keys_by_kind(affected_nodes, "policy_control")
+    affected_checks = _keys_by_kind(affected_nodes, "checkov_check")
+    affected_findings = _keys_by_kind(affected_nodes, "checkov_finding")
+    affected_evidence = _keys_by_kind(affected_nodes, "shift_left_evidence")
+    affected_variables = _keys_by_kind(affected_nodes, "module_variable")
+    affected_semantic_entities = _keys_by_kind(affected_nodes, "semantic_entity")
+    affected_semantic_constraints = _keys_by_kind(affected_nodes, "semantic_constraint")
+    affected_source_contexts = _keys_by_kind(affected_nodes, "source_context")
+    affected_input_diffs = _keys_by_kind(affected_nodes, "input_diff")
+    affected_source_changes = _keys_by_kind(affected_nodes, "source_change")
+    affected_readiness = _keys_by_kind(affected_nodes, "handoff_readiness")
+    affected_readiness_blockers = _keys_by_kind(affected_nodes, "readiness_blocker")
+    affected_contract_validation = _keys_by_kind(affected_nodes, "contract_validation")
+    affected_contract_results = _keys_by_kind(affected_nodes, "contract_result")
+    affected_validation_violations = _keys_by_kind(affected_nodes, "validation_violation")
     affected_downstream_validation = _keys_by_kind(
-        downstream_nodes,
+        affected_nodes,
         "downstream_validation_evidence",
     )
-    manual_gates = _keys_by_kind(downstream_nodes, "manual_gate")
+    manual_gates = _keys_by_kind(affected_nodes, "manual_gate")
     impact_paths = _impact_paths(graph, root_ids, downstream_nodes)
     review_priorities = _impact_review_priorities(
         readiness_blockers=affected_readiness_blockers,
@@ -830,6 +831,29 @@ def changed_report_roots(bundle: Path, changed_report: Path | None) -> list[Impa
         for node_id in root_ids
         if node_id in graph.nodes
     ]
+    return _dedupe_roots(roots)
+
+
+def changed_graph_diff_roots(
+    graph_diff_report: dict[str, Any],
+    *,
+    kinds: list[str] | None = None,
+) -> list[ImpactRoot]:
+    """Return root-selectable nodes that changed or were added in a graph diff."""
+
+    root_kinds = set(_root_kinds())
+    kind_filter = {item for item in kinds or [] if item}
+    roots: list[ImpactRoot] = []
+    for section in ("changedNodes", "addedNodes"):
+        for item in _coerce_list(graph_diff_report.get(section)):
+            node = _dict(item.get("after")) if section == "changedNodes" else _dict(item)
+            kind = str(node.get("kind") or "")
+            key = str(node.get("key") or "")
+            if not kind or not key or kind not in root_kinds:
+                continue
+            if kind_filter and kind not in kind_filter:
+                continue
+            roots.append(ImpactRoot(kind=kind, key=key))
     return _dedupe_roots(roots)
 
 

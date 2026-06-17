@@ -13,6 +13,7 @@ from .impact_graph import (
     build_impact_matrix_report,
     build_impact_report,
     changed_decision_roots,
+    changed_graph_diff_roots,
     changed_report_roots,
 )
 from .sample_config import SampleConfig
@@ -55,15 +56,43 @@ def compare_handoff_bundles(before_dir: Path, after_dir: Path) -> dict[str, Any]
         if (after.path / "input-diff-report.yaml").exists()
         else None
     )
+    graph_diff = build_graph_diff_report(before.path, after.path)
     changed_roots = changed_decision_roots({"decisionDelta": decision_delta})
-    matrix_roots = [*changed_roots, *changed_report_roots(after.path, input_diff_report)]
+    graph_diff_roots = changed_graph_diff_roots(
+        graph_diff,
+        kinds=[
+            "artifact",
+            "policy_control",
+            "module_variable",
+            "target_contract",
+            "target_capability",
+            "manual_gate",
+            "handoff_readiness",
+            "contract_validation",
+            "contract_result",
+            "validation_violation",
+            "downstream_validation_evidence",
+            "semantic_entity",
+            "semantic_constraint",
+            "shift_left_evidence",
+            "checkov_finding",
+            "scan_file",
+        ],
+    )
+    impact_roots = [
+        *changed_roots,
+        *graph_diff_roots,
+    ]
+    matrix_roots = [
+        *impact_roots,
+        *changed_report_roots(after.path, input_diff_report),
+    ]
     impact_traversal = build_impact_report(
         after.path,
-        roots=changed_roots,
+        roots=impact_roots,
         changed_report=input_diff_report,
     )
     impact_matrix = build_impact_matrix_report(after.path, roots=matrix_roots)
-    graph_diff = build_graph_diff_report(before.path, after.path)
     review_focus = _review_focus(
         decision_delta=decision_delta,
         requirement_delta=requirement_delta,

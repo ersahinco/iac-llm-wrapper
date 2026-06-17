@@ -29,7 +29,7 @@ Existing deployment mechanisms remain downstream.
 | `graph-path.yaml` | Shortest-path explanation between two typed bundle graph roots, including hop relationships, traversal direction, unmatched roots, no-path status, and review focus. | Core graph tooling | `graph path --bundle --from --to --output`. | No |
 | `graph-neighborhood.yaml` | Bounded dependency neighborhood around one typed bundle graph root, including neighbor node depths, connecting traversal hops, optional kind filtering, no-match status, and review focus. | Core graph tooling | `graph neighbors --bundle --root --output`. | No |
 | `graph-diff.yaml` | Typed graph delta between two generated bundles, including added/removed/changed nodes, added/removed edges, node-kind counts, and review focus. | Core graph tooling | `graph diff --before --after --output`. | No |
-| `handoff-comparison.yaml` | Compact before/after bundle delta for incremental packet or sample updates: readiness, requirement completeness, decisions, blockers, artifacts, impact traversal, impact matrix for changed and input-diff roots, typed graph diff, model quality, and sample recommendations. | Core review tooling | `iac-llm-wrapper review compare --output`. | No |
+| `handoff-comparison.yaml` | Compact before/after bundle delta for incremental packet or sample updates: readiness, requirement completeness, decisions, blockers, artifacts, impact traversal, impact matrix for changed decisions, input-diff roots, and graph-diff changed roots such as artifact digest changes, typed graph diff, model quality, and sample recommendations. | Core review tooling | `iac-llm-wrapper review compare --output`. | No |
 | `shift-left-evidence.yaml` | Optional Checkov evidence for an owner-provided IaC/module/pipeline path, including tool availability, command, registered policy packs, owner custom-policy paths, IaC kind, result, summary counts, findings, mapped controls, unmapped findings, and no-deploy boundary. | Core shift-left tooling | `shift-left checkov --bundle --scan-path`. | No |
 | `handoff-comparison.html` | Static delta review page for what changed, what stayed stable, and what must be reviewed. | Core review tooling | `iac-llm-wrapper review compare --html-output`. | No |
 | `lza-validation-evidence.yaml` | Validation-only AWS LZA config-validator command, no-mutation/read-only lookup boundary, temporary-staging/replay boundary, source metadata, config digests, exit code, diagnostic summary, and captured stdout/stderr. | AWS LZA validation adapter | `iac-llm-wrapper lza validate`. | No |
@@ -51,7 +51,9 @@ Existing deployment mechanisms remain downstream.
   whether a registered target has enough immutable input for a downstream
   plan/diff without interpretation. These files do not invoke the plan.
 - Reviewers use `handoff-comparison.yaml` to inspect only the deltas from an
-  incremental document or sample-configuration update.
+  incremental document or sample-configuration update. Its impact matrix includes
+  changed decisions, input-diff roots, and changed/added graph roots from
+  `graph-diff.yaml`, including generated artifact digest changes.
 - Reviewers and agents use `bundle-graph.yaml` as the queryable bundle graph.
   Its catalog describes node kinds, selectable roots, relationship meanings, and
   observed source/target node-kind pairs so an agent can traverse the graph

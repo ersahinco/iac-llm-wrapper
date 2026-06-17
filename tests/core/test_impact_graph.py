@@ -23,6 +23,7 @@ from intent_engine.core.impact_graph import (
     build_path_report,
     build_recommended_impact_matrix_report,
     build_roots_report,
+    changed_graph_diff_roots,
     render_find_report_text,
     render_graph_diff_text,
     render_impact_matrix_text,
@@ -1159,6 +1160,10 @@ def test_graph_diff_reports_changed_decision_and_module_nodes(tmp_path: Path):
     rendered = render_graph_diff_text(report)
     assert "Graph Diff" in rendered
     assert "decision:cidr" in rendered
+    graph_roots = changed_graph_diff_roots(report, kinds=["artifact", "module_variable"])
+    assert ImpactRoot(kind="artifact", key="module-inputs.yaml") in graph_roots
+    assert ImpactRoot(kind="module_variable", key="cidr") in graph_roots
+    assert ImpactRoot(kind="decision", key="cidr") not in graph_roots
 
 
 def test_graph_diff_reports_added_shift_left_evidence_nodes(tmp_path: Path):
@@ -1222,13 +1227,17 @@ def test_bundle_compare_includes_impact_traversal(tmp_path: Path):
     assert "review priority severity: highest=medium" in rendered
     assert "affected target contracts: terraform-aws-vpc-module" in rendered
     assert "affected policy controls: VPC-ATTACHMENT-001, VPC-NETWORK-001" in rendered
-    assert "impact paths: artifact:decision-report.yaml:" in rendered
+    assert "affected artifacts: decision-report.yaml" in rendered
     matrix = report["impactMatrix"]
     assert matrix["schemaVersion"] == "intent-engine/graph-impact-matrix/v1"
-    assert matrix["summary"]["matchedRootCount"] == 1
-    assert matrix["rows"][0]["root"]["id"] == "decision:cidr"
+    assert matrix["summary"]["matchedRootCount"] >= 3
+    matrix_roots = {row["root"]["id"] for row in matrix["rows"]}
+    assert "decision:cidr" in matrix_roots
+    assert "artifact:module-inputs.yaml" in matrix_roots
+    assert "module_variable:cidr" in matrix_roots
     assert "Impact matrix:" in rendered
     assert "decision:cidr: status=matched" in rendered
+    assert "artifact:module-inputs.yaml: status=matched" in rendered
     graph_diff = report["graphDiff"]
     assert graph_diff["summary"]["status"] == "changed"
     assert graph_diff["summary"]["nodeChangedCount"] >= 2
