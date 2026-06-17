@@ -1134,11 +1134,22 @@ def test_graph_path_reports_semantic_route_to_artifact():
         "Typed relationship emitted by the pattern semantic model."
     )
     assert [item["direction"] for item in report["path"]] == ["downstream", "downstream"]
+    assert report["endpointNeighborhoodQueries"] == {
+        "source": (
+            "iac-llm-wrapper graph neighbors --bundle <bundle> "
+            "--root semantic_entity:control:security-hub"
+        ),
+        "target": (
+            "iac-llm-wrapper graph neighbors --bundle <bundle> --root artifact:security-config.yaml"
+        ),
+    }
     rendered = render_path_report_text(report)
     assert "Graph Path" in rendered
     assert "Path summary:" in rendered
     assert "Relationship counts:" in rendered
     assert "Node kind counts:" in rendered
+    assert "Endpoint neighborhood queries:" in rendered
+    assert "graph neighbors --bundle <bundle> --root artifact:security-config.yaml" in rendered
     assert "semantic_entity:control:security-hub --semantic:produces_artifact" in rendered
     assert "Typed relationship emitted by the pattern semantic model." in rendered
 

@@ -551,6 +551,7 @@ def build_path_report(
         "unmatchedRoots": unmatched,
         "path": [_path_step_to_dict(graph, step) for step in steps],
         "pathSummary": _path_steps_summary(graph, steps),
+        "endpointNeighborhoodQueries": _endpoint_neighborhood_queries(source_id, target_id),
         "reviewFocus": _path_review_focus(
             status=status,
             source_id=source_id,
@@ -1410,6 +1411,15 @@ def render_path_report_text(report: dict[str, Any]) -> str:
     lines.extend(_count_lines(_dict(summary.get("relationshipCounts"))))
     lines.append("Node kind counts:")
     lines.extend(_count_lines(_dict(summary.get("nodeKindCounts"))))
+    lines.append("Endpoint neighborhood queries:")
+    endpoint_queries = _dict(report.get("endpointNeighborhoodQueries"))
+    if endpoint_queries:
+        for key in ("source", "target"):
+            query = str(endpoint_queries.get(key) or "")
+            if query:
+                lines.append(f"  - {key}: {query}")
+    else:
+        lines.append("  - None")
     lines.append("Path:")
     path_lines = []
     for step in _coerce_list(report.get("path")):
@@ -3173,6 +3183,18 @@ def _path_relationship_counts(steps: list[_PathStep]) -> dict[str, int]:
         relationship = step.edge.relationship
         counts[relationship] = counts.get(relationship, 0) + 1
     return {relationship: counts[relationship] for relationship in sorted(counts)}
+
+
+def _endpoint_neighborhood_queries(
+    source_id: str | None,
+    target_id: str | None,
+) -> dict[str, str]:
+    queries: dict[str, str] = {}
+    if source_id:
+        queries["source"] = f"iac-llm-wrapper graph neighbors --bundle <bundle> --root {source_id}"
+    if target_id and target_id != source_id:
+        queries["target"] = f"iac-llm-wrapper graph neighbors --bundle <bundle> --root {target_id}"
+    return queries
 
 
 def _path_node_kind_counts(
