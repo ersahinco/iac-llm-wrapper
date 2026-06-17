@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -1401,6 +1402,12 @@ def _build_graph(bundle: Path) -> tuple[_ImpactGraph, str]:
         contract_validation=contract_validation,
         downstream_validation=downstream_validation,
     )
+    _add_artifact_digest_properties(
+        graph,
+        bundle=bundle,
+        replay_manifest=replay_manifest,
+        downstream_validation=downstream_validation,
+    )
     return graph, pattern
 
 
@@ -2079,6 +2086,72 @@ def _add_downstream_validation_node(
         artifact_id = graph.add_node("artifact", str(artifact_name), str(artifact_name))
         graph.add_edge(artifact_id, evidence_id, "validated-by-downstream-evidence")
     return evidence_id
+
+
+def _add_artifact_digest_properties(
+    graph: _ImpactGraph,
+    *,
+    bundle: Path,
+    replay_manifest: dict[str, Any],
+    downstream_validation: dict[str, Any],
+) -> None:
+    replay_digests = _digests_by_name(_dict(replay_manifest.get("artifacts")).get("files"))
+    validation_digests = _digests_by_name(
+        _dict(downstream_validation.get("input")).get("configFileDigests")
+    )
+    for node in graph.nodes.values():
+        if node.kind != "artifact" or not node.key:
+            continue
+        artifact_path = _artifact_file_path(bundle, node.key)
+        actual_sha = ""
+        if artifact_path is not None and artifact_path.is_file():
+            actual_sha = _sha256_file(artifact_path)
+            node.properties.update(
+                {
+                    "existsInBundle": True,
+                    "sha256": actual_sha,
+                    "sizeBytes": artifact_path.stat().st_size,
+                    "digestSource": "bundle-file",
+                }
+            )
+        replay_sha = replay_digests.get(node.key)
+        if replay_sha:
+            node.properties["replaySha256"] = replay_sha
+            if actual_sha:
+                node.properties["replayDigestMatches"] = actual_sha == replay_sha
+        validation_sha = validation_digests.get(node.key)
+        if validation_sha:
+            node.properties["downstreamValidationSha256"] = validation_sha
+            if actual_sha:
+                node.properties["downstreamValidationDigestMatches"] = actual_sha == validation_sha
+
+
+def _digests_by_name(value: Any) -> dict[str, str]:
+    digests: dict[str, str] = {}
+    for item in _coerce_list(value):
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "")
+        sha256 = str(item.get("sha256") or "")
+        if name and sha256:
+            digests[name] = sha256
+    return digests
+
+
+def _artifact_file_path(bundle: Path, artifact_name: str) -> Path | None:
+    path = Path(artifact_name)
+    if path.is_absolute():
+        return None
+    try:
+        candidate = (bundle / path).resolve()
+        candidate.relative_to(bundle.resolve())
+    except ValueError:
+        return None
+    return candidate
+
+
+def _sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _first_mapping(*values: Any) -> dict[str, Any]:

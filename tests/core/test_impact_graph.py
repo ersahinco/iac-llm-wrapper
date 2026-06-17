@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import ruamel.yaml
@@ -566,6 +567,33 @@ def test_bundle_graph_report_exports_catalog_for_agents(tmp_path: Path):
     assert report["queryHints"]["rootSelectorSyntax"] == "<kind>:<key>"
 
 
+def test_bundle_graph_artifact_nodes_include_file_digests(tmp_path: Path):
+    bundle = _terraform_vpc_bundle(tmp_path / "bundle")
+
+    report = build_bundle_graph_report(bundle)
+
+    artifacts = {item["key"]: item for item in report["nodes"] if item["kind"] == "artifact"}
+    module_inputs = artifacts["module-inputs.yaml"]
+    expected_sha = hashlib.sha256((bundle / "module-inputs.yaml").read_bytes()).hexdigest()
+    assert module_inputs["properties"]["existsInBundle"] is True
+    assert module_inputs["properties"]["sha256"] == expected_sha
+    assert module_inputs["properties"]["sizeBytes"] > 0
+    assert module_inputs["properties"]["digestSource"] == "bundle-file"
+
+
+def test_bundle_graph_artifact_nodes_include_replay_digests():
+    bundle = Path("fixtures/aws-lza-standard-v1")
+
+    report = build_bundle_graph_report(bundle)
+
+    artifacts = {item["key"]: item for item in report["nodes"] if item["kind"] == "artifact"}
+    accounts = artifacts["accounts-config.yaml"]
+    expected_sha = hashlib.sha256((bundle / "accounts-config.yaml").read_bytes()).hexdigest()
+    assert accounts["properties"]["sha256"] == expected_sha
+    assert accounts["properties"]["replaySha256"] == expected_sha
+    assert accounts["properties"]["replayDigestMatches"] is True
+
+
 def test_bundle_graph_report_exports_source_context_nodes(tmp_path: Path):
     bundle = _terraform_vpc_bundle(tmp_path / "bundle")
 
@@ -1118,6 +1146,15 @@ def test_graph_diff_reports_changed_decision_and_module_nodes(tmp_path: Path):
     assert report["summary"]["status"] == "changed"
     assert "decision:cidr" in changed_ids
     assert "module_variable:cidr" in changed_ids
+    assert "artifact:module-inputs.yaml" in changed_ids
+    artifact_change = next(
+        item for item in report["changedNodes"] if item["id"] == "artifact:module-inputs.yaml"
+    )
+    assert "properties" in artifact_change["changedFields"]
+    assert (
+        artifact_change["before"]["properties"]["sha256"]
+        != artifact_change["after"]["properties"]["sha256"]
+    )
     assert report["summary"]["nodeChangedCount"] >= 2
     rendered = render_graph_diff_text(report)
     assert "Graph Diff" in rendered
