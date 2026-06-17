@@ -596,6 +596,7 @@ def build_neighborhood_report(
         if kind_filter
         else steps
     )
+    root_edge_summary = _neighborhood_root_edge_summary(filtered_steps, root_id)
 
     return {
         "schemaVersion": "intent-engine/graph-neighborhood/v1",
@@ -610,6 +611,7 @@ def build_neighborhood_report(
             "edgeCount": len(filtered_steps),
             "kindFilter": kind_filter,
             "nodeKinds": _count_by([node.to_dict() for node in neighbor_nodes], "kind"),
+            "rootEdgeSummary": root_edge_summary,
         },
         "root": _node_or_selector(graph, root_id, root),
         "unmatchedRoots": []
@@ -1285,7 +1287,11 @@ def render_neighborhood_report_text(report: dict[str, Any]) -> str:
         lines.append("")
         lines.append("Unmatched roots:")
         lines.extend(_unmatched_root_lines(unmatched, include_role=True))
-    lines.extend(["", f"Neighbors: {summary.get('neighborCount', 0)}", "Node kinds:"])
+    lines.extend(["", f"Neighbors: {summary.get('neighborCount', 0)}", "Root edge summary:"])
+    root_edge_summary = _dict(summary.get("rootEdgeSummary"))
+    for key in ["incoming", "outgoing", "bridging", "total"]:
+        lines.append(f"  - {key}: {root_edge_summary.get(key, 0)}")
+    lines.append("Node kinds:")
     for key, count in sorted(_dict(summary.get("nodeKinds")).items()):
         lines.append(f"  - {key}: {count}")
     lines.append("Neighborhood:")
@@ -3174,6 +3180,23 @@ def _matrix_upstream_dependency_kind_counts(rows: list[dict[str, Any]]) -> dict[
         for kind, count in row_counts.items():
             counts[str(kind)] = counts.get(str(kind), 0) + int(count or 0)
     return {kind: counts[kind] for kind in sorted(counts)}
+
+
+def _neighborhood_root_edge_summary(
+    steps: list[_PathStep],
+    root_id: str | None,
+) -> dict[str, int]:
+    counts = {"incoming": 0, "outgoing": 0, "bridging": 0, "total": len(steps)}
+    if not root_id:
+        return counts
+    for step in steps:
+        if step.target == root_id:
+            counts["incoming"] += 1
+        elif step.source == root_id:
+            counts["outgoing"] += 1
+        else:
+            counts["bridging"] += 1
+    return counts
 
 
 def _upstream_dependency_kind_counts(report: dict[str, Any]) -> dict[str, int]:
