@@ -2442,7 +2442,36 @@ def _bundle_graph_indexes(
         "nodesByKind": _node_ids_by_kind(nodes),
         "outgoing": _adjacency_index(edges, source_key="from", target_key="to"),
         "incoming": _adjacency_index(edges, source_key="to", target_key="from"),
+        "edgesByRelationship": _edges_by_relationship(edges),
+        "rootSelectorsByKind": _root_selectors_by_kind(nodes),
     }
+
+
+def _edges_by_relationship(edges: list[dict[str, str]]) -> dict[str, list[dict[str, str]]]:
+    grouped: dict[str, list[dict[str, str]]] = {}
+    for edge in edges:
+        relationship = str(edge.get("relationship") or "")
+        source = str(edge.get("from") or "")
+        target = str(edge.get("to") or "")
+        if relationship and source and target:
+            grouped.setdefault(relationship, []).append(
+                {"from": source, "to": target, "relationship": relationship}
+            )
+    return {
+        relationship: sorted(items, key=lambda item: (item["from"], item["to"]))
+        for relationship, items in sorted(grouped.items())
+    }
+
+
+def _root_selectors_by_kind(nodes: list[dict[str, Any]]) -> dict[str, list[str]]:
+    root_kinds = set(_root_kinds())
+    grouped: dict[str, list[str]] = {}
+    for node in nodes:
+        kind = str(node.get("kind") or "")
+        key = str(node.get("key") or "")
+        if kind in root_kinds and key:
+            grouped.setdefault(kind, []).append(f"{kind}:{key}")
+    return {kind: sorted(selectors) for kind, selectors in sorted(grouped.items())}
 
 
 def _bundle_graph_catalog(
