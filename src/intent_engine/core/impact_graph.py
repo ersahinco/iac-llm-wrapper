@@ -1074,7 +1074,9 @@ def render_find_report_text(report: dict[str, Any]) -> str:
                 continue
             node = _dict(match.get("node"))
             fields = ", ".join(str(item) for item in _coerce_list(match.get("matchedFields")))
-            lines.append(f"  - {_node_label(node)} [{fields}]")
+            root = _dict(match.get("root"))
+            suffix = f" root={root.get('root', '')}" if root else ""
+            lines.append(f"  - {_node_label(node)} [{fields}]{suffix}")
     else:
         lines.append("  - None")
     lines.append("Review focus:")
@@ -2598,11 +2600,16 @@ def _find_match(node: _ImpactNode, query_tokens: list[str]) -> dict[str, Any] | 
         score += 3
     if node.label.casefold() in query_tokens:
         score += 2
-    return {
+    match = {
         "score": score,
         "matchedFields": matched_fields,
         "node": node.to_dict(),
     }
+    if node.kind in set(_root_kinds()):
+        match["root"] = _root_entry(node)
+    else:
+        match["rootSelectable"] = False
+    return match
 
 
 def _node_search_fields(node: _ImpactNode) -> dict[str, str]:

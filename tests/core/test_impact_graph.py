@@ -771,9 +771,17 @@ def test_graph_find_reports_matching_candidate_roots():
     assert report["summary"]["matchCount"] == 1
     assert report["matches"][0]["node"]["id"] == "semantic_entity:control:security-hub"
     assert "label" in report["matches"][0]["matchedFields"]
+    assert report["matches"][0]["root"]["root"] == "semantic_entity:control:security-hub"
+    assert report["matches"][0]["root"]["commands"]["impact"].endswith(
+        "--root semantic_entity:control:security-hub"
+    )
+    assert report["matches"][0]["root"]["commands"]["neighbors"].endswith(
+        "--root semantic_entity:control:security-hub"
+    )
     rendered = render_find_report_text(report)
     assert "Graph Find" in rendered
     assert "semantic_entity:control:security-hub" in rendered
+    assert "root=semantic_entity:control:security-hub" in rendered
 
 
 def test_graph_find_can_match_properties_and_limit_results():
