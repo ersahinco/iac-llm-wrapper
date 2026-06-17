@@ -762,6 +762,7 @@ def build_impact_matrix_report(
     affected_gates = _matrix_union(rows, "manualGates")
     upstream_source_changes = _matrix_union(rows, "upstreamSourceChanges")
     upstream_input_diffs = _matrix_union(rows, "upstreamInputDiffs")
+    checklist_category_counts = _matrix_checklist_category_counts(rows)
     graph_summary = _dict(_dict(rows[0].get("graph")) if rows else {})
     return {
         "schemaVersion": "intent-engine/graph-impact-matrix/v1",
@@ -784,6 +785,8 @@ def build_impact_matrix_report(
             "manualGateCount": len(affected_gates),
             "upstreamSourceChangeCount": len(upstream_source_changes),
             "upstreamInputDiffCount": len(upstream_input_diffs),
+            "reviewChecklistCategoryCounts": checklist_category_counts,
+            "reviewChecklistCategories": sorted(checklist_category_counts),
         },
         "affectedArtifacts": affected_artifacts,
         "affectedTargetContracts": affected_contracts,
@@ -1204,6 +1207,13 @@ def render_impact_matrix_text(report: dict[str, Any]) -> str:
     lines.extend(_list_or_none(_coerce_list(report.get("affectedChecks"))))
     lines.append("Manual gates:")
     lines.extend(_list_or_none(_coerce_list(report.get("manualGates"))))
+    lines.append("Review checklist categories:")
+    checklist_counts = _dict(summary.get("reviewChecklistCategoryCounts"))
+    lines.extend(
+        _list_or_none(
+            [f"{category}: {count}" for category, count in sorted(checklist_counts.items())]
+        )
+    )
     lines.append("Upstream source changes:")
     lines.extend(_list_or_none(_coerce_list(report.get("upstreamSourceChanges"))))
     lines.append("Upstream input diffs:")
@@ -3020,6 +3030,20 @@ def _matrix_union(rows: list[dict[str, Any]], key: str) -> list[str]:
     for row in rows:
         values.update(str(item) for item in _coerce_list(row.get(key)) if item)
     return sorted(values)
+
+
+def _matrix_checklist_category_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        if _dict(row.get("summary")).get("status") != "matched":
+            continue
+        for item in _coerce_list(row.get("reviewChecklist")):
+            if not isinstance(item, dict):
+                continue
+            category = str(item.get("category") or "")
+            if category:
+                counts[category] = counts.get(category, 0) + 1
+    return {category: counts[category] for category in sorted(counts)}
 
 
 def _matrix_severity_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
