@@ -330,6 +330,7 @@ def build_impact_report(
     )
     manual_gates = _keys_by_kind(affected_nodes, "manual_gate")
     impact_paths = _impact_paths(graph, root_ids, downstream_nodes)
+    dependency_paths = _dependency_paths(graph, upstream_nodes, root_ids)
     review_priorities = _impact_review_priorities(
         readiness_blockers=affected_readiness_blockers,
         validation_violations=affected_validation_violations,
@@ -366,6 +367,7 @@ def build_impact_report(
             "rootCount": len(root_ids),
             "downstreamImpactCount": len(downstream),
             "upstreamDependencyCount": len(upstream),
+            "upstreamDependencyPathCount": len(dependency_paths),
             "affectedArtifactCount": len(affected_artifacts),
             "affectedTargetContractCount": len(affected_target_contracts),
             "affectedTargetCapabilityCount": len(affected_target_capabilities),
@@ -411,6 +413,7 @@ def build_impact_report(
         "affectedValidationViolations": affected_validation_violations,
         "affectedDownstreamValidationEvidence": affected_downstream_validation,
         "manualGates": manual_gates,
+        "dependencyPaths": dependency_paths,
         "impactPaths": impact_paths,
         "reviewPriorities": review_priorities,
         "reviewChecklist": review_checklist,
@@ -1396,6 +1399,8 @@ def render_impact_report_text(report: dict[str, Any]) -> str:
     lines.extend(_list_or_none(_coerce_list(report.get("affectedDownstreamValidationEvidence"))))
     lines.append("Manual gates:")
     lines.extend(_list_or_none(_coerce_list(report.get("manualGates"))))
+    lines.append("Dependency paths:")
+    lines.extend(_dependency_path_lines(_coerce_list(report.get("dependencyPaths"))))
     lines.append("Impact paths:")
     lines.extend(_path_lines(_coerce_list(report.get("impactPaths"))))
     lines.append("Review focus:")
@@ -2789,6 +2794,56 @@ def _impact_paths(
     return sorted(paths, key=lambda item: str(_dict(item.get("target")).get("id", "")))
 
 
+def _dependency_paths(
+    graph: _ImpactGraph,
+    upstream_nodes: list[_ImpactNode],
+    roots: list[str],
+) -> list[dict[str, Any]]:
+    interesting_kinds = {
+        "requirement",
+        "decision",
+        "source_context",
+        "input_diff",
+        "source_change",
+        "semantic_entity",
+        "semantic_constraint",
+        "readiness_blocker",
+        "contract_result",
+        "validation_violation",
+        "target_contract",
+        "policy_control",
+        "checkov_check",
+        "checkov_finding",
+    }
+    paths: list[dict[str, Any]] = []
+    for node in upstream_nodes:
+        if node.kind not in interesting_kinds:
+            continue
+        for root_id in roots:
+            edges = graph.shortest_path([node.id], root_id)
+            if not edges:
+                continue
+            root_node = graph.nodes.get(root_id)
+            paths.append(
+                {
+                    "dependency": node.to_dict(),
+                    "root": root_node.to_dict() if root_node is not None else {"id": root_id},
+                    "hops": [
+                        {
+                            "from": graph.nodes[edge.source].to_dict(),
+                            "relationship": edge.relationship,
+                            "relationshipDescription": _relationship_description(edge.relationship),
+                            "to": graph.nodes[edge.target].to_dict(),
+                        }
+                        for edge in edges
+                        if edge.source in graph.nodes and edge.target in graph.nodes
+                    ],
+                }
+            )
+            break
+    return sorted(paths, key=lambda item: str(_dict(item.get("dependency")).get("id", "")))
+
+
 def _path_step_to_dict(graph: _ImpactGraph, step: _PathStep) -> dict[str, Any]:
     edge = step.edge
     return {
@@ -2822,6 +2877,7 @@ def _impact_matrix_row(
             "status": summary.get("status", "unknown"),
             "downstreamImpactCount": summary.get("downstreamImpactCount", 0),
             "upstreamDependencyCount": summary.get("upstreamDependencyCount", 0),
+            "upstreamDependencyPathCount": summary.get("upstreamDependencyPathCount", 0),
             "highestReviewPrioritySeverity": summary.get("highestReviewPrioritySeverity", "none"),
             "reviewPrioritySeverityCounts": _dict(summary.get("reviewPrioritySeverityCounts")),
             "affectedArtifactCount": len(_coerce_list(report.get("affectedArtifacts"))),
@@ -3403,6 +3459,31 @@ def _node_list_lines(nodes: list[Any]) -> list[str]:
             lines.append(f"  - {_node_label(node)}")
     if len(nodes) > 12:
         lines.append(f"  ... {len(nodes) - 12} more")
+    return lines or ["  - None"]
+
+
+def _dependency_path_lines(paths: list[Any]) -> list[str]:
+    if not paths:
+        return ["  - None"]
+    lines: list[str] = []
+    for path in paths[:8]:
+        if not isinstance(path, dict):
+            continue
+        root = _dict(path.get("root"))
+        hops = _coerce_list(path.get("hops"))
+        rendered_hops = []
+        for hop in hops:
+            if not isinstance(hop, dict):
+                continue
+            source = _dict(hop.get("from"))
+            destination = _dict(hop.get("to"))
+            rendered_hops.append(
+                f"{source.get('id', '')} --{hop.get('relationship', '')}--> "
+                f"{destination.get('id', '')}{_relationship_description_suffix(hop)}"
+            )
+        lines.append(f"  - {root.get('id', 'unknown')}: " + " | ".join(rendered_hops))
+    if len(paths) > 8:
+        lines.append(f"  ... {len(paths) - 8} more")
     return lines or ["  - None"]
 
 

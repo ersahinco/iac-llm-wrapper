@@ -152,6 +152,12 @@ def test_decision_impact_traverses_contract_module_and_policy_edges(tmp_path: Pa
         "--to policy_control:VPC-NETWORK-001"
     ) in policy_step["pathQueries"]
     assert report["summary"]["reviewChecklistCount"] == len(report["reviewChecklist"])
+    assert report["summary"]["upstreamDependencyPathCount"] == len(report["dependencyPaths"])
+    source_dependency_path = next(
+        item for item in report["dependencyPaths"] if item["dependency"]["kind"] == "source_context"
+    )
+    assert source_dependency_path["root"]["id"] == "decision:cidr"
+    assert source_dependency_path["hops"][-1]["relationship"] == "provides-decision-context"
     path_targets = {item["target"]["id"] for item in report["impactPaths"]}
     assert "policy_control:VPC-NETWORK-001" in path_targets
     assert "artifact:decision-report.yaml" in path_targets
@@ -168,6 +174,7 @@ def test_decision_impact_traverses_contract_module_and_policy_edges(tmp_path: Pa
     rendered = render_impact_report_text(report)
     assert "Impact Analysis" in rendered
     assert "Review checklist:" in rendered
+    assert "Dependency paths:" in rendered
     assert "Affected target contracts:" in rendered
     assert "Impact paths:" in rendered
     assert "decision:cidr --mapped-to-control--> policy_control:VPC-NETWORK-001" in rendered
@@ -301,6 +308,7 @@ def test_graph_impact_matrix_compares_multiple_roots(tmp_path: Path):
     assert statuses["decision:missing"] == "no-match"
     cidr_row = next(row for row in report["rows"] if row["root"]["id"] == "decision:cidr")
     assert cidr_row["reviewChecklist"][0]["category"] == "target-contracts"
+    assert cidr_row["summary"]["upstreamDependencyPathCount"] >= 1
     rendered = render_impact_matrix_text(report)
     assert "Graph Impact Matrix" in rendered
     assert "decision:cidr" in rendered
