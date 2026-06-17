@@ -575,12 +575,22 @@ def test_graph_roots_report_lists_concrete_traversal_roots(tmp_path: Path):
     assert report["summary"]["status"] == "matched"
     assert "decision:cidr" in report["rootsByKind"]["decision"]
     assert "policy_control:VPC-NETWORK-001" in report["rootsByKind"]["policy_control"]
+    assert report["summary"]["topologyHotspotRootCount"] >= 1
+    assert "decision:cidr" in report["summary"]["topologyHotspotRootKinds"]["decision"]
+    hotspot = next(
+        item for item in report["topologyHotspotRoots"] if item["root"] == "decision:cidr"
+    )
+    assert hotspot["reason"] == "High-degree graph node; inspect as a broad dependency pivot."
+    assert hotspot["totalDegree"] == hotspot["incomingDegree"] + hotspot["outgoingDegree"]
+    assert hotspot["commands"]["impact"].endswith("--root decision:cidr")
     root = next(item for item in report["roots"] if item["root"] == "decision:cidr")
     assert root["commands"]["impact"].endswith("--root decision:cidr")
     assert root["commands"]["neighbors"].endswith("--root decision:cidr")
     rendered = render_roots_report_text(report)
     assert "Graph Roots" in rendered
     assert "Root kinds:" in rendered
+    assert "Topology hotspot roots:" in rendered
+    assert "decision:cidr" in rendered
 
 
 def test_graph_roots_report_recommends_source_change_roots(tmp_path: Path):
@@ -639,6 +649,8 @@ def test_graph_roots_cli_writes_report(tmp_path: Path):
     assert report["schemaVersion"] == "intent-engine/graph-roots/v1"
     assert "decision:cidr" in report["rootsByKind"]["decision"]
     assert report["summary"]["kindFilter"] == ["decision"]
+    assert set(report["summary"]["topologyHotspotRootKinds"]) == {"decision"}
+    assert all(item["node"]["kind"] == "decision" for item in report["topologyHotspotRoots"])
 
 
 def test_bundle_graph_report_exports_readiness_and_contract_validation_nodes(tmp_path: Path):

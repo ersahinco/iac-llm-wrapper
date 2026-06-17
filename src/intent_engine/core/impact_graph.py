@@ -720,6 +720,7 @@ def build_roots_report(
     ]
     roots = [_root_entry(node) for node in nodes]
     recommendations = _recommended_review_roots(nodes)
+    topology_hotspots = _topology_hotspot_root_entries(graph, kinds=kind_filter)
     status = "matched" if roots else "no-match"
     return {
         "schemaVersion": "intent-engine/graph-roots/v1",
@@ -732,11 +733,14 @@ def build_roots_report(
             "recommendedReviewRootCount": len(recommendations),
             "recommendedReviewRootCategories": _recommendation_categories(recommendations),
             "recommendedReviewRootCategoryCounts": _recommendation_category_counts(recommendations),
+            "topologyHotspotRootCount": len(topology_hotspots),
+            "topologyHotspotRootKinds": _roots_by_kind(topology_hotspots),
             "kindFilter": kind_filter,
             "nodeKinds": _count_by([entry["node"] for entry in roots], "kind"),
         },
         "rootsByKind": _roots_by_kind(roots),
         "recommendedReviewRoots": recommendations,
+        "topologyHotspotRoots": topology_hotspots,
         "roots": roots,
         "reviewFocus": _roots_review_focus(
             status=status,
@@ -1125,6 +1129,7 @@ def render_roots_report_text(report: dict[str, Any]) -> str:
         f"Bundle: {report.get('bundle', '')}",
         f"Roots: {summary.get('rootCount', 0)}",
         f"Recommended review roots: {summary.get('recommendedReviewRootCount', 0)}",
+        f"Topology hotspot roots: {summary.get('topologyHotspotRootCount', 0)}",
         "",
         "Root kinds:",
     ]
@@ -1143,6 +1148,21 @@ def render_roots_report_text(report: dict[str, Any]) -> str:
             lines.append(f"  - {_node_label(node)} [{category}]: {item.get('reason', '')}")
         if len(recommendations) > 12:
             lines.append(f"  ... {len(recommendations) - 12} more")
+    else:
+        lines.append("  - None")
+    lines.append("Topology hotspot roots:")
+    hotspots = _coerce_list(report.get("topologyHotspotRoots"))
+    if hotspots:
+        for item in hotspots[:12]:
+            if not isinstance(item, dict):
+                continue
+            node = _dict(item.get("node"))
+            lines.append(
+                f"  - {_node_label(node)}: total={item.get('totalDegree', 0)} "
+                f"in={item.get('incomingDegree', 0)} out={item.get('outgoingDegree', 0)}"
+            )
+        if len(hotspots) > 12:
+            lines.append(f"  ... {len(hotspots) - 12} more")
     else:
         lines.append("  - None")
     lines.append("Review focus:")
@@ -2638,6 +2658,42 @@ def _roots_by_kind(roots: list[dict[str, Any]]) -> dict[str, list[str]]:
         if root_value:
             grouped.setdefault(kind, []).append(root_value)
     return {kind: sorted(items) for kind, items in sorted(grouped.items())}
+
+
+def _topology_hotspot_root_entries(
+    graph: _ImpactGraph,
+    *,
+    kinds: list[str] | None = None,
+    limit: int = 12,
+) -> list[dict[str, Any]]:
+    kind_filter = set(kinds or [])
+    nodes = [node.to_dict() for node in sorted(graph.nodes.values(), key=lambda item: item.id)]
+    edges = [
+        edge.to_dict()
+        for edge in sorted(
+            graph.edges,
+            key=lambda item: (item.source, item.relationship, item.target),
+        )
+    ]
+    topology = _bundle_graph_topology_summary(nodes, edges)
+    entries: list[dict[str, Any]] = []
+    for hotspot in _coerce_list(topology.get("hotspotNodes")):
+        if not isinstance(hotspot, dict) or not hotspot.get("rootSelectable"):
+            continue
+        node_id = str(hotspot.get("id") or "")
+        if node_id not in graph.nodes:
+            continue
+        if kind_filter and graph.nodes[node_id].kind not in kind_filter:
+            continue
+        entry = _root_entry(graph.nodes[node_id])
+        entry["reason"] = "High-degree graph node; inspect as a broad dependency pivot."
+        entry["incomingDegree"] = hotspot.get("incomingDegree", 0)
+        entry["outgoingDegree"] = hotspot.get("outgoingDegree", 0)
+        entry["totalDegree"] = hotspot.get("totalDegree", 0)
+        entries.append(entry)
+        if len(entries) >= limit:
+            break
+    return entries
 
 
 def _recommended_review_roots(nodes: list[_ImpactNode]) -> list[dict[str, Any]]:
