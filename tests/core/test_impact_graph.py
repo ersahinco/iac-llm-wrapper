@@ -579,7 +579,13 @@ def test_graph_roots_report_recommends_source_change_roots(tmp_path: Path):
     assert report["summary"]["kindFilter"] == ["source_change"]
     assert report["rootsByKind"]["source_change"] == ["source_change:structured:cidr"]
     assert report["recommendedReviewRoots"][0]["root"] == "source_change:structured:cidr"
+    assert report["recommendedReviewRoots"][0]["category"] == "source-changes"
     assert "Source change" in report["recommendedReviewRoots"][0]["reason"]
+    assert report["summary"]["recommendedReviewRootCategories"] == ["source-changes"]
+    assert report["summary"]["recommendedReviewRootCategoryCounts"] == {"source-changes": 1}
+    rendered = render_roots_report_text(report)
+    assert "Recommended review categories:" in rendered
+    assert "source-changes: 1" in rendered
 
 
 def test_graph_roots_cli_writes_report(tmp_path: Path):

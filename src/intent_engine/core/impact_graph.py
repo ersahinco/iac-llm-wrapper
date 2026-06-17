@@ -728,6 +728,8 @@ def build_roots_report(
             "status": status,
             "rootCount": len(roots),
             "recommendedReviewRootCount": len(recommendations),
+            "recommendedReviewRootCategories": _recommendation_categories(recommendations),
+            "recommendedReviewRootCategoryCounts": _recommendation_category_counts(recommendations),
             "kindFilter": kind_filter,
             "nodeKinds": _count_by([entry["node"] for entry in roots], "kind"),
         },
@@ -1101,6 +1103,8 @@ def render_roots_report_text(report: dict[str, Any]) -> str:
     ]
     for key, count in sorted(_dict(summary.get("nodeKinds")).items()):
         lines.append(f"  - {key}: {count}")
+    lines.append("Recommended review categories:")
+    lines.extend(_count_lines(_dict(summary.get("recommendedReviewRootCategoryCounts"))))
     lines.append("Recommended review roots:")
     recommendations = _coerce_list(report.get("recommendedReviewRoots"))
     if recommendations:
@@ -1108,7 +1112,8 @@ def render_roots_report_text(report: dict[str, Any]) -> str:
             if not isinstance(item, dict):
                 continue
             node = _dict(item.get("node"))
-            lines.append(f"  - {_node_label(node)}: {item.get('reason', '')}")
+            category = str(item.get("category") or "uncategorized")
+            lines.append(f"  - {_node_label(node)} [{category}]: {item.get('reason', '')}")
         if len(recommendations) > 12:
             lines.append(f"  ... {len(recommendations) - 12} more")
     else:
@@ -2572,9 +2577,11 @@ def _roots_by_kind(roots: list[dict[str, Any]]) -> dict[str, list[str]]:
 def _recommended_review_roots(nodes: list[_ImpactNode]) -> list[dict[str, Any]]:
     recommendations = []
     for node in nodes:
-        reason = _review_root_reason(node)
+        category = _review_root_category(node)
+        reason = _review_root_reason(category)
         if reason:
             entry = _root_entry(node)
+            entry["category"] = category
             entry["reason"] = reason
             recommendations.append(entry)
     return sorted(
@@ -2583,27 +2590,56 @@ def _recommended_review_roots(nodes: list[_ImpactNode]) -> list[dict[str, Any]]:
     )
 
 
-def _review_root_reason(node: _ImpactNode) -> str:
+def _recommendation_categories(recommendations: list[dict[str, Any]]) -> list[str]:
+    return sorted(
+        {
+            str(item.get("category") or "")
+            for item in recommendations
+            if str(item.get("category") or "")
+        }
+    )
+
+
+def _recommendation_category_counts(recommendations: list[dict[str, Any]]) -> dict[str, int]:
+    return _count_by(recommendations, "category")
+
+
+def _review_root_category(node: _ImpactNode) -> str:
     status = str(node.properties.get("status") or "").lower()
     if node.kind == "source_change":
-        return "Source change can affect downstream decisions and emitted handoff artifacts."
+        return "source-changes"
     if node.kind == "readiness_blocker":
-        return "Readiness blocker must be resolved or accepted before handoff."
+        return "readiness-blockers"
     if node.kind == "validation_violation":
-        return "Contract validation violation requires review before handoff."
+        return "validation-violations"
     if node.kind == "checkov_finding":
-        return "Checkov finding is shift-left evidence for owner policy review."
+        return "checkov-findings"
     if node.kind == "downstream_validation_evidence" and status not in {"", "pass"}:
-        return "Downstream validation evidence is not passing."
+        return "downstream-validation"
     if node.kind == "contract_validation" and status not in {"", "pass"}:
-        return "Contract validation status is not passing."
+        return "contract-validation"
     if node.kind == "handoff_readiness" and (
         status not in {"", "ready"} or node.properties.get("handoffAllowed") is False
     ):
-        return "Handoff readiness is not ready or not allowed."
+        return "handoff-readiness"
     if node.kind == "shift_left_evidence" and status not in {"", "pass", "skipped"}:
-        return "Shift-left evidence is not passing."
+        return "shift-left-evidence"
     return ""
+
+
+def _review_root_reason(category: str) -> str:
+    return {
+        "source-changes": (
+            "Source change can affect downstream decisions and emitted handoff artifacts."
+        ),
+        "readiness-blockers": "Readiness blocker must be resolved or accepted before handoff.",
+        "validation-violations": "Contract validation violation requires review before handoff.",
+        "checkov-findings": "Checkov finding is shift-left evidence for owner policy review.",
+        "downstream-validation": "Downstream validation evidence is not passing.",
+        "contract-validation": "Contract validation status is not passing.",
+        "handoff-readiness": "Handoff readiness is not ready or not allowed.",
+        "shift-left-evidence": "Shift-left evidence is not passing.",
+    }.get(category, "")
 
 
 def _recommendation_rank(node: dict[str, Any]) -> int:
