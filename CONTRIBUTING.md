@@ -68,12 +68,34 @@ uv run python scripts/sync-sample-fixtures.py --check
 uv run python scripts/evaluate-golden-journey.py
 uv run python scripts/evaluate-extraction.py
 uv run python scripts/evaluate-usability.py
-uv run pre-commit run --all-files
+uv run --extra dev prek run --all-files
 ```
 
 For small changes, run the smallest relevant subset from the change matrix.
 Extraction, pattern, or prompt changes should also use the LLM-backed workflows
 in [docs/LLM_SETUP.md](docs/LLM_SETUP.md) when model behavior matters.
+
+## Shift-left hook tools
+
+`prek` reads `.pre-commit-config.yaml` and runs lightweight checks on normal
+commits: Ruff, YAML/TOML hygiene, Actionlint, Typos, Markdownlint, ShellCheck,
+shfmt, Hadolint, Terraform/OpenTofu fmt, mypy, Pyright, and fixture drift. Native
+tools that are not installed are skipped by default; set
+`PREK_REQUIRE_EXTERNAL_TOOLS=1` when a workstation or CI job should fail closed
+on missing external tools.
+
+Deeper or slower checks are registered as manual hooks:
+
+```bash
+uv run --extra dev prek run --all-files --hook-stage manual
+```
+
+Manual hooks cover Terraform/OpenTofu validate, Terraform docs, TFLint,
+tfupdate availability, Checkov IaC/policy scanning, Trivy and Grype filesystem
+scans, Gitleaks and Deepfence SecretScanner secret scans, and OWASP
+Dependency-Check. Paid or hosted services such as SonarQube/Palo Alto/BISE are
+not required for local contribution; owners can run those in their platform
+pipelines when they apply.
 
 ## Code conventions
 

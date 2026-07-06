@@ -106,6 +106,8 @@ def _hcl_value(value: Any) -> str:
         # writes a simple HCL object literal — rarely needed for tfvars.
         pairs = ", ".join(f"{k} = {_hcl_value(v)}" for k, v in value.items())
         return "{" + pairs + "}"
+    if isinstance(value, str) and value.startswith("${") and value.endswith("}"):
+        return value[2:-1]
     # Strings (and anything else) get quoted
     return json.dumps(str(value))
 
@@ -124,8 +126,9 @@ def gen_tfvars(intent: Any, output_dir: Path) -> None:
 
     for mi in inputs:
         lines.append(f"# Module: {mi.module_name}")
+        key_width = max((len(key) for key in mi.variables), default=0)
         for key, value in mi.variables.items():
-            lines.append(f"{key} = {_hcl_value(value)}")
+            lines.append(f"{key.ljust(key_width)} = {_hcl_value(value)}")
         lines.append("")
 
     output_dir.mkdir(parents=True, exist_ok=True)

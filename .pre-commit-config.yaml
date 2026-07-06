@@ -17,6 +17,46 @@ repos:
 
   - repo: local
     hooks:
+      - id: actionlint
+        name: actionlint
+        entry: uv run python scripts/run-prek-tool-check.py actionlint
+        language: system
+        files: ^\.github/workflows/.*\.ya?ml$
+      - id: markdownlint
+        name: markdownlint
+        entry: uv run python scripts/run-prek-tool-check.py markdownlint
+        language: system
+        files: \.md$
+      - id: typos
+        name: typos
+        entry: uv run python scripts/run-prek-tool-check.py typos
+        language: system
+        files: \.(hcl|json|md|py|sh|tf|tfvars|toml|txt|ya?ml)$
+      - id: shellcheck
+        name: shellcheck
+        entry: uv run python scripts/run-prek-tool-check.py shellcheck
+        language: system
+        files: \.(bash|bats|sh)$
+      - id: shfmt
+        name: shfmt
+        entry: uv run python scripts/run-prek-tool-check.py shfmt
+        language: system
+        files: \.(bash|bats|sh)$
+      - id: hadolint
+        name: hadolint
+        entry: uv run python scripts/run-prek-tool-check.py hadolint
+        language: system
+        files: (^|/)(Dockerfile[^/]*|.*\.dockerfile)$
+      - id: terraform-fmt
+        name: terraform fmt
+        entry: uv run python scripts/run-prek-tool-check.py terraform-fmt
+        language: system
+        files: \.(hcl|tf|tfvars)$
+      - id: opentofu-fmt
+        name: opentofu fmt
+        entry: uv run python scripts/run-prek-tool-check.py opentofu-fmt
+        language: system
+        files: \.(hcl|tf|tfvars)$
       - id: mypy
         name: mypy
         entry: uv run --extra dev mypy
@@ -32,3 +72,74 @@ repos:
         entry: uv run python scripts/sync-sample-fixtures.py --check
         language: system
         pass_filenames: false
+      - id: commitlint
+        name: commitlint
+        entry: uv run python scripts/run-prek-tool-check.py commitlint
+        language: system
+        stages: [commit-msg]
+      - id: terraform-validate
+        name: terraform validate
+        entry: uv run python scripts/run-prek-tool-check.py terraform-validate
+        language: system
+        files: \.tf$
+        stages: [manual]
+      - id: opentofu-validate
+        name: opentofu validate
+        entry: uv run python scripts/run-prek-tool-check.py opentofu-validate
+        language: system
+        files: \.tf$
+        stages: [manual]
+      - id: terraform-docs
+        name: terraform-docs
+        entry: uv run python scripts/run-prek-tool-check.py terraform-docs
+        language: system
+        files: \.tf$
+        stages: [manual]
+      - id: tflint
+        name: tflint
+        entry: uv run python scripts/run-prek-tool-check.py tflint
+        language: system
+        files: \.tf$
+        stages: [manual]
+      - id: tfupdate
+        name: tfupdate availability
+        entry: uv run python scripts/run-prek-tool-check.py tfupdate
+        language: system
+        files: \.tf$
+        stages: [manual]
+      - id: checkov
+        name: checkov IaC and policy scan
+        entry: uv run python scripts/run-prek-tool-check.py checkov
+        language: system
+        pass_filenames: false
+        stages: [manual]
+      - id: trivy-fs
+        name: trivy filesystem vulnerability, secret, and config scan
+        entry: uv run python scripts/run-prek-tool-check.py trivy-fs
+        language: system
+        pass_filenames: false
+        stages: [manual]
+      - id: grype-fs
+        name: grype filesystem dependency scan
+        entry: uv run python scripts/run-prek-tool-check.py grype-fs
+        language: system
+        pass_filenames: false
+        stages: [manual]
+      - id: gitleaks
+        name: gitleaks secret scan
+        entry: uv run python scripts/run-prek-tool-check.py gitleaks
+        language: system
+        pass_filenames: false
+        stages: [manual]
+      - id: deepfence-secretscanner
+        name: Deepfence SecretScanner scan
+        entry: uv run python scripts/run-prek-tool-check.py deepfence-secretscanner
+        language: system
+        pass_filenames: false
+        stages: [manual]
+      - id: owasp-dependency-check
+        name: OWASP Dependency-Check scan
+        entry: uv run python scripts/run-prek-tool-check.py owasp-dependency-check
+        language: system
+        pass_filenames: false
+        stages: [manual]

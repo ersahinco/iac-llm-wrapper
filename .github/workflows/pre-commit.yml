@@ -1,11 +1,11 @@
-name: Pre-commit
+name: Prek
 
 on:
   pull_request:
     branches: [main]
 
 jobs:
-  pre-commit:
+  prek:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,5 +22,5 @@ jobs:
         run: |
           uv pip install --system -e ".[dev]"
 
-      - name: Run pre-commit
-        run: uv run pre-commit run --all-files
+      - name: Run prek
+        run: uv run --extra dev prek run --all-files

@@ -46,7 +46,7 @@ dev = [
     "pyright>=1.1.410",
     "pip-audit>=2.7",
     "bandit>=1.7",
-    "pre-commit>=3.0",
+    "prek>=0.4.8",
 ]
 
 [build-system]

@@ -193,7 +193,7 @@ class TestGenTFVars:
         assert tfvars.exists()
         content = tfvars.read_text()
         assert "lza-network" in content
-        assert 'cidr = "10.0.0.0/16"' in content
+        assert 'cidr        = "10.0.0.0/16"' in content
         assert "enable_logs = true" in content
 
     def test_no_module_inputs_skips(self, tmp_path: Path):
@@ -226,6 +226,21 @@ class TestGenTFVars:
         assert "# Module: mod-b" in content
         assert "x = 1" in content
         assert "y = false" in content
+
+    def test_tfvars_formats_interpolation_references_as_hcl_references(self, tmp_path: Path):
+        payload = IaCIntentPayload(
+            design_doc=None,  # type: ignore[arg-type]
+            module_inputs=[
+                ModuleInputs(
+                    module_name="terraform-aws-eks",
+                    variables={"vpc_id": "${module.vpc.vpc_id}"},
+                )
+            ],
+            intent=None,
+        )
+        gen_tfvars(payload, tmp_path)
+        content = (tmp_path / "terraform.tfvars").read_text()
+        assert "vpc_id = module.vpc.vpc_id" in content
 
     def test_global_generation_scopes_tfvars_to_explicit_terraform_patterns(
         self,

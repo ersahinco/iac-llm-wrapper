@@ -33,3 +33,35 @@ def test_github_actions_do_not_run_infrastructure_deploy_commands():
     )
     for command in forbidden_commands:
         assert command not in workflows
+
+
+def test_prek_security_and_infra_hooks_are_registered():
+    config = _read(".pre-commit-config.yaml")
+
+    expected_hooks = (
+        "actionlint",
+        "markdownlint",
+        "typos",
+        "shellcheck",
+        "shfmt",
+        "hadolint",
+        "commitlint",
+        "terraform-fmt",
+        "opentofu-fmt",
+        "terraform-validate",
+        "opentofu-validate",
+        "terraform-docs",
+        "tflint",
+        "tfupdate",
+        "checkov",
+        "trivy-fs",
+        "grype-fs",
+        "gitleaks",
+        "deepfence-secretscanner",
+        "owasp-dependency-check",
+    )
+    for hook_id in expected_hooks:
+        assert f"id: {hook_id}" in config
+
+    assert "scripts/run-prek-tool-check.py" in config
+    assert "stages: [manual]" in config

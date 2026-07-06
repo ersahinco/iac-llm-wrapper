@@ -41,7 +41,7 @@ auditTrail:
   how: decided
 - timestamp: '2026-06-09T12:39:29.378030+00:00'
   key: identity_center_assignments
-  value: 
+  value:
     ClinicalPlatform:ClinicalReadOnly:ClinicalProd,SecurityAuditors:SecurityAudit:Audit
   how: decided
 - timestamp: '2026-06-09T12:39:29.378045+00:00'
