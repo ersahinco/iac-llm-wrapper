@@ -18,6 +18,7 @@ from .sample_config import SampleConfig, SampleMatch, find_best_sample_matches, 
 
 GeneratorFn = Callable[[Any, Path], None]
 TargetReportBuilder = Callable[[dict[str, Any], str], dict[str, Any]]
+ReadinessEnricher = Callable[[Any, dict[str, Any]], dict[str, Any]]
 
 
 @dataclass
@@ -60,6 +61,8 @@ class Pattern:
     policy_packs: list[PolicyPack] = field(default_factory=list)
     # Optional pattern-owned target routing/report builder.
     target_report_builder: TargetReportBuilder | None = None
+    # Optional pattern-owned readiness details such as plan maturity.
+    readiness_enricher: ReadinessEnricher | None = None
     # Whether this pattern emits a registered target plan-ready metadata bundle.
     plan_ready: bool = False
 

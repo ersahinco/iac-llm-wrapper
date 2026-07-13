@@ -17,10 +17,31 @@ readiness:
       review.
     blockers: *id001
   planReady:
-    status: not-declared
+    status: blocked
     planAllowed: false
-    summary: No registered plan-ready bundle is declared for this target.
-    blockers: []
+    summary: AWS LZA configuration is ready for review, but plan/diff still
+      needs explicit inputs.
+    blockers:
+      - code: AWS_LZA_PLAN_ACCOUNT_EMAILS_REQUIRED
+        message: Generated account emails use placeholder example.com addresses;
+          replace them with owned account vending emails before a
+          no-interpretation LZA plan.
+        affectedArtifacts:
+          - accounts-config.yaml
+        owner: release-owner
+      - code: AWS_LZA_PLAN_NETWORK_DETAILS_REQUIRED
+        message: Generated network config still contains empty route tables,
+          subnets, NAT gateways, or TGW attachment details that require
+          network-owner review before plan.
+        affectedArtifacts:
+          - network-config.yaml
+        owner: network-owner
+      - code: AWS_LZA_PLAN_TGW_ROUTES_REQUIRED
+        message: Hub-spoke topology has a transit gateway shell but no route
+          entries or attachment intent suitable for an interpretation-free plan.
+        affectedArtifacts:
+          - network-config.yaml
+        owner: network-owner
 targetContracts:
   - name: aws-lza-sample-configuration
     kind: aws-lza-sample-configuration

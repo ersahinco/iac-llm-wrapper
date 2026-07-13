@@ -8,6 +8,7 @@ from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern, PatternGenerat
 
 from .contracts import AWS_LZA_SAMPLE_CONFIG_CONTRACT
 from .generators import (
+    enrich_lza_handoff_readiness,
     gen_lza_accounts_config,
     gen_lza_decision_report,
     gen_lza_deployment_runbook,
@@ -228,6 +229,7 @@ def _register_pattern() -> None:
             ),
             contracts=[AWS_LZA_SAMPLE_CONFIG_CONTRACT],
             samples=aws_lza_samples(),
+            readiness_enricher=enrich_lza_handoff_readiness,
             plan_ready=True,
         )
     )

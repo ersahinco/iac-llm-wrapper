@@ -112,6 +112,17 @@ def _build_payload(
     )
 
 
+def _enrich_handoff_readiness(
+    pattern: str,
+    intent: Any,
+    readiness: dict[str, Any],
+) -> dict[str, Any]:
+    pattern_obj = GLOBAL_REGISTRY.get(pattern)
+    if pattern_obj.readiness_enricher is None:
+        return readiness
+    return pattern_obj.readiness_enricher(intent, dict(readiness))
+
+
 def _to_builtin(value: Any) -> Any:
     if hasattr(value, "value"):
         return _to_builtin(value.value)
@@ -567,6 +578,7 @@ def _build_failure_artifacts_and_raise(
     output_dir: Path,
     pattern: str,
     graph,
+    intent: Any,
     violations: list[Violation],
     llm_result: LLMGraphResult,
     evidence_store: LLMEvidenceStore | None,
@@ -586,6 +598,7 @@ def _build_failure_artifacts_and_raise(
         blocking_result,
         target_capability_report,
     )
+    readiness = _enrich_handoff_readiness(pattern, intent, readiness)
     extraction_summary = _build_extraction_summary(
         pattern=pattern,
         evidence_store=evidence_store,
@@ -696,6 +709,7 @@ def _validate_and_generate(
         blocking_llm_result,
         target_capability_report,
     )
+    readiness = _enrich_handoff_readiness(pattern, intent, readiness)
     extraction_summary = _build_extraction_summary(
         pattern=pattern,
         evidence_store=evidence_store,
@@ -715,6 +729,7 @@ def _validate_and_generate(
             output_dir=output_dir,
             pattern=pattern,
             graph=graph,
+            intent=intent,
             violations=violations,
             llm_result=llm_result,
             evidence_store=evidence_store,
@@ -753,6 +768,7 @@ def _validate_and_generate(
             output_dir=output_dir,
             pattern=pattern,
             graph=graph,
+            intent=intent,
             violations=artifact_violations,
             llm_result=llm_result,
             evidence_store=evidence_store,

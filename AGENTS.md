@@ -153,20 +153,25 @@ AWS LZA owner-validation readiness audit and lean repair.
 
 - **Committed cleanup**: `606bd3e` removed redundant YAML helpers, unused hook
   metadata, a generic test docstring, and stale session memory.
+- **Committed validation review fix**: `d297e59` links persisted
+  `contract-validation.yaml` in review HTML and prioritizes placeholder account
+  email failures before AWS lookup permission.
 - **Customer packet**: the banking AWS LZA packet compiles and reviews in
   ignored `tests/results/owner-readiness-banking-lza/`; handoff is allowed, but
   downstream plan readiness is blocked on owner account emails and explicit
   network/TGW plan inputs.
-- **Fixes in progress**: static review links existing `contract-validation.yaml`;
-  LZA diagnostics and review fallbacks prioritize placeholder account-email
-  failures before AWS account lookup permission.
+- **Fixes in progress**: pattern-owned readiness enrichment now makes
+  `handoff-plan.yaml` agree with AWS LZA `decision-report.yaml` and
+  `plan-manifest.yaml`: default sample bundles show plan readiness blocked on
+  concrete plan input blockers, while explicit private plan inputs show
+  `planAllowed: true`.
 - **Evidence**: the base packet official LZA validation now reports
   `owner-account-email-required` (`Default email (audit@example.com) found.`).
   An ignored private plan-input variant with non-placeholder emails and
   network/TGW details reaches `aws-account-lookup-permission`, proving the repo
   side clears plan inputs before the owner AWS context gate.
-- **Tests**: `uv run pytest` passed (452 passed, 1 skipped); focused review/LZA
-  and review CLI tests passed.
+- **Tests**: `uv run pytest` passed (452 passed, 1 skipped); focused AWS LZA,
+  generator, contract validation, review/LZA, and review CLI tests passed.
 - **Lint/format/type/hooks**: `uv run ruff check .`,
   `uv run ruff format --check .`, `uv run --extra dev mypy`,
   `uv run --extra dev pyright .`, and

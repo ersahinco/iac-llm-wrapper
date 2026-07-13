@@ -402,6 +402,15 @@ def _lza_plan_readiness(intent: Any) -> dict[str, Any]:
     }
 
 
+def enrich_lza_handoff_readiness(intent: Any, readiness: dict[str, Any]) -> dict[str, Any]:
+    lza_intent = _aws_lza_intent(intent)
+    if lza_intent is None:
+        return readiness
+    enriched = dict(readiness)
+    enriched["planReady"] = _lza_plan_readiness(lza_intent)
+    return enriched
+
+
 def gen_lza_plan_manifest(payload: Any, output_dir: Path) -> None:
     readiness = getattr(payload, "handoff_readiness", {})
     intent = _aws_lza_intent(payload)
@@ -520,7 +529,5 @@ def gen_lza_decision_report(intent: Any, output_dir: Path) -> None:
         "semanticModel": build_aws_lza_semantic_model(intent).to_dict(),
     }
     if readiness:
-        readiness = dict(readiness)
-        readiness["planReady"] = _lza_plan_readiness(intent)
-        data["handoffReadiness"] = readiness
+        data["handoffReadiness"] = enrich_lza_handoff_readiness(intent, readiness)
     _write_yaml(output_dir, "decision-report.yaml", data)

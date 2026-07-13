@@ -30,7 +30,7 @@ artifacts:
     - name: global-config.yaml
       sha256: 477f2eeb1f8066f5bf564d9609535651824815e2b46aee765dd642672abdef46
     - name: handoff-plan.yaml
-      sha256: 37842c8ba71e70500122235700be67cb521576f8c1b78fad0f50801ef995aac7
+      sha256: aa79021ac8df2d08a7a3565cf33a6ea7e89dc4c89d40baa3a439ff45a158fda8
     - name: iam-config.yaml
       sha256: 32345f049b5f518633a0451c93dec5e88d8949c0ad4be8843029c144d17d7e36
     - name: lineage-manifest.yaml

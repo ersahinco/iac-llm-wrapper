@@ -331,6 +331,14 @@ class TestAwsLzaPattern:
             "AWS_LZA_PLAN_NETWORK_DETAILS_REQUIRED",
             "AWS_LZA_PLAN_TGW_ROUTES_REQUIRED",
         } <= {item["code"] for item in plan["blockers"]}
+        handoff = yaml.load((output / "handoff-plan.yaml").read_text())
+        assert handoff["readiness"]["planReady"]["status"] == "blocked"
+        assert handoff["readiness"]["planReady"]["planAllowed"] is False
+        assert {
+            "AWS_LZA_PLAN_ACCOUNT_EMAILS_REQUIRED",
+            "AWS_LZA_PLAN_NETWORK_DETAILS_REQUIRED",
+            "AWS_LZA_PLAN_TGW_ROUTES_REQUIRED",
+        } <= {item["code"] for item in handoff["readiness"]["planReady"]["blockers"]}
         assert {item["artifact"] for item in plan["immutableInputs"]} == {
             "accounts-config.yaml",
             "global-config.yaml",
@@ -394,6 +402,10 @@ class TestAwsLzaPattern:
         assert plan["planInvocation"]["mode"] == "metadata-only"
         assert plan["planInvocation"]["applyAllowed"] is False
         assert "Release owner confirms account emails" in " ".join(plan["manualGates"])
+        handoff = yaml.load((output / "handoff-plan.yaml").read_text())
+        assert handoff["readiness"]["planReady"]["status"] == "ready"
+        assert handoff["readiness"]["planReady"]["planAllowed"] is True
+        assert handoff["readiness"]["planReady"]["blockers"] == []
 
         accounts = yaml.load((output / "accounts-config.yaml").read_text())
         account_emails = {
