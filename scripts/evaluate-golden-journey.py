@@ -15,6 +15,7 @@ from typing import Any
 import ruamel.yaml
 
 from intent_engine.core.contract_validation import build_contract_validation
+from intent_engine.core.yaml_utils import write_yaml_artifact
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 READY_FIXTURE = REPO_ROOT / "fixtures" / "eval" / "aws-lza-customer-board-notes.md"
@@ -678,27 +679,20 @@ def _print_results(
 def _write_benchmark_summary(path: Path | None, summary: dict[str, Any]) -> None:
     if path is None:
         return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    yaml = ruamel.yaml.YAML()
-    yaml.default_flow_style = False
-    with path.open("w") as handle:
-        yaml.dump(
-            {
-                "schemaVersion": "intent-engine/golden-journey-benchmark/v1",
-                **summary,
-            },
-            handle,
-        )
+    write_yaml_artifact(
+        path,
+        {
+            "schemaVersion": "intent-engine/golden-journey-benchmark/v1",
+            **summary,
+        },
+        header="",
+    )
 
 
 def _write_results(path: Path | None, artifact: dict[str, Any]) -> None:
     if path is None:
         return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    yaml = ruamel.yaml.YAML()
-    yaml.default_flow_style = False
-    with path.open("w") as handle:
-        yaml.dump(artifact, handle)
+    write_yaml_artifact(path, artifact, header="")
 
 
 def _results_artifact(

@@ -14,13 +14,11 @@ from intent_engine.core.contract_validation import (
 from intent_engine.core.contracts import ArtifactContract, TargetContract
 from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern
 from intent_engine.core.requirements import Requirement, RequirementGraph
+from intent_engine.core.yaml_utils import write_yaml_artifact
 
 
 def _write_yaml(path: Path, data: dict[str, Any]) -> None:
-    yaml = ruamel.yaml.YAML()
-    yaml.default_flow_style = False
-    with path.open("w") as handle:
-        yaml.dump(data, handle)
+    write_yaml_artifact(path, data, header="")
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:

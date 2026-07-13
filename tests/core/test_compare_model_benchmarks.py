@@ -7,17 +7,14 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import ruamel.yaml
+from intent_engine.core.yaml_utils import write_yaml_artifact
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "compare-model-benchmarks.py"
 
 
 def _write_yaml(path: Path, data: dict[str, Any]) -> None:
-    yaml = ruamel.yaml.YAML()
-    yaml.default_flow_style = False
-    with path.open("w") as handle:
-        yaml.dump(data, handle)
+    write_yaml_artifact(path, data, header="")
 
 
 def _run(*paths: Path, require_conformant: bool = False) -> subprocess.CompletedProcess[str]:

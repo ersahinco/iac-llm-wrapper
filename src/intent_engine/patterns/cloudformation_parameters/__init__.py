@@ -177,10 +177,6 @@ def _validate_intent(intent: Any) -> list[Violation]:
     return violations
 
 
-def _write_yaml(output_dir: Path, name: str, data: dict[str, Any]) -> None:
-    write_yaml_artifact(output_dir / name, data, header="")
-
-
 def gen_cloudformation_parameters(intent: Any, output_dir: Path) -> None:
     model = _intent(intent)
     if model is None:
@@ -193,7 +189,7 @@ def gen_cloudformation_parameters(intent: Any, output_dir: Path) -> None:
         "capabilities": model.capabilities,
         "executionRoleArn": model.execution_role_arn,
     }
-    _write_yaml(output_dir, "cloudformation-parameters.yaml", data)
+    write_yaml_artifact(output_dir / "cloudformation-parameters.yaml", data, header="")
 
 
 def gen_decision_report(intent: Any, output_dir: Path) -> None:
@@ -217,7 +213,7 @@ def gen_decision_report(intent: Any, output_dir: Path) -> None:
     }
     if readiness:
         data["handoffReadiness"] = readiness
-    _write_yaml(output_dir, "decision-report.yaml", data)
+    write_yaml_artifact(output_dir / "decision-report.yaml", data, header="")
 
 
 SECTION_MAP: dict[str, tuple[str, str | None]] = {

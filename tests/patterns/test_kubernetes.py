@@ -1,9 +1,4 @@
-"""Acceptance test: kubernetes-cluster pattern compiles end-to-end.
-
-This test proves the framework is generic: we added a new use case
-without modifying extractor.py, compiler.py, validator.py,
-interview.py, or cli.py.
-"""
+"""Kubernetes pattern compile tests."""
 
 from __future__ import annotations
 

@@ -13,14 +13,11 @@ from intent_engine.core.battle_summary import (
     build_battle_summary,
     write_battle_summary,
 )
+from intent_engine.core.yaml_utils import write_yaml_artifact
 
 
 def _write_yaml(path: Path, data: dict[str, Any]) -> None:
-    yaml = ruamel.yaml.YAML()
-    yaml.default_flow_style = False
-    path.write_text("")
-    with path.open("w") as handle:
-        yaml.dump(data, handle)
+    write_yaml_artifact(path, data, header="")
 
 
 def _case(

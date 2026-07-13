@@ -10,8 +10,8 @@ mechanisms. Direct deployment and whole-IaC-from-scratch generation stay out of
 runtime scope.
 
 AWS Landing Zone Accelerator is the first product path: collected inputs become
-contract-checked LZA YAML/config files for the downstream LZA deployment process. The
-core must stay generic: patterns own domain models, contracts, validators,
+contract-checked LZA YAML/config files for the downstream LZA deployment process.
+The core must stay generic: patterns own domain models, contracts, validators,
 samples, and target configuration emitters.
 
 ## Commands
@@ -31,51 +31,94 @@ uv run --extra dev prek run --all-files
 
 ## Architecture
 
-- **Models** (`src/intent_engine/patterns/*/models.py`): Pydantic v2 intent data models. Pattern-specific models drive extraction, graph sync, validation, semantic model derivation, and artifact emission.
-- **Extract** (`extractor.py`): Single graph-driven `Extractor`. Prompts come from requirement nodes, not regex or fixed document layout. Without LLM, deterministic fallback applies graph defaults and structured Markdown entity recovery.
-- **Patterns** (`patterns.py`): Lean registry for pluggable product paths. Current built-ins: `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, `terraform-vpc`.
-- **Requirements** (`requirements.py`): Decision graph with `applies_if`/`blocked_if`, richer `applies_when`/`blocked_when` expressions, `depends_on`, cascade rules, tradeoffs, compliance controls, signals, and audit trail.
-- **Semantic model** (`semantic_model.py` + pattern `semantic.py`): Lightweight typed entities, relationships, and predicate constraint results for real-world dependencies without RDF/OWL, Datalog, or a graph database.
-- **Interview** (`interview.py`): Graph-ordered requirement capture. Shows context, asks only applicable gaps, supports save/resume, and records rationale.
-- **Validate** (`validator.py`): Fail-closed graph and pattern validation. Missing required applicable decisions become compile errors.
-- **Generate** (`generator.py`): Registry-driven emitter for decision report, generic handoff plan, target configuration artifacts, lineage, runbook, module inputs when pattern owns module mapping, sample recommendations, and static review artifacts.
-- **Contracts** (`contracts.py`): Target artifact contracts define required files, paths, decisions, lineage, and stable value assertions.
-- **Samples** (`sample_config.py`): Registered reference bundles with pinned source metadata, module refs, tags, fixture dirs, and match recommendations.
-- **LLM** (`llm_caller.py`): Pluggable OpenAI-compatible and Ollama backends with retry/backoff and evidence capture.
-- **CLI** (`cli.py`): `compile`, `interview`, `validate`, `explain`, `sample`, `contract`, `graph`, `discover`, `template`, `review`. Default pattern is `aws-lza`.
+- **Models** (`src/intent_engine/patterns/*/models.py`): Pydantic v2 intent data
+  models. Pattern-specific models drive extraction, graph sync, validation,
+  semantic model derivation, and artifact emission.
+- **Extract** (`extractor.py`): Single graph-driven `Extractor`. Prompts come
+  from requirement nodes, not regex or fixed document layout. Without LLM,
+  deterministic fallback applies graph defaults and structured Markdown entity
+  recovery.
+- **Patterns** (`patterns.py`): Lean registry for pluggable product paths.
+  Current built-ins: `aws-lza`, `cloudformation-parameters`,
+  `kubernetes-cluster`, `terraform-vpc`.
+- **Requirements** (`requirements.py`): Decision graph with `applies_if`,
+  `blocked_if`, expression gates, dependencies, cascade rules, tradeoffs,
+  compliance controls, signals, and audit trail.
+- **Semantic model** (`semantic_model.py` + pattern `semantic.py`): Lightweight
+  typed entities, relationships, and predicate constraint results for
+  real-world dependencies without RDF/OWL, Datalog, or a graph database.
+- **Interview** (`interview.py`): Graph-ordered requirement capture. Shows
+  context, asks only applicable gaps, supports save/resume, and records
+  rationale.
+- **Validate** (`validator.py`): Fail-closed graph and pattern validation.
+  Missing required applicable decisions become compile errors.
+- **Generate** (`generator.py`): Registry-driven emitter for decision report,
+  handoff plan, target configuration artifacts, lineage, runbook, module inputs
+  when pattern-owned, sample recommendations, and static review artifacts.
+- **Contracts** (`contracts.py`): Target artifact contracts define required
+  files, paths, decisions, lineage, and stable value assertions.
+- **Samples** (`sample_config.py`): Registered reference bundles with pinned
+  source metadata, module refs, tags, fixture dirs, and match recommendations.
+- **LLM** (`llm_caller.py`): Pluggable OpenAI-compatible, Bedrock-through-local
+  AWS CLI, and Ollama backends with retry/backoff and evidence capture.
+- **CLI** (`cli.py`): `compile`, `compile-git`, `interview`, `validate`,
+  `explain`, `sample`, `contract`, `graph`, `discover`, `template`, `review`,
+  `shift-left`, and AWS LZA validation helpers. Default pattern is `aws-lza`.
 
 ## Current Pattern Surface
 
-- `aws-lza`: Contract-backed AWS LZA registered target path. Emits official-style LZA YAML target configuration artifacts, decision report, lineage manifest, deployment runbook, and sample recommendations. Does not emit deployable Terraform/Terragrunt landing-zone stacks.
-- `cloudformation-parameters`: BYOM CloudFormation parameter handoff for an approved existing template. Emits parameters and decision report, not a stack or deployment.
-- `kubernetes-cluster`: Contract-backed K8s handoff for cluster/namespace config with optional Terraform EKS module input references.
-- `terraform-vpc`: BYOM Terraform AWS VPC module input capture. Emits module variables/tfvars handoff for an existing module, not root deployment scaffolding.
+- `aws-lza`: Contract-backed AWS LZA registered target path. Emits official-style
+  LZA YAML target configuration artifacts, decision report, lineage manifest,
+  deployment runbook, plan/replay metadata, target capability graph, and sample
+  recommendations. It does not emit deployable Terraform/Terragrunt
+  landing-zone stacks.
+- `cloudformation-parameters`: BYOM CloudFormation parameter handoff for an
+  approved existing template. Emits parameters and decision report, not a stack
+  or deployment.
+- `kubernetes-cluster`: Contract-backed Kubernetes handoff for
+  cluster/namespace config with optional Terraform EKS module input references.
+- `terraform-vpc`: BYOM Terraform AWS VPC module input capture. Emits module
+  variables/tfvars handoff plus delivery metadata for an existing module,
+  account, and owner pipeline; it does not emit root deployment scaffolding.
 
 ## Key Decisions
 
 - Core stays domain-agnostic. Use-case logic lives in pattern packages.
-- Graph owns decision order, branching, blocked paths, cascades, gaps, provenance, and handoff sequencing.
-- Existing accelerators/modules are registered targets with contracts and data models before they are emitted configuration artifacts.
+- Graphs own decision order, branching, blocked paths, cascades, gaps,
+  provenance, and handoff sequencing.
+- Existing accelerators/modules are registered targets with contracts and data
+  models before emitted configuration artifacts are trusted.
 - Current compile/generation paths make no AWS API calls and do not deploy. The
-  AWS LZA validation-only evidence adapter may run the official local validator,
-  which can perform read-only account lookup through the provided AWS/LZA
-  context. No arbitrary Terraform from prose.
-- "Wrapper" means architect exchange to registered target configuration, not bypassing IaC tools, accelerators, or gates.
+  AWS LZA validation-only adapter may run the official local validator, which can
+  perform read-only account lookup through the provided AWS/LZA context.
+- "Wrapper" means architect exchange to registered target configuration, not
+  bypassing IaC tools, accelerators, owner pipelines, or gates.
 - Sample recommendations must persist as artifacts, not terminal-only hints.
-- `src/intent_engine/patterns/aws_lza` is the only AWS LZA path. Old research path was removed to avoid two-source confusion.
+- `src/intent_engine/patterns/aws_lza` is the only AWS LZA path.
+- Handoff artifacts are not deployments. `handoffReadiness` and
+  `handoffAllowed` are the canonical readiness fields.
+- Secrets travel as secret-store references and expected parameter names, never
+  raw values.
+- Add data-modeling or graph depth only when real packets expose a missed
+  relationship or repeated review failure.
 
 ## Fixtures
 
-- `fixtures/aws-lza-standard-v1/`, `fixtures/aws-lza-regulated-v1/`, `fixtures/aws-lza-healthcare-v1/`: emitted AWS LZA sample handoff bundles.
-- `fixtures/k8s-cluster-v1/`: emitted K8s sample handoff bundle.
-- `fixtures/usability/`: role trials for architect gap capture, engineer handoff, BYOM Terraform, and BYOM CloudFormation parameter flow.
-- `fixtures/eval/`: extraction gold corpus with expected handoff artifact checks.
-- Version suffixes (`-v1`) are fixture contract versions. They protect emitted artifact shape from silent drift.
+- `fixtures/aws-lza-standard-v1/`, `fixtures/aws-lza-regulated-v1/`,
+  `fixtures/aws-lza-healthcare-v1/`: emitted AWS LZA sample handoff bundles.
+- `fixtures/k8s-cluster-v1/`: emitted Kubernetes sample handoff bundle.
+- `fixtures/usability/`: role trials for architect gap capture, engineer
+  handoff, BYOM Terraform, and BYOM CloudFormation parameter flow.
+- `fixtures/eval/`: extraction gold corpus with expected handoff artifact
+  checks.
+- Version suffixes (`-v1`) are fixture contract versions. They protect emitted
+  artifact shape from silent drift.
 
 ## Model-Driven Flow
 
 1. Architect writes Markdown or runs interview.
-2. Extractor asks LLM for graph decisions, or deterministic fallback applies explicit structured inputs plus defaults.
+2. Extractor asks LLM for graph decisions, or deterministic fallback applies
+   explicit structured inputs plus defaults.
 3. Graph applies decisions in dependency order and records provenance.
 4. Discovery reports applicable gaps and detected signals.
 5. Interview fills only missing applicable decisions.
@@ -83,13 +126,14 @@ uv run --extra dev prek run --all-files
 
 ## Extension Contract
 
-Add new target path by registering a pattern with:
+Add a new target path by registering a pattern with:
 
 - Pydantic intent model.
 - Requirement graph.
 - Optional deployment target contract.
 - Optional sample configs.
-- Optional validators/target configuration emitters/module mapping.
+- Optional validators, target configuration emitters, policy packs, target
+  capability report, or module mapping.
 
 Do not add provider-specific branches to core CLI/compiler/extractor/generator.
 
@@ -103,179 +147,35 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, pytest, ruff, mypy, pyright.
 
 ### Current Goal
 
-T82: Expanded local shift-left prek hook surface
+Repository AI-slop audit and lean repair.
 
 ### Status
 
-- **Tests**: focused graph-diff follow-up commands, review-compare matrix follow-up commands, graph-impact-matrix row follow-up commands, graph matrix topology-hotspot roots, graph-roots topology hotspot roots, bundle-graph hotspot topology, graph-path endpoint neighborhood queries, graph-neighborhood relationship rollups, impact checklist neighborhood follow-up queries, graph-diff changed-node and edge-relationship rollups, review-compare impact matrix root categories, graph-impact-matrix recommendation category rollups, graph-roots recommendation category rollups, graph-find matched-field and root-selectable rollups, graph-path summaries and rollups, graph-neighborhood root-edge summaries, impact-report node-kind rollups, impact checklist representative path previews, bundle-graph topology summary, graph-impact-matrix Checkov finding and module variable rollups, upstream dependency kind rollups, checklist rollups, graph-diff property paths, upstream dependency paths, unmatched-root suggestions, traversal relationship descriptions, impact review checklist, bundle-graph relationship/root-selector indexes, graph-find traversal commands, bundle-compare root-selection reasons, graph-diff roots in review compare, artifact digest graph diff, bundle graph artifact digest provenance, bundle graph catalog, graph matrix changed-report roots, graph matrix provenance, review-compare input-diff impact matrix, review-compare impact matrix, recommended graph impact matrix, graph impact matrix, target-surface impact traversal, impact review severity rollups, impact review priorities, static-review graph artifact links, graph roots inventory, source-provenance graph, readiness/validation graph, review-compare graph diff, graph diff, shift-left evidence graph, generic impact roots, graph find, graph neighborhood, graph path, semantic bundle graph, impact traversal, bundle-compare, artifact review, and product-language tests passed (72 passing); Terraform VPC customer-notes battle test passed; previous full suite passed (400 passing, 1 skipped); Terraform VPC and default AWS LZA battle tests passed; usability passed (8 passing); extraction eval passed (8 passing); golden journey passed; fixture drift check passed
-- **Lint**: clean (`uv run ruff check .`)
-- **Format**: clean (`uv run ruff format --check .`)
-- **Type check**: clean (`mypy` and `pyright`)
-- **Repo**: `github.com/ersahinco/iac-llm-wrapper` (private)
-- **Last session**: Expanded `.pre-commit-config.yaml` under `prek` with local OSS/native shift-left hooks for Actionlint, Typos, Markdownlint, ShellCheck, shfmt, Hadolint, Terraform/OpenTofu fmt, Terraform/OpenTofu validate, Terraform docs, TFLint, tfupdate, Checkov, Trivy, Grype, Gitleaks, Deepfence SecretScanner, OWASP Dependency-Check, and optional Commitlint. Missing native tools skip by default and can fail closed with `PREK_REQUIRE_EXTERNAL_TOOLS=1`. Default and manual prek stages pass, focused hook/generator tests pass, and `.tfvars` generation now emits Terraform-fmt-compatible HCL.
-
-### Done
-
-- Core: graph-driven extraction/discovery/interview/validation, pattern registry, contracts, handoff generation, static review, contract validation, benchmark/battle artifacts, sample matching, and CLI commands are implemented and covered.
-- Built-ins: `aws-lza`, `cloudformation-parameters`, `kubernetes-cluster`, and `terraform-vpc` are contract-backed handoff paths. Their compile/generation paths make no cloud API calls and do not deploy from prose. The AWS LZA validation-only adapter is a separate evidence path that may run the official local validator with read-only account lookup through the provided AWS/LZA context.
-- Evaluation: deterministic extraction corpus includes clean, blocked, BYOM, and customer-style prose cases; role usability trials, forbidden-artifact checks, fixture drift guard, contract validation tests, battle-summary tests, static review tests, stakeholder handoff-confidence checks, and full repo gate are green.
-- Golden journey: `scripts/evaluate-golden-journey.py` is the quickest product-confidence check for the core promise: messy customer-style AWS LZA notes to service-style reviewed handoff bundle. It supports `--scenario ready`, `--scenario blocked`, `--scenario all`, `--require-conformant`, `--benchmark-output`, and `--output` for readiness, blocked-safety, model baseline checks, and CI/archive result artifacts.
-- Bedrock: `--provider bedrock` uses the local AWS CLI session with Bedrock Runtime Converse, defaulting region from `INTENT_ENGINE_AWS_REGION`, `AWS_REGION`, `AWS_DEFAULT_REGION`, then `eu-central-1`; it records Bedrock token usage in the existing trace/benchmark schema without adding a new harness or SDK dependency.
-- Observability: `model-benchmark.yaml` now reports raw LLM coverage of accepted decisions, missing accepted keys, and model conformance (`pass`, `review`, `fail`, `not-applicable`); LLM battle summaries surface raw-model misses as expected weaknesses instead of hiding them behind deterministic Markdown success.
-- Model comparison: `scripts/compare-model-benchmarks.py` shows `rawCoverage`, `rawMissing`, `missingKeys`, and `conformance`; `--require-conformant` fails non-conformant LLM benchmark runs.
-- Static review: `handoff-review.html` starts with a human summary of readiness, contract status, allowed next action, blocker traceability, model conformance, raw LLM coverage, missing raw decision keys, and expected weaknesses.
-- Developer visuals: `scripts/render-dev-views.py` writes local `tests/results/dev-views/index.html` plus Mermaid/JSON requirement graphs, Mermaid Pydantic intent model diagrams, a Mermaid module dependency graph, and Markdown summaries of golden journey/model benchmark artifacts. These are local development artifacts, not product UI.
-- Customer packet trial: `fixtures/eval/customer-packet-banking-lza.md` captures a realistic banking AWS LZA packet with client notes, architect clarification, security review, secret-store references, and engineer handoff reminders. Its expected artifact contract is part of the existing extraction eval corpus.
-- Usability: `scripts/evaluate-usability.py` now includes ready and blocked static-review stakeholder trials plus a service-style handoff-confidence trial that verifies what is ready, what can move next, target contracts, manual gates, and raw evidence omission.
-- Cleanup: removed stale LZA research/extension/diff/apply/default-normalizer surfaces, no-contract artifact fallback, pattern `extra_artifacts`, duplicate fixture normalization, and stale duplicate LLM docs.
-- T73 high-risk lean cleanup: collapsed duplicated compile validation/generation flow, moved samples/contracts fully onto patterns, made review HTML read-only against input bundles, moved AWS LZA validation and target routing under AWS LZA pattern ownership, made `decision-audit.yaml` a core expected artifact with stable replay hashing, and aligned golden-journey checks with the read-only review contract.
-- T74 owner-validation evidence follow-up: refreshed AWS credentials, compiled the existing banking packet into ignored `tests/results/owner-lza-validation-banking/` with private non-placeholder account emails, regenerated static review, and ran `iac-llm-wrapper lza validate` against the local AWS LZA checkout. Evidence is private/ignored and shows only the remaining read-only account lookup permission blocker.
-- T75 lean owner-validation checklist clarification: `docs/LZA_DOWNSTREAM_VALIDATION.md` now makes the owner-approved account email prerequisite explicit for `Management`, control-plane accounts, network accounts when present, and workload accounts. No CLI, generator, fixture, or private evidence changes were added.
-- T76 broader product goal positioning: README now frames the long-term direction as a model-agnostic, contract-first handoff layer for approved accelerators, IaC modules, and platform pipelines. Architect/platform/engineer preferences become requirement graphs, target contracts, sample alignment, review evidence, and manual gates. GitHub Actions/platform CI/CD are positioned as shift-left consumers of reviewed bundles that route into owner-controlled deployment paths, not as direct deployment run surfaces owned by this core. `tests/core/test_product_language.py` guards this wording.
-- T77 non-language goal audit: GitHub Actions CI now runs `scripts/evaluate-golden-journey.py` as a shift-left reviewed-bundle check, `.github/pull_request_template.md` asks contributors to run it, and `tests/core/test_ci_shift_left.py` guards both the CI check and absence of infrastructure apply/deploy commands in workflows.
-- T78 shift-left/git-diff/workload practice: Added explicit `compile-git --base-ref --doc-root --bundle-root --output-root` orchestration over existing incremental compile, with `git-incremental-plan.yaml` recording changed docs, skipped paths, baseline availability, output bundle paths, and compile status. Added optional `shift-left checkov --bundle --scan-path` evidence capture with soft-fail default and `--require-pass` for owner pipelines. Terraform VPC now captures `target_account_id` and `deployment_pipeline_ref` as required handoff metadata under `delivery`, while `module-inputs.yaml`/`terraform.tfvars` remain module-variable-only. Added an existing-account Terraform VPC usability trial and owner Terraform fixture. Battle tests now write contract validation evidence before scoring, and Terraform VPC/default AWS LZA battle runs pass.
-- T79 regulated policy graph and Checkov evidence: Added core `PolicyPack`, `PolicyControl`, `PolicyCheckRef`, and `PolicyRequirementMapping` models, `Pattern.policy_packs`, pattern-check validation for requirement/contract mappings, conditional `policy-graph.yaml`, and policy inventory in `context-manifest.yaml`. Terraform VPC now registers `regulated-vpc-baseline-v1` for SOC2/PCI/HIPAA/NIST/custom client mappings across delivery metadata, VPC/subnet CIDRs, NAT, DNS, module variables, and custom Checkov refs such as `CKV_CUSTOM_VPC_001` and `CKV_CUSTOM_VPC_ATTACHMENT_001`. `shift-left checkov` now supports `--policy-pack`, repeatable `--external-checks-dir`, `--iac-kind`, and `--checkov-framework`, records owner policy paths, mapped controls, unmapped findings, and no-deploy/no-cloud-mutation boundary, and still requires owner IaC/module paths rather than generated tfvars alone. Static review surfaces policy packs, frameworks, failed controls, unmapped findings, owner policy paths, and next actions as owner CI/CD evidence, not attestation or deployment approval.
-- T80 graph dependency traversal impact analysis: Added a read-only impact graph builder and `graph impact` CLI. It derives graph nodes and edges from generated bundle artifacts plus registered patterns, covering requirements, decisions, target contracts, lineage artifact paths, module variables, policy controls, Checkov refs/findings, shift-left evidence, target capabilities, samples, manual gates, semantic entities, semantic relationships, and semantic predicate constraints. `impact-report.yaml` records selected roots, unmatched roots with suggested retry roots, selected/downstream/upstream/affected node-kind rollups, upstream dependencies with dependency paths into selected roots, downstream affected nodes, review priorities with highest-severity and per-severity summary counts, ordered review checklist with representative path previews and follow-up path/neighborhood queries, affected artifacts, affected target contracts, affected target capabilities, affected sample recommendations, affected policy controls/checks/findings/module variables, affected semantic entities/constraints, manual gates, root-to-target impact paths with relationship descriptions, and review focus with a no-deploy/no-cloud-mutation/no-attestation boundary; affected rollups include selected root nodes as well as downstream nodes. `graph-impact-matrix.yaml` compares multiple selected, recommended, topology-hotspot, changed-report, or bundle-comparison roots by match status, root-selection reason, recommendation category rollups, severity, upstream dependency kind rollups, upstream source-change/input-diff provenance, affected artifacts, target contracts, target capabilities, sample recommendations, policy controls, checks, Checkov findings, module variables, manual gates, per-root review checklists, per-row follow-up traversal commands, and checklist category rollups for triage before deeper path/neighborhood queries. `review compare` now embeds both the merged `impactTraversal` and per-root `impactMatrix`, so changed decisions, input-diff roots, and changed/added graph-diff roots surface richer blast-radius evidence with explainable paths and side-by-side changed-root triage, including rendered root-selection categories/reasons, artifact digest change roots, property-level changed graph paths, likely impacted decision roots from `input-diff-report.yaml`, and graph-impact-matrix follow-up commands even when accepted decisions did not change. `graph bundle --bundle` exports the complete typed `bundle-graph.yaml` substrate for agents and reviewers that need to query the graph directly before selecting traversal roots, including AWS LZA semantic model facts and shift-left Checkov evidence when present. `bundle-graph.yaml` includes topology summary counts/lists for root-selectable, connected, isolated, source, sink, branching, join, and high-degree hotspot nodes with traversal commands; query indexes for nodes by kind, incoming/outgoing adjacency, relationship-to-edge lookup, and root selectors by kind; a self-describing catalog of node kinds, root selectability, relationship meanings, edge counts, observed source/target kind pairs, artifact file digest metadata with replay/downstream validation digest comparisons where available, and query hints for find, roots, impact, path, neighborhood, matrix, recommended matrix, and diff commands. `graph find --bundle --query` discovers candidate typed roots across node id, kind, key, label, and properties with optional kind filtering and `graph-find.yaml`; find output includes matched-field rollups plus root-selectable/context-only result counts, and root-selectable matches include root selectors and impact/neighborhood commands for immediate traversal. `graph roots --bundle` inventories concrete typed roots by kind and emits `graph-roots.yaml` with copy-pasteable impact/neighborhood commands, topology hotspot roots with degree counts and reasons, plus recommended review roots and recommendation category rollups for source changes, blockers, findings, and validation evidence. Static `handoff-review.html` links typed graph review artifacts when they already exist in the bundle, without generating or mutating them. `graph impact` accepts convenience selectors plus generic `--root <kind:key>` selectors for every typed graph node, including semantic entities, Checkov findings, scan files, and shift-left evidence. `graph matrix --bundle --root <kind:key>` compares several typed graph roots in one `graph-impact-matrix.yaml` artifact, `graph matrix --recommended` builds that matrix from recommended review roots with optional kind filtering, `graph matrix --hotspots` builds it from topology hotspot roots with optional kind filtering, and `graph matrix --changed-report <input-diff-report.yaml>` derives matrix roots from likely impacted requirements. `graph path --bundle --from <kind:key> --to <kind:key>` explains the shortest dependency path between two specific graph roots with a compact path summary, relationship/node-kind rollups, relationship descriptions, endpoint neighborhood follow-up queries, and unmatched-root suggestions, and can traverse downstream, upstream, or either direction while emitting optional `graph-path.yaml`. `graph neighbors --bundle --root <kind:key>` exposes a bounded neighborhood around one graph root with depth, direction, optional node-kind and relationship rollups, optional kind filtering, root-edge incoming/outgoing/bridging summaries, traversal hops with relationship descriptions, unmatched-root suggestions, and optional `graph-neighborhood.yaml`. `graph diff --before --after` compares two generated bundles as typed graph nodes and edges, including changed node-kind/field rollups, property-level node changes, added/removed edge relationship rollups, artifact digest property changes, and impact/neighborhood follow-up commands for root-selectable deltas, emitting optional `graph-diff.yaml` for graph-native delta review. `review compare` also embeds `graphDiff` in YAML, terminal text, and static HTML so typed graph deltas travel with broader handoff comparison evidence. Handoff readiness, readiness blockers, contract validation, contract results, validation violations, and downstream validation evidence are now first-class graph nodes when those artifacts exist, so decision impact can reach the review and validation evidence that must be rechecked. Source context, input diff reports, and source changes are also first-class graph nodes, so source packet deltas can traverse into affected decisions and onward to artifacts, policy controls, readiness, and validation evidence. Sample recommendation nodes are connected to decisions that influence their match/rank, and target capability dependencies are traversable.
-- T81 prek-backed pre-commit hook runner migration: Replaced the dev dependency on Python `pre-commit` with `prek>=0.4.8`, refreshed `uv.lock`, updated CI and contributor/agent checklists to run `uv run --extra dev prek run --all-files`, and kept the existing `.pre-commit-config.yaml` hook contract. The full prek suite passes.
-- T82 expanded local shift-left prek hook surface: Added repo-local optional native-tool wrapper `scripts/run-prek-tool-check.py` and registered OSS/local shift-left hooks for workflow linting, spelling/Markdown, shell/Dockerfile hygiene, Terraform/OpenTofu fmt and manual validation/docs, TFLint, tfupdate, Checkov, Trivy, Grype, Gitleaks, Deepfence SecretScanner, OWASP Dependency-Check, and config-gated Commitlint. Paid/hosted services such as SonarQube, Palo Alto, and BISE are documented as owner/platform pipeline integrations, not local prerequisites. Actionlint fixed the release workflow hash glob, Checkov skips non-deployable fixture/test outputs in repo-level scans, Terraform validate skips uninitialized module roots instead of running init, and generated `terraform.tfvars` output is now Terraform-fmt-compatible.
-- Language: user-facing docs and artifacts use `handoffReadiness`/`handoffAllowed` only. Docs now also state that secrets should travel as secret-store references and expected parameter names, never raw values.
-- Quality gates: Ruff, Ruff format, mypy, Pyright/Pylance, fixture drift, coverage tests, extraction/usability/golden journey checks, Bandit, pip-audit, uv build, and prek-backed pre-commit hooks are wired into local/CI workflows as applicable.
-- T36 usability: CLI output now points first-time users from discovery and compile results to service-style compile, blocked review generation, `handoff-plan.yaml`, and static review creation. `handoff-review.html` now includes reviewer next actions derived from readiness, contract status, artifacts, and raw evidence state. README and LLM setup now include a concise real customer packet path for Ollama and direct Bedrock runs with `--no-raw-evidence`.
-- T37 remediation: review findings are resolved without adding new harnesses, dashboards, private pattern loading, or broad AWS schema depth. The fixes tighten discoverability, evidence handling, generator scope, terminology, and code organization while preserving legacy artifact compatibility where external consumers may still depend on older keys.
-- T38 remediation: discovery partial-input handling, public generator scoping, interview artifact parity, active handoff terminology, CloudFormation README accuracy, and discovery regression coverage are fixed. Sample fixtures now include deterministic `llm-trace-summary.yaml` and `model-benchmark.yaml` for interview-generated bundles so review pages no longer show unexplained missing evidence.
-- T38 targeted re-review: first-run CLI workflow, interview/compile artifact parity, generator scope, pattern report readiness, handoff terminology, fixture/docs consistency, and `cli_guidance` organization were rechecked. Follow-up fixes preserve interview default provenance, make simulated discovery decisions explicit, remove blocked wording from ready safe handoff paths, and improve raw-evidence omission wording in review HTML.
-- T39 operating rhythm: Ran banking AWS LZA, retail board-note AWS LZA, blocked AWS LZA, BYOM Terraform VPC, and blocked BYOM CloudFormation packets through `discover -> compile --no-raw-evidence -> review html`. Ready packets were clear enough for reviewed handoff, blocked compile/review artifacts were safe, and the repeated first-success friction in blocked discovery next steps was fixed without adding harnesses or dashboard surface.
-- T39 follow-up rhythm: Ran complex AWS LZA, standard AWS LZA, incomplete architect AWS LZA, BYOM CloudFormation, and BYOM Terraform packets through the same path. The previous discovery guidance fix held. No stuck, mistrust, or manual-translation point repeated or blocked handoff, so no engine change was made.
-- T40 incremental compare: `iac-llm-wrapper review compare --before <bundle> --after <bundle> --output handoff-comparison.yaml` compares existing generated bundles without rerunning extraction. The report surfaces readiness changes, requirement completeness changes, accepted decision additions/removals/changes, blocker additions/resolutions, changed artifact file hashes, model quality changes, and sample recommendation additions/removals/rank/score changes.
-- T41 diff-aware compile: `iac-llm-wrapper compile --baseline-bundle <bundle> --baseline-doc <before.md> --changed-doc <after.md> --output <bundle> --no-raw-evidence` supports incremental long-document updates. Baseline decisions are carried forward, changed structured decisions override them, optional LLM extraction sees only scoped delta context plus previous decisions/summary, and the full graph plus contracts still validate the complete resulting state. `input-diff-report.yaml` records changed headings, changed structured decision lines, hunks, and likely impacted requirements. `incremental-compile-report.yaml` records reused, changed, added, removed, carried-forward, and re-confirmation decisions. `review compare --html-output` emits a static delta page.
-- T42 target capability graph: the requirement graph remains the decision/readiness layer, and a second target capability graph now explains downstream routing and coverage. AWS LZA is the first reference target: accepted landing-zone decisions are covered by the LZA accelerator path, app/workload infrastructure language is flagged for separate module-composition or generator handling, and arbitrary Terraform/Terragrunt generation remains blocked unless a registered target owns it.
-- T43 battle test: Ran realistic ready AWS LZA, blocked AWS LZA, BYOM Terraform, incremental document update, review comparison, static delta HTML, and sample recommendation movement through the current CLI. No new harness or dashboard was added. The only blocking usability issue found was false unsupported target routing from negated generation language and short keyword substring matches; target capability detection now requires affirmative whole-token matches and ignores local negation.
-- T44 usability bug sweep: Fixed route-scoping and wording issues found in real generated outputs. Pure AWS LZA handoffs no longer show workload-module gates as active manual gates; blocked target capability rows show unavailable; blocked compile suggests `template --pattern <actual-pattern>`; BYOM patterns without target graphs show `not declared`; blocked reviews explain missing `handoff-plan.yaml`; raw evidence omission displays as `not requested`.
-- T45 follow-up usability sweep: After committing T42-T44, re-ran first-run and handoff paths from a clean baseline. Fixed discovery clarifying-question copy so it uses graph questions instead of generic fallback text, fixed comparison HTML so added/removed artifacts are visible alongside changed artifacts, fixed blocked-review traceability so AWS LZA cross-field validator blockers point to concrete requirement questions instead of `unknown`, fixed repeated discovery gap numbering, replaced AWS-shaped safe handoff wording with pattern-neutral target-toolchain language, made ready review next actions owner-neutral for BYOM paths, normalized input diff report values so list decision deltas do not mix list and scalar forms, fixed terminal `review compare` artifact delta output so added/changed/removed artifact groups are visible without opening YAML or HTML, aligned runbook/review/harness wording on `Handoff allowed` instead of `Handoff ready`, and fixed comparison decision-delta rendering so added/changed/removed accepted decisions are all named in terminal and static HTML review output.
-- T46 context-as-code guardrails: `pattern check` now validates bounded `Pattern.prompt_context`, rejects missing/vague context, surfaces context rule counts in CLI output, and requires explicit violation code/message for required open decisions without defaults. CloudFormation, Kubernetes, and Terraform VPC prompt contexts now state handoff boundaries and forbid deployable scaffolding generation from prose. Added `docs/CONTEXT_AS_CODE.md` and linked it from README and pattern authoring guidance.
-- T47 complete lightweight context-as-code adoption: Successful pattern-backed bundles now emit and validate `context-manifest.yaml`. The manifest records the active pattern, prompt context digest/text, requirement graph inventory, target contracts, samples, target capabilities, runtime LLM/extraction summary, expected artifacts, and guardrails. `Pattern.expected_artifacts()`, `validate_generated`, ready-bundle contract validation, docs, tests, and registered sample fixtures now treat the manifest as a first-class non-deployable artifact.
-- T48 semantic facts for target routing: Target capability routing now consumes explicit `UnsupportedAskFact` entities instead of scanning source text inside graph evaluation. Deterministic source-text matching extracts facts with evidence spans first; the graph then selects module-composition/generator/manual/blocked paths from facts and accepted decisions. `target-capability-graph.yaml`, `handoff-plan.yaml`, `llm-trace-summary.yaml`, and `context-manifest.yaml` expose the semantic fact state for review.
-- T49 lightweight typed semantic model: Added expression gates to requirement graphs and a no-infrastructure semantic model layer. AWS LZA now derives typed entities, relationships, and predicate constraints for account/OU placement, Identity Center permission-set and assignment references, home-region containment, valid network CIDR, control/artifact relationships, and delegated-admin Security OU placement. Validation and generated decision reports use that model, while existing flat decision fields and artifacts remain backward compatible.
-- T50 fail-closed hardening: Compile success now depends on graph/pattern validation, blocked target capability routing, incremental reconfirmation for high-risk changed prose, and post-generation artifact contracts. Contract validation fails closed when readiness metadata is absent. Requirement expression shape is checked by `pattern check`. AWS LZA duplicate account conflicts are semantic blockers, and explicit workload-account OU placement is preserved in generated handoff artifacts.
-- T51 residual hardening: Generated target artifacts are staged and promoted only after contract validation passes; failed compiles remove known generated/stale artifact files before writing safe blocked assessment artifacts. Partial readiness metadata in standalone `contract-validation.yaml` is blocked, and runtime expression evaluation fails closed on invalid expression shapes.
-- T52 product boundary: Public docs now prefer registered target configuration language over broad IaC generation claims. AWS LZA is documented as the canonical target where validated inputs become LZA YAML/config artifacts for an existing deployment mechanism. Docs guardrail tests prevent accidental claims of direct deployment or whole-IaC-from-scratch generation.
-- T53 plan-ready registered target bundle: AWS LZA now declares plan-ready bundle support as metadata only, emits `plan-manifest.yaml` with immutable inputs, prerequisites, expected plan outputs, manual gates, no-apply boundaries, and unresolved plan blockers, and emits `replay-manifest.yaml` with source, contract, and artifact digests. The generic plan-ready contract validates these artifacts only for registered plan-ready patterns; non-AWS patterns are not forced into premature capability machinery.
-- T54 AWS LZA plan-ready proof: Realistic AWS LZA packets were compiled and their plan manifests inspected; blocker text is useful for config-ready-but-plan-blocked packets. The almost-plan-ready packet now reaches `planReady: ready` with explicit account emails, core VPC route tables/subnets/NAT gateways, TGW route tables/routes, and TGW attachments, while still emitting metadata only and no invocation. Negated "No Terraform root modules, Terragrunt..." boundary language no longer triggers unsupported Terraform generation routing.
-- T55 AWS LZA network schema comparison: Public schema comparison revealed generator fixes. Owner validation still requires a real downstream command, pipeline output, or checklist.
-- T56 validation evidence cleanup: Unverified local evidence was removed. Do not claim owner validation without an actual downstream validation signal or deliberate product artifact.
-- T57 contributor onboarding and LZA validation packet: README was shortened into a front door and the LZA validation checklist was introduced as the first owner evidence target.
-- T58 less-docs refinement: Removed the separate contributor onboarding doc and merged its unique value into `CONTRIBUTING.md`: repo map, tracked-vs-generated rule, change matrix, anti-slop doc rule, and real-owner-evidence rule. README no longer carries repo layout or quality gate detail. The only new doc left is `docs/LZA_DOWNSTREAM_VALIDATION.md`, kept as a checklist-first owner packet.
-- T59 implementation reduction: Added a small shared YAML artifact writer in `core/yaml_utils.py` and removed duplicated YAML dump/write helpers from core generator, compiler artifact writes, AWS LZA helpers, and Kubernetes generators without changing CLI/runtime interfaces or artifact intent.
-- T60 compiler slimming: Extracted incremental baseline parsing to `core/baseline.py`, readiness shaping to `core/readiness.py`, and artifact staging/promotion/contract validation to `core/compile_artifacts.py`. `compiler.py` remains the orchestrator and still exposes the existing public validation helpers for compatibility.
-- T61 LZA ecosystem positioning: Added `docs/LZA_RELATED_WORK_STRATEGY.md` to synthesize AWS LZA Universal Configuration, Luminarlz, Nuvibit NTC, and daily LZA operations into product principles and an ordered backlog. README now frames the tool as pre-flight decision capture and handoff readiness before AWS LZA runs, and CONTRIBUTING rejects related-work-inspired runners, dashboards, plugin loaders, or schema expansion without repeated evidence.
-- T62 LZA validation-only evidence: `iac-llm-wrapper lza validate --bundle <bundle> --lza-source <local-lza-repo-or-source>` runs the official local AWS LZA config validator against staged generated config files and writes `lza-validation-evidence.yaml` with command, exit code, stdout/stderr, package version, optional git commit, and explicit no-deploy/no-synth/no-clone/no-install/no-AWS-mutation guardrails. It falls back to Corepack when a direct `yarn` executable is not on PATH.
-- T63 AI-generated code cleanup: Recent LZA validation adapter code was reviewed for unnecessary comments, over-defensive internal checks, and avoidable duplication. The resulting change stayed deliberately small: centralize the evidence filename usage and keep safety checks only where they guard user input, local toolchain discovery, subprocess execution, malformed package metadata, and evidence capture.
-- T64 project-wide AI slop cleanup: Consolidated remaining obvious YAML writer duplication into `core.yaml_utils` where semantics matched, trimmed restating comments in discovery/model introspection, and kept defensive code at filesystem, subprocess, parser, model, LLM, and downstream validation boundaries.
-- T65 review remediation: Full-bundle AWS LZA owner packet wording replaced network-only validation language; LZA validation evidence now records SHA256s for each config artifact; compile warns on LLM extraction failure when fallback proceeds; the stale `llm` install extra was removed from contributor setup; AWS LZA prompt context now flags explicit Terraform requests as unsupported. AWS LZA sample context/replay fixtures were refreshed for the prompt-context digest change.
-- T66 real AWS LZA validation evidence: Ran `fixtures/eval/customer-packet-banking-lza.md` through a fresh service-style compile and `iac-llm-wrapper lza validate` against `/Users/cemreoguz.ersahin/Downloads/landing-zone-accelerator-on-aws` (`packageVersion: 1.15.0`). The official validator first rejected generated schema shapes for `snsTopics`, Identity Center `sessionDuration`, Management OU placement, central security delegated admin, and unbacked Security Hub SNS references. The generator/contract now emits official-compatible shapes: `snsTopics` object, numeric session durations, Management in `Root`, Audit as central security services delegate, and no invented notification topic references. Rerun evidence is at ignored path `tests/results/t66-lza-validation/lza-validation-evidence.yaml`; it fails only because `audit@example.com` is still a placeholder and local AWS account lookup returned `AccessDeniedException`.
-- T67 evidence traceability hardening: Static review context and HTML now include LZA validation evidence when `lza-validation-evidence.yaml` exists. Reviewers can see validation status, exit code, command, source checkout path/version/commit when available, config file SHA256s, a link to the evidence file, and raw validator output without hunting through the bundle.
-- T68 failure visibility hardening: Review context and HTML now classify two quiet failure paths explicitly: LLM parse/backend errors are visible in the summary, model benchmark section, expected weaknesses, and reviewer next actions; failed AWS LZA validation evidence becomes the first reviewer next action so reviewers do not read "pass reviewed artifacts" before the failed downstream-validation warning.
-- T69 lean architecture slice: `src/intent_engine/cli.py` now delegates raw evidence YAML writing and incremental compile summary YAML reading to `core.yaml_utils`, removing local ruamel plumbing while keeping the CLI as the orchestration surface.
-- T70 product boundary cleanup: Public surfaces now avoid stale intent-to-IaC orchestration positioning and describe the promise as registered target configuration handoff. AWS LZA wording now distinguishes contract-checked generated YAML from downstream LZA validation and application.
-- T71 packet-driven improvement loop: Ran customer-style banking LZA, messy blocked LZA, and Terraform VPC packets through `discover -> compile --no-raw-evidence -> review`. The repeated LZA paths were clear; the Terraform path found and fixed a real trust issue where redundant raw LLM contradictions could block deterministic Markdown decisions. Regression coverage keeps raw contradictions visible in trace/benchmark artifacts while blocking count remains zero.
-- T72 partial owner-validation follow-up: Re-ran local AWS LZA validation against a bundle with explicit account emails rather than generated `example.com` placeholders. Evidence at ignored path `tests/results/t72-lza-validation-no-default-email/lza-validation-evidence.yaml` shows the default-email issue is gone and the remaining failure is `AccessDeniedException` in `accounts-config.yaml`. This is not owner validation because the emails are not owner-approved and the local AWS session still lacks the required lookup permission.
-- T72 owner-packet prerequisite hardening: `docs/LZA_DOWNSTREAM_VALIDATION.md` now requires owner-approved account vending emails and an AWS account lookup context/profile before local or owner validation claims. The checklist also treats `AccessDeniedException`, schema output, and pipeline output as concrete blocker evidence rather than acceptance.
-- T72 validation diagnostic hardening: `lza-validation-evidence.yaml` now records a diagnostic category, summary, and next action alongside raw validator stdout/stderr. CLI failure output and static review surface non-pass diagnostic categories and next actions while remaining compatible with older evidence files.
-- T72 validation boundary wording: README, architecture, artifact catalog, and downstream-validation packet now distinguish no AWS mutation from possible read-only AWS account lookup by the official local LZA validator. Product-language tests guard against the old "no AWS API call" wording.
-- T72 validation evidence boundary hardening: `lza-validation-evidence.yaml` now records the no-mutation/read-only account lookup boundary directly, and `handoff-review.html` surfaces that boundary without requiring reviewers to expand raw YAML. Older evidence files remain compatible.
-- T72 repo-memory boundary hardening: AGENTS now distinguishes no-cloud-call compile/generation paths from the AWS LZA validation-only adapter's possible read-only account lookup. Product-language tests guard against the stale broad "built-ins make no AWS/cloud API calls" wording.
-- T72 validation replay boundary hardening: `lza-validation-evidence.yaml` now records that the validator input is a temporary staged copy removed after validation and that captured command argv is not replayable after the temp directory is gone. Static review surfaces the staging/replay boundary so reviewers know to rerun `iac-llm-wrapper lza validate` against the source bundle.
-
-### Next
-
-1. Finish owner validation only after an AWS/LZA validation context with account lookup permission is available, or after the downstream owner reviews the private `aws-account-lookup-permission` evidence and supplies acceptance or concrete next-step output.
-2. Keep using packet-driven loops before adding product surface: record only repeated stuckness, mistrust, manual translation, or blocker confusion.
-3. Use diff-aware compile plus `review compare` whenever a long document or sample configuration changes incrementally; review only the delta first, then decide whether a repeated/blocking point deserves implementation.
-4. Continue packet-based requirement harvesting before adding product surface: record only stuck/mistrust/manual-translation moments, and implement only repeated or handoff-blocking requirements.
-5. Stop harness expansion unless real local/Bedrock model runs expose pain.
-6. Run `evaluate-extraction.py --llm`, `evaluate-usability.py --llm`, and `compare-model-benchmarks.py --require-conformant` with approved local/Bedrock models when broader model regression confidence is needed; use result artifacts to decide whether prompts or fixtures need tightening.
-7. If reviewers still struggle to resolve blockers, consider adding lightweight anchors from blocker rows to exported requirement graph nodes without adding JavaScript.
-8. Continue AWS LZA schema depth only where real customer inputs justify it.
-9. Bring Terraform module-composition toward plan-ready only after AWS LZA's plan-ready network/account fields survive one owner-reviewed packet.
-10. Next data-modeling increments should add typed entities only where a real
-   packet exposes a missed relationship; defer Datalog until constraints become
-   deeply inferential or platform-team policy preferences need rule composition.
-
-### Roadmap
-
-Roadmap rules:
-
-- Keep `### Current Goal` set to the active slice only.
-- Work in evidence-first order: T66, T67, T68, T69, T70, then T71.
-- Close each slice independently with its own tests, evidence, and session-state update.
-- Do not add dashboards, deploy runners, synth runners, plugin loaders, broad AWS schema expansion, or extra harnesses unless repeated real evidence forces the need.
-
-#### T66: Real AWS LZA validation evidence
-
-- **Goal**: Replace locally plausible validation with one real owner/toolchain signal.
-- **Why now**: This is the highest-trust gap before stronger downstream claims are credible.
-- **In scope**: Generate one realistic AWS LZA bundle from an existing customer-style packet; run `iac-llm-wrapper lza validate --bundle ... --lza-source ...` against a real local AWS LZA source checkout; send the full generated config bundle plus `decision-report.yaml`, `lineage-manifest.yaml`, `handoff-plan.yaml`, `replay-manifest.yaml`, `context-manifest.yaml`, and `lza-validation-evidence.yaml` to the downstream owner; capture owner approval, official validator output, pipeline output, or concrete schema/error output.
-- **Out of scope**: Generator rewrites, schema expansion, deploy/synth invocation, AWS mutation, new harnesses, dashboards, or product claims stronger than the captured evidence.
-- **Done when**: The repo has one captured downstream validation signal for a realistic packet and still clearly states that handoff artifacts are not deployments.
-- **Tests/evidence**: `uv run pytest tests/core/test_lza_validation.py`; `uv run python scripts/sync-sample-fixtures.py --check`; attach the real owner/toolchain evidence path or summary to session state.
-
-#### T67: Evidence traceability hardening
-
-- **Goal**: Make every trust claim inspectable.
-- **Why now**: Hashes now exist in validation evidence, but reviewers still need the full evidence chain to tell one consistent story.
-- **In scope**: Check consistency between `lza-validation-evidence.yaml`, `replay-manifest.yaml`, `lineage-manifest.yaml`, and static review output; confirm validation evidence hashes match exact generated AWS LZA config files; add hash visibility to review artifacts only if owner/reviewer use shows a need; rename or soften any field that implies stronger validation than the evidence supports.
-- **Out of scope**: New artifact families, dashboards, JavaScript review apps, or changing generated target config semantics.
-- **Done when**: A reviewer can answer what files were validated, from which bundle, by which command, against which LZA source, with what result.
-- **Tests/evidence**: `uv run pytest tests/core/test_lza_validation.py`; relevant artifact review tests if review output changes; `uv run python scripts/sync-sample-fixtures.py --check`.
-
-#### T68: Failure visibility hardening
-
-- **Goal**: Make fallback behavior useful but never quiet.
-- **Why now**: The CLI now warns on LLM backend failure, but other fallback paths should be intentionally classified.
-- **In scope**: Inventory failed LLM calls, skipped raw evidence, deterministic defaults, missing optional evidence, and blocked compile artifacts; classify each as expected, warning-worthy, or compile-blocking; add warnings/tests only where user trust or handoff readiness would otherwise be misleading.
-- **Out of scope**: Turning deterministic fallback into blanket compile failure, adding model dashboards, or making raw evidence mandatory for service-style runs.
-- **Done when**: CLI and review artifacts make it obvious when the model helped, failed, or was bypassed.
-- **Tests/evidence**: `uv run pytest tests/core/test_cli.py`; targeted review/artifact tests for any changed review wording; `uv run pytest` before closing the slice.
-
-#### T69: Lean architecture slices
-
-- **Goal**: Reduce `compiler.py` and `cli.py` gravity wells without a rewrite.
-- **Why now**: The boundaries are mostly right, but repeated nearby changes should leave the code smaller and clearer.
-- **In scope**: Extract small cohesive helpers only when touching nearby behavior; prefer boring ownership modules for readiness, evidence, validation, or review helpers; preserve existing public interfaces and artifact shapes unless a slice explicitly owns the change.
-- **Out of scope**: Broad rewrites, service layers, plugin loaders, generic framework abstractions, or churn that does not remove real complexity.
-- **Done when**: Large modules shrink opportunistically while behavior and tests stay stable.
-- **Tests/evidence**: The tests covering the touched behavior plus `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run --extra dev mypy`, and `uv run --extra dev pyright .`.
-
-#### T70: Product boundary cleanup
-
-- **Goal**: Keep the promise crisp: registered target configuration and handoff readiness.
-- **Why now**: The product is strongest when its claims are narrower than its evidence.
-- **In scope**: Search docs and CLI output for inflated claims around deployment, IaC generation, automation, and downstream validation; keep only claims backed by contracts, tests, owner evidence, or generated artifacts; delete duplicate docs before adding new ones; keep AWS LZA as the proof path.
-- **Out of scope**: Broad target depth, new public docs that repeat existing guidance, or positioning that implies direct deployment from prose.
-- **Done when**: README, CONTRIBUTING, validation docs, CLI guidance, and AGENTS all describe the same restrained product boundary.
-- **Tests/evidence**: `uv run pytest tests/core/test_product_language.py`; CLI guidance tests if terminal text changes; `git diff --check`.
-
-#### T71: Packet-driven improvement loop
-
-- **Goal**: Let real packets choose the roadmap.
-- **Why now**: The next useful requirements should come from observed handoff friction, not imagined capability.
-- **In scope**: Run messy customer-style packets through `discover -> compile --no-raw-evidence -> review`; record only stuckness, mistrust, manual translation, or repeated blocker confusion; promote repeated pain into the next T-number slice.
-- **Out of scope**: One-off polish, dashboarding, new harnesses, broad schema depth, or speculative target expansion.
-- **Done when**: New implementation work is backed by repeated packet friction or a handoff-blocking issue.
-- **Tests/evidence**: Store or summarize packet results in session state; run the targeted tests for any behavior changed by the resulting slice.
+- **Complete**: removed leftover YAML writer/dumper duplication, removed an
+  unused hook-wrapper field, trimmed a generic test docstring, and compressed
+  stale historical session memory.
+- **Tests**: `uv run pytest` passed (450 passed, 1 skipped); targeted touched
+  tests passed before the full suite.
+- **Lint/format/type**: `uv run ruff check .`, `uv run ruff format --check .`,
+  `uv run --extra dev mypy`, and `uv run --extra dev pyright .` passed.
+- **Product/eval gates**: fixture drift check passed; golden journey passed;
+  extraction eval passed (8 passed); usability eval passed (8 passed);
+  product-language guardrails passed.
+- **Hooks**: `uv run --extra dev prek run --all-files` and
+  `uv run --extra dev prek run --all-files --hook-stage manual` passed,
+  including optional native shift-left scans.
+- **Diff hygiene**: `git diff --check` passed.
 
 ### Durable Decisions
 
-- Core stays domain-agnostic; pattern packages own models, graphs, contracts, validators, samples, and generators.
-- Two-layer graph architecture is the product direction: requirement graphs own decisions, gaps, blockers, provenance, and readiness; target capability graphs own downstream route selection, target coverage, unsupported asks, manual gates, and blocked generation paths.
-- Typed property graph plus predicate constraints is the current data-modeling direction. Keep Pydantic as the serialized handoff model and lightweight stdlib/dataclass traversal/evaluation; do not introduce RDF/OWL, Datalog, or graph databases until real policy inference needs justify them.
-- Graph and contracts own readiness. LLM output is evidence until accepted by graph requirements and artifact contracts.
-- Handoff artifacts are not deployments. `handoffReadiness` is the canonical readiness field.
-- Raw LLM evidence is local development/debug material. Service-style runs can disable raw prompt/response storage with `--no-raw-evidence` while preserving `llm-trace-summary.yaml`, `model-benchmark.yaml`, and `handoff-review.html` for interpretation review.
-- Secrets must be represented as secret-store references plus expected parameter names so values do not enter prompts, raw evidence, review HTML, Git, or handoff artifacts.
-- Built-ins are enough until a team has proprietary modules, controls, sample bundles, or gates that justify private patterns.
-- Customer-style eval fixtures should mix prose, meeting notes, architect clarification passes, review reminders, and structured decisions so the harness protects real handoff behavior, not only template-shaped examples.
-- Local customer-fixture hardening should prefer the best model a work MacBook Pro can handle, currently `qwen2.5:7b` in this workspace; Bedrock remains an approved cloud path through an OpenAI-compatible gateway/proxy when cost and policy require it.
-- Local T21 comparison showed `qwen2.5:3b` had the best raw AWS LZA coverage on the customer board-notes fixture in this run, while `qwen2.5:7b` remained ready but missed Identity Center keys and `llama3.2:3b` was weak for AWS board notes.
-- Direct Bedrock T31 run used SSO role `AWSReservedSSO_AWSAdministratorAccess_0f7a04d12908e8e3` in account `691627364817`. Catalog showed `amazon.nova-2-lite-v1:0` in `eu-central-1`, but runtime required inference profile `eu.amazon.nova-2-lite-v1:0`. Golden journey result: ready `20/20` raw coverage, conformance `pass`, 3657 tokens, 3926.3 ms; blocked `17/17` raw coverage, safely blocked, 4292 tokens, 4314.4 ms. No prompt or fixture tightening needed from this run.
-- T33 customer packet trial used `eu.amazon.nova-2-lite-v1:0`. Service-style compile with `--no-raw-evidence` wrote `tests/results/customer-packet-banking-lza-bedrock`, review HTML was ready/contract-pass/model-conformant, raw coverage was `20/20`, raw missing `0`, parse errors `0`, 3771 tokens, 4139.2 ms, and raw evidence was omitted. Existing LLM eval also passed with raw coverage `20/20`, 3493 tokens, 3401.9 ms. Review categories recorded no prompt/model misses and no missing graph/model fields; one expected review note remains that structured Markdown carried accepted decisions.
+- Keep the product boundary narrow: registered target configuration handoff,
+  contract checks, review evidence, and owner-controlled downstream execution.
+- Prefer packet-driven fixes over imagined platform features.
+- Prefer deletion and shared local helpers over new abstractions.
+- Keep generated/ignored evidence out of committed source unless it is an
+  intentional fixture or contract artifact.
+
+### Next
+
+1. Keep future cleanup packet- or test-driven; prefer deletion when behavior is
+   already covered by shared helpers.

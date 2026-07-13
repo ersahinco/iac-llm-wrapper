@@ -21,6 +21,7 @@ import ruamel.yaml
 
 from intent_engine.core.contracts import ContractValidator
 from intent_engine.core.patterns import GLOBAL_REGISTRY
+from intent_engine.core.yaml_utils import write_yaml_artifact
 from intent_engine.patterns import load_builtin_patterns
 
 load_builtin_patterns()
@@ -463,19 +464,7 @@ def _write_eval_results(
             for result in results
         ],
     }
-    yaml = ruamel.yaml.YAML()
-    yaml.default_flow_style = False
-    yaml.indent(mapping=2, sequence=4, offset=2)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(_yaml_header() + _yaml_dump(yaml, data))
-
-
-def _yaml_dump(yaml: ruamel.yaml.YAML, data: dict[str, Any]) -> str:
-    from io import StringIO
-
-    buf = StringIO()
-    yaml.dump(data, buf)
-    return "\n".join(line.rstrip() for line in buf.getvalue().splitlines()) + "\n"
+    write_yaml_artifact(path, data, _yaml_header())
 
 
 def _yaml_header() -> str:

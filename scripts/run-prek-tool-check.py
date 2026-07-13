@@ -17,7 +17,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 FileMode = Literal["args", "none", "terraform-dirs", "terraform-docs-dirs"]
@@ -30,7 +29,6 @@ class ToolCheck:
     alternatives: tuple[str, ...] = ()
     patterns: tuple[str, ...] = ()
     mode: FileMode = "args"
-    manual_only: bool = False
     config_files: tuple[str, ...] = ()
 
 
@@ -96,71 +94,60 @@ CHECKS: dict[str, ToolCheck] = {
         args=("validate",),
         patterns=(r"\.tf$",),
         mode="terraform-dirs",
-        manual_only=True,
     ),
     "opentofu-validate": ToolCheck(
         executable="tofu",
         args=("validate",),
         patterns=(r"\.tf$",),
         mode="terraform-dirs",
-        manual_only=True,
     ),
     "terraform-docs": ToolCheck(
         executable="terraform-docs",
         args=("markdown", "table", "--output-check"),
         patterns=(r"\.tf$",),
         mode="terraform-docs-dirs",
-        manual_only=True,
     ),
     "tflint": ToolCheck(
         executable="tflint",
         args=("--recursive", "--minimum-failure-severity=error"),
         patterns=(r"\.tf$",),
         mode="none",
-        manual_only=True,
     ),
     "tfupdate": ToolCheck(
         executable="tfupdate",
         args=("--version",),
         patterns=(r"\.tf$",),
         mode="none",
-        manual_only=True,
     ),
     "checkov": ToolCheck(
         executable="checkov",
         args=("-d", ".", "--quiet", "--skip-path", "fixtures", "--skip-path", "tests/results"),
         mode="none",
-        manual_only=True,
     ),
     "trivy-fs": ToolCheck(
         executable="trivy",
         args=("fs", "--quiet", "--scanners", "vuln,secret,config", "."),
         mode="none",
-        manual_only=True,
     ),
     "grype-fs": ToolCheck(
         executable="grype",
         args=("dir:.",),
         mode="none",
-        manual_only=True,
     ),
     "gitleaks": ToolCheck(
         executable="gitleaks",
         args=("detect", "--source", ".", "--redact", "--no-banner"),
         mode="none",
-        manual_only=True,
     ),
     "deepfence-secretscanner": ToolCheck(
         executable="SecretScanner",
         args=("-path", ".", "-mask"),
         mode="none",
-        manual_only=True,
     ),
     "owasp-dependency-check": ToolCheck(
         executable="dependency-check",
         args=("--scan", ".", "--format", "JSON", "--out", "tests/results/dependency-check"),
         mode="none",
-        manual_only=True,
     ),
 }
 
@@ -172,7 +159,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     check = CHECKS[args.check]
-    if check.config_files and not any((ROOT / config_file).exists() for config_file in check.config_files):
+    if check.config_files and not any(
+        (ROOT / config_file).exists() for config_file in check.config_files
+    ):
         print(f"{args.check}: no config file found")
         return 0
 
@@ -230,7 +219,9 @@ def _terraform_dirs(files: list[str]) -> list[Path]:
 def _terraform_docs_dirs(files: list[str]) -> list[Path]:
     dirs = []
     for directory in _terraform_dirs(files):
-        if (directory / ".terraform-docs.yml").exists() or (directory / ".terraform-docs.yaml").exists():
+        if (directory / ".terraform-docs.yml").exists() or (
+            directory / ".terraform-docs.yaml"
+        ).exists():
             dirs.append(directory)
         else:
             print(f"terraform-docs: skipping {directory}; no .terraform-docs config")

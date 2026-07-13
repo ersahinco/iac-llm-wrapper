@@ -5,21 +5,17 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import ruamel.yaml
-
 from intent_engine.core.artifact_review import (
     build_review_context,
     render_review_html,
     write_review_html,
 )
+from intent_engine.core.yaml_utils import write_yaml_artifact
 from intent_engine.patterns import load_builtin_patterns
 
 
 def _write_yaml(path: Path, data: dict[str, Any]) -> None:
-    yaml = ruamel.yaml.YAML()
-    yaml.default_flow_style = False
-    with path.open("w") as handle:
-        yaml.dump(data, handle)
+    write_yaml_artifact(path, data, header="")
 
 
 def _write_review_bundle(
