@@ -7,6 +7,7 @@ from typing import Any
 from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern, PatternGenerator
 
 from .contracts import AWS_LZA_SAMPLE_CONFIG_CONTRACT
+from .entities import apply_llm_entities, extract_markdown_entities, merge_markdown_entities
 from .generators import (
     enrich_lza_handoff_readiness,
     gen_lza_accounts_config,
@@ -23,6 +24,7 @@ from .generators import (
 )
 from .graph import build_aws_lza_graph
 from .models import AwsLzaIntent
+from .review import load_lza_review_evidence
 from .samples import aws_lza_samples
 from .target_capabilities import (
     TargetCapability,
@@ -225,11 +227,67 @@ def _register_pattern() -> None:
                 "This pattern gathers decisions for AWS Landing Zone Accelerator. "
                 "Use AWS LZA sample configurations as the downstream deployment contract. "
                 "Extract only decisions needed for LZA configuration and handoff; flag "
-                "explicit custom Terraform requests as unsupported for this pattern."
+                "explicit custom Terraform requests as unsupported for this pattern. "
+                "When the packet explicitly lists named entities, the JSON may also include "
+                "top-level accounts as [{name, ou, description}] and ous as "
+                "[{name, description}]. These are metadata, not requirement gaps."
             ),
             contracts=[AWS_LZA_SAMPLE_CONFIG_CONTRACT],
             samples=aws_lza_samples(),
             readiness_enricher=enrich_lza_handoff_readiness,
+            markdown_entity_extractor=extract_markdown_entities,
+            markdown_entity_applier=merge_markdown_entities,
+            llm_entity_applier=apply_llm_entities,
+            review_evidence_loader=load_lza_review_evidence,
+            violation_requirement_map={
+                "AWS_LZA_SECURITY_OU_REQUIRED": "organizational_units",
+                "AWS_LZA_INFRASTRUCTURE_OU_REQUIRED": "organizational_units",
+                "AWS_LZA_WORKLOADS_OU_REQUIRED": "organizational_units",
+                "AWS_LZA_LOG_ARCHIVE_ACCOUNT_REQUIRED": "log_archive_account",
+                "AWS_LZA_AUDIT_ACCOUNT_REQUIRED": "audit_account",
+                "AWS_LZA_SECURITY_TOOLING_ACCOUNT_REQUIRED": "security_tooling_account",
+                "AWS_LZA_IDENTITY_CENTER_ADMIN_UNKNOWN": (
+                    "identity_center_delegated_admin_account"
+                ),
+                "AWS_LZA_IDENTITY_CENTER_ASSIGNMENT_FORMAT_INVALID": (
+                    "identity_center_assignments"
+                ),
+                "AWS_LZA_IDENTITY_CENTER_ASSIGNMENT_PERMISSION_SET_UNKNOWN": (
+                    "identity_center_assignments"
+                ),
+                "AWS_LZA_IDENTITY_CENTER_ASSIGNMENT_ACCOUNT_UNKNOWN": (
+                    "identity_center_assignments"
+                ),
+                "AWS_LZA_HOME_REGION_NOT_ENABLED": "enabled_regions",
+            },
+            artifact_review_owners={
+                "accounts-config.yaml": "platform-owner",
+                "global-config.yaml": "platform-owner",
+                "iam-config.yaml": "security-owner",
+                "network-config.yaml": "network-owner",
+                "organization-config.yaml": "platform-owner",
+                "security-config.yaml": "security-owner",
+            },
+            reconfirmation_categories=(
+                "accelerator",
+                "accounts",
+                "identity",
+                "network",
+                "organization",
+                "security",
+            ),
+            reconfirmation_keys=(
+                "baseline",
+                "home_region",
+                "enabled_regions",
+                "identity_center_delegated_admin_account",
+                "identity_center_permission_sets",
+                "identity_center_assignments",
+                "network_account",
+                "network_cidr",
+                "topology",
+            ),
+            forbidden_artifacts=("terraform.tfvars", "main.tf", "terragrunt.hcl"),
             plan_ready=True,
         )
     )

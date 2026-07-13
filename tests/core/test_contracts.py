@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import BaseModel
-
 from intent_engine.core.contracts import (
     BLOCKED_ASSESSMENT_CONTRACT,
     CONTEXT_MANIFEST_CONTRACT,
@@ -22,11 +20,6 @@ from intent_engine.core.requirements import Requirement, RequirementGraph
 from intent_engine.patterns import load_builtin_patterns
 
 load_builtin_patterns()
-
-
-class ExampleIntent(BaseModel):
-    region: str = "eu-central-1"
-    account: str = ""
 
 
 def _contract() -> TargetContract:
@@ -111,10 +104,6 @@ class TestContractValidator:
             "CONTRACT_ASSERTION_RULE_REQUIRED",
             "CONTRACT_ASSERTION_AMBIGUOUS",
         }
-
-    def test_missing_required_decision_fails(self):
-        violations = ContractValidator(_contract()).validate_intent(ExampleIntent())
-        assert {violation.code for violation in violations} == {"ACCOUNT_REQUIRED"}
 
     def test_graph_must_contain_required_and_lineage_decisions(self):
         graph = RequirementGraph()

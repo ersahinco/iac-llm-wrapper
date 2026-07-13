@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import ruamel.yaml
+from pydantic import BaseModel
 
 from intent_engine.core.contract_validation import (
     build_contract_validation,
@@ -15,6 +16,15 @@ from intent_engine.core.contracts import ArtifactContract, TargetContract
 from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern
 from intent_engine.core.requirements import Requirement, RequirementGraph
 from intent_engine.core.yaml_utils import write_yaml_artifact
+
+
+class _TestIntent(BaseModel):
+    region: str = ""
+
+
+def _registry_snapshot() -> dict[str, Pattern]:
+    GLOBAL_REGISTRY.list()
+    return dict(GLOBAL_REGISTRY._patterns)
 
 
 def _write_yaml(path: Path, data: dict[str, Any]) -> None:
@@ -42,12 +52,13 @@ def _graph() -> RequirementGraph:
 
 
 def _register_example_pattern() -> dict[str, Pattern]:
-    original = dict(GLOBAL_REGISTRY._patterns)
+    original = _registry_snapshot()
     GLOBAL_REGISTRY.register(
         Pattern(
             name="contract-validation-example",
             description="Contract validation example",
             graph_factory=_graph,
+            intent_factory=_TestIntent,
             prompt_context=(
                 "This pattern captures approved region handoff context only. "
                 "Extract the region decision for an existing target contract."

@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import ruamel.yaml
 
 import intent_engine.patterns.kubernetes  # noqa: F401 — triggers pattern registration
-from intent_engine.core.compiler import compile_from_interview
+from intent_engine.core.compiler import CompileError, compile_from_interview
 from intent_engine.core.patterns import GLOBAL_REGISTRY
 
 
@@ -19,6 +20,16 @@ class TestKubernetesPattern:
         assert p.intent_factory is not None
         assert [contract.name for contract in p.contracts] == ["kubernetes-cluster-config"]
         assert "cluster-config.yaml" in p.expected_artifacts()
+
+    def test_node_pool_minimum_cannot_exceed_maximum(self, tmp_path: Path):
+        with pytest.raises(CompileError) as excinfo:
+            compile_from_interview(
+                {"node_pool_min_size": "4", "node_pool_max_size": "2"},
+                tmp_path,
+                pattern="kubernetes-cluster",
+            )
+
+        assert "INTENT_MODEL_ROOT_INVALID" in str(excinfo.value)
 
     def test_compile_from_interview_creates_artifacts(self, tmp_path: Path):
         decisions = {
@@ -78,14 +89,21 @@ class TestKubernetesPattern:
 
     def test_template_generation(self):
         from intent_engine.core.compiler import generate_template
+        from intent_engine.core.markdown_extractor import extract_from_markdown
 
         markdown = generate_template(pattern="kubernetes-cluster")
         assert "# Design Document — kubernetes-cluster pattern" in markdown
         assert "## Cluster" in markdown
         assert "## Network" in markdown
         assert "## Node Pools" in markdown
-        assert "name: k8s-cluster" in markdown
+        assert "cluster_name: k8s-cluster" in markdown
         assert "pod_cidr: 10.244.0.0/16" in markdown
+        decisions = extract_from_markdown(
+            markdown,
+            GLOBAL_REGISTRY.get("kubernetes-cluster").create_graph(),
+        )
+        assert decisions["cluster_name"] == "k8s-cluster"
+        assert decisions["cluster_version"] == "1.29"
 
     def test_validate_command_passes(self, tmp_path: Path):
         from typer.testing import CliRunner
@@ -226,13 +244,18 @@ rollback:
         assert intent.network_policy_enabled is True
         assert intent.node_pool_min_size == 1
 
-    def test_kubernetes_generators_skip_other_patterns(self, tmp_path: Path):
+    def test_generation_rejects_mismatched_pattern_intent(self, tmp_path: Path):
         from intent_engine.core.generator import generate_all
+        from intent_engine.core.module_mapping import IaCIntentPayload
         from intent_engine.patterns.kubernetes import K8sIntent
 
         output = tmp_path / "output"
-        generate_all(K8sIntent(), output, pattern="aws-lza")
-
-        assert not (output / "cluster-config.yaml").exists()
-        assert not (output / "namespace-config.yaml").exists()
-        assert not (output / "decision-report.yaml").exists()
+        with pytest.raises(TypeError, match="requires AwsLzaIntent"):
+            generate_all(
+                IaCIntentPayload(
+                    module_inputs=[],
+                    intent=K8sIntent(),
+                    pattern="aws-lza",
+                ),
+                output,
+            )

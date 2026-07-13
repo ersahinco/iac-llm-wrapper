@@ -70,7 +70,6 @@ class LzaIdentityCenterAssignment(BaseModel):
     principal: str
     permission_set: str
     target_account: str
-    principal_type: str = "GROUP"
 
 
 class LzaControl(BaseModel):
@@ -119,6 +118,3 @@ class AwsLzaIntent(BaseModel):
     compliance_overlay: ComplianceOverlay = ComplianceOverlay.NONE
     ous: list[LzaOrganizationalUnit] = Field(default_factory=list)
     accounts: list[LzaAccount] = Field(default_factory=list)
-    permission_sets: list[LzaPermissionSet] = Field(default_factory=list)
-    assignments: list[LzaIdentityCenterAssignment] = Field(default_factory=list)
-    controls: list[LzaControl] = Field(default_factory=list)

@@ -8,7 +8,7 @@ annotations, and coerce values generically.
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any, cast, get_args, get_origin
+from typing import Any, get_args, get_origin
 
 from pydantic import BaseModel
 
@@ -126,7 +126,12 @@ def coerce_value(raw: Any, annotation: Any) -> Any:
     if annotation is bool:
         if isinstance(raw, bool):
             return raw
-        return str(raw).lower() in ("true", "yes", "1")
+        normalized = str(raw).strip().lower()
+        if normalized in ("true", "yes", "1"):
+            return True
+        if normalized in ("false", "no", "0"):
+            return False
+        return None
     if annotation is float:
         try:
             return float(raw)
@@ -174,49 +179,6 @@ def list_annotation_item_model(annotation: Any) -> type[BaseModel] | None:
     return None
 
 
-def discover_model_fields(
-    model: type[BaseModel],
-    prefix: str = "",
-) -> dict[str, tuple[str, Any]]:
-    """Discover all leaf fields on a model suitable for graph requirements.
-
-    Returns a dict of key -> (dotted_path, annotation).
-    Skips nested BaseModel fields (they are not leafs) and list[BaseModel].
-    """
-    result: dict[str, tuple[str, Any]] = {}
-    for name, field_info in model.model_fields.items():
-        annotation = field_info.annotation
-        path = f"{prefix}{name}" if not prefix else f"{prefix}.{name}"
-
-        origin = get_origin(annotation)
-        args = get_args(annotation)
-
-        if origin is not None and type(None) in args:
-            annotation = next(a for a in args if a is not type(None))
-            origin = get_origin(annotation)
-            args = get_args(annotation)
-
-        # Skip list[BaseModel] — handled separately
-        if origin is list:
-            item_type = args[0] if args else Any
-            if isinstance(item_type, type):
-                item_cls = cast(type[Any], item_type)
-                try:
-                    if issubclass(item_cls, BaseModel):
-                        continue
-                except TypeError:
-                    pass
-
-        if isinstance(annotation, type) and issubclass(annotation, BaseModel):
-            result.update(discover_model_fields(annotation, path))
-            continue
-
-        key = path.replace(".", "_")
-        result[key] = (path, annotation)
-
-    return result
-
-
 def validate_requirement_against_model(
     req: Any,
     model: type[BaseModel],
@@ -237,83 +199,3 @@ def validate_requirement_against_model(
     except (AttributeError, TypeError) as e:
         errors.append(f"Requirement '{req.key}': target_field '{req.target_field}' invalid: {e}")
     return errors
-
-
-def append_to_list_field(
-    intent: BaseModel,
-    dotted_path: str,
-    item_data: Any,
-) -> bool:
-    """Append a model instance to a list[Model] field on an intent.
-
-    Returns True if successful, False if the field is not a list[Model].
-    """
-    try:
-        _, annotation = resolve_field_info(type(intent), dotted_path)
-        item_model = list_annotation_item_model(annotation)
-        if item_model is None or not isinstance(item_data, dict):
-            return False
-        instance = item_model(**item_data)
-        # Navigate to the list and append
-        parts = dotted_path.split(".")
-        obj = intent
-        for part in parts[:-1]:
-            obj = getattr(obj, part)
-        lst = getattr(obj, parts[-1])
-        lst.append(instance)
-        return True
-    except Exception:
-        return False
-
-
-def merge_into_list_field(
-    intent: BaseModel,
-    dotted_path: str,
-    item_data: dict[str, Any],
-    dedupe_key: str = "name",
-) -> bool:
-    """Append or backfill a list[Model] field on an intent.
-
-    If an existing item with the same `dedupe_key` exists, only fields explicitly
-    provided by `item_data` are merged, and only when the current item did not
-    explicitly set them or currently holds an empty value.
-    """
-    try:
-        _, annotation = resolve_field_info(type(intent), dotted_path)
-        item_model = list_annotation_item_model(annotation)
-        if item_model is None:
-            return False
-
-        instance = item_model(**item_data)
-        parts = dotted_path.split(".")
-        obj = intent
-        for part in parts[:-1]:
-            obj = getattr(obj, part)
-        lst = getattr(obj, parts[-1])
-
-        if dedupe_key not in item_data:
-            lst.append(instance)
-            return True
-
-        dedupe_value = item_data[dedupe_key]
-        for idx, existing in enumerate(lst):
-            if getattr(existing, dedupe_key, None) != dedupe_value:
-                continue
-
-            explicit_existing = set(getattr(existing, "model_fields_set", set()))
-            updates: dict[str, Any] = {}
-            for field_name in getattr(instance, "model_fields_set", set()):
-                if field_name == dedupe_key:
-                    continue
-                current_value = getattr(existing, field_name, None)
-                if field_name not in explicit_existing or current_value in (None, "", [], {}):
-                    updates[field_name] = getattr(instance, field_name)
-
-            if updates:
-                lst[idx] = existing.model_copy(update=updates)
-            return True
-
-        lst.append(instance)
-        return True
-    except Exception:
-        return False

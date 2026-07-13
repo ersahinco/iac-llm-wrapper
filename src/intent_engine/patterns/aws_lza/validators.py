@@ -8,7 +8,7 @@ from .models import AwsLzaIntent
 from .semantic import build_aws_lza_semantic_model
 
 
-def validate_aws_lza_intent(intent: AwsLzaIntent, graph=None) -> list[Violation]:
+def validate_aws_lza_intent(intent: AwsLzaIntent) -> list[Violation]:
     model = build_aws_lza_semantic_model(intent)
     return [
         Violation(

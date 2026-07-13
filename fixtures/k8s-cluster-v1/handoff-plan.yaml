@@ -46,7 +46,7 @@ steps:
     rollback: Stop handoff until contract validation is clean.
   - id: review-cluster-config-yaml
     title: Review cluster-config.yaml
-    owner: network-owner
+    owner: target-owner
     dependsOn:
       - validate-target-contracts
     manualGate: true

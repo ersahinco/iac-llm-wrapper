@@ -14,19 +14,13 @@ from typing import Any
 class TargetCapabilityType(StrEnum):
     ACCELERATOR = "accelerator"
     MODULE_COMPOSITION = "module-composition"
-    GENERATOR = "generator"
-    TEMPLATE_GENERATION = "template-generation"
-    MANUAL = "manual"
     BLOCKED = "blocked"
 
 
 _ROUTING_ORDER = {
     TargetCapabilityType.ACCELERATOR: 0,
     TargetCapabilityType.MODULE_COMPOSITION: 1,
-    TargetCapabilityType.GENERATOR: 2,
-    TargetCapabilityType.TEMPLATE_GENERATION: 3,
-    TargetCapabilityType.MANUAL: 4,
-    TargetCapabilityType.BLOCKED: 5,
+    TargetCapabilityType.BLOCKED: 2,
 }
 
 _NEGATED_BEFORE_MARKERS = (
@@ -72,20 +66,6 @@ def _is_keyword_boundary(text: str, index: int, keyword_length: int) -> bool:
     return not (after and (after.isalnum() or after == "_"))
 
 
-def _has_affirmative_keyword_match(text: str, keyword: str) -> bool:
-    keyword = keyword.lower()
-    start = 0
-    while True:
-        index = text.find(keyword, start)
-        if index == -1:
-            return False
-        if _is_keyword_boundary(text, index, len(keyword)) and not _is_negated_keyword_match(
-            text, index, len(keyword)
-        ):
-            return True
-        start = index + len(keyword)
-
-
 @dataclass(frozen=True)
 class UnsupportedRequest:
     """A source-text signal that this target path does not own."""
@@ -105,10 +85,8 @@ class UnsupportedAskFact:
     label: str
     evidence_span: str
     recommended_target: TargetCapabilityType
-    owned_by_pattern: bool
     detected_by: str
     reason: str
-    source: str = "deterministic-text"
 
     def to_dict(self) -> dict[str, str | bool]:
         return {
@@ -116,10 +94,10 @@ class UnsupportedAskFact:
             "label": self.label,
             "evidenceSpan": self.evidence_span,
             "recommendedTarget": self.recommended_target.value,
-            "ownedByPattern": self.owned_by_pattern,
+            "ownedByPattern": False,
             "detectedBy": self.detected_by,
             "reason": self.reason,
-            "source": self.source,
+            "source": "deterministic-text",
         }
 
 
@@ -209,8 +187,8 @@ class TargetCapabilityGraph:
                     "recommendedTarget": fact.recommended_target.value,
                     "reason": fact.reason,
                     "evidenceSpan": fact.evidence_span,
-                    "ownedByPattern": fact.owned_by_pattern,
-                    "source": fact.source,
+                    "ownedByPattern": False,
+                    "source": "deterministic-text",
                 }
             )
 
@@ -269,7 +247,6 @@ def extract_unsupported_ask_facts(
                         label=unsupported.label,
                         evidence_span=_evidence_span(source_text, index, len(keyword)),
                         recommended_target=unsupported.recommended_target,
-                        owned_by_pattern=False,
                         detected_by=capability.key,
                         reason=unsupported.reason,
                     )

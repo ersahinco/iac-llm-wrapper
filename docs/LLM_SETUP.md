@@ -195,7 +195,7 @@ carry the reference, owner, expected parameter name, and validation notes.
 ## LLM vs Deterministic Fallback
 
 ### With LLM (Model-Assisted Path)
-- Extracts free-form values from prose (accounts, workloads, CIDRs)
+- Extracts free-form values from prose (accounts, OUs, CIDRs)
 - Detects signals from unstructured text
 - Fills gaps with guided interview
 - Handles implicit requirements
@@ -205,7 +205,7 @@ carry the reference, owner, expected parameter name, and validation notes.
 - Uses graph defaults
 - Requires explicit `--decisions` JSON for custom values
 - Signal detection still works via keyword matching
-- Structured Markdown sections can recover named accounts, OUs, and workloads
+- The AWS LZA pattern can recover named accounts and OUs from structured sections
 - **Not sufficient for real design documents**
 
 The deterministic fallback exists for:

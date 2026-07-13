@@ -34,11 +34,7 @@ from .document_diff import (
 from .extractor import Extractor, LLMGraphResult
 from .interview import InterviewEngine
 from .llm_caller import LLMCaller, LLMEvidenceStore
-from .markdown_extractor import (
-    extract_entities_from_markdown,
-    extract_from_markdown_with_diagnostics,
-)
-from .model_introspection import append_to_list_field, merge_into_list_field
+from .markdown_extractor import extract_from_markdown_with_diagnostics
 from .observability import build_model_benchmark
 from .patterns import GLOBAL_REGISTRY
 from .readiness import (
@@ -65,41 +61,22 @@ class CompileError(Exception):
         super().__init__(msgs)
 
 
-def _merge_extracted_entities(intent: Any, entities: dict[str, list[dict[str, Any]]]) -> None:
-    """Merge deterministic entities into intent without duplicating named items."""
-    for entity_type in ("ous", "accounts", "workloads"):
-        if not hasattr(intent, entity_type):
-            continue
-        for item in entities.get(entity_type, []):
-            if not merge_into_list_field(intent, entity_type, item):
-                append_to_list_field(intent, entity_type, item)
-
-
 def _build_payload(
     intent: Any,
     pattern: str,
     decisions: dict[str, Any] | None = None,
-    design_doc_data: dict[str, Any] | None = None,
     extraction_summary: dict[str, Any] | None = None,
     handoff_readiness: dict[str, Any] | None = None,
     target_capability_report: dict[str, Any] | None = None,
     source_context: dict[str, Any] | None = None,
     decision_audit: list[dict[str, Any]] | None = None,
 ) -> Any:
-    """Wrap intent in IaCIntentPayload with design doc and module inputs."""
-    from .module_mapping import DesignDocument, IaCIntentPayload
-
-    design_doc = DesignDocument()
-    if design_doc_data:
-        design_doc.project_name = design_doc_data.get("project_name", "")
-        design_doc.business_justification = design_doc_data.get("business_justification", "")
-        design_doc.estimated_tier = design_doc_data.get("estimated_tier", "")
-        design_doc.compliance_tags = design_doc_data.get("compliance_tags", [])
+    """Wrap validated intent with artifact generation context."""
+    from .module_mapping import IaCIntentPayload
 
     pattern_obj = GLOBAL_REGISTRY.get(pattern)
     module_inputs = pattern_obj.module_mapper(intent) if pattern_obj.module_mapper else []
     return IaCIntentPayload(
-        design_doc=design_doc,
         module_inputs=module_inputs,
         intent=intent,
         pattern=pattern,
@@ -204,7 +181,6 @@ def _llm_result_for_blocking(
         return llm_result
     return LLMGraphResult(
         decisions=llm_result.decisions,
-        design_doc=llm_result.design_doc,
         signal_decisions=llm_result.signal_decisions,
         gaps=llm_result.gaps,
         contradictions=contradictions,
@@ -326,31 +302,11 @@ def _build_target_capability_report(
     return cast(dict[str, Any], pattern_obj.target_report_builder(decisions, source_text))
 
 
-_HIGH_RISK_RECONFIRMATION_CATEGORIES = {
-    "accelerator",
-    "accounts",
-    "identity",
-    "network",
-    "organization",
-    "security",
-}
-_HIGH_RISK_RECONFIRMATION_KEYS = {
-    "baseline",
-    "home_region",
-    "enabled_regions",
-    "identity_center_delegated_admin_account",
-    "identity_center_permission_sets",
-    "identity_center_assignments",
-    "network_account",
-    "network_cidr",
-    "topology",
-}
-
-
 def _incremental_reconfirmation_violations(
     graph,
     incremental_report: dict[str, Any],
     input_diff: dict[str, Any],
+    pattern_obj: Any,
 ) -> list[Violation]:
     source = input_diff.get("source", {}) if isinstance(input_diff.get("source"), dict) else {}
     if not source.get("baselineDocumentAvailable"):
@@ -369,8 +325,8 @@ def _incremental_reconfirmation_violations(
         key = str(key_value)
         req = requirements.get(key)
         category = getattr(req, "category", "")
-        if key not in _HIGH_RISK_RECONFIRMATION_KEYS and category not in (
-            _HIGH_RISK_RECONFIRMATION_CATEGORIES
+        if key not in pattern_obj.reconfirmation_keys and (
+            category not in pattern_obj.reconfirmation_categories
         ):
             continue
         label = getattr(req, "label", key)
@@ -639,6 +595,7 @@ class LLMContextProvider:
         self,
         prose: str,
         graph,
+        pattern: str,
         llm_caller: LLMCaller | None = None,
         evidence_store: LLMEvidenceStore | None = None,
     ) -> None:
@@ -646,7 +603,7 @@ class LLMContextProvider:
         self.graph = graph
         self.llm_caller = llm_caller
         self.evidence_store = evidence_store
-        self.extractor = Extractor(graph=graph)
+        self.extractor = Extractor(graph=graph, pattern=pattern)
 
     def run(self) -> LLMGraphResult:
         """Run LLM graph traversal and return structured result.
@@ -681,7 +638,6 @@ def _validate_and_generate(
     markdown_contradictions: list[dict[str, Any]],
     applied_decisions: dict[str, list[str]],
     dry_run: bool,
-    design_doc_data: dict[str, Any] | None = None,
     extra_artifacts: dict[str, Any] | None = None,
     extra_violations: list[Violation] | None = None,
 ) -> None:
@@ -750,7 +706,6 @@ def _validate_and_generate(
         intent,
         pattern,
         graph.typed_decisions(),
-        design_doc_data,
         extraction_summary=extraction_summary,
         handoff_readiness=readiness,
         target_capability_report=target_capability_report,
@@ -826,7 +781,9 @@ def compile_design(
     # ------------------------------------------------------------------
     markdown_result = extract_from_markdown_with_diagnostics(text, graph)
     markdown_decisions = markdown_result.decisions
-    markdown_entities = extract_entities_from_markdown(text)
+    markdown_entities = (
+        pattern_obj.markdown_entity_extractor(text) if pattern_obj.markdown_entity_extractor else {}
+    )
     applied_decisions: dict[str, list[str]] = {
         "markdown": [],
         "llm": [],
@@ -842,6 +799,7 @@ def compile_design(
     llm_result = LLMContextProvider(
         prose=text,
         graph=graph,
+        pattern=pattern,
         llm_caller=llm_caller,
         evidence_store=evidence_store,
     ).run()
@@ -878,7 +836,8 @@ def compile_design(
     else:
         intent = pattern_obj.intent_factory()
     # Deterministic entities backfill items that small models often omit.
-    _merge_extracted_entities(intent, markdown_entities)
+    if pattern_obj.markdown_entity_applier:
+        pattern_obj.markdown_entity_applier(markdown_entities, intent)
     # Apply graph cascades (topology -> network.topology, etc.)
     graph.apply_to_intent(intent)
 
@@ -896,7 +855,6 @@ def compile_design(
         markdown_contradictions=markdown_result.contradictions,
         applied_decisions=applied_decisions,
         dry_run=dry_run,
-        design_doc_data=llm_result.design_doc,
     )
 
 
@@ -949,7 +907,11 @@ def compile_incremental_design(
 
     markdown_result = extract_from_markdown_with_diagnostics(changed_text, graph)
     markdown_decisions = markdown_result.decisions
-    markdown_entities = extract_entities_from_markdown(changed_text)
+    markdown_entities = (
+        pattern_obj.markdown_entity_extractor(changed_text)
+        if pattern_obj.markdown_entity_extractor
+        else {}
+    )
     applied_decisions: dict[str, list[str]] = {
         "baseline": [],
         "markdown": [],
@@ -970,6 +932,7 @@ def compile_incremental_design(
     llm_result = LLMContextProvider(
         prose=scoped_context,
         graph=graph,
+        pattern=pattern,
         llm_caller=llm_caller,
         evidence_store=evidence_store,
     ).run()
@@ -996,7 +959,8 @@ def compile_incremental_design(
         intent = llm_result.to_intent(extractor)
     else:
         intent = pattern_obj.intent_factory()
-    _merge_extracted_entities(intent, markdown_entities)
+    if pattern_obj.markdown_entity_applier:
+        pattern_obj.markdown_entity_applier(markdown_entities, intent)
     graph.apply_to_intent(intent)
 
     incremental_report = incremental_decision_report(
@@ -1034,12 +998,12 @@ def compile_incremental_design(
         markdown_contradictions=markdown_result.contradictions,
         applied_decisions=applied_decisions,
         dry_run=dry_run,
-        design_doc_data=llm_result.design_doc,
         extra_artifacts=extra_artifacts,
         extra_violations=_incremental_reconfirmation_violations(
             graph,
             incremental_report,
             input_diff,
+            pattern_obj,
         ),
     )
 
@@ -1102,27 +1066,11 @@ def _build_section_map(pattern: str, graph) -> dict[str, tuple[str, str | None]]
     pattern_obj = GLOBAL_REGISTRY.get(pattern)
     section_map: dict[str, tuple[str, str | None]] = dict(pattern_obj.section_map)
 
-    # Fallback: derive section from categories used by current built-in patterns.
-    _CATEGORY_TO_SECTION: dict[str, str] = {
-        "accelerator": "LZA Baseline",
-        "accounts": "Accounts",
-        "cloudformation": "CloudFormation",
-        "core": "Core",
-        "identity": "Identity",
-        "organization": "Organization",
-        "network": "Network",
-        "security": "Security",
-        "workload": "Workloads",
-        "general": "General",
-        "meta": "Metadata",
-    }
     for key, req in graph._requirements.items():
         if key in section_map:
             continue
         category = req.category or "general"
-        section_name = _CATEGORY_TO_SECTION.get(category)
-        if section_name:
-            section_map[key] = (section_name, req.key)
+        section_map[key] = (category.replace("-", " ").title(), req.key)
 
     return section_map
 

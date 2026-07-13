@@ -27,15 +27,11 @@ def _write_yaml(output_dir: Path, name: str, data: Any) -> None:
     write_yaml_artifact(output_dir / name, data, header)
 
 
-def _aws_lza_intent(payload: Any) -> AwsLzaIntent | None:
+def _aws_lza_intent(payload: Any) -> AwsLzaIntent:
     intent = getattr(payload, "intent", payload)
-    if isinstance(intent, AwsLzaIntent):
-        return intent
-    return None
-
-
-def _normalized_ous(intent: AwsLzaIntent) -> set[str]:
-    return {ou.strip().lower() for ou in intent.organizational_units if ou.strip()}
+    if not isinstance(intent, AwsLzaIntent):
+        raise TypeError(f"AWS LZA generator requires AwsLzaIntent, got {type(intent).__name__}.")
+    return intent
 
 
 def _management_access_role(intent: AwsLzaIntent) -> str:

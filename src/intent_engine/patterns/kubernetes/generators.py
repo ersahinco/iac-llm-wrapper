@@ -10,17 +10,15 @@ from intent_engine.core.yaml_utils import write_yaml_artifact
 from .models import K8sIntent
 
 
-def _k8s_intent(payload: Any) -> K8sIntent | None:
+def _k8s_intent(payload: Any) -> K8sIntent:
     intent = getattr(payload, "intent", payload)
-    if isinstance(intent, K8sIntent):
-        return intent
-    return None
+    if not isinstance(intent, K8sIntent):
+        raise TypeError(f"Kubernetes generator requires K8sIntent, got {type(intent).__name__}.")
+    return intent
 
 
 def gen_cluster_config(intent: Any, output_dir: Path) -> None:
     model = _k8s_intent(intent)
-    if model is None:
-        return
     data = {
         "cluster": {
             "name": model.cluster_name,
@@ -45,8 +43,6 @@ def gen_cluster_config(intent: Any, output_dir: Path) -> None:
 
 def gen_namespace_config(intent: Any, output_dir: Path) -> None:
     model = _k8s_intent(intent)
-    if model is None:
-        return
     write_yaml_artifact(
         output_dir / "namespace-config.yaml",
         {"namespaces": [{"name": model.namespace_name}]},
@@ -57,8 +53,6 @@ def gen_namespace_config(intent: Any, output_dir: Path) -> None:
 def gen_k8s_decision_report(intent: Any, output_dir: Path) -> None:
     readiness = getattr(intent, "handoff_readiness", {})
     model = _k8s_intent(intent)
-    if model is None:
-        return
     data = {
         "pattern": "kubernetes-cluster",
         "clusterName": model.cluster_name,

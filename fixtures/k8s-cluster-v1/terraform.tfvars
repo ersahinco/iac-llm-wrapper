@@ -3,5 +3,3 @@
 # Module: terraform-aws-eks
 cluster_name    = "prod-k8s"
 cluster_version = "1.30"
-vpc_id          = module.vpc.vpc_id
-subnet_ids      = module.vpc.private_subnets

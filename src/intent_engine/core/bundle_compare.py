@@ -8,36 +8,8 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
-from .impact_graph import (
-    build_graph_diff_report,
-    build_impact_matrix_report,
-    build_impact_report,
-    changed_decision_roots,
-    changed_graph_diff_root_reasons,
-    changed_graph_diff_roots,
-    changed_report_roots,
-)
 from .sample_config import SampleConfig
 from .yaml_utils import read_yaml_mapping, write_yaml_artifact
-
-COMPARE_GRAPH_DIFF_ROOT_KINDS = [
-    "artifact",
-    "policy_control",
-    "module_variable",
-    "target_contract",
-    "target_capability",
-    "manual_gate",
-    "handoff_readiness",
-    "contract_validation",
-    "contract_result",
-    "validation_violation",
-    "downstream_validation_evidence",
-    "semantic_entity",
-    "semantic_constraint",
-    "shift_left_evidence",
-    "checkov_finding",
-    "scan_file",
-]
 
 
 @dataclass(frozen=True)
@@ -70,53 +42,6 @@ def compare_handoff_bundles(before_dir: Path, after_dir: Path) -> dict[str, Any]
         artifact_delta=artifact_delta,
         sample_delta=sample_delta,
         after=after,
-    )
-    input_diff_report = (
-        after.path / "input-diff-report.yaml"
-        if (after.path / "input-diff-report.yaml").exists()
-        else None
-    )
-    graph_diff = build_graph_diff_report(before.path, after.path)
-    changed_roots = changed_decision_roots({"decisionDelta": decision_delta})
-    graph_diff_roots = changed_graph_diff_roots(
-        graph_diff,
-        kinds=COMPARE_GRAPH_DIFF_ROOT_KINDS,
-    )
-    changed_report_reasons = _changed_report_root_reasons(after.path, input_diff_report)
-    graph_diff_reasons = changed_graph_diff_root_reasons(
-        graph_diff,
-        kinds=COMPARE_GRAPH_DIFF_ROOT_KINDS,
-    )
-    changed_decision_reasons = _changed_decision_root_reasons(decision_delta)
-    root_reasons = {
-        **changed_report_reasons,
-        **graph_diff_reasons,
-        **changed_decision_reasons,
-    }
-    root_categories = {
-        **_root_category_map(changed_report_reasons, "input-diff-roots"),
-        **_root_category_map(graph_diff_reasons, "graph-diff-roots"),
-        **_root_category_map(changed_decision_reasons, "decision-deltas"),
-    }
-    impact_roots = [
-        *changed_roots,
-        *graph_diff_roots,
-    ]
-    matrix_roots = [
-        *impact_roots,
-        *changed_report_roots(after.path, input_diff_report),
-    ]
-    impact_traversal = build_impact_report(
-        after.path,
-        roots=impact_roots,
-        changed_report=input_diff_report,
-    )
-    impact_matrix = build_impact_matrix_report(
-        after.path,
-        roots=matrix_roots,
-        root_reasons=root_reasons,
-        root_categories=root_categories,
-        root_source="bundle-compare",
     )
     review_focus = _review_focus(
         decision_delta=decision_delta,
@@ -172,9 +97,6 @@ def compare_handoff_bundles(before_dir: Path, after_dir: Path) -> dict[str, Any]
         "decisionDelta": decision_delta,
         "inputDelta": _input_delta(before.input_diff, after.input_diff),
         "impactedRequirementMap": impacted_map,
-        "impactTraversal": impact_traversal,
-        "impactMatrix": impact_matrix,
-        "graphDiff": graph_diff,
         "artifactDelta": artifact_delta,
         "sampleRecommendationDelta": sample_delta,
         "modelDelta": model_delta,
@@ -200,9 +122,6 @@ def render_bundle_comparison_html(report: dict[str, Any]) -> str:
     artifacts = _dict(report.get("artifactDelta"))
     samples = _dict(report.get("sampleRecommendationDelta"))
     impacts = _coerce_list(report.get("impactedRequirementMap"))
-    impact_traversal = _dict(report.get("impactTraversal"))
-    impact_matrix = _dict(report.get("impactMatrix"))
-    graph_diff = _dict(report.get("graphDiff"))
     focus = _coerce_list(summary.get("reviewFocus"))
     return "\n".join(
         [
@@ -241,52 +160,8 @@ def render_bundle_comparison_html(report: dict[str, Any]) -> str:
                 [
                     _html_list(_decision_review_lines(decisions)),
                     _html_named_list(
-                        "Affected artifacts",
-                        _coerce_list(impact_traversal.get("affectedArtifacts")),
-                    ),
-                    _html_named_list(
-                        "Affected target contracts",
-                        _coerce_list(impact_traversal.get("affectedTargetContracts")),
-                    ),
-                    _html_named_list(
-                        "Affected target capabilities",
-                        _coerce_list(impact_traversal.get("affectedTargetCapabilities")),
-                    ),
-                    _html_named_list(
-                        "Affected samples",
-                        _coerce_list(impact_traversal.get("affectedSamples")),
-                    ),
-                    _html_named_list(
-                        "Affected policy controls",
-                        _coerce_list(impact_traversal.get("affectedPolicyControls")),
-                    ),
-                    _html_named_list(
-                        "Affected checks",
-                        _coerce_list(impact_traversal.get("affectedChecks")),
-                    ),
-                    _html_kv(
-                        "Review priority severity",
-                        _impact_priority_summary(impact_traversal),
-                    ),
-                    _html_named_list(
-                        "Affected module variables",
-                        _coerce_list(impact_traversal.get("affectedModuleVariables")),
-                    ),
-                    _html_named_list(
-                        "Manual gates",
-                        _coerce_list(impact_traversal.get("manualGates")),
-                    ),
-                    _html_named_list(
-                        "Impact paths",
-                        _impact_path_summaries(_coerce_list(impact_traversal.get("impactPaths"))),
-                    ),
-                    _html_named_list(
-                        "Impact matrix",
-                        _impact_matrix_summaries(impact_matrix),
-                    ),
-                    _html_named_list(
-                        "Graph diff",
-                        _graph_diff_summaries(graph_diff),
+                        "Changed artifacts",
+                        _coerce_list(artifacts.get("changed")),
                     ),
                     _html_table(
                         [
@@ -335,9 +210,6 @@ def render_bundle_comparison_text(report: dict[str, Any]) -> str:
     sample_delta = _dict(report.get("sampleRecommendationDelta"))
     readiness_delta = _dict(report.get("readinessDelta"))
     input_delta = _dict(report.get("inputDelta"))
-    impact_traversal = _dict(report.get("impactTraversal"))
-    impact_matrix = _dict(report.get("impactMatrix"))
-    graph_diff = _dict(report.get("graphDiff"))
     lines = [
         "=== Handoff Bundle Comparison ===",
         "",
@@ -379,68 +251,6 @@ def render_bundle_comparison_text(report: dict[str, Any]) -> str:
     lines.extend(_text_decision_list("Added", _coerce_list(decision_delta.get("added"))))
     lines.extend(_text_decision_list("Changed", _coerce_list(decision_delta.get("changed"))))
     lines.extend(_text_decision_list("Removed", _coerce_list(decision_delta.get("removed"))))
-
-    if impact_traversal:
-        summary_block = _dict(impact_traversal.get("summary"))
-        lines.extend(
-            [
-                "",
-                "Impact traversal:",
-                f"  status: {summary_block.get('status', 'unknown')}",
-                f"  downstream impacts: {summary_block.get('downstreamImpactCount', 0)}",
-                "  review priority severity: " + _impact_priority_summary(impact_traversal),
-                "  affected artifacts: "
-                + _join_or_none(_coerce_list(impact_traversal.get("affectedArtifacts"))),
-                "  affected target contracts: "
-                + _join_or_none(_coerce_list(impact_traversal.get("affectedTargetContracts"))),
-                "  affected target capabilities: "
-                + _join_or_none(_coerce_list(impact_traversal.get("affectedTargetCapabilities"))),
-                "  affected samples: "
-                + _join_or_none(_coerce_list(impact_traversal.get("affectedSamples"))),
-                "  affected policy controls: "
-                + _join_or_none(_coerce_list(impact_traversal.get("affectedPolicyControls"))),
-                "  affected checks: "
-                + _join_or_none(_coerce_list(impact_traversal.get("affectedChecks"))),
-                "  affected module variables: "
-                + _join_or_none(_coerce_list(impact_traversal.get("affectedModuleVariables"))),
-                "  manual gates: "
-                + _join_or_none(_coerce_list(impact_traversal.get("manualGates"))),
-                "  impact paths: "
-                + _join_or_none(
-                    _impact_path_summaries(_coerce_list(impact_traversal.get("impactPaths")))[:5]
-                ),
-            ]
-        )
-
-    if impact_matrix:
-        summary_block = _dict(impact_matrix.get("summary"))
-        lines.extend(
-            [
-                "",
-                "Impact matrix:",
-                f"  roots: {summary_block.get('matchedRootCount', 0)} of "
-                f"{summary_block.get('rootCount', 0)} matched",
-                "  review priority severity: " + _impact_priority_summary(impact_matrix),
-                "  recommendation categories: "
-                + _join_or_none(_category_count_summaries(impact_matrix)),
-                "  rows: " + _join_or_none(_impact_matrix_summaries(impact_matrix)[:5]),
-            ]
-        )
-
-    if graph_diff:
-        summary_block = _dict(graph_diff.get("summary"))
-        lines.extend(
-            [
-                "",
-                "Graph diff:",
-                f"  status: {summary_block.get('status', 'unknown')}",
-                f"  nodes: added={summary_block.get('nodeAddedCount', 0)} "
-                f"removed={summary_block.get('nodeRemovedCount', 0)} "
-                f"changed={summary_block.get('nodeChangedCount', 0)}",
-                f"  edges: added={summary_block.get('edgeAddedCount', 0)} "
-                f"removed={summary_block.get('edgeRemovedCount', 0)}",
-            ]
-        )
 
     if input_delta.get("available"):
         lines.extend(
@@ -500,106 +310,6 @@ def _text_decision_list(title: str, values: list[Any]) -> list[str]:
     if len(values) > 12:
         lines.append(f"    ... {len(values) - 12} more")
     return lines
-
-
-def _join_or_none(items: list[Any]) -> str:
-    return ", ".join(str(item) for item in items) if items else "none"
-
-
-def _impact_priority_summary(impact_traversal: dict[str, Any]) -> str:
-    summary = _dict(impact_traversal.get("summary"))
-    counts = _dict(summary.get("reviewPrioritySeverityCounts"))
-    highest = str(summary.get("highestReviewPrioritySeverity") or "none")
-    parts = [
-        f"{severity}={int(counts.get(severity, 0) or 0)}"
-        for severity in ("critical", "high", "medium", "low")
-    ]
-    return f"highest={highest} {' '.join(parts)}"
-
-
-def _category_count_summaries(report: dict[str, Any]) -> list[str]:
-    counts = _dict(_dict(report.get("summary")).get("recommendationCategoryCounts"))
-    return [f"{category}: {count}" for category, count in sorted(counts.items())]
-
-
-def _impact_path_summaries(paths: list[Any]) -> list[str]:
-    summaries: list[str] = []
-    for path in paths:
-        if not isinstance(path, dict):
-            continue
-        target = _dict(path.get("target"))
-        hops = _coerce_list(path.get("hops"))
-        if not target or not hops:
-            continue
-        rendered_hops: list[str] = []
-        for hop in hops:
-            if not isinstance(hop, dict):
-                continue
-            source = _dict(hop.get("from"))
-            destination = _dict(hop.get("to"))
-            rendered_hops.append(
-                f"{source.get('id', '')} --{hop.get('relationship', '')}--> "
-                f"{destination.get('id', '')}"
-            )
-        summaries.append(f"{target.get('id', 'unknown')}: " + " | ".join(rendered_hops))
-    return summaries
-
-
-def _impact_matrix_summaries(impact_matrix: dict[str, Any]) -> list[str]:
-    summaries: list[str] = []
-    for row in _coerce_list(impact_matrix.get("rows")):
-        if not isinstance(row, dict):
-            continue
-        root = _dict(row.get("root"))
-        summary = _dict(row.get("summary"))
-        line = (
-            f"{root.get('id', 'unknown')}: "
-            f"status={summary.get('status', 'unknown')}, "
-            f"severity={summary.get('highestReviewPrioritySeverity', 'none')}, "
-            f"artifacts={summary.get('affectedArtifactCount', 0)}, "
-            f"contracts={summary.get('affectedTargetContractCount', 0)}, "
-            f"capabilities={summary.get('affectedTargetCapabilityCount', 0)}, "
-            f"samples={summary.get('affectedSampleCount', 0)}, "
-            f"controls={summary.get('affectedPolicyControlCount', 0)}, "
-            f"checks={summary.get('affectedCheckCount', 0)}, "
-            f"gates={summary.get('manualGateCount', 0)}, "
-            f"sourceChanges={summary.get('upstreamSourceChangeCount', 0)}"
-        )
-        reason = str(row.get("recommendationReason") or "")
-        if reason:
-            category = str(row.get("recommendationCategory") or "")
-            if category:
-                line += f", category={category}"
-            line += f", reason={reason}"
-        commands = _dict(row.get("rootCommands"))
-        command_parts = [
-            f"{name}={command}"
-            for name, command in (
-                ("impact", str(commands.get("impact") or "")),
-                ("neighbors", str(commands.get("neighbors") or "")),
-            )
-            if command
-        ]
-        if command_parts:
-            line += ", follow-up queries: " + "; ".join(command_parts)
-        summaries.append(line)
-    return summaries
-
-
-def _graph_diff_summaries(graph_diff: dict[str, Any]) -> list[str]:
-    if not graph_diff:
-        return []
-    summary = _dict(graph_diff.get("summary"))
-    return [
-        f"status: {summary.get('status', 'unknown')}",
-        "nodes: "
-        f"added={summary.get('nodeAddedCount', 0)}, "
-        f"removed={summary.get('nodeRemovedCount', 0)}, "
-        f"changed={summary.get('nodeChangedCount', 0)}",
-        "edges: "
-        f"added={summary.get('edgeAddedCount', 0)}, "
-        f"removed={summary.get('edgeRemovedCount', 0)}",
-    ]
 
 
 def _load_bundle(path: Path) -> _BundleSnapshot:
@@ -851,37 +561,6 @@ def _model_delta(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any
         if before.get(key, "unknown") != after.get(key, "unknown")
     ]
     return {"before": before, "after": after, "changed": changed}
-
-
-def _changed_decision_root_reasons(decision_delta: dict[str, Any]) -> dict[str, str]:
-    reasons: dict[str, str] = {}
-    for section, action in (
-        ("added", "added"),
-        ("changed", "changed"),
-        ("removed", "removed"),
-    ):
-        for item in _coerce_list(decision_delta.get(section)):
-            if isinstance(item, dict) and item.get("key"):
-                reasons[f"decision:{item['key']}"] = (
-                    f"Accepted decision was {action} between compared bundles."
-                )
-    return reasons
-
-
-def _root_category_map(root_reasons: dict[str, str], category: str) -> dict[str, str]:
-    return {root: category for root in root_reasons}
-
-
-def _changed_report_root_reasons(
-    after_path: Path,
-    input_diff_report: Path | None,
-) -> dict[str, str]:
-    return {
-        f"{root.kind}:{root.key}": (
-            "Input diff report identified this requirement as changed or likely impacted."
-        )
-        for root in changed_report_roots(after_path, input_diff_report)
-    }
 
 
 def _input_delta(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:

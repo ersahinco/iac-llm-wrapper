@@ -4,12 +4,23 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pydantic import BaseModel
+
 from intent_engine.core.contracts import ArtifactContract, TargetContract
 from intent_engine.core.pattern_check import check_pattern
 from intent_engine.core.patterns import Pattern
 from intent_engine.core.policy import PolicyControl, PolicyPack, PolicyRequirementMapping
 from intent_engine.core.requirements import Requirement, RequirementGraph
 from intent_engine.core.sample_config import SampleConfig
+
+
+class _TestIntent(BaseModel):
+    region: str = ""
+    network: str = ""
+    mode: str = ""
+    a: str = ""
+    b: str = ""
+    c: str = ""
 
 
 def _graph(*requirements: Requirement) -> RequirementGraph:
@@ -51,6 +62,7 @@ def test_check_pattern_passes_for_minimal_valid_pattern(tmp_path: Path):
         name="valid-pattern",
         description="Valid pattern",
         graph_factory=lambda: _graph(_requirement()),
+        intent_factory=_TestIntent,
         prompt_context=(
             "This pattern captures approved region handoff context only. "
             "Extract the region decision for an existing target contract."
@@ -81,7 +93,12 @@ def test_check_pattern_reports_graph_factory_failure(tmp_path: Path):
     def broken_graph() -> RequirementGraph:
         raise RuntimeError("boom")
 
-    pattern = Pattern(name="broken", description="Broken", graph_factory=broken_graph)
+    pattern = Pattern(
+        name="broken",
+        description="Broken",
+        graph_factory=broken_graph,
+        intent_factory=_TestIntent,
+    )
 
     result = check_pattern(pattern, fixtures_root=tmp_path)
 
@@ -104,6 +121,7 @@ def test_check_pattern_reports_requirement_metadata_and_dependency_failures(tmp_
                 violation_message=None,
             )
         ),
+        intent_factory=_TestIntent,
     )
 
     result = check_pattern(pattern, fixtures_root=tmp_path)
@@ -131,6 +149,7 @@ def test_check_pattern_reports_invalid_requirement_expressions(tmp_path: Path):
                 blocked_when={"bogus": {"decision": "mode"}},
             ),
         ),
+        intent_factory=_TestIntent,
         prompt_context=(
             "This pattern captures approved region handoff context only. "
             "Extract the region decision for an existing target contract."
@@ -156,6 +175,7 @@ def test_check_pattern_reports_requirement_cycles(tmp_path: Path):
             _requirement(key="b", depends_on=["a"]),
             _requirement(key="c", depends_on=["b"]),
         ),
+        intent_factory=_TestIntent,
         prompt_context=(
             "This pattern captures approved region handoff context only. "
             "Extract the region decision for an existing target contract."
@@ -174,6 +194,7 @@ def test_check_pattern_reports_missing_or_vague_context(tmp_path: Path):
         name="missing-context",
         description="Missing context",
         graph_factory=lambda: _graph(_requirement()),
+        intent_factory=_TestIntent,
     )
 
     missing_result = check_pattern(missing_context, fixtures_root=tmp_path)
@@ -185,6 +206,7 @@ def test_check_pattern_reports_missing_or_vague_context(tmp_path: Path):
         name="vague-context",
         description="Vague context",
         graph_factory=lambda: _graph(_requirement()),
+        intent_factory=_TestIntent,
         prompt_context="Use the document intelligently and make a good architecture plan.",
     )
 
@@ -203,6 +225,7 @@ def test_check_pattern_reports_contract_and_empty_artifact_failures(tmp_path: Pa
         name="bad-contract",
         description="Bad contract",
         graph_factory=lambda: _graph(_requirement()),
+        intent_factory=_TestIntent,
         contracts=[
             TargetContract(
                 name="bad-contract",
@@ -228,6 +251,7 @@ def test_check_pattern_reports_missing_sample_fixture(tmp_path: Path):
         name="sample-pattern",
         description="Sample pattern",
         graph_factory=lambda: _graph(_requirement()),
+        intent_factory=_TestIntent,
         samples=[
             SampleConfig(
                 name="sample-missing-fixture",
@@ -255,6 +279,7 @@ def test_check_pattern_reports_policy_mapping_failures(tmp_path: Path):
         name="policy-pattern",
         description="Policy pattern",
         graph_factory=lambda: _graph(_requirement()),
+        intent_factory=_TestIntent,
         prompt_context=(
             "This pattern captures approved region handoff context only. "
             "Extract the region decision for an existing target contract."

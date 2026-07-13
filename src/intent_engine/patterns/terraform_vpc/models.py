@@ -11,7 +11,7 @@ class TerraformVpcIntent(BaseModel):
     vpc_name: str = "app-vpc"
     primary_region: str = "eu-central-1"
     cidr: str = "10.0.0.0/16"
-    az_count: int = 2
+    az_count: int = Field(default=2, ge=1, le=6)
     public_subnet_cidrs: list[str] = Field(default_factory=list)
     private_subnet_cidrs: list[str] = Field(default_factory=list)
     enable_nat_gateway: bool = True

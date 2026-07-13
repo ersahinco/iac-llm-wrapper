@@ -157,8 +157,11 @@ contextInventory:
     - name: k8s-cluster-v1
       version: 1.0.0
       sourceUrl: https://github.com/terraform-aws-modules/terraform-aws-eks
-      sourceContract:
-      tags: []
+      sourceContract: kubernetes-cluster-config
+      tags:
+        - eks
+        - kubernetes
+        - terraform
   policyPacks: []
   targetCapabilities: []
   planReady:

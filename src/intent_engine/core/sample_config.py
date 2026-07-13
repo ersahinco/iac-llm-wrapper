@@ -52,21 +52,6 @@ class SampleConfig(BaseModel):
     )
     decisions: dict[str, Any] = Field(default_factory=dict)
     module_refs: list[ModuleRef] = Field(default_factory=list)
-    requires: list[str] = Field(
-        default_factory=list,
-        description="Other sample config names this depends on",
-    )
-
-    def diff(self, other_decisions: dict[str, Any]) -> dict[str, Any]:
-        """Compare another decision set against this sample."""
-        changes: dict[str, Any] = {}
-        for k, v in self.decisions.items():
-            if k in other_decisions:
-                if other_decisions[k] != v:
-                    changes[k] = {"sample": v, "current": other_decisions[k]}
-            else:
-                changes[k] = {"sample": v, "current": None}
-        return changes
 
     @property
     def fixture_name(self) -> str:

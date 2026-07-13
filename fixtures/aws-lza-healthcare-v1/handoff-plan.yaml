@@ -170,9 +170,6 @@ targetCapabilities:
   routingOrder:
     - accelerator
     - module-composition
-    - generator
-    - template-generation
-    - manual
     - blocked
   capabilities:
     - key: aws-lza-sample-config

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from types import SimpleNamespace
 
 import ruamel.yaml
+from pydantic import BaseModel
 
 from intent_engine.core.contracts import ArtifactContract, TargetContract
 from intent_engine.core.generator import (
@@ -16,10 +16,19 @@ from intent_engine.core.generator import (
     gen_tfvars,
     generate_all,
 )
-from intent_engine.core.module_mapping import DesignDocument, IaCIntentPayload, ModuleInputs
+from intent_engine.core.module_mapping import IaCIntentPayload, ModuleInputs
 from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern, PatternGenerator
 from intent_engine.core.requirements import Requirement, RequirementGraph
 from intent_engine.core.sample_config import SampleConfig
+
+
+class _TestIntent(BaseModel):
+    region: str = ""
+
+
+def _registry_snapshot() -> dict[str, Pattern]:
+    GLOBAL_REGISTRY.list()
+    return dict(GLOBAL_REGISTRY._patterns)
 
 
 def _yaml_load(path: Path) -> dict:
@@ -43,12 +52,13 @@ def _handoff_graph() -> RequirementGraph:
 
 
 def _register_handoff_pattern() -> dict[str, Pattern]:
-    original = dict(GLOBAL_REGISTRY._patterns)
+    original = _registry_snapshot()
     GLOBAL_REGISTRY.register(
         Pattern(
             name="handoff-semantic-test",
             description="Handoff semantic test",
             graph_factory=_handoff_graph,
+            intent_factory=_TestIntent,
             prompt_context=(
                 "This pattern captures approved region handoff context only. "
                 "Extract the region decision for an existing target contract."
@@ -75,7 +85,7 @@ class TestPatternOwnedGenerators:
         self,
         tmp_path: Path,
     ):
-        original = dict(GLOBAL_REGISTRY._patterns)
+        original = _registry_snapshot()
         called: list[str] = []
 
         def gen_a(intent: object, output_dir: Path) -> None:
@@ -90,6 +100,7 @@ class TestPatternOwnedGenerators:
                     name="pattern-generator-test",
                     description="Pattern generator test",
                     graph_factory=_handoff_graph,
+                    intent_factory=_TestIntent,
                     generators=[
                         PatternGenerator("b", gen_b, priority=20),
                         PatternGenerator("a", gen_a, priority=10),
@@ -97,7 +108,6 @@ class TestPatternOwnedGenerators:
                 )
             )
             payload = IaCIntentPayload(
-                design_doc=DesignDocument(),
                 module_inputs=[],
                 intent=None,
                 pattern="pattern-generator-test",
@@ -110,7 +120,7 @@ class TestPatternOwnedGenerators:
             GLOBAL_REGISTRY._patterns = original
 
     def test_generate_all_skips_other_pattern_generators(self, tmp_path: Path):
-        original = dict(GLOBAL_REGISTRY._patterns)
+        original = _registry_snapshot()
         called: list[str] = []
 
         def active_gen(intent: object, output_dir: Path) -> None:
@@ -125,6 +135,7 @@ class TestPatternOwnedGenerators:
                     name="active-pattern-generator-test",
                     description="Active pattern generator test",
                     graph_factory=_handoff_graph,
+                    intent_factory=_TestIntent,
                     generators=[PatternGenerator("active", active_gen)],
                 )
             )
@@ -133,11 +144,11 @@ class TestPatternOwnedGenerators:
                     name="inactive-pattern-generator-test",
                     description="Inactive pattern generator test",
                     graph_factory=_handoff_graph,
+                    intent_factory=_TestIntent,
                     generators=[PatternGenerator("inactive", inactive_gen)],
                 )
             )
             payload = IaCIntentPayload(
-                design_doc=DesignDocument(),
                 module_inputs=[],
                 intent=None,
                 pattern="active-pattern-generator-test",
@@ -179,7 +190,6 @@ class TestHCLValue:
 class TestGenTFVars:
     def test_writes_file(self, tmp_path: Path):
         payload = IaCIntentPayload(
-            design_doc=DesignDocument(),
             module_inputs=[
                 ModuleInputs(
                     module_name="lza-network",
@@ -198,7 +208,6 @@ class TestGenTFVars:
 
     def test_no_module_inputs_skips(self, tmp_path: Path):
         payload = IaCIntentPayload(
-            design_doc=None,  # type: ignore[arg-type]
             module_inputs=[],
             intent=None,
         )
@@ -207,7 +216,6 @@ class TestGenTFVars:
 
     def test_multiple_modules(self, tmp_path: Path):
         payload = IaCIntentPayload(
-            design_doc=None,  # type: ignore[arg-type]
             module_inputs=[
                 ModuleInputs(
                     module_name="mod-a",
@@ -227,9 +235,8 @@ class TestGenTFVars:
         assert "x = 1" in content
         assert "y = false" in content
 
-    def test_tfvars_formats_interpolation_references_as_hcl_references(self, tmp_path: Path):
+    def test_tfvars_quotes_strings_that_resemble_interpolation(self, tmp_path: Path):
         payload = IaCIntentPayload(
-            design_doc=None,  # type: ignore[arg-type]
             module_inputs=[
                 ModuleInputs(
                     module_name="terraform-aws-eks",
@@ -240,23 +247,23 @@ class TestGenTFVars:
         )
         gen_tfvars(payload, tmp_path)
         content = (tmp_path / "terraform.tfvars").read_text()
-        assert "vpc_id = module.vpc.vpc_id" in content
+        assert 'vpc_id = "${module.vpc.vpc_id}"' in content
 
     def test_global_generation_scopes_tfvars_to_explicit_terraform_patterns(
         self,
         tmp_path: Path,
     ):
-        original = dict(GLOBAL_REGISTRY._patterns)
+        original = _registry_snapshot()
         try:
             GLOBAL_REGISTRY.register(
                 Pattern(
                     name="future-non-terraform-pattern",
                     description="Future non-Terraform module handoff",
                     graph_factory=_handoff_graph,
+                    intent_factory=_TestIntent,
                 )
             )
             payload = IaCIntentPayload(
-                design_doc=DesignDocument(),
                 module_inputs=[
                     ModuleInputs(
                         module_name="future-module",
@@ -279,7 +286,9 @@ class TestGenHandoffPlan:
     def test_ready_handoff_requires_review_before_toolchain_action(self, tmp_path: Path):
         original = _register_handoff_pattern()
         try:
-            payload = SimpleNamespace(
+            payload = IaCIntentPayload(
+                module_inputs=[],
+                intent=None,
                 pattern="handoff-semantic-test",
                 handoff_readiness={"status": "ready", "handoffAllowed": True},
             )
@@ -308,7 +317,9 @@ class TestGenHandoffPlan:
     def test_blocked_handoff_allows_only_resolution_action(self, tmp_path: Path):
         original = _register_handoff_pattern()
         try:
-            payload = SimpleNamespace(
+            payload = IaCIntentPayload(
+                module_inputs=[],
+                intent=None,
                 pattern="handoff-semantic-test",
                 handoff_readiness={
                     "status": "blocked",
@@ -338,7 +349,6 @@ class TestGenContextManifest:
         original = _register_handoff_pattern()
         try:
             payload = IaCIntentPayload(
-                design_doc=DesignDocument(),
                 module_inputs=[ModuleInputs(module_name="example", variables={"region": "eu"})],
                 intent=None,
                 pattern="handoff-semantic-test",
@@ -377,13 +387,14 @@ class TestGenContextManifest:
 
 class TestGenSampleRecommendations:
     def test_writes_file_when_pattern_has_sample_matches(self, tmp_path: Path):
-        original = dict(GLOBAL_REGISTRY._patterns)
+        original = _registry_snapshot()
         try:
             GLOBAL_REGISTRY.register(
                 Pattern(
                     name="test-pattern-rec",
                     description="Sample recommendation test",
                     graph_factory=_handoff_graph,
+                    intent_factory=_TestIntent,
                     samples=[
                         SampleConfig(
                             name="test-sample-rec-v1",
@@ -397,7 +408,6 @@ class TestGenSampleRecommendations:
                 )
             )
             payload = IaCIntentPayload(
-                design_doc=None,  # type: ignore[arg-type]
                 module_inputs=[],
                 intent=None,
                 pattern="test-pattern-rec",
@@ -416,7 +426,6 @@ class TestGenSampleRecommendations:
 
     def test_skips_without_pattern_decisions(self, tmp_path: Path):
         payload = IaCIntentPayload(
-            design_doc=None,  # type: ignore[arg-type]
             module_inputs=[],
             intent=None,
         )

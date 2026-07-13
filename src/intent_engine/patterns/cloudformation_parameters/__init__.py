@@ -18,11 +18,14 @@ from intent_engine.core.yaml_utils import write_yaml_artifact
 from .models import CloudFormationParametersIntent
 
 
-def _intent(payload: Any) -> CloudFormationParametersIntent | None:
+def _intent(payload: Any) -> CloudFormationParametersIntent:
     intent = getattr(payload, "intent", payload)
-    if isinstance(intent, CloudFormationParametersIntent):
-        return intent
-    return None
+    if not isinstance(intent, CloudFormationParametersIntent):
+        raise TypeError(
+            "CloudFormation generator requires CloudFormationParametersIntent, "
+            f"got {type(intent).__name__}."
+        )
+    return intent
 
 
 def _graph_factory() -> RequirementGraph:
@@ -158,16 +161,15 @@ def _parameter_items(values: list[str]) -> list[dict[str, str]]:
         if "=" not in value:
             continue
         key, parameter_value = value.split("=", 1)
-        items.append({"ParameterKey": key.strip(), "ParameterValue": parameter_value.strip()})
+        if key.strip():
+            items.append({"ParameterKey": key.strip(), "ParameterValue": parameter_value.strip()})
     return items
 
 
 def _validate_intent(intent: Any) -> list[Violation]:
     model = _intent(intent)
-    if model is None:
-        return []
     violations: list[Violation] = []
-    if model.parameter_overrides and not _parameter_items(model.parameter_overrides):
+    if len(_parameter_items(model.parameter_overrides)) != len(model.parameter_overrides):
         violations.append(
             Violation(
                 code="CLOUDFORMATION_PARAMETER_FORMAT_INVALID",
@@ -179,8 +181,6 @@ def _validate_intent(intent: Any) -> list[Violation]:
 
 def gen_cloudformation_parameters(intent: Any, output_dir: Path) -> None:
     model = _intent(intent)
-    if model is None:
-        return
     data: dict[str, Any] = {
         "stackName": model.stack_name,
         "templateUrl": model.template_url,
@@ -195,8 +195,6 @@ def gen_cloudformation_parameters(intent: Any, output_dir: Path) -> None:
 def gen_decision_report(intent: Any, output_dir: Path) -> None:
     readiness = getattr(intent, "handoff_readiness", {})
     model = _intent(intent)
-    if model is None:
-        return
     data = {
         "pattern": "cloudformation-parameters",
         "stack": {

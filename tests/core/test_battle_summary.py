@@ -52,9 +52,20 @@ def _write_ready_bundle(output_dir: Path, *, artifacts: tuple[str, ...]) -> None
         output_dir / "llm-trace-summary.yaml",
         {
             "acceptedDecisions": {
+                "audit_account": "Audit",
+                "baseline": "standard",
+                "centralized_logging": True,
+                "enabled_regions": ["eu-central-1"],
+                "home_region": "eu-central-1",
+                "identity_center_delegated_admin_account": "SecurityTooling",
                 "network_account": "Network",
                 "identity_center_permission_sets": ["SecurityAdmin"],
                 "identity_center_assignments": ["SecurityAdmin->Platform"],
+                "log_archive_account": "LogArchive",
+                "org_mode": "organizations",
+                "organizational_units": ["Security", "Infrastructure", "Workloads"],
+                "security_tooling_account": "SecurityTooling",
+                "topology": "hub-spoke",
             },
             "rawLlmDecisions": {},
             "appliedDecisions": {"markdown": ["network_account"], "llm": []},
@@ -69,7 +80,7 @@ def _write_ready_bundle(output_dir: Path, *, artifacts: tuple[str, ...]) -> None
             "readiness": {"status": "ready"},
             "latency": {"totalMs": 0},
             "tokens": {"totalTokens": 0},
-            "quality": {"acceptedDecisionCount": 3, "parseErrorCount": 0},
+            "quality": {"acceptedDecisionCount": 14, "parseErrorCount": 0},
         },
     )
     _write_yaml(output_dir / "contract-validation.yaml", {"summary": {"status": "pass"}})
@@ -229,6 +240,18 @@ def test_llm_raw_decision_gap_is_expected_weakness(tmp_path: Path):
     output_dir = repo_root / "out"
     _write_ready_bundle(output_dir, artifacts=("accounts-config.yaml",))
     (output_dir / "raw-evidence.yaml").write_text("requests: []\n")
+    trace = ruamel.yaml.YAML(typ="safe").load((output_dir / "llm-trace-summary.yaml").read_text())
+    trace["rawLlmDecisions"] = {
+        key: value
+        for key, value in trace["acceptedDecisions"].items()
+        if key
+        not in {
+            "identity_center_assignments",
+            "identity_center_permission_sets",
+            "network_account",
+        }
+    }
+    _write_yaml(output_dir / "llm-trace-summary.yaml", trace)
     benchmark = ruamel.yaml.YAML(typ="safe").load((output_dir / "model-benchmark.yaml").read_text())
     benchmark["latency"] = {"totalMs": 100}
     benchmark["tokens"] = {"totalTokens": 10}
@@ -278,7 +301,7 @@ def test_aws_lza_deployable_scaffold_fails(tmp_path: Path):
     assert {
         "type": "fail",
         "area": "safety",
-        "message": "Unexpected deployable scaffold emitted: main.tf.",
+        "message": "Unexpected forbidden artifact emitted: main.tf.",
     } in summary["findings"]
 
 

@@ -64,11 +64,9 @@ def test_compare_handoff_bundles_reports_blocker_and_sample_deltas(tmp_path: Pat
     assert report["decisionDelta"]["added"] == [{"key": "new_decision", "value": "new-value"}]
     assert report["decisionDelta"]["removed"] == [{"key": "legacy_decision", "value": "old-value"}]
     assert "target.yaml" in report["artifactDelta"]["changed"]
-    assert report["graphDiff"]["schemaVersion"] == "intent-engine/graph-diff/v1"
     assert report["sampleRecommendationDelta"]["topBefore"] == "sample-a"
     assert report["sampleRecommendationDelta"]["topAfter"] == "sample-b"
     assert report["sampleRecommendationDelta"]["rankChanges"]
-    assert report["impactMatrix"]["schemaVersion"] == "intent-engine/graph-impact-matrix/v1"
 
     rendered = render_bundle_comparison_text(report)
     assert "Handoff Bundle Comparison" in rendered
@@ -82,12 +80,6 @@ def test_compare_handoff_bundles_reports_blocker_and_sample_deltas(tmp_path: Pat
     assert "    - incremental-compile-report.yaml" in rendered
     assert "  Changed:" in rendered
     assert "    - target.yaml" in rendered
-    assert "Graph diff:" in rendered
-    assert "Impact matrix:" in rendered
-    assert "review priority severity:" in rendered
-    assert "affected target contracts:" in rendered
-    assert "affected target capabilities:" in rendered
-    assert "affected samples:" in rendered
     html = render_bundle_comparison_html(report)
     assert "Added: new_decision: new-value" in html
     assert "Removed: legacy_decision: old-value" in html
@@ -95,13 +87,7 @@ def test_compare_handoff_bundles_reports_blocker_and_sample_deltas(tmp_path: Pat
     assert "Added" in html
     assert "incremental-compile-report.yaml" in html
     assert "target.yaml" in html
-    assert "Graph diff" in html
-    assert "Impact matrix" in html
-    assert "Review priority severity" in html
-    assert "follow-up queries" in html
-    assert "Affected target contracts" in html
-    assert "Affected target capabilities" in html
-    assert "Affected samples" in html
+    assert "Changed artifacts" in html
 
 
 def _write_bundle(

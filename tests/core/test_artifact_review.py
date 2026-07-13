@@ -25,6 +25,7 @@ def _write_review_bundle(
     raw_evidence_status: str = "requested",
     lza_validation: bool = False,
     parse_error_count: int = 0,
+    pattern: str = "example-pattern",
 ) -> Path:
     input_dir.mkdir(parents=True)
     evidence_path = input_dir / "raw-evidence.yaml"
@@ -33,7 +34,7 @@ def _write_review_bundle(
     _write_yaml(
         input_dir / "decision-report.yaml",
         {
-            "pattern": "example-pattern",
+            "pattern": pattern,
             "organizationName": "Contoso",
             "handoffReadiness": {
                 "status": "blocked",
@@ -87,7 +88,7 @@ def _write_review_bundle(
     _write_yaml(
         input_dir / "handoff-plan.yaml",
         {
-            "pattern": "example-pattern",
+            "pattern": pattern,
             "readiness": {"status": "ready", "handoffAllowed": True},
             "allowedNextAction": "Resolve blockers.",
             "targetContracts": [
@@ -278,7 +279,7 @@ def test_build_review_context_uses_report_readiness_and_artifact_rows(tmp_path: 
 
 def test_review_context_surfaces_lza_validation_evidence(tmp_path: Path):
     input_dir = tmp_path / "out"
-    validation_path = _write_review_bundle(input_dir, lza_validation=True)
+    validation_path = _write_review_bundle(input_dir, lza_validation=True, pattern="aws-lza")
 
     context = build_review_context(
         input_dir,
@@ -287,8 +288,8 @@ def test_review_context_surfaces_lza_validation_evidence(tmp_path: Path):
         contract_validation_path=validation_path,
     )
 
-    assert context["reviewSummary"]["lzaValidationStatus"] == "fail"
-    assert context["lzaValidationSummary"] == {
+    assert context["reviewSummary"]["targetValidationStatus"] == "fail"
+    assert context["targetValidationSummary"] == {
         "status": "fail",
         "exitCode": "1",
         "command": "corepack yarn validate-config /tmp/config",
@@ -296,7 +297,7 @@ def test_review_context_surfaces_lza_validation_evidence(tmp_path: Path):
         "sourceCwd": "/tmp/landing-zone-accelerator-on-aws/source",
         "packageVersion": "1.15.0",
         "gitCommit": "abcde12",
-        "awsLookupBoundary": (
+        "lookupBoundary": (
             "The official AWS LZA validator may perform read-only account lookup "
             "through the provided AWS/LZA context."
         ),
@@ -325,8 +326,12 @@ def test_review_context_surfaces_lza_validation_evidence(tmp_path: Path):
                 "sha256": "abc123",
             }
         ],
+        "failureAction": (
+            "Do not claim downstream AWS LZA validation until "
+            "lza-validation-evidence.yaml failures are resolved."
+        ),
     }
-    assert context["links"]["lzaValidation"] == "lza-validation-evidence.yaml"
+    assert context["links"]["targetValidation"] == "lza-validation-evidence.yaml"
     assert (
         "Do not claim downstream AWS LZA validation until lza-validation-evidence.yaml "
         "failures are resolved."
@@ -335,7 +340,7 @@ def test_review_context_surfaces_lza_validation_evidence(tmp_path: Path):
 
 def test_review_context_prioritizes_default_email_validation_fallback(tmp_path: Path):
     input_dir = tmp_path / "out"
-    validation_path = _write_review_bundle(input_dir)
+    validation_path = _write_review_bundle(input_dir, pattern="aws-lza")
     _write_yaml(
         input_dir / "lza-validation-evidence.yaml",
         {
@@ -359,7 +364,7 @@ def test_review_context_prioritizes_default_email_validation_fallback(tmp_path: 
         contract_validation_path=validation_path,
     )
 
-    assert context["lzaValidationSummary"]["failureExcerpt"] == (
+    assert context["targetValidationSummary"]["failureExcerpt"] == (
         "Default email (audit@example.com) found."
     )
 
@@ -385,6 +390,16 @@ def test_review_context_warns_on_llm_parse_errors(tmp_path: Path):
         "LLM extraction recorded parse or backend errors; review llm-trace-summary.yaml "
         "and model-benchmark.yaml before trusting model contribution."
     ) in context["reviewerNextActions"]
+
+
+def test_non_lza_review_omits_lza_validation_section(tmp_path: Path):
+    input_dir = tmp_path / "out"
+    _write_review_bundle(input_dir)
+
+    html = render_review_html(input_dir)
+
+    assert "LZA Validation Evidence" not in html
+    assert "LZA validation" not in html
 
 
 def test_review_context_maps_pattern_validator_blockers_to_requirement_questions(
@@ -482,21 +497,15 @@ def test_review_context_maps_pattern_validator_blockers_to_requirement_questions
     assert all(row["question"] != "unknown" for row in rows.values())
 
 
-def test_render_review_html_uses_existing_graph_exports(tmp_path: Path):
+def test_render_review_html_uses_existing_requirement_graph_exports(tmp_path: Path):
     input_dir = tmp_path / "out"
-    _write_review_bundle(input_dir, lza_validation=True)
+    _write_review_bundle(input_dir, lza_validation=True, pattern="aws-lza")
     (input_dir / "requirement-graph.json").write_text("{}\n")
     (input_dir / "requirement-graph.mmd").write_text("flowchart TD\n")
-    (input_dir / "bundle-graph.yaml").write_text("schemaVersion: intent-engine/bundle-graph/v1\n")
-    (input_dir / "graph-roots.yaml").write_text("schemaVersion: intent-engine/graph-roots/v1\n")
-    (input_dir / "impact-report.yaml").write_text("schemaVersion: intent-engine/impact-report/v1\n")
-    (input_dir / "graph-impact-matrix.yaml").write_text(
-        "schemaVersion: intent-engine/graph-impact-matrix/v1\n"
-    )
 
     html = render_review_html(input_dir)
 
-    assert "example-pattern handoff review" in html
+    assert "aws-lza handoff review" in html
     assert "Review Summary" in html
     assert "Reviewer Next Actions" in html
     assert "Do not pass target artifacts" in html
@@ -528,15 +537,10 @@ def test_render_review_html_uses_existing_graph_exports(tmp_path: Path):
     assert "Structured Markdown carried the handoff" in html
     assert "requirement-graph.json" in html
     assert "requirement-graph.mmd" in html
-    assert "Graph Review Artifacts" in html
-    assert "bundle-graph.yaml" in html
-    assert "graph-roots.yaml" in html
-    assert "impact-report.yaml" in html
-    assert "graph-impact-matrix.yaml" in html
     assert "raw-evidence.yaml" in html
     assert "LZA Validation Evidence" in html
     assert "lza-validation-evidence.yaml" in html
-    assert "LZA validation failure" in html
+    assert "Target validation failure" in html
     assert "AccessDeniedException" in html
     assert "network-config.yaml" in html
     assert "abc123" in html

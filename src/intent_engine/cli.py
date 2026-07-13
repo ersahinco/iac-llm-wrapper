@@ -47,36 +47,6 @@ from .core.git_incremental import (
     git_show_text,
 )
 from .core.graph_export import graph_to_json, graph_to_mermaid
-from .core.impact_graph import (
-    ImpactRoot,
-    build_bundle_graph_report,
-    build_find_report,
-    build_graph_diff_report,
-    build_hotspot_impact_matrix_report,
-    build_impact_matrix_report,
-    build_impact_report,
-    build_neighborhood_report,
-    build_path_report,
-    build_recommended_impact_matrix_report,
-    build_roots_report,
-    changed_report_roots,
-    render_bundle_graph_text,
-    render_find_report_text,
-    render_graph_diff_text,
-    render_impact_matrix_text,
-    render_impact_report_text,
-    render_neighborhood_report_text,
-    render_path_report_text,
-    render_roots_report_text,
-    write_bundle_graph_report,
-    write_find_report,
-    write_graph_diff_report,
-    write_impact_matrix_report,
-    write_impact_report,
-    write_neighborhood_report,
-    write_path_report,
-    write_roots_report,
-)
 from .core.interview import InterviewEngine
 from .core.llm_caller import LLMEvidenceStore, auto_detect_llm
 from .core.markdown_extractor import extract_from_markdown
@@ -84,7 +54,6 @@ from .core.pattern_check import check_pattern
 from .core.patterns import GLOBAL_REGISTRY, Pattern
 from .core.policy import PolicyPack
 from .core.sample_config import SampleConfig
-from .core.suggestion import SuggestionEngine
 from .core.yaml_utils import read_yaml_mapping, write_yaml_artifact
 from .patterns import load_builtin_patterns
 from .patterns.aws_lza.validation import (
@@ -207,31 +176,6 @@ def _selected_policy_packs_or_exit(
         )
         raise typer.Exit(1)
     return selected
-
-
-def _graph_root_or_exit(value: str, option_name: str) -> ImpactRoot:
-    if ":" not in value:
-        typer.echo(
-            f"Error: {option_name} must use <kind>:<key>, for example decision:cidr.",
-            err=True,
-        )
-        raise typer.Exit(1)
-    kind, key = value.split(":", 1)
-    if not kind or not key:
-        typer.echo(
-            f"Error: {option_name} must use <kind>:<key>, for example decision:cidr.",
-            err=True,
-        )
-        raise typer.Exit(1)
-    return ImpactRoot(kind=kind, key=key)
-
-
-def _matrix_root_source(*, has_explicit: bool, has_changed: bool) -> str:
-    if has_explicit and has_changed:
-        return "changed-report-plus-explicit"
-    if has_changed:
-        return "changed-report"
-    return "explicit"
 
 
 def _parse_decisions_or_exit(raw_decisions: str | None) -> dict[str, Any] | None:
@@ -429,419 +373,6 @@ def graph_export(
         typer.echo(f"Graph exported to: {output}")
         return
     typer.echo(rendered, nl=False)
-
-
-@graph_app.command("find")
-def graph_find(
-    bundle: Path = typer.Option(
-        ...,
-        "--bundle",
-        help="Generated handoff bundle directory to search.",
-    ),
-    query: str = typer.Option(
-        ...,
-        "--query",
-        "-q",
-        help="Text to search across graph node id, key, label, kind, and properties.",
-    ),
-    kind: list[str] | None = typer.Option(
-        None,
-        "--kind",
-        help="Optional node kind filter for returned matches. Repeatable.",
-    ),
-    limit: int = typer.Option(
-        20,
-        "--limit",
-        help="Maximum number of matches to return.",
-    ),
-    output: Path | None = typer.Option(
-        None,
-        "--output",
-        "-o",
-        help="Optional graph-find.yaml output path.",
-    ),
-) -> None:
-    """Find candidate typed graph roots inside a generated handoff bundle."""
-    if not bundle.is_dir():
-        typer.echo(f"Error: bundle path is not a directory: {bundle}", err=True)
-        raise typer.Exit(1)
-    if limit < 0:
-        typer.echo("Error: --limit must be zero or greater.", err=True)
-        raise typer.Exit(1)
-    report = build_find_report(bundle, query=query, kinds=kind, limit=limit)
-    typer.echo(render_find_report_text(report), nl=False)
-    if output is not None:
-        write_find_report(report, output)
-        typer.echo(f"Graph find report written to: {output}")
-
-
-@graph_app.command("roots")
-def graph_roots(
-    bundle: Path = typer.Option(
-        ...,
-        "--bundle",
-        help="Generated handoff bundle directory to inspect.",
-    ),
-    kind: list[str] | None = typer.Option(
-        None,
-        "--kind",
-        help="Optional node kind filter for returned roots. Repeatable.",
-    ),
-    output: Path | None = typer.Option(
-        None,
-        "--output",
-        "-o",
-        help="Optional graph-roots.yaml output path.",
-    ),
-) -> None:
-    """List concrete typed graph roots available for traversal."""
-    if not bundle.is_dir():
-        typer.echo(f"Error: bundle path is not a directory: {bundle}", err=True)
-        raise typer.Exit(1)
-    report = build_roots_report(bundle, kinds=kind)
-    typer.echo(render_roots_report_text(report), nl=False)
-    if output is not None:
-        write_roots_report(report, output)
-        typer.echo(f"Graph roots report written to: {output}")
-
-
-@graph_app.command("impact")
-def graph_impact(
-    bundle: Path = typer.Option(
-        ...,
-        "--bundle",
-        help="Generated handoff bundle directory to traverse.",
-    ),
-    decision: list[str] | None = typer.Option(
-        None,
-        "--decision",
-        help="Decision key to use as an impact root. Repeatable.",
-    ),
-    artifact: list[str] | None = typer.Option(
-        None,
-        "--artifact",
-        help="Artifact filename to use as an impact root. Repeatable.",
-    ),
-    policy_control: list[str] | None = typer.Option(
-        None,
-        "--policy-control",
-        help="Policy control ID to use as an impact root. Repeatable.",
-    ),
-    module_variable: list[str] | None = typer.Option(
-        None,
-        "--module-variable",
-        help="Module variable name to use as an impact root. Repeatable.",
-    ),
-    semantic_entity: list[str] | None = typer.Option(
-        None,
-        "--semantic-entity",
-        help="Semantic entity key to use as an impact root. Repeatable.",
-    ),
-    semantic_constraint: list[str] | None = typer.Option(
-        None,
-        "--semantic-constraint",
-        help="Semantic constraint key to use as an impact root. Repeatable.",
-    ),
-    root: list[str] | None = typer.Option(
-        None,
-        "--root",
-        help="Generic typed graph root as <kind>:<key>. Repeatable.",
-    ),
-    changed_report: Path | None = typer.Option(
-        None,
-        "--changed-report",
-        help="input-diff-report.yaml to derive impact roots from changed requirements.",
-    ),
-    output: Path | None = typer.Option(
-        None,
-        "--output",
-        "-o",
-        help="Optional impact-report.yaml output path.",
-    ),
-) -> None:
-    """Traverse bundle graph dependencies and report downstream impact."""
-    if not bundle.is_dir():
-        typer.echo(f"Error: bundle path is not a directory: {bundle}", err=True)
-        raise typer.Exit(1)
-    if changed_report is not None and not changed_report.exists():
-        typer.echo(f"Error: changed report does not exist: {changed_report}", err=True)
-        raise typer.Exit(1)
-    roots = [
-        *(ImpactRoot(kind="decision", key=item) for item in (decision or [])),
-        *(ImpactRoot(kind="artifact", key=item) for item in (artifact or [])),
-        *(ImpactRoot(kind="policy_control", key=item) for item in (policy_control or [])),
-        *(ImpactRoot(kind="module_variable", key=item) for item in (module_variable or [])),
-        *(ImpactRoot(kind="semantic_entity", key=item) for item in (semantic_entity or [])),
-        *(ImpactRoot(kind="semantic_constraint", key=item) for item in (semantic_constraint or [])),
-        *(_graph_root_or_exit(item, "--root") for item in (root or [])),
-    ]
-    if not roots and changed_report is None:
-        typer.echo(
-            "Error: provide at least one root via --decision, --artifact, "
-            "--policy-control, --module-variable, --semantic-entity, "
-            "--semantic-constraint, --root, or --changed-report.",
-            err=True,
-        )
-        raise typer.Exit(1)
-    report = build_impact_report(bundle, roots=roots, changed_report=changed_report)
-    typer.echo(render_impact_report_text(report), nl=False)
-    if output is not None:
-        write_impact_report(report, output)
-        typer.echo(f"Impact report written to: {output}")
-
-
-@graph_app.command("matrix")
-def graph_matrix(
-    bundle: Path = typer.Option(
-        ...,
-        "--bundle",
-        help="Generated handoff bundle directory to traverse.",
-    ),
-    root: list[str] | None = typer.Option(
-        None,
-        "--root",
-        help="Generic typed graph root as <kind>:<key>. Repeatable.",
-    ),
-    recommended: bool = typer.Option(
-        False,
-        "--recommended",
-        help="Build the matrix from graph roots recommended for review.",
-    ),
-    hotspots: bool = typer.Option(
-        False,
-        "--hotspots",
-        help="Build the matrix from high-degree topology hotspot roots.",
-    ),
-    kind: list[str] | None = typer.Option(
-        None,
-        "--kind",
-        help="Optional node kind filter when --recommended or --hotspots is used. Repeatable.",
-    ),
-    changed_report: Path | None = typer.Option(
-        None,
-        "--changed-report",
-        help="input-diff-report.yaml to derive matrix roots from changed requirements.",
-    ),
-    output: Path | None = typer.Option(
-        None,
-        "--output",
-        "-o",
-        help="Optional graph-impact-matrix.yaml output path.",
-    ),
-) -> None:
-    """Compare impact across multiple typed graph roots."""
-    if not bundle.is_dir():
-        typer.echo(f"Error: bundle path is not a directory: {bundle}", err=True)
-        raise typer.Exit(1)
-    if changed_report is not None and not changed_report.exists():
-        typer.echo(f"Error: changed report does not exist: {changed_report}", err=True)
-        raise typer.Exit(1)
-    roots = [_graph_root_or_exit(item, "--root") for item in (root or [])]
-    changed_roots = changed_report_roots(bundle, changed_report)
-    if recommended and hotspots:
-        typer.echo("Error: choose only one of --recommended or --hotspots.", err=True)
-        raise typer.Exit(1)
-    if not roots and not changed_roots and not recommended and not hotspots:
-        typer.echo(
-            "Error: provide --root at least once, use --recommended, use --hotspots, "
-            "or provide --changed-report.",
-            err=True,
-        )
-        raise typer.Exit(1)
-    if recommended:
-        report = build_recommended_impact_matrix_report(
-            bundle,
-            kinds=kind,
-            extra_roots=[*roots, *changed_roots],
-        )
-    elif hotspots:
-        report = build_hotspot_impact_matrix_report(
-            bundle,
-            kinds=kind,
-            extra_roots=[*roots, *changed_roots],
-        )
-    else:
-        report = build_impact_matrix_report(
-            bundle,
-            roots=[*roots, *changed_roots],
-            root_source=_matrix_root_source(
-                has_explicit=bool(roots),
-                has_changed=bool(changed_roots),
-            ),
-        )
-    typer.echo(render_impact_matrix_text(report), nl=False)
-    if output is not None:
-        write_impact_matrix_report(report, output)
-        typer.echo(f"Graph impact matrix written to: {output}")
-
-
-@graph_app.command("path")
-def graph_path(
-    bundle: Path = typer.Option(
-        ...,
-        "--bundle",
-        help="Generated handoff bundle directory to traverse.",
-    ),
-    source_root: str = typer.Option(
-        ...,
-        "--from",
-        help="Source graph root as <kind>:<key>, for example decision:cidr.",
-    ),
-    target_root: str = typer.Option(
-        ...,
-        "--to",
-        help="Target graph root as <kind>:<key>, for example artifact:module-inputs.yaml.",
-    ),
-    direction: str = typer.Option(
-        "either",
-        "--direction",
-        help="Traversal direction: downstream, upstream, or either.",
-    ),
-    output: Path | None = typer.Option(
-        None,
-        "--output",
-        "-o",
-        help="Optional graph-path.yaml output path.",
-    ),
-) -> None:
-    """Explain the shortest graph path between two typed bundle roots."""
-    if not bundle.is_dir():
-        typer.echo(f"Error: bundle path is not a directory: {bundle}", err=True)
-        raise typer.Exit(1)
-    if direction not in {"downstream", "upstream", "either"}:
-        typer.echo(
-            "Error: --direction must be one of downstream, upstream, either.",
-            err=True,
-        )
-        raise typer.Exit(1)
-    report = build_path_report(
-        bundle,
-        source=_graph_root_or_exit(source_root, "--from"),
-        target=_graph_root_or_exit(target_root, "--to"),
-        direction=direction,
-    )
-    typer.echo(render_path_report_text(report), nl=False)
-    if output is not None:
-        write_path_report(report, output)
-        typer.echo(f"Graph path report written to: {output}")
-
-
-@graph_app.command("neighbors")
-def graph_neighbors(
-    bundle: Path = typer.Option(
-        ...,
-        "--bundle",
-        help="Generated handoff bundle directory to traverse.",
-    ),
-    root: str = typer.Option(
-        ...,
-        "--root",
-        help="Root graph node as <kind>:<key>, for example decision:cidr.",
-    ),
-    depth: int = typer.Option(
-        1,
-        "--depth",
-        help="Maximum hop depth to include.",
-    ),
-    direction: str = typer.Option(
-        "either",
-        "--direction",
-        help="Traversal direction: downstream, upstream, or either.",
-    ),
-    kind: list[str] | None = typer.Option(
-        None,
-        "--kind",
-        help="Optional node kind filter for returned neighbors. Repeatable.",
-    ),
-    output: Path | None = typer.Option(
-        None,
-        "--output",
-        "-o",
-        help="Optional graph-neighborhood.yaml output path.",
-    ),
-) -> None:
-    """Show a bounded dependency neighborhood around one typed graph root."""
-    if not bundle.is_dir():
-        typer.echo(f"Error: bundle path is not a directory: {bundle}", err=True)
-        raise typer.Exit(1)
-    if depth < 0:
-        typer.echo("Error: --depth must be zero or greater.", err=True)
-        raise typer.Exit(1)
-    if direction not in {"downstream", "upstream", "either"}:
-        typer.echo(
-            "Error: --direction must be one of downstream, upstream, either.",
-            err=True,
-        )
-        raise typer.Exit(1)
-    report = build_neighborhood_report(
-        bundle,
-        root=_graph_root_or_exit(root, "--root"),
-        depth=depth,
-        direction=direction,
-        kinds=kind,
-    )
-    typer.echo(render_neighborhood_report_text(report), nl=False)
-    if output is not None:
-        write_neighborhood_report(report, output)
-        typer.echo(f"Graph neighborhood report written to: {output}")
-
-
-@graph_app.command("diff")
-def graph_diff(
-    before: Path = typer.Option(
-        ...,
-        "--before",
-        help="Previous generated handoff bundle directory.",
-    ),
-    after: Path = typer.Option(
-        ...,
-        "--after",
-        help="Updated generated handoff bundle directory.",
-    ),
-    output: Path | None = typer.Option(
-        None,
-        "--output",
-        "-o",
-        help="Optional graph-diff.yaml output path.",
-    ),
-) -> None:
-    """Compare two generated bundle graphs as typed nodes and edges."""
-    if not before.is_dir():
-        typer.echo(f"Error: before bundle path is not a directory: {before}", err=True)
-        raise typer.Exit(1)
-    if not after.is_dir():
-        typer.echo(f"Error: after bundle path is not a directory: {after}", err=True)
-        raise typer.Exit(1)
-    report = build_graph_diff_report(before, after)
-    typer.echo(render_graph_diff_text(report), nl=False)
-    if output is not None:
-        write_graph_diff_report(report, output)
-        typer.echo(f"Graph diff written to: {output}")
-
-
-@graph_app.command("bundle")
-def graph_bundle(
-    bundle: Path = typer.Option(
-        ...,
-        "--bundle",
-        help="Generated handoff bundle directory to export as a typed graph.",
-    ),
-    output: Path | None = typer.Option(
-        None,
-        "--output",
-        "-o",
-        help="Optional bundle-graph.yaml output path.",
-    ),
-) -> None:
-    """Export the full typed graph derived from a generated handoff bundle."""
-    if not bundle.is_dir():
-        typer.echo(f"Error: bundle path is not a directory: {bundle}", err=True)
-        raise typer.Exit(1)
-    report = build_bundle_graph_report(bundle)
-    typer.echo(render_bundle_graph_text(report), nl=False)
-    if output is not None:
-        write_bundle_graph_report(report, output)
-        typer.echo(f"Bundle graph written to: {output}")
 
 
 @pattern_app.command("check")
@@ -1394,16 +925,6 @@ def discover(
         "-d",
         help='JSON object of pre-filled decisions, e.g. {"region":"eu-central-1"}',
     ),
-    suggest: bool = typer.Option(
-        False,
-        "--suggest",
-        help="Show contextual suggestions for next decisions",
-    ),
-    path: bool = typer.Option(
-        False,
-        "--path",
-        help="Preview the full decision path with current state",
-    ),
     pattern: str = typer.Option(
         DEFAULT_PATTERN,
         "--pattern",
@@ -1450,9 +971,6 @@ def discover(
 
     Shows requirement gaps, clarifying questions, and next steps.
     Use --decisions to simulate decisions before discovering.
-    Use --suggest to see which questions would be asked next.
-    Use --path to see the full decision path with statuses.
-
     When an LLM is available, the design doc prose is extracted first
     to auto-fill decisions before gap analysis. Use --no-llm to skip.
     """
@@ -1496,6 +1014,7 @@ def discover(
         llm_provider = LLMContextProvider(
             prose=text,
             graph=graph,
+            pattern=pattern,
             llm_caller=llm_caller,
             evidence_store=evidence_store,
         )
@@ -1510,8 +1029,8 @@ def discover(
     if decision_dict:
         simulated_decisions = graph.apply_decisions(decision_dict)
 
-    extractor = Extractor(graph=graph)
-    intent = extractor.extract(text)
+    extractor = Extractor(graph=graph, pattern=pattern)
+    intent = extractor.extract()
 
     discovery = DiscoveryEngine(graph)
     result = discovery.discover(intent, text=text)
@@ -1555,7 +1074,7 @@ def discover(
                 typer.echo(f"      Suggestion: {gap.suggestion}")
                 typer.echo("")
 
-        questions = generate_clarifying_questions(result, intent, graph=graph)
+        questions = generate_clarifying_questions(result, graph=graph)
         if questions:
             typer.echo("Clarifying questions to ask:")
             for i, q in enumerate(questions, 1):
@@ -1566,40 +1085,6 @@ def discover(
                 typer.echo(f"  {i}. [{q['key']}] {q['question']}{opt_str}{def_str}")
                 if q.get("context"):
                     typer.echo(f"     context: {q['context']}")
-
-    if suggest:
-        typer.echo("")
-        typer.echo("=== Remaining Questions (after sync) ===")
-        suggest_engine = SuggestionEngine(graph)
-        suggestions = suggest_engine.suggest_next()
-        if not suggestions:
-            typer.echo("  All requirements satisfied.")
-        else:
-            for i, s in enumerate(suggestions, 1):
-                opt_str = f" | options: {', '.join(s.options)}" if s.options else ""
-                def_str = f" | default: {s.default}" if s.default else ""
-                typer.echo(f"  {i}. {s.label}: {s.question}{opt_str}{def_str}")
-                if s.context:
-                    typer.echo(f"     context: {s.context}")
-                if s.hint:
-                    typer.echo(f"     hint: {s.hint}")
-
-    if path:
-        typer.echo("")
-        typer.echo("=== Decision Path Preview ===")
-        suggest_engine = SuggestionEngine(graph)
-        path_items = suggest_engine.preview_path()
-        for item in path_items:
-            status_icon = {
-                "decided": "✓",
-                "defaulted": "✓*",
-                "pending": "?",
-                "blocked": "✗",
-                "skipped": "-",
-            }.get(item["status"], "?")
-            val = item["value"]
-            ctx = f" | {item['context']}" if item["context"] else ""
-            typer.echo(f"  {status_icon} {item['key']} = {val}{ctx}")
 
     _write_evidence_output(evidence_output, evidence_store)
     _emit_discovery_next_steps(input=input, pattern=pattern, complete=result.is_complete())
@@ -1888,11 +1373,6 @@ def sample(
                 if ref.description:
                     summary += f" | {ref.description}"
                 typer.echo(f"  - {summary}")
-        if sample_obj.requires:
-            typer.echo("")
-            typer.echo("Requires:")
-            for dependency in sample_obj.requires:
-                typer.echo(f"  - {dependency}")
 
 
 @app.command()

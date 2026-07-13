@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pydantic import BaseModel
+
 from intent_engine.core.requirements import Requirement, RequirementGraph
 from intent_engine.core.validator import Violation, validate, validate_graph
 
@@ -12,6 +14,10 @@ from intent_engine.core.validator import Violation, validate, validate_graph
 class SimpleIntent:
     region: str = ""
     topology: str = ""
+
+
+class NumericIntent(BaseModel):
+    count: int = 1
 
 
 class TestValidateGraph:
@@ -127,6 +133,21 @@ class TestValidateGraph:
 
 
 class TestValidate:
+    def test_invalid_mutated_model_blocks_before_pattern_validation(self):
+        intent = NumericIntent()
+        intent.count = None  # type: ignore[assignment]
+        validator_called = False
+
+        def extra_check(value: NumericIntent) -> list[Violation]:
+            nonlocal validator_called
+            validator_called = True
+            return []
+
+        violations = validate(intent, extra_validators=[extra_check])
+
+        assert [violation.code for violation in violations] == ["INTENT_MODEL_COUNT_INVALID"]
+        assert validator_called is False
+
     def test_basic_validate_no_graph(self):
         intent = SimpleIntent(region="eu-west-1")
         assert validate(intent) == []
@@ -146,7 +167,7 @@ class TestValidate:
         assert len(violations) == 1
 
     def test_validate_with_extra_validator(self):
-        def extra_check(intent, graph=None):
+        def extra_check(intent):
             if not intent.region:
                 return [Violation(code="NO_REGION", message="Missing region")]
             return []
@@ -157,7 +178,7 @@ class TestValidate:
         assert violations[0].code == "NO_REGION"
 
     def test_extra_validator_passes_when_ok(self):
-        def extra_check(intent, graph=None):
+        def extra_check(intent):
             return []
 
         intent = SimpleIntent(region="eu-west-1")

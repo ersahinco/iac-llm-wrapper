@@ -53,7 +53,6 @@ def test_extracts_unsupported_ask_fact_with_evidence_span():
             label="Workload infrastructure",
             evidence_span="Needs an application stack with RDS later.",
             recommended_target=TargetCapabilityType.MODULE_COMPOSITION,
-            owned_by_pattern=False,
             detected_by="landing-zone",
             reason="Workload resources need a separate target.",
         )
@@ -75,7 +74,6 @@ def test_capability_routing_uses_semantic_facts_not_raw_text():
         label="Workload infrastructure",
         evidence_span="Needs RDS later.",
         recommended_target=TargetCapabilityType.MODULE_COMPOSITION,
-        owned_by_pattern=False,
         detected_by="landing-zone",
         reason="Workload resources need a separate target.",
     )

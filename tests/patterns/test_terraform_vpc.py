@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import ruamel.yaml
 
 import intent_engine.patterns.terraform_vpc  # noqa: F401 - triggers registration
-from intent_engine.core.compiler import compile_from_interview, validate_generated
+from intent_engine.core.compiler import CompileError, compile_from_interview, validate_generated
 from intent_engine.core.patterns import GLOBAL_REGISTRY
 
 
@@ -85,12 +86,24 @@ class TestTerraformVpcPattern:
             "deployment_pipeline_ref": "github://platform-networking/vpc-deploy",
         }
 
-        try:
+        with pytest.raises(CompileError) as excinfo:
             compile_from_interview(decisions, tmp_path, pattern="terraform-vpc")
-        except Exception as exc:
-            assert "PUBLIC_SUBNET_AZ_COUNT_MISMATCH" in str(exc)
-        else:
-            raise AssertionError("Expected subnet count mismatch to fail")
+
+        assert "PUBLIC_SUBNET_AZ_COUNT_MISMATCH" in str(excinfo.value)
+
+    def test_az_count_outside_emitter_range_fails(self, tmp_path: Path):
+        decisions = {
+            "az_count": "7",
+            "public_subnet_cidrs": ",".join(f"10.30.{index}.0/24" for index in range(7)),
+            "private_subnet_cidrs": ",".join(f"10.31.{index}.0/24" for index in range(7)),
+            "target_account_id": "111122223333",
+            "deployment_pipeline_ref": "github://platform-networking/vpc-deploy",
+        }
+
+        with pytest.raises(CompileError) as excinfo:
+            compile_from_interview(decisions, tmp_path, pattern="terraform-vpc")
+
+        assert "INTENT_MODEL_AZ_COUNT_INVALID" in str(excinfo.value)
 
     def test_delivery_metadata_is_required(self, tmp_path: Path):
         decisions = {
@@ -102,11 +115,9 @@ class TestTerraformVpcPattern:
             "private_subnet_cidrs": "10.30.10.0/24,10.30.11.0/24",
         }
 
-        try:
+        with pytest.raises(CompileError) as excinfo:
             compile_from_interview(decisions, tmp_path, pattern="terraform-vpc")
-        except Exception as exc:
-            text = str(exc)
-            assert "TERRAFORM_VPC_TARGET_ACCOUNT_REQUIRED" in text
-            assert "TERRAFORM_VPC_PIPELINE_REQUIRED" in text
-        else:
-            raise AssertionError("Expected missing delivery metadata to fail")
+
+        text = str(excinfo.value)
+        assert "TERRAFORM_VPC_TARGET_ACCOUNT_REQUIRED" in text
+        assert "TERRAFORM_VPC_PIPELINE_REQUIRED" in text

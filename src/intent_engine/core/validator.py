@@ -3,14 +3,16 @@
 Two layers of validation:
   1. Graph-driven: the requirement graph declares what is required when applicable.
      This makes validation data-driven — new requirements automatically enforce rules.
-  2. Intent-driven: cross-field and list-item checks that are hard to express in the
-     graph (e.g., workload target_account, ECS runtime + network mode).
+  2. Intent-driven: pattern validators handle cross-field and list-item checks that
+     are hard to express in the graph.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+
+from pydantic import BaseModel, ValidationError
 
 from .requirements import RequirementGraph, RequirementStatus
 
@@ -61,10 +63,24 @@ def validate(
     the system data-model-driven: adding a Requirement node with
     required_when_applicable=True automatically creates a fail-closed rule.
 
-    Pattern-specific validators can optionally accept a graph parameter
-    to make graph-aware decisions.
+    Pattern-specific validation runs against the typed intent model.
     """
     violations: list[Violation] = []
+
+    if isinstance(intent, BaseModel):
+        try:
+            type(intent).model_validate(intent.model_dump())
+        except ValidationError as exc:
+            for error in exc.errors():
+                path = ".".join(str(part) for part in error["loc"]) or "<root>"
+                code_path = "_".join(str(part).upper() for part in error["loc"]) or "ROOT"
+                violations.append(
+                    Violation(
+                        code=f"INTENT_MODEL_{code_path}_INVALID",
+                        message=f"Intent field '{path}' is invalid: {error['msg']}",
+                    )
+                )
+            return violations
 
     # Layer 1: graph-driven validation (data model is truth)
     if graph is not None:
@@ -73,10 +89,6 @@ def validate(
     # Layer 2: pattern-specific validators
     if extra_validators:
         for validator in extra_validators:
-            try:
-                violations.extend(validator(intent, graph=graph))
-            except TypeError:
-                # Fallback for validators that don't accept graph
-                violations.extend(validator(intent))
+            violations.extend(validator(intent))
 
     return violations

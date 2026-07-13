@@ -253,21 +253,22 @@ semanticModel:
       violationCode: AWS_LZA_INFRASTRUCTURE_OU_REQUIRED
       violationMessage: Hub-spoke topology requires an Infrastructure OU for the
         network account.
-    - key: workload-accounts-workloads-ou
-      label: Workload accounts have Workloads OU
+    - key: workload-account-ous-exist
+      label: Workload account OUs exist
       expression:
         applies_when:
           present:
             decision: workload_accounts
         requires_entity:
           kind: OU
-          name: Workloads
+          names:
+            - Workloads
       status: pass
-      evidence: workload_accounts=['Prod']; ous=['Infrastructure', 'Root',
-        'Security', 'Workloads']
+      evidence: workload_accounts=['Prod']; required_ous=['Workloads'];
+        ous=['Infrastructure', 'Root', 'Security', 'Workloads']
       violationCode: AWS_LZA_WORKLOADS_OU_REQUIRED
-      violationMessage: Workload accounts require a Workloads OU in
-        organization-config.yaml.
+      violationMessage: Workload account OU placements must reference
+        organizational units defined in organization-config.yaml.
     - key: centralized-logging-log-archive-account
       label: Centralized logging has log archive account
       expression:

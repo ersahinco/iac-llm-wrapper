@@ -12,6 +12,7 @@ from intent_engine.core.compiler import CompileError, compile_design, compile_fr
 from intent_engine.core.contracts import ContractValidator
 from intent_engine.core.extractor import Extractor
 from intent_engine.core.generator import generate_all
+from intent_engine.core.module_mapping import IaCIntentPayload
 from intent_engine.core.patterns import GLOBAL_REGISTRY
 from intent_engine.patterns.aws_lza.contracts import AWS_LZA_SAMPLE_CONFIG_CONTRACT
 from intent_engine.patterns.aws_lza.models import AwsLzaIntent, LzaAccount
@@ -52,7 +53,7 @@ class TestAwsLzaPattern:
 
     def test_extractor_with_graph_uses_pattern_intent_model(self):
         graph = GLOBAL_REGISTRY.get("aws-lza").create_graph()
-        intent = Extractor(graph=graph).extract("")
+        intent = Extractor(graph=graph).extract()
 
         assert isinstance(intent, AwsLzaIntent)
 
@@ -107,6 +108,23 @@ class TestAwsLzaPattern:
         ]
 
         assert "AWS_LZA_ACCOUNT_ENTITY_CONFLICT" in {item["violationCode"] for item in failed}
+
+    def test_workload_accounts_can_use_an_explicit_existing_ou(self):
+        intent = AwsLzaIntent(
+            organizational_units=["Security", "Infrastructure", "Sandbox"],
+            workload_accounts=["SandboxDev"],
+            network_account="Network",
+            identity_center_permission_sets=["ReadOnlyAccess"],
+            identity_center_assignments=["Admins:ReadOnlyAccess:Management"],
+            accounts=[LzaAccount(name="SandboxDev", ou="Sandbox")],
+        )
+
+        failed_codes = {
+            item.violation_code
+            for item in build_aws_lza_semantic_model(intent).failed_constraints()
+        }
+
+        assert "AWS_LZA_WORKLOADS_OU_REQUIRED" not in failed_codes
 
     def test_compile_from_interview_creates_handoff_artifacts(self, tmp_path: Path):
         decisions = {
@@ -580,11 +598,22 @@ class TestAwsLzaPattern:
             "identity_center_assignments",
         } <= {item["key"] for item in missing["questions"]}
 
-    def test_malformed_identity_center_assignment_blocks(self, tmp_path: Path):
+    @pytest.mark.parametrize(
+        "assignment",
+        [
+            "PlatformAdmins:ReadOnlyAccess",
+            "PlatformAdmins:ReadOnlyAccess:Management:unexpected",
+        ],
+    )
+    def test_malformed_identity_center_assignment_blocks(
+        self,
+        tmp_path: Path,
+        assignment: str,
+    ):
         decisions = {
             "network_account": "Network",
             "identity_center_permission_sets": "ReadOnlyAccess",
-            "identity_center_assignments": "PlatformAdmins:ReadOnlyAccess",
+            "identity_center_assignments": assignment,
         }
 
         with pytest.raises(CompileError) as exc_info:
@@ -738,10 +767,16 @@ class TestAwsLzaPattern:
             ".organizationalUnits[]"
         ) in errors
 
-    def test_aws_generators_are_pattern_scoped(self, tmp_path: Path):
-        generate_all(AwsLzaIntent(), tmp_path / "output", pattern="kubernetes-cluster")
-
-        assert not (tmp_path / "output" / "organization-config.yaml").exists()
+    def test_generation_rejects_mismatched_pattern_intent(self, tmp_path: Path):
+        with pytest.raises(TypeError, match="requires K8sIntent"):
+            generate_all(
+                IaCIntentPayload(
+                    module_inputs=[],
+                    intent=AwsLzaIntent(),
+                    pattern="kubernetes-cluster",
+                ),
+                tmp_path / "output",
+            )
 
     def test_hub_spoke_requires_network_account(self, tmp_path: Path):
         with pytest.raises(CompileError) as excinfo:

@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import ruamel.yaml
 
 import intent_engine.patterns.cloudformation_parameters  # noqa: F401
-from intent_engine.core.compiler import compile_from_interview, validate_generated
+from intent_engine.core.compiler import CompileError, compile_from_interview, validate_generated
 from intent_engine.core.patterns import GLOBAL_REGISTRY
 
 
@@ -52,3 +53,19 @@ def test_cloudformation_parameters_pattern_is_registered():
     assert pattern.description
     assert "cloudformation-parameters.yaml" in pattern.expected_artifacts()
     assert "handoff-plan.yaml" in pattern.expected_artifacts()
+
+
+def test_cloudformation_parameters_rejects_any_malformed_override(tmp_path: Path):
+    with pytest.raises(CompileError) as exc_info:
+        compile_from_interview(
+            {
+                "template_url": "s3://approved-templates/orders-service.yaml",
+                "parameter_overrides": "Environment=prod, malformed",
+            },
+            tmp_path,
+            pattern="cloudformation-parameters",
+        )
+
+    assert {violation.code for violation in exc_info.value.violations} == {
+        "CLOUDFORMATION_PARAMETER_FORMAT_INVALID"
+    }

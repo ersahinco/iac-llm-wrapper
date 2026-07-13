@@ -147,35 +147,43 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, pytest, ruff, mypy, pyright.
 
 ### Current Goal
 
-AWS LZA owner-validation readiness audit and lean repair.
+Keep the registered-target handoff product lean and evidence-backed while
+continuing minimum-cost validation across local and AWS LZA owner boundaries.
 
 ### Status
 
-- **Committed cleanup**: `606bd3e` removed redundant YAML helpers, unused hook
-  metadata, a generic test docstring, and stale session memory.
-- **Committed validation review fix**: `d297e59` links persisted
-  `contract-validation.yaml` in review HTML and prioritizes placeholder account
-  email failures before AWS lookup permission.
-- **Customer packet**: the banking AWS LZA packet compiles and reviews in
-  ignored `tests/results/owner-readiness-banking-lza/`; handoff is allowed, but
-  downstream plan readiness is blocked on owner account emails and explicit
-  network/TGW plan inputs.
-- **Committed plan-readiness fix**: `a593ef7` makes `handoff-plan.yaml` agree
-  with AWS LZA `decision-report.yaml` and `plan-manifest.yaml`: default sample
-  bundles show plan readiness blocked on concrete plan input blockers, while
-  explicit private plan inputs show `planAllowed: true`.
-- **Evidence**: the base packet official LZA validation now reports
-  `owner-account-email-required` (`Default email (audit@example.com) found.`).
-  An ignored private plan-input variant with non-placeholder emails and
-  network/TGW details reaches `aws-account-lookup-permission`, proving the repo
-  side clears plan inputs before the owner AWS context gate.
-- **Tests**: `uv run pytest` passed (452 passed, 1 skipped); focused AWS LZA,
-  generator, contract validation, review/LZA, and review CLI tests passed.
-- **Lint/format/type/hooks**: `uv run ruff check .`,
-  `uv run ruff format --check .`, `uv run --extra dev mypy`,
-  `uv run --extra dev pyright .`, and
-  `uv run --extra dev prek run --all-files` passed.
-- **Remaining blocker**: downstream-clean AWS LZA evidence requires
+- **Repo-wide AI slop audit**: removed roughly 9,000 lines of unused or
+  duplicative surface, led by the 4,236-line typed bundle impact graph, its
+  1,681-line test suite, unused suggestion paths, hidden compatibility models,
+  and provider behavior that had leaked into generic core.
+- **Enforced quality checks**: removed 20 external `prek` hooks that silently
+  passed when tools were absent. `prek` now runs installed checks that fail on
+  evidence gaps; Checkov remains the explicit first-class shift-left evidence
+  command for owner-provided IaC.
+- **Fail-closed behavior**: patterns must register a Pydantic intent model,
+  generator payload/model mismatches raise, mutated models are revalidated,
+  malformed booleans no longer become `false`, Terraform AZ counts are bounded,
+  Kubernetes node-pool bounds are checked, and malformed CloudFormation
+  parameter entries block the handoff.
+- **Pattern ownership**: AWS named-entity recovery, validator-to-requirement
+  review mapping, LZA validation evidence, artifact review owners, incremental
+  reconfirmation policy, and forbidden artifact checks now live on the AWS LZA
+  pattern instead of generic core branches.
+- **Validation**: `uv run pytest` passed with 382 tests and one skipped. Ruff,
+  Ruff format, mypy, Pyright, fixture drift, golden journey, extraction (8/8),
+  usability (8/8), and `prek run --all-files` all passed. Registered AWS LZA and
+  Kubernetes fixtures were regenerated from the audited behavior.
+- **Model comparison**: the implicit local Ollama fallback used
+  `llama3.2:3b`, took about 79 seconds, and produced a graph delta from the
+  deterministic bundle. It inferred `SandboxDev` belongs to the `Sandbox` OU,
+  while deterministic recovery assigned it to `Workloads`; the packet does not
+  explicitly map workload accounts to OUs. Both bundles passed validation, so
+  deterministic-versus-model graph diff is a required review signal.
+- **AWS cost boundary**: validation-only remains the recommended LZA cloud
+  ceiling. Current AWS guidance estimates the sample LZA environment at roughly
+  $430.22/month even with no activity or workloads, so full personal-account LZA
+  deployment is not a minimum-cost test.
+- **Remaining blocker**: downstream-clean AWS LZA evidence still requires
   owner-approved account emails and an AWS/LZA validation context with read-only
   account lookup permission; no deploy/apply path was added.
 
@@ -185,12 +193,24 @@ AWS LZA owner-validation readiness audit and lean repair.
   contract checks, review evidence, and owner-controlled downstream execution.
 - Prefer packet-driven fixes over imagined platform features.
 - Prefer deletion and shared local helpers over new abstractions.
+- Require a real packet, contract, review failure, or measured gap before adding
+  a feature; do not preserve test-only feature families without product callers.
+- Do not register quality checks that pass when their required tool is absent.
+- Keep pattern-specific review, extraction, and validation behavior on the
+  owning pattern rather than branching in generic core.
 - Keep generated/ignored evidence out of committed source unless it is an
   intentional fixture or contract artifact.
+- Treat deterministic compile as the local product baseline and explicit,
+  pinned-model compile as a separate extraction-quality experiment.
+- Compare deterministic and model bundles before handoff; an exit-zero result
+  alone does not prove interpretation equivalence.
+- Do not use a full personal LZA deployment as a cost-minimal validation path.
 
 ### Next
 
-1. Re-run official `iac-llm-wrapper lza validate` with owner-approved account
+1. Clarify the intended OU for each workload account in the customer packet, or
+   make the ambiguity fail closed before downstream handoff.
+2. Re-run official `iac-llm-wrapper lza validate` with owner-approved account
    emails and an AWS/LZA lookup-capable validation context.
-2. If validation still fails, fix only packet-backed repo issues or record
+3. If validation still fails, fix only packet-backed repo issues or record
    owner-side failures as downstream evidence.

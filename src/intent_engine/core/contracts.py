@@ -123,21 +123,6 @@ class ContractValidator:
             )
         return violations
 
-    def validate_intent(self, intent: Any) -> list[Violation]:
-        violations: list[Violation] = []
-        for decision in self.contract.required_decisions:
-            value = self._get_dotted(intent, decision)
-            if value in (None, "", [], {}):
-                violations.append(
-                    Violation(
-                        code=f"{decision.upper()}_REQUIRED",
-                        message=(
-                            f"Contract '{self.contract.name}' requires decision '{decision}'."
-                        ),
-                    )
-                )
-        return violations
-
     def validate_graph(self, graph: Any) -> list[Violation]:
         violations: list[Violation] = []
         requirements = getattr(graph, "_requirements", {})
@@ -391,14 +376,6 @@ class ContractValidator:
                 return False
             return normalized
         return value
-
-    def _get_dotted(self, obj: Any, dotted_path: str) -> Any:
-        current = obj
-        for part in dotted_path.split("."):
-            if not hasattr(current, part):
-                return None
-            current = getattr(current, part)
-        return current
 
 
 BLOCKED_ASSESSMENT_CONTRACT = TargetContract(

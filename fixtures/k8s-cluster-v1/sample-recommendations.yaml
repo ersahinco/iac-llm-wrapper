@@ -14,15 +14,18 @@ currentDecisions:
   namespace_name: production
 recommendations:
   - name: k8s-cluster-v1
-    description: ''
+    description: EKS cluster and namespace handoff with one managed node pool.
     version: 1.0.0
     releaseDate: '2025-06-01'
     sourceUrl: https://github.com/terraform-aws-modules/terraform-aws-eks
-    sourceContract:
-    upstreamVariant:
-    tags: []
-    sameDecisionCount: 8
-    differentDecisionCount: 2
+    sourceContract: kubernetes-cluster-config
+    upstreamVariant: managed-node-group
+    tags:
+      - eks
+      - kubernetes
+      - terraform
+    sameDecisionCount: 10
+    differentDecisionCount: 0
     missingDecisionCount: 0
     totalSampleDecisions: 10
     sameDecisions:
@@ -31,15 +34,11 @@ recommendations:
       - namespace_name
       - network_policy_enabled
       - node_pool_instance_type
+      - node_pool_max_size
+      - node_pool_min_size
       - node_pool_name
       - pod_cidr
       - service_cidr
-    differentDecisions:
-      node_pool_min_size:
-        sample: '2'
-        current: 2
-      node_pool_max_size:
-        sample: '5'
-        current: 5
+    differentDecisions: {}
     missingDecisions: {}
     extraCurrentDecisions: {}

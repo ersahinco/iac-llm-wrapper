@@ -15,6 +15,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from .contracts import TargetContract
+from .module_mapping import IaCIntentPayload
 from .patterns import PatternGenerator
 from .policy import policy_pack_inventory, policy_packs_to_dict
 from .yaml_utils import write_yaml_artifact
@@ -35,55 +37,26 @@ def _write(output_dir: Path, name: str, data: Any, schema_version: str | None = 
     write_yaml_artifact(output_dir / name, data, header)
 
 
-def generate_all(intent: Any, output_dir: Path, pattern: str | None = None) -> None:
-    from .module_mapping import DesignDocument, IaCIntentPayload
+def generate_all(payload: IaCIntentPayload, output_dir: Path) -> None:
     from .patterns import GLOBAL_REGISTRY as PATTERN_REGISTRY
 
-    if isinstance(intent, IaCIntentPayload):
-        payload = intent
-    else:
-        payload = IaCIntentPayload(
-            design_doc=DesignDocument(),
-            module_inputs=[],
-            intent=intent,
-        )
-    effective_pattern = pattern or getattr(payload, "pattern", "") or None
     pattern_generators: list[PatternGenerator] = []
-    if effective_pattern:
-        pattern_generators = PATTERN_REGISTRY.get(effective_pattern).generators
+    if payload.pattern:
+        pattern = PATTERN_REGISTRY.get(payload.pattern)
+        if payload.intent is not None and not isinstance(payload.intent, pattern.intent_factory):
+            raise TypeError(
+                f"Pattern '{payload.pattern}' requires {pattern.intent_factory.__name__}, "
+                f"got {type(payload.intent).__name__}."
+            )
+        pattern_generators = pattern.generators
     generators = [*CORE_GENERATORS, *pattern_generators]
     for generator in sorted(generators, key=lambda item: item.priority):
         generator.fn(payload, output_dir)
 
 
-def gen_design_doc(intent: Any, output_dir: Path) -> None:
-    """Write design-doc.yaml when business context is present."""
-    if not hasattr(intent, "design_doc"):
-        return
-    dd = intent.design_doc
-    if not any(
-        [
-            dd.project_name,
-            dd.business_justification,
-            dd.estimated_tier,
-            dd.compliance_tags,
-        ]
-    ):
-        return
-    data = {
-        "projectName": dd.project_name,
-        "businessJustification": dd.business_justification,
-        "estimatedTier": dd.estimated_tier,
-        "complianceTags": dd.compliance_tags,
-    }
-    _write(output_dir, "design-doc.yaml", data)
-
-
-def gen_module_inputs(intent: Any, output_dir: Path) -> None:
+def gen_module_inputs(payload: IaCIntentPayload, output_dir: Path) -> None:
     """Write module-inputs.yaml when module mappings exist."""
-    if not hasattr(intent, "module_inputs"):
-        return
-    inputs = intent.module_inputs
+    inputs = payload.module_inputs
     if not inputs:
         return
     data = {
@@ -106,17 +79,13 @@ def _hcl_value(value: Any) -> str:
         # writes a simple HCL object literal — rarely needed for tfvars.
         pairs = ", ".join(f"{k} = {_hcl_value(v)}" for k, v in value.items())
         return "{" + pairs + "}"
-    if isinstance(value, str) and value.startswith("${") and value.endswith("}"):
-        return value[2:-1]
     # Strings (and anything else) get quoted
     return json.dumps(str(value))
 
 
-def gen_tfvars(intent: Any, output_dir: Path) -> None:
+def gen_tfvars(payload: IaCIntentPayload, output_dir: Path) -> None:
     """Write terraform.tfvars from module_inputs when mappings exist."""
-    if not hasattr(intent, "module_inputs"):
-        return
-    inputs = intent.module_inputs
+    inputs = payload.module_inputs
     if not inputs:
         return
 
@@ -135,13 +104,10 @@ def gen_tfvars(intent: Any, output_dir: Path) -> None:
     (output_dir / "terraform.tfvars").write_text("\n".join(lines))
 
 
-def gen_sample_recommendations(intent: Any, output_dir: Path) -> None:
+def gen_sample_recommendations(payload: IaCIntentPayload, output_dir: Path) -> None:
     """Write sample-recommendations.yaml when pattern-backed samples exist."""
-    if not hasattr(intent, "pattern") or not hasattr(intent, "decisions"):
-        return
-
-    pattern = getattr(intent, "pattern", "")
-    decisions = getattr(intent, "decisions", {})
+    pattern = payload.pattern
+    decisions = payload.decisions
     if not pattern or not decisions:
         return
 
@@ -180,17 +146,17 @@ def gen_sample_recommendations(intent: Any, output_dir: Path) -> None:
     _write(output_dir, "sample-recommendations.yaml", data)
 
 
-def gen_llm_trace_summary(intent: Any, output_dir: Path) -> None:
+def gen_llm_trace_summary(payload: IaCIntentPayload, output_dir: Path) -> None:
     """Write a lean summary of extraction evidence when compile captured it."""
-    summary = getattr(intent, "extraction_summary", None)
+    summary = payload.extraction_summary
     if not summary:
         return
     _write(output_dir, "llm-trace-summary.yaml", summary)
 
 
-def gen_model_benchmark(intent: Any, output_dir: Path) -> None:
+def gen_model_benchmark(payload: IaCIntentPayload, output_dir: Path) -> None:
     """Write model behavior rollups from the extraction trace."""
-    summary = getattr(intent, "extraction_summary", None)
+    summary = payload.extraction_summary
     if not summary:
         return
     from .observability import build_model_benchmark
@@ -198,11 +164,9 @@ def gen_model_benchmark(intent: Any, output_dir: Path) -> None:
     _write(output_dir, "model-benchmark.yaml", build_model_benchmark(summary))
 
 
-def gen_decision_audit(intent: Any, output_dir: Path) -> None:
+def gen_decision_audit(payload: IaCIntentPayload, output_dir: Path) -> None:
     """Write the graph decision audit trail captured during compile."""
-    audit = getattr(intent, "decision_audit", None)
-    if audit is None:
-        return
+    audit = payload.decision_audit
     write_yaml_artifact(
         output_dir / "decision-audit.yaml",
         {"auditTrail": audit},
@@ -231,11 +195,8 @@ def _sha256_replay_artifact(path: Path) -> str:
     return _sha256_text(text)
 
 
-def _contract_digest(contract: Any) -> str:
-    if hasattr(contract, "model_dump"):
-        payload = contract.model_dump(by_alias=True)
-    else:
-        payload = contract
+def _contract_digest(contract: TargetContract) -> str:
+    payload = contract.model_dump(by_alias=True)
     rendered = json.dumps(payload, sort_keys=True, default=str)
     return _sha256_text(rendered)
 
@@ -246,9 +207,9 @@ def _model_name(model: Any) -> str:
     return type(model).__name__
 
 
-def gen_context_manifest(intent: Any, output_dir: Path) -> None:
+def gen_context_manifest(payload: IaCIntentPayload, output_dir: Path) -> None:
     """Write the code-owned context inventory used to build this handoff bundle."""
-    pattern = getattr(intent, "pattern", "")
+    pattern = payload.pattern
     if not pattern:
         return
 
@@ -257,10 +218,10 @@ def gen_context_manifest(intent: Any, output_dir: Path) -> None:
     pattern_obj = PATTERN_REGISTRY.get(pattern)
     graph = pattern_obj.create_graph()
     prompt_context = " ".join(pattern_obj.prompt_context.split())
-    decisions = getattr(intent, "decisions", {}) or {}
-    extraction_summary = getattr(intent, "extraction_summary", {}) or {}
-    target_capability_report = getattr(intent, "target_capability_report", {}) or {}
-    module_inputs = getattr(intent, "module_inputs", []) or []
+    decisions = payload.decisions
+    extraction_summary = payload.extraction_summary
+    target_capability_report = payload.target_capability_report
+    module_inputs = payload.module_inputs
     samples = sorted(PATTERN_REGISTRY.get(pattern).samples, key=lambda sample: sample.name)
 
     data = {
@@ -344,7 +305,7 @@ def gen_context_manifest(intent: Any, output_dir: Path) -> None:
         "runtimeContext": {
             "acceptedDecisionCount": len(decisions),
             "moduleInputCount": len(module_inputs),
-            "source": getattr(intent, "source_context", {}) or {},
+            "source": payload.source_context,
             "llm": {
                 "provider": extraction_summary.get("provider", "not-run"),
                 "model": extraction_summary.get("model", "not-run"),
@@ -372,9 +333,9 @@ def gen_context_manifest(intent: Any, output_dir: Path) -> None:
     _write(output_dir, "context-manifest.yaml", data, "intent-engine/context-manifest/v1")
 
 
-def gen_policy_graph(intent: Any, output_dir: Path) -> None:
+def gen_policy_graph(payload: IaCIntentPayload, output_dir: Path) -> None:
     """Write registered policy graph metadata when a pattern declares policy packs."""
-    pattern = getattr(intent, "pattern", "")
+    pattern = payload.pattern
     if not pattern:
         return
 
@@ -395,27 +356,16 @@ def gen_policy_graph(intent: Any, output_dir: Path) -> None:
     _write(output_dir, "policy-graph.yaml", data, "intent-engine/policy-graph/v1")
 
 
-def _artifact_owner(artifact_name: str) -> str:
-    lowered = artifact_name.lower()
-    if "security" in lowered or "iam" in lowered:
-        return "security-owner"
-    if "network" in lowered or "vpc" in lowered or "cluster" in lowered:
-        return "network-owner"
-    if "account" in lowered or "organization" in lowered or "global" in lowered:
-        return "platform-owner"
-    return "target-owner"
-
-
-def gen_handoff_plan(intent: Any, output_dir: Path) -> None:
+def gen_handoff_plan(payload: IaCIntentPayload, output_dir: Path) -> None:
     """Write a generic handoff plan from pattern contracts and readiness."""
-    pattern = getattr(intent, "pattern", "")
+    pattern = payload.pattern
     if not pattern:
         return
 
     from .patterns import GLOBAL_REGISTRY as PATTERN_REGISTRY
 
     pattern_obj = PATTERN_REGISTRY.get(pattern)
-    readiness = getattr(intent, "handoff_readiness", {}) or {}
+    readiness = payload.handoff_readiness
     allowed = bool(readiness.get("handoffAllowed", True))
     allowed_next_action = readiness.get(
         "allowedNextAction",
@@ -425,7 +375,7 @@ def gen_handoff_plan(intent: Any, output_dir: Path) -> None:
             else "Pass the reviewed artifacts to the existing target toolchain after manual gates."
         ),
     )
-    target_capabilities = getattr(intent, "target_capability_report", {}) or {}
+    target_capabilities = payload.target_capability_report
     contracts = pattern_obj.contracts
     required_artifacts = list(
         dict.fromkeys(
@@ -437,7 +387,7 @@ def gen_handoff_plan(intent: Any, output_dir: Path) -> None:
         {
             "id": f"review-{artifact_name.replace('.', '-').replace('_', '-')}",
             "title": f"Review {artifact_name}",
-            "owner": _artifact_owner(artifact_name),
+            "owner": pattern_obj.artifact_review_owners.get(artifact_name, "target-owner"),
             "dependsOn": ["validate-target-contracts"],
             "manualGate": True,
             "rollback": "Reject the handoff, correct the source intent, and re-run compile.",
@@ -513,9 +463,9 @@ def gen_handoff_plan(intent: Any, output_dir: Path) -> None:
     _write(output_dir, "handoff-plan.yaml", data)
 
 
-def gen_replay_manifest(intent: Any, output_dir: Path) -> None:
+def gen_replay_manifest(payload: IaCIntentPayload, output_dir: Path) -> None:
     """Write digest inventory for plan-ready registered target replay."""
-    pattern = getattr(intent, "pattern", "")
+    pattern = payload.pattern
     if not pattern:
         return
 
@@ -537,7 +487,7 @@ def gen_replay_manifest(intent: Any, output_dir: Path) -> None:
     ]
     data = {
         "pattern": pattern,
-        "source": getattr(intent, "source_context", {}) or {"mode": "unknown", "sha256": ""},
+        "source": payload.source_context or {"mode": "unknown", "sha256": ""},
         "contracts": [
             {
                 "name": contract.name,
@@ -559,7 +509,6 @@ def gen_replay_manifest(intent: Any, output_dir: Path) -> None:
 
 
 CORE_GENERATORS = [
-    PatternGenerator("design-doc", gen_design_doc, priority=4),
     PatternGenerator("context-manifest", gen_context_manifest, priority=4),
     PatternGenerator("policy-graph", gen_policy_graph, priority=4),
     PatternGenerator("module-inputs", gen_module_inputs, priority=5),

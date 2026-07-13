@@ -26,13 +26,9 @@ class Question:
     depends_on: list[str]
     applies_reason: str | None
     blocked_reason: str | None
-    # Knowledge fields
     compliance_controls: list[str]
     tradeoffs: list[str]
-    consequences: list[str]
     signals: list[str]
-    confidence: float
-    overridable: bool
 
 
 class InterviewEngine:
@@ -69,10 +65,7 @@ class InterviewEngine:
             blocked_reason=self.graph.is_blocked_reason(key),
             compliance_controls=req.compliance_controls,
             tradeoffs=req.tradeoffs,
-            consequences=req.consequences,
             signals=req.signals,
-            confidence=req.confidence,
-            overridable=req.overridable,
         )
 
     def answer(self, key: str, value: Any) -> None:
@@ -170,10 +163,6 @@ class InterviewEngine:
                 output_fn("  Tradeoffs:")
                 for t in q.tradeoffs:
                     output_fn(f"    - {t}")
-            if q.consequences:
-                output_fn("  Consequences:")
-                for c in q.consequences:
-                    output_fn(f"    - {c}")
             output_fn(f"  {q.question}")
 
             if q.options:
@@ -275,9 +264,6 @@ class InterviewEngine:
         intent = pattern_obj.intent_factory()
         self.graph.apply_to_intent(intent)
         return intent
-
-    def path_log(self) -> list[str]:
-        return list(self._path_log)
 
     def summary(self) -> str:
         lines = ["=== Interview Summary ===", ""]

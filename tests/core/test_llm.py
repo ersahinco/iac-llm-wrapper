@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from intent_engine.core.compiler import compile_design
+from intent_engine.core.compiler import LLMContextProvider, compile_design
 from intent_engine.core.extractor import Extractor
 from intent_engine.core.llm_caller import (
     BedrockCliBackend,
@@ -22,6 +22,7 @@ from intent_engine.core.llm_caller import (
     create_backend,
 )
 from intent_engine.core.observability import build_model_benchmark
+from intent_engine.core.patterns import GLOBAL_REGISTRY
 
 
 class MockLLMBackend(LLMBackend):
@@ -99,6 +100,21 @@ class TestLLMCaller:
             "completion_tokens": 4,
             "total_tokens": 15,
         }
+
+    def test_context_provider_uses_the_active_pattern_prompt(self):
+        backend = MockLLMBackend('{"decisions": {}}')
+        provider = LLMContextProvider(
+            prose="VPC design",
+            graph=GLOBAL_REGISTRY.get("terraform-vpc").create_graph(),
+            pattern="terraform-vpc",
+            llm_caller=LLMCaller(backend),
+        )
+
+        provider.run()
+
+        prompt = backend.calls[0]["prompt"]
+        assert "existing approved Terraform AWS VPC module" in prompt
+        assert "AWS Landing Zone Accelerator" not in prompt
 
 
 class TestLLMEvidence:
@@ -294,7 +310,7 @@ class TestEndToEndLLM:
 
         assert "Use only SCHEMA keys for decisions" in prompt
         assert "explicit 'schema_key: value' bullets" in prompt
-        assert "Do not report gaps for design_doc, accounts, OUs, or workloads metadata" in prompt
+        assert "Do not report gaps for metadata outside SCHEMA" in prompt
         assert "If unsure about a SCHEMA key" in prompt
 
     def test_aws_lza_llm_round_trip(self, tmp_path: Path):
@@ -415,14 +431,14 @@ class TestEndToEndLLM:
                 "signal_decisions": {},
                 "gaps": [
                     {
-                        "key": "project_name",
+                        "key": "unregistered_metadata",
                         "reason": "Not mentioned.",
                         "suggestion": "Ask for a project name.",
                     }
                 ],
                 "contradictions": [
                     {
-                        "key": "compliance_tags",
+                        "key": "unregistered_label",
                         "reason": "Not mentioned consistently.",
                     }
                 ],
@@ -435,10 +451,10 @@ class TestEndToEndLLM:
         report = (output / "decision-report.yaml").read_text()
         trace = (output / "llm-trace-summary.yaml").read_text()
         assert "handoffAllowed: true" in report
-        assert "project_name" in trace
-        assert "compliance_tags" in trace
+        assert "unregistered_metadata" in trace
+        assert "unregistered_label" in trace
         assert "blocking: []" in trace
-        assert "LLM_GAP_PROJECT_NAME" not in report
+        assert "LLM_GAP_UNREGISTERED_METADATA" not in report
 
     def test_markdown_decisions_take_precedence_over_llm(self, tmp_path: Path):
         fixture = tmp_path / "design.md"

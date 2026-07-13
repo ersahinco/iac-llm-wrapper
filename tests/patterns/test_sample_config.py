@@ -122,8 +122,7 @@ class TestK8sSampleConfigRegistered:
     def test_k8s_v1_has_module_refs(self):
         cfg = _sample("k8s-cluster-v1")
         module_names = {m.module_name for m in cfg.module_refs}
-        assert "terraform-aws-eks" in module_names
-        assert "terraform-aws-vpc" in module_names
+        assert module_names == {"terraform-aws-eks"}
 
     def test_k8s_v1_module_refs_have_versions(self):
         cfg = _sample("k8s-cluster-v1")

@@ -103,6 +103,9 @@ def check_pattern(
         )
 
     known_contracts = {contract.name for contract in pattern.contracts}
+    known_artifacts = {
+        artifact.name for contract in pattern.contracts for artifact in contract.artifacts
+    }
     for pack in pattern.policy_packs:
         if not pack.controls:
             violations.append(f"{pack.name}: policy pack has no controls")
@@ -129,6 +132,16 @@ def check_pattern(
                 or mapping.owner_policy_refs
             ):
                 violations.append(f"{pack.name}:{control.id}: policy control has no mapping")
+
+    for code, requirement_key in pattern.violation_requirement_map.items():
+        if requirement_key not in graph._requirements:
+            violations.append(f"{code}: unknown mapped requirement {requirement_key}")
+    for requirement_key in pattern.reconfirmation_keys:
+        if requirement_key not in graph._requirements:
+            violations.append(f"unknown reconfirmation requirement {requirement_key}")
+    for artifact_name in pattern.artifact_review_owners:
+        if artifact_name not in known_artifacts:
+            violations.append(f"unknown artifact owner mapping {artifact_name}")
 
     expected_artifacts = pattern.expected_artifacts()
     for artifact in expected_artifacts:

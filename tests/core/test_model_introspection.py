@@ -8,10 +8,8 @@ import pytest
 from pydantic import BaseModel
 
 from intent_engine.core.model_introspection import (
-    append_to_list_field,
     coerce_value,
     derive_target_type,
-    discover_model_fields,
     field_exists,
     list_annotation_item_model,
     resolve_field_info,
@@ -106,6 +104,7 @@ class TestCoerceValue:
     def test_coerce_bool(self):
         assert coerce_value("true", bool) is True
         assert coerce_value("false", bool) is False
+        assert coerce_value("sometimes", bool) is None
 
     def test_coerce_optional_str(self):
         assert coerce_value("hello", str | None) == "hello"
@@ -144,45 +143,3 @@ class TestListAnnotationItemModel:
 
     def test_list_of_primitives_returns_none(self):
         assert list_annotation_item_model(list[str]) is None
-
-
-class TestDiscoverModelFields:
-    def test_discovers_leaf_fields(self):
-        fields = discover_model_fields(SampleModel)
-        assert "name" in fields
-        assert "nested_name" in fields
-        assert "nested_count" in fields
-
-    def test_skips_nested_models(self):
-        fields = discover_model_fields(SampleModel)
-        assert "nested" not in fields
-
-    def test_skips_list_of_models(self):
-        fields = discover_model_fields(SampleModel)
-        assert "items" not in fields
-
-
-class TestAppendToListField:
-    def test_appends_to_list_field(self):
-        intent = SampleModel()
-        ok = append_to_list_field(intent, "items", {"name": "first", "value": "v1"})
-        assert ok is True
-        assert len(intent.items) == 1
-        assert intent.items[0].name == "first"
-        assert intent.items[0].value == "v1"
-
-    def test_appends_multiple(self):
-        intent = SampleModel()
-        append_to_list_field(intent, "items", {"name": "a"})
-        append_to_list_field(intent, "items", {"name": "b"})
-        assert len(intent.items) == 2
-
-    def test_non_list_returns_false(self):
-        intent = SampleModel()
-        ok = append_to_list_field(intent, "name", {"name": "x"})
-        assert ok is False
-
-    def test_primitive_list_returns_false(self):
-        intent = SampleModel()
-        ok = append_to_list_field(intent, "tags", "new-tag")
-        assert ok is False

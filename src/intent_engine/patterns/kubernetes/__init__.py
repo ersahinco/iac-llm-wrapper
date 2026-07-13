@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from intent_engine.core.generator import gen_tfvars
 from intent_engine.core.module_mapping import ModuleInputs
 from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern, PatternGenerator
@@ -11,7 +9,6 @@ from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern, PatternGenerat
 from .contracts import K8S_CONTRACT
 from .generators import gen_cluster_config, gen_k8s_decision_report, gen_namespace_config
 from .graph import (
-    K8S_FREE_FORM_EXAMPLES,
     K8S_SECTION_MAP,
     K8S_SECTION_ORDER,
     build_k8s_graph,
@@ -20,18 +17,14 @@ from .models import K8sIntent
 from .samples import k8s_samples
 
 
-def map_k8s_intent_to_modules(intent: Any) -> list[ModuleInputs]:
+def map_k8s_intent_to_modules(intent: K8sIntent) -> list[ModuleInputs]:
     """Map Kubernetes intent to optional IaC module variable references."""
-    if not isinstance(intent, K8sIntent):
-        return []
     return [
         ModuleInputs(
             module_name="terraform-aws-eks",
             variables={
                 "cluster_name": intent.cluster_name,
                 "cluster_version": intent.cluster_version,
-                "vpc_id": "${module.vpc.vpc_id}",
-                "subnet_ids": "${module.vpc.private_subnets}",
             },
         )
     ]
@@ -56,7 +49,6 @@ def _register_pattern() -> None:
             intent_factory=K8sIntent,
             section_map=dict(K8S_SECTION_MAP),
             section_order=list(K8S_SECTION_ORDER),
-            free_form_examples=dict(K8S_FREE_FORM_EXAMPLES),
             prompt_context=(
                 "This pattern captures Kubernetes cluster handoff configuration for an "
                 "existing approved cluster or module workflow. Extract values as follows:\n"
@@ -71,6 +63,7 @@ def _register_pattern() -> None:
             generators=list(_K8S_GENERATORS),
             contracts=[K8S_CONTRACT],
             samples=k8s_samples(),
+            reconfirmation_categories=("network",),
         )
     )
 

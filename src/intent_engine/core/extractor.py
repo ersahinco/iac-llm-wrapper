@@ -29,7 +29,12 @@ def _bool(v: Any) -> bool | None:
         return None
     if isinstance(v, bool):
         return v
-    return str(v).lower() in ("true", "yes", "1")
+    normalized = str(v).strip().lower()
+    if normalized in ("true", "yes", "1"):
+        return True
+    if normalized in ("false", "no", "0"):
+        return False
+    return None
 
 
 def _safe_json_parse(raw: str) -> dict[str, Any] | None:
@@ -100,7 +105,6 @@ class LLMGraphResult:
     """Structured result from LLM graph traversal."""
 
     decisions: dict[str, str] = field(default_factory=dict)
-    design_doc: dict[str, Any] = field(default_factory=dict)
     signal_decisions: dict[str, str] = field(default_factory=dict)
     gaps: list[dict[str, Any]] = field(default_factory=list)
     contradictions: list[dict[str, Any]] = field(default_factory=list)
@@ -111,9 +115,7 @@ class LLMGraphResult:
         intent = extractor._decisions_to_intent(self.decisions)
         parsed = _safe_json_parse(self.raw_response)
         if isinstance(parsed, dict):
-            extractor._parse_workloads(parsed, intent)
-            extractor._parse_accounts(parsed, intent)
-            extractor._parse_ous(parsed, intent)
+            extractor._apply_pattern_entities(parsed, intent)
         return intent
 
 
@@ -138,21 +140,17 @@ class Extractor:
         self.pattern = pattern
         self._intent_model = self._resolve_intent_model()
 
-    def _resolve_intent_model(self) -> type[BaseModel] | None:
+    def _resolve_intent_model(self) -> type[BaseModel]:
         """Resolve the intent model for this pattern."""
         graph_model = getattr(self.graph, "_intent_model", None)
         if isinstance(graph_model, type) and issubclass(graph_model, BaseModel):
             return graph_model
-        try:
-            from .patterns import GLOBAL_REGISTRY
+        from .patterns import GLOBAL_REGISTRY
 
-            pattern_obj = GLOBAL_REGISTRY.get(self.pattern)
-            model = pattern_obj.intent_factory
-            if isinstance(model, type) and issubclass(model, BaseModel):
-                return model
-        except Exception:
-            pass
-        return None
+        model = GLOBAL_REGISTRY.get(self.pattern).intent_factory
+        if isinstance(model, type) and issubclass(model, BaseModel):
+            return model
+        raise TypeError(f"Pattern '{self.pattern}' must register a Pydantic intent model.")
 
     def _build_schema(self) -> dict[str, Any]:
         """Generate a flat JSON schema from the requirement graph."""
@@ -198,10 +196,6 @@ class Extractor:
                 lines.append("  Tradeoffs:")
                 for t in req.tradeoffs:
                     lines.append(f"    - {t}")
-            if req.consequences:
-                lines.append("  Consequences:")
-                for c in req.consequences:
-                    lines.append(f"    - {c}")
         return "\n".join(lines)
 
     def _build_signal_context(self) -> str:
@@ -237,15 +231,12 @@ class Extractor:
         signal_context = self._build_signal_context()
 
         # Optional domain context from pattern metadata
-        domain_ctx = ""
-        try:
-            from .patterns import GLOBAL_REGISTRY
+        from .patterns import GLOBAL_REGISTRY
 
-            pattern_obj = GLOBAL_REGISTRY.get(self.pattern)
-            if pattern_obj.prompt_context:
-                domain_ctx = f"\n=== DOMAIN CONTEXT ===\n{pattern_obj.prompt_context}\n"
-        except Exception:
-            pass
+        domain_ctx = ""
+        pattern_obj = GLOBAL_REGISTRY.get(self.pattern)
+        if pattern_obj.prompt_context:
+            domain_ctx = f"\n=== DOMAIN CONTEXT ===\n{pattern_obj.prompt_context}\n"
 
         return (
             "You are an architecture intent extractor.\n"
@@ -266,49 +257,12 @@ class Extractor:
             "8. If the document contains explicit 'schema_key: value' bullets or lines "
             "where schema_key appears in the SCHEMA, copy those keys into decisions "
             "exactly unless the value is contradicted later.\n"
-            "9. If the document mentions accounts, workloads, or OUs, include them as "
-            "top-level JSON arrays in the output.\n"
-            '10. Account format: {"name": "...", "ou": "...", "description": "..."}\n'
-            '11. Workload format: {"name": "...", "target_account": "...", '
-            '"network_mode": "private" (or "public"), '
-            '"runtime": "ecs-fargate" (or "ec2" or "eks"), '
-            '"public_ingress": false, "port": 8080, "cpu": 256, "memory": 512}\n'
-            '12. OU format: {"name": "...", "description": "..."}\n'
-            "13. Use only SCHEMA keys for decisions, signal_decisions, gaps, and "
-            "contradictions. Do not report gaps for design_doc, accounts, OUs, or "
-            "workloads metadata.\n\n"
-            "=== EXAMPLE OUTPUT ===\n"
-            "For a document with region=eu-central-1, topology=hub-spoke, "
-            "an OU 'Infrastructure', and one account 'prod' under it:\n"
-            "{\n"
-            '  "decisions": {\n'
-            '    "primary_region": "eu-central-1",\n'
-            '    "topology": "hub-spoke"\n'
-            "  },\n"
-            '  "accounts": [{"name": "prod", "ou": "Infrastructure", '
-            '"description": "Production account"}],\n'
-            '  "ous": [{"name": "Infrastructure", '
-            '"description": "Shared services OU"}],\n'
-            '  "design_doc": {},\n'
-            '  "signal_decisions": {},\n'
-            '  "gaps": [],\n'
-            '  "contradictions": []\n'
-            "}\n\n"
+            "9. Use only SCHEMA keys for decisions, signal_decisions, gaps, and "
+            "contradictions. Do not report gaps for metadata outside SCHEMA.\n\n"
             "=== OUTPUT FORMAT ===\n"
             "Return ONLY valid JSON (no markdown fences) with this exact structure:\n"
             "{\n"
             '  "decisions": { ...key: value from document... },\n'
-            '  "accounts": [{"name": "...", "ou": "...", "description": "..."}, ...],\n'
-            '  "ous": [{"name": "...", "description": "..."}, ...],\n'
-            '  "workloads": [{"name": "...", "target_account": "...", '
-            '"network_mode": "private", "runtime": "ecs-fargate", '
-            '"public_ingress": false, "port": 8080, "cpu": 256, "memory": 512}, ...],\n'
-            '  "design_doc": {\n'
-            '    "project_name": "...",\n'
-            '    "business_justification": "...",\n'
-            '    "estimated_tier": "...",\n'
-            '    "compliance_tags": ["..."]\n'
-            "  },\n"
             '  "signal_decisions": { ...key: value inferred from signals... },\n'
             '  "gaps": [\n'
             '    {"key": "requirement_key", "reason": "why it is missing", '
@@ -318,6 +272,7 @@ class Extractor:
             '    {"key": "requirement_key", "reason": "why it contradicts", "details": "..."}\n'
             "  ]\n"
             "}\n\n"
+            "Include pattern-owned top-level entities only when DOMAIN CONTEXT defines them.\n"
             "If the document does not mention a field, omit it from 'decisions'.\n"
             "Do NOT hallucinate values. If unsure about a SCHEMA key, omit the decision "
             "and list that SCHEMA key in 'gaps'.\n\n"
@@ -338,7 +293,6 @@ class Extractor:
         # Graph-aware format
         if "decisions" in data or "signal_decisions" in data:
             result.decisions = self._coerce_decisions(data.get("decisions", {}))
-            result.design_doc = data.get("design_doc", {})
             result.signal_decisions = self._coerce_decisions(data.get("signal_decisions", {}))
             result.gaps = data.get("gaps", [])
             result.contradictions = data.get("contradictions", [])
@@ -364,9 +318,13 @@ class Extractor:
                 if isinstance(raw_val, bool):
                     coerced[key] = "true" if raw_val else "false"
                 else:
-                    coerced[key] = (
-                        "true" if str(raw_val).lower() in ("true", "yes", "1") else "false"
-                    )
+                    normalized = str(raw_val).strip().lower()
+                    if normalized in ("true", "yes", "1"):
+                        coerced[key] = "true"
+                    elif normalized in ("false", "no", "0"):
+                        coerced[key] = "false"
+                    else:
+                        coerced[key] = str(raw_val)
             elif target_type == "int":
                 try:
                     coerced[key] = str(int(float(raw_val)))
@@ -389,14 +347,7 @@ class Extractor:
         """
 
         model = self._intent_model
-        if model is None:
-            # Fallback: create a plain object when no model is known
-            class _FallbackIntent:
-                pass
-
-            intent: Any = _FallbackIntent()
-        else:
-            intent = model()
+        intent: Any = model()
 
         for key, req in self.graph._requirements.items():
             if req.target_field is None or key not in decisions:
@@ -406,13 +357,12 @@ class Extractor:
                 continue
 
             parsed_val: Any = None
-            if model is not None:
-                try:
-                    _, annotation = resolve_field_info(model, req.target_field)
-                    parsed_val = coerce_value(raw_val, annotation)
-                except Exception:
-                    # Fall back to target_type string match.
-                    pass
+            try:
+                _, annotation = resolve_field_info(model, req.target_field)
+                parsed_val = coerce_value(raw_val, annotation)
+            except (AttributeError, TypeError, ValueError):
+                # Fall back to target_type metadata.
+                pass
 
             if parsed_val is None:
                 # Fallback for string-based target_type metadata.
@@ -447,39 +397,19 @@ class Extractor:
 
         return intent
 
-    def _parse_workloads(self, data: dict[str, Any], intent: Any) -> None:
-        if not hasattr(intent, "workloads"):
-            return
-        from .model_introspection import append_to_list_field
+    def _apply_pattern_entities(self, data: dict[str, Any], intent: Any) -> None:
+        from .patterns import GLOBAL_REGISTRY
 
-        for wl_data in data.get("workloads", []):
-            if isinstance(wl_data, dict):
-                append_to_list_field(intent, "workloads", wl_data)
+        applier = GLOBAL_REGISTRY.get(self.pattern).llm_entity_applier
+        if applier is not None:
+            applier(data, intent)
 
-    def _parse_accounts(self, data: dict[str, Any], intent: Any) -> None:
-        if not hasattr(intent, "accounts"):
-            return
-        from .model_introspection import append_to_list_field
-
-        for acct_data in data.get("accounts", []):
-            if isinstance(acct_data, dict):
-                append_to_list_field(intent, "accounts", acct_data)
-
-    def _parse_ous(self, data: dict[str, Any], intent: Any) -> None:
-        if not hasattr(intent, "ous"):
-            return
-        from .model_introspection import append_to_list_field
-
-        for ou_data in data.get("ous", data.get("ou", [])):
-            if isinstance(ou_data, dict):
-                append_to_list_field(intent, "ous", ou_data)
-
-    def extract(self, text: str, llm_response: str | None = None) -> Any:
+    def extract(self, llm_response: str | None = None) -> Any:
         if llm_response is not None:
             result = self.parse_response(llm_response)
             intent = result.to_intent(self)
             return intent
-        # No LLM response — return default intent (data model drives defaults)
+        # No LLM response: return the model defaults.
 
         g = self.graph
         g.apply_defaults_for_remaining()
@@ -489,12 +419,4 @@ class Extractor:
 
     def _create_default_intent(self) -> Any:
         """Create a default intent instance from the pattern's intent_factory."""
-        model = self._intent_model
-        if model is not None:
-            return model()
-
-        # Fallback to dynamic object when no model is known
-        class _FallbackIntent:
-            pass
-
-        return _FallbackIntent()
+        return self._intent_model()

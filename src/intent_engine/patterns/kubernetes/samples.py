@@ -13,6 +13,10 @@ def k8s_samples() -> list[SampleConfig]:
             version="1.0.0",
             release_date="2025-06-01",
             source_url="https://github.com/terraform-aws-modules/terraform-aws-eks",
+            source_contract="kubernetes-cluster-config",
+            upstream_variant="managed-node-group",
+            description="EKS cluster and namespace handoff with one managed node pool.",
+            tags=["eks", "kubernetes", "terraform"],
             decisions={
                 "cluster_name": "prod-k8s",
                 "cluster_version": "1.30",
@@ -21,8 +25,8 @@ def k8s_samples() -> list[SampleConfig]:
                 "service_cidr": "10.96.0.0/12",
                 "node_pool_name": "primary",
                 "node_pool_instance_type": "t3.large",
-                "node_pool_min_size": "2",
-                "node_pool_max_size": "5",
+                "node_pool_min_size": 2,
+                "node_pool_max_size": 5,
                 "namespace_name": "production",
             },
             module_refs=[
@@ -31,12 +35,6 @@ def k8s_samples() -> list[SampleConfig]:
                     source="terraform-aws-modules/eks/aws",
                     version="~> 20.0",
                     description="EKS cluster with managed node groups, IRSA, security groups",
-                ),
-                ModuleRef(
-                    module_name="terraform-aws-vpc",
-                    source="terraform-aws-modules/vpc/aws",
-                    version="~> 5.0",
-                    description="VPC with public/private subnets for EKS cluster",
                 ),
             ],
         )

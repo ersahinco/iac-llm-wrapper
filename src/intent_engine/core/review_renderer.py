@@ -18,7 +18,10 @@ def render_review_html(context: dict[str, Any]) -> str:
     links = _dict(context.get("links"))
     review_summary = _dict(context.get("reviewSummary"))
     model_quality = _dict(context.get("modelQuality"))
-    lza_validation_summary = _dict(context.get("lzaValidationSummary"))
+    target_validation_summary = _dict(context.get("targetValidationSummary"))
+    target_validation_title = str(
+        context.get("targetValidationTitle", "Target Validation Evidence")
+    )
     policy_evidence_summary = _dict(context.get("policyEvidenceSummary"))
     target_capabilities = _dict(context.get("targetCapabilities"))
     target_capabilities_declared = bool(target_capabilities)
@@ -78,9 +81,17 @@ def render_review_html(context: dict[str, Any]) -> str:
                         str(review_summary.get("blockingContradictionCount", 0)),
                     ),
                     _kv("Contract status", str(review_summary.get("contractStatus", "unknown"))),
-                    _kv(
-                        "LZA validation",
-                        str(review_summary.get("lzaValidationStatus", "not-run")),
+                    *(
+                        [
+                            _kv(
+                                str(
+                                    review_summary.get("targetValidationLabel", "Target validation")
+                                ),
+                                str(review_summary.get("targetValidationStatus", "not-run")),
+                            )
+                        ]
+                        if target_validation_summary
+                        else []
                     ),
                     _kv(
                         "Policy evidence",
@@ -98,11 +109,11 @@ def render_review_html(context: dict[str, Any]) -> str:
                     *(
                         [
                             _kv(
-                                "LZA validation failure",
-                                str(review_summary.get("lzaValidationFailure", "")),
+                                "Target validation failure",
+                                str(review_summary.get("targetValidationFailure", "")),
                             )
                         ]
-                        if review_summary.get("lzaValidationFailure")
+                        if review_summary.get("targetValidationFailure")
                         else []
                     ),
                     _kv("Selected target path", summary_target_path),
@@ -173,29 +184,6 @@ def render_review_html(context: dict[str, Any]) -> str:
                 ],
             ),
             _section(
-                "Graph Review Artifacts",
-                [
-                    _link_list(
-                        [
-                            ("Bundle graph", str(graph_exports.get("bundleGraph", ""))),
-                            ("Graph roots", str(graph_exports.get("graphRoots", ""))),
-                            ("Impact report", str(graph_exports.get("impactReport", ""))),
-                            (
-                                "Graph impact matrix",
-                                str(graph_exports.get("graphImpactMatrix", "")),
-                            ),
-                            ("Graph find", str(graph_exports.get("graphFind", ""))),
-                            ("Graph path", str(graph_exports.get("graphPath", ""))),
-                            (
-                                "Graph neighborhood",
-                                str(graph_exports.get("graphNeighborhood", "")),
-                            ),
-                            ("Graph diff", str(graph_exports.get("graphDiff", ""))),
-                        ]
-                    ),
-                ],
-            ),
-            _section(
                 "Target Capability Graph",
                 _target_capability_section(
                     target_capabilities,
@@ -228,13 +216,19 @@ def render_review_html(context: dict[str, Any]) -> str:
                     ),
                 ],
             ),
-            _section(
-                "LZA Validation Evidence",
-                _lza_validation_section(
-                    lza_validation_summary,
-                    _dict(context.get("lzaValidationEvidence")),
-                    links.get("lzaValidation"),
-                ),
+            *(
+                [
+                    _section(
+                        target_validation_title,
+                        _target_validation_section(
+                            target_validation_summary,
+                            _dict(context.get("targetValidationEvidence")),
+                            links.get("targetValidation"),
+                        ),
+                    )
+                ]
+                if target_validation_summary
+                else []
             ),
             _section(
                 "Policy Graph And Shift-Left Evidence",
@@ -392,13 +386,13 @@ def _contract_table(results: list[Any]) -> str:
     return "<table>" + "".join(rows) + "</table>"
 
 
-def _lza_validation_section(
+def _target_validation_section(
     summary: dict[str, Any],
     evidence: dict[str, Any],
     evidence_link: Any,
 ) -> list[str]:
     if summary.get("status") == "not-run":
-        return ['<p class="muted">No LZA validation evidence found.</p>']
+        return ['<p class="muted">No target validation evidence found.</p>']
     return [
         _kv("Status", str(summary.get("status", "unknown"))),
         _kv("Exit code", str(summary.get("exitCode", "unknown"))),
@@ -421,8 +415,8 @@ def _lza_validation_section(
         _kv("Git commit", str(summary.get("gitCommit", "unknown"))),
         _kv("Source path", str(summary.get("sourcePath", ""))),
         *(
-            [_kv("AWS lookup boundary", str(summary.get("awsLookupBoundary", "")))]
-            if summary.get("awsLookupBoundary")
+            [_kv("Lookup boundary", str(summary.get("lookupBoundary", "")))]
+            if summary.get("lookupBoundary")
             else []
         ),
         *(
@@ -441,9 +435,9 @@ def _lza_validation_section(
             else []
         ),
         _kv("Command", str(summary.get("command", ""))),
-        _artifact_link_row("LZA validation evidence", evidence_link),
+        _artifact_link_row("Target validation evidence", evidence_link),
         _digest_table(_coerce_list(summary.get("configFileDigests"))),
-        _details("Raw LZA validation evidence", _yaml_dump(evidence)),
+        _details("Raw target validation evidence", _yaml_dump(evidence)),
     ]
 
 

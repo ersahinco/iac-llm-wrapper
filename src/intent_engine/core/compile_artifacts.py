@@ -126,7 +126,7 @@ def generate_validated_artifacts(
         dir=output_dir.parent,
     ) as staging:
         staging_dir = Path(staging)
-        generate_all(payload, staging_dir, pattern=pattern)
+        generate_all(payload, staging_dir)
         for name, data in (extra_artifacts or {}).items():
             write_intent_yaml_artifact(staging_dir, name, data)
         violations = artifact_contract_violations(staging_dir, pattern)

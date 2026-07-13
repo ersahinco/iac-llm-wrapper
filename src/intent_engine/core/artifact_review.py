@@ -3,21 +3,13 @@
 from __future__ import annotations
 
 import os
-import re
 from pathlib import Path
 from typing import Any
-
-from intent_engine.patterns.aws_lza.validation import (
-    LZA_VALIDATION_EVIDENCE,
-    summarize_lza_validation_output,
-)
 
 from .contract_validation import build_contract_validation
 from .patterns import GLOBAL_REGISTRY
 from .review_renderer import render_review_html as render_review_html_context
 from .yaml_utils import read_yaml_mapping
-
-_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def write_review_html(input_dir: Path, output: Path) -> None:
@@ -86,12 +78,23 @@ def build_review_context(
     blocking_contradictions = _trace_list(trace, "contradictions", "blocking")
     artifacts = _artifact_rows(input_dir, _artifact_names(input_dir, handoff, lineage))
     raw_evidence = _raw_evidence(trace)
-    lza_validation_evidence = _read_yaml(input_dir / LZA_VALIDATION_EVIDENCE)
-    lza_validation_summary = _lza_validation_summary(lza_validation_evidence)
+    pattern_name = str(report.get("pattern", handoff.get("pattern", "handoff")))
+    try:
+        pattern_obj = GLOBAL_REGISTRY.get(pattern_name)
+    except KeyError:
+        pattern_obj = None
+    target_validation = (
+        pattern_obj.review_evidence_loader(input_dir)
+        if pattern_obj is not None and pattern_obj.review_evidence_loader is not None
+        else {}
+    )
+    target_validation_summary = _dict(target_validation.get("summary"))
+    target_validation_evidence = _dict(target_validation.get("evidence"))
+    target_validation_artifact = str(target_validation.get("artifactName", ""))
     policy_evidence_summary = _policy_evidence_summary(policy_graph, shift_left_evidence)
 
     return {
-        "pattern": str(report.get("pattern", handoff.get("pattern", "handoff"))),
+        "pattern": pattern_name,
         "readiness": readiness,
         "reviewSummary": {
             "readiness": readiness.get("status", "unknown"),
@@ -105,8 +108,9 @@ def build_review_context(
             "allowedNextAction": readiness.get("allowedNextAction", ""),
             "modelQuality": model_quality,
             "modelParseErrorCount": model_quality.get("parseErrorCount", 0),
-            "lzaValidationStatus": lza_validation_summary.get("status", "not-run"),
-            "lzaValidationFailure": lza_validation_summary.get("failureExcerpt", ""),
+            "targetValidationLabel": str(target_validation.get("label", "Target validation")),
+            "targetValidationStatus": target_validation_summary.get("status", "not-run"),
+            "targetValidationFailure": target_validation_summary.get("failureExcerpt", ""),
             "policyPackCount": policy_evidence_summary.get("policyPackCount", 0),
             "policyEvidenceStatus": policy_evidence_summary.get("status", "not-run"),
             "failedPolicyControlCount": policy_evidence_summary.get("failedPolicyControlCount", 0),
@@ -127,8 +131,11 @@ def build_review_context(
         "contractValidation": _coerce_list(contract_validation.get("contracts")),
         "contractValidationArtifact": contract_validation,
         "contractStatus": contract_status,
-        "lzaValidationEvidence": lza_validation_evidence,
-        "lzaValidationSummary": lza_validation_summary,
+        "targetValidationTitle": str(
+            target_validation.get("sectionTitle", "Target Validation Evidence")
+        ),
+        "targetValidationEvidence": target_validation_evidence,
+        "targetValidationSummary": target_validation_summary,
         "policyGraph": policy_graph,
         "shiftLeftEvidence": shift_left_evidence,
         "policyEvidenceSummary": policy_evidence_summary,
@@ -139,7 +146,7 @@ def build_review_context(
             raw_evidence=raw_evidence,
             artifacts=artifacts,
             model_quality=model_quality,
-            lza_validation_summary=lza_validation_summary,
+            target_validation_summary=target_validation_summary,
             policy_evidence_summary=policy_evidence_summary,
         ),
         "artifacts": artifacts,
@@ -154,7 +161,13 @@ def build_review_context(
             "contractValidation": _href(link_base_dir, contract_validation_path)
             if contract_validation_path is not None
             else None,
-            "lzaValidation": _artifact_href(input_dir, link_base_dir, LZA_VALIDATION_EVIDENCE),
+            "targetValidation": _artifact_href(
+                input_dir,
+                link_base_dir,
+                target_validation_artifact,
+            )
+            if target_validation_artifact
+            else None,
             "policyGraph": _artifact_href(input_dir, link_base_dir, "policy-graph.yaml"),
             "shiftLeftEvidence": _artifact_href(
                 input_dir,
@@ -171,24 +184,14 @@ def build_review_context(
 
 
 def _existing_graph_exports(input_dir: Path) -> dict[str, str]:
-    exports: dict[str, str] = {}
-    if (input_dir / "requirement-graph.json").exists():
-        exports["json"] = "requirement-graph.json"
-    if (input_dir / "requirement-graph.mmd").exists():
-        exports["mermaid"] = "requirement-graph.mmd"
-    for key, name in {
-        "bundleGraph": "bundle-graph.yaml",
-        "graphRoots": "graph-roots.yaml",
-        "impactReport": "impact-report.yaml",
-        "graphImpactMatrix": "graph-impact-matrix.yaml",
-        "graphFind": "graph-find.yaml",
-        "graphPath": "graph-path.yaml",
-        "graphNeighborhood": "graph-neighborhood.yaml",
-        "graphDiff": "graph-diff.yaml",
-    }.items():
-        if (input_dir / name).exists():
-            exports[key] = name
-    return exports
+    return {
+        key: name
+        for key, name in {
+            "json": "requirement-graph.json",
+            "mermaid": "requirement-graph.mmd",
+        }.items()
+        if (input_dir / name).exists()
+    }
 
 
 def _relative_graph_exports(
@@ -324,24 +327,10 @@ def _markdown_contradiction_key(code: str, message: str) -> str:
 
 
 def _validator_code_key(pattern: str, code: str) -> str:
-    pattern_codes = {
-        "aws-lza": {
-            "AWS_LZA_SECURITY_OU_REQUIRED": "organizational_units",
-            "AWS_LZA_INFRASTRUCTURE_OU_REQUIRED": "organizational_units",
-            "AWS_LZA_WORKLOADS_OU_REQUIRED": "organizational_units",
-            "AWS_LZA_LOG_ARCHIVE_ACCOUNT_REQUIRED": "log_archive_account",
-            "AWS_LZA_AUDIT_ACCOUNT_REQUIRED": "audit_account",
-            "AWS_LZA_SECURITY_TOOLING_ACCOUNT_REQUIRED": "security_tooling_account",
-            "AWS_LZA_IDENTITY_CENTER_ADMIN_UNKNOWN": ("identity_center_delegated_admin_account"),
-            "AWS_LZA_IDENTITY_CENTER_ASSIGNMENT_FORMAT_INVALID": ("identity_center_assignments"),
-            "AWS_LZA_IDENTITY_CENTER_ASSIGNMENT_PERMISSION_SET_UNKNOWN": (
-                "identity_center_assignments"
-            ),
-            "AWS_LZA_IDENTITY_CENTER_ASSIGNMENT_ACCOUNT_UNKNOWN": ("identity_center_assignments"),
-            "AWS_LZA_HOME_REGION_NOT_ENABLED": "enabled_regions",
-        }
-    }
-    return pattern_codes.get(pattern, {}).get(code, "")
+    try:
+        return GLOBAL_REGISTRY.get(pattern).violation_requirement_map.get(code, "")
+    except KeyError:
+        return ""
 
 
 def _resolution_type(code: str, key: str, conflicting_codes: set[str]) -> str:
@@ -448,46 +437,6 @@ def _raw_evidence(trace: dict[str, Any]) -> str:
     return f"{status} ({path})" if path else str(status)
 
 
-def _lza_validation_summary(evidence: dict[str, Any]) -> dict[str, Any]:
-    if not evidence:
-        return {"status": "not-run", "configFileDigests": []}
-    command = _dict(evidence.get("command"))
-    source = _dict(evidence.get("lzaSource"))
-    input_block = _dict(evidence.get("input"))
-    boundary = _dict(evidence.get("boundary"))
-    status = str(evidence.get("status", "unknown"))
-    exit_code = _exit_code(command.get("exitCode"), status=status)
-    diagnostic = _dict(evidence.get("diagnostic")) or summarize_lza_validation_output(
-        exit_code=exit_code,
-        stdout=str(command.get("stdout", "") or ""),
-        stderr=str(command.get("stderr", "") or ""),
-    )
-    argv = command.get("argv")
-    command_text = " ".join(str(item) for item in argv) if isinstance(argv, list) else ""
-    failure_excerpt = (
-        str(diagnostic.get("summary") or _lza_validation_failure_excerpt(command))
-        if status != "pass"
-        else ""
-    )
-    return {
-        "status": status,
-        "exitCode": str(command.get("exitCode", "unknown")),
-        "command": command_text,
-        "sourcePath": str(source.get("requestedPath", "")),
-        "sourceCwd": str(source.get("commandWorkingDirectory", "")),
-        "packageVersion": str(source.get("packageVersion", "unknown")),
-        "gitCommit": str(source.get("gitCommit") or "unknown"),
-        "awsLookupBoundary": _aws_lookup_boundary(boundary),
-        "stagingBoundary": str(input_block.get("stagingBoundary", "")),
-        "commandReplayable": command.get("replayable", "unknown"),
-        "commandReplayBoundary": str(command.get("replayBoundary", "")),
-        "diagnosticCategory": str(diagnostic.get("category", "")),
-        "diagnosticNextAction": str(diagnostic.get("nextAction", "")),
-        "failureExcerpt": failure_excerpt,
-        "configFileDigests": _coerce_list(input_block.get("configFileDigests")),
-    }
-
-
 def _policy_evidence_summary(
     policy_graph: dict[str, Any],
     shift_left_evidence: dict[str, Any],
@@ -546,44 +495,6 @@ def _policy_evidence_summary(
     }
 
 
-def _aws_lookup_boundary(boundary: dict[str, Any]) -> str:
-    explicit = boundary.get("awsAccountLookupBoundary")
-    if explicit:
-        return str(explicit)
-    if boundary.get("readOnlyAwsAccountLookupMayOccur") is True:
-        return (
-            "The official AWS LZA validator may perform read-only account lookup "
-            "through the provided AWS/LZA context."
-        )
-    return ""
-
-
-def _exit_code(value: Any, *, status: str) -> int:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return 0 if status == "pass" else 1
-
-
-def _lza_validation_failure_excerpt(command: dict[str, Any]) -> str:
-    text = "\n".join(str(command.get(key, "") or "") for key in ("stdout", "stderr"))
-    lines = [_ANSI_ESCAPE_RE.sub("", line).strip() for line in text.splitlines()]
-    for line in lines:
-        if "Default email" in line:
-            return line[line.find("Default email") :]
-    for line in lines:
-        if "AccessDeniedException" in line:
-            return line[line.find("AccessDeniedException") :]
-    for line in lines:
-        if " has " in line and " issues:" in line:
-            return line.rsplit("|", 1)[-1].strip()
-    for line in lines:
-        clean = _ANSI_ESCAPE_RE.sub("", line).strip()
-        if "Config file validation failed" in clean:
-            return "Config file validation failed."
-    return ""
-
-
 def _reviewer_next_actions(
     *,
     readiness: dict[str, Any],
@@ -591,7 +502,7 @@ def _reviewer_next_actions(
     raw_evidence: str,
     artifacts: list[dict[str, str]],
     model_quality: dict[str, Any],
-    lza_validation_summary: dict[str, Any],
+    target_validation_summary: dict[str, Any],
     policy_evidence_summary: dict[str, Any],
 ) -> list[str]:
     status = str(readiness.get("status", "unknown"))
@@ -621,11 +532,16 @@ def _reviewer_next_actions(
                 + ", ".join(missing_artifacts)
                 + ".",
             )
-    if str(lza_validation_summary.get("status", "not-run")) == "fail":
+    if str(target_validation_summary.get("status", "not-run")) == "fail":
         actions.insert(
             0,
-            "Do not claim downstream AWS LZA validation until lza-validation-evidence.yaml "
-            "failures are resolved.",
+            str(
+                target_validation_summary.get("failureAction")
+                or (
+                    "Resolve target validation evidence failures before claiming "
+                    "downstream validation."
+                )
+            ),
         )
     policy_status = str(policy_evidence_summary.get("status", "not-run"))
     if int(policy_evidence_summary.get("policyPackCount", 0) or 0):

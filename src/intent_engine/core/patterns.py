@@ -11,14 +11,17 @@ from typing import Any
 from pydantic import BaseModel
 
 from .contracts import CORE_CONTRACTS, ContractValidator, TargetContract
-from .module_mapping import ModuleInputs
+from .module_mapping import IaCIntentPayload, ModuleInputs
 from .policy import PolicyPack
 from .requirements import RequirementGraph
 from .sample_config import SampleConfig, SampleMatch, find_best_sample_matches, find_samples
 
-GeneratorFn = Callable[[Any, Path], None]
+GeneratorFn = Callable[[IaCIntentPayload, Path], None]
 TargetReportBuilder = Callable[[dict[str, Any], str], dict[str, Any]]
 ReadinessEnricher = Callable[[Any, dict[str, Any]], dict[str, Any]]
+MarkdownEntityExtractor = Callable[[str], dict[str, list[dict[str, Any]]]]
+EntityApplier = Callable[[dict[str, Any], Any], None]
+ReviewEvidenceLoader = Callable[[Path], dict[str, Any]]
 
 
 @dataclass
@@ -37,8 +40,7 @@ class Pattern:
     name: str
     description: str
     graph_factory: Callable[[], RequirementGraph]
-    # Intent model factory — the Pydantic model that this pattern produces
-    intent_factory: Callable[[], BaseModel] = field(default_factory=lambda: lambda: BaseModel())
+    intent_factory: type[BaseModel]
     # Domain context injected into LLM prompts
     prompt_context: str = ""
     # Section mapping for template generation: key -> (section, field_name)
@@ -63,14 +65,22 @@ class Pattern:
     target_report_builder: TargetReportBuilder | None = None
     # Optional pattern-owned readiness details such as plan maturity.
     readiness_enricher: ReadinessEnricher | None = None
+    # Optional pattern-owned structured entity recovery.
+    markdown_entity_extractor: MarkdownEntityExtractor | None = None
+    markdown_entity_applier: EntityApplier | None = None
+    llm_entity_applier: EntityApplier | None = None
+    review_evidence_loader: ReviewEvidenceLoader | None = None
+    violation_requirement_map: dict[str, str] = field(default_factory=dict)
+    artifact_review_owners: dict[str, str] = field(default_factory=dict)
+    reconfirmation_categories: tuple[str, ...] = ()
+    reconfirmation_keys: tuple[str, ...] = ()
+    forbidden_artifacts: tuple[str, ...] = ()
     # Whether this pattern emits a registered target plan-ready metadata bundle.
     plan_ready: bool = False
 
     def create_graph(self) -> RequirementGraph:
         graph = self.graph_factory()
-        model = self.intent_factory
-        if isinstance(model, type) and issubclass(model, BaseModel):
-            graph._intent_model = model
+        graph._intent_model = self.intent_factory
         return graph
 
     def expected_artifacts(self) -> list[str]:
@@ -123,16 +133,7 @@ class PatternRegistry:
         from .model_introspection import validate_requirement_against_model
 
         model = pattern.intent_factory
-        if not isinstance(model, type):
-            return
-        if not issubclass(model, BaseModel):
-            return
-
-        try:
-            graph = pattern.create_graph()
-        except NameError:
-            # Graph factory depends on not-yet-loaded symbols during import.
-            return
+        graph = pattern.create_graph()
 
         errors: list[str] = []
         for req in graph._requirements.values():
@@ -157,6 +158,22 @@ class PatternRegistry:
                             f"Policy pack '{pack.name}' control '{control.id}': "
                             f"unknown target contract '{contract_name}'"
                         )
+        for code, requirement_key in pattern.violation_requirement_map.items():
+            if requirement_key not in known_requirements:
+                errors.append(
+                    f"Violation mapping '{code}': unknown requirement '{requirement_key}'"
+                )
+        for requirement_key in pattern.reconfirmation_keys:
+            if requirement_key not in known_requirements:
+                errors.append(f"Reconfirmation key '{requirement_key}' is not a requirement")
+        known_artifacts = {
+            artifact.name for contract in pattern.contracts for artifact in contract.artifacts
+        }
+        for artifact_name in pattern.artifact_review_owners:
+            if artifact_name not in known_artifacts:
+                errors.append(
+                    f"Artifact owner mapping references unknown artifact '{artifact_name}'"
+                )
         if errors:
             msg = "Pattern '{}' schema validation failed:\n  - {}".format(
                 pattern.name, "\n  - ".join(errors)

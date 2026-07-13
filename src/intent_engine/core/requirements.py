@@ -203,23 +203,12 @@ class Requirement:
     cascade: dict[str, str] = field(default_factory=dict)
     category: str = "general"
     hint: str | None = None
-    why_applies: str | None = None
-    why_blocked: str | None = None
     # Model-driven mapping: which intent model field this node maps to -------
     target_field: str | None = None  # dotted path: "network.cidr", "security.enabled"
     target_type: str = "string"  # string, int, bool, float, *_list, or enum name
-    # Well-Architected mapping ------------------------------------------------
-    wa_pillars: list[str] = field(default_factory=list)
-    # Knowledge fields ---------------------------------------------------------
     compliance_controls: list[str] = field(default_factory=list)
-    enterprise_standards: list[str] = field(default_factory=list)
     signals: list[str] = field(default_factory=list)
     tradeoffs: list[str] = field(default_factory=list)
-    alternatives: list[str] = field(default_factory=list)
-    consequences: list[str] = field(default_factory=list)
-    experience_notes: list[str] = field(default_factory=list)
-    confidence: float = 1.0  # confidence in default (0-1)
-    overridable: bool = True  # can experience override default
     # Validation metadata ------------------------------------------------------
     required_when_applicable: bool = True  # fail-closed if applicable but unset
     violation_code: str | None = None  # e.g. HUB_SPOKE_NETWORK_ACCOUNT_REQUIRED
@@ -229,20 +218,16 @@ class Requirement:
 class RequirementGraph:
     """Tracks requirements, their dependencies, and resolution status."""
 
-    def __init__(self, intent_model: Any = None) -> None:
+    def __init__(self) -> None:
         self._edges: list[tuple[str, str]] = []
         self._edge_set: set[tuple[str, str]] = set()
         self._requirements: dict[str, Requirement] = {}
         self._decisions: dict[str, str] = {}
         self._status: dict[str, RequirementStatus] = {}
         self._audit_log: list[dict[str, Any]] = []
-        # Optional intent model for auto-deriving target_field/target_type
-        self._intent_model = intent_model
+        self._intent_model: Any = None
 
     def add(self, req: Requirement) -> None:
-        # Auto-derive target_field/target_type from model when not provided
-        if self._intent_model is not None:
-            self._auto_derive_requirement(req)
         self._requirements[req.key] = req
         for dep in self._ordering_dependencies(req):
             self._add_edge(dep, req.key)
@@ -329,36 +314,6 @@ class RequirementGraph:
         deps.extend(expression_dependencies(req.applies_when))
         deps.extend(expression_dependencies(req.blocked_when))
         return list(dict.fromkeys(dep for dep in deps if dep != req.key))
-
-    def _auto_derive_requirement(self, req: Requirement) -> None:
-        """Auto-populate target_field and target_type from the intent model."""
-        from .model_introspection import derive_target_type, discover_model_fields
-
-        model = self._intent_model
-        if model is None or not isinstance(model, type):
-            return
-
-        # If target_field is not set, try to discover it from the model
-        if req.target_field is None:
-            discovered = discover_model_fields(model)
-            if req.key in discovered:
-                req.target_field = discovered[req.key][0]
-
-        # If target_type is not set (or is generic "string"), derive from annotation
-        if req.target_field and (not req.target_type or req.target_type == "string"):
-            try:
-                from .model_introspection import resolve_field_info
-
-                _, annotation = resolve_field_info(model, req.target_field)
-                req.target_type = derive_target_type(annotation)
-            except Exception:
-                pass
-
-        # Auto-generate label/question from key if not provided
-        if not req.label:
-            req.label = req.key.replace("_", " ").title()
-        if not req.question:
-            req.question = f"What is the {req.label.lower()}?"
 
     def _audit(self, key: str, value: str, how: str, reason: str | None = None) -> None:
         from datetime import datetime
@@ -458,9 +413,9 @@ class RequirementGraph:
         for condition_key, blocking_values in req.blocked_if.items():
             if self._decisions.get(condition_key) in blocking_values:
                 cond_val = self._decisions.get(condition_key, "(undecided)")
-                return req.why_blocked or f"Blocked when {condition_key}={cond_val}"
+                return f"Blocked when {condition_key}={cond_val}"
         if req.blocked_when is not None and evaluate_expression(req.blocked_when, self._decisions):
-            return req.why_blocked or f"Blocked when {describe_expression(req.blocked_when)}"
+            return f"Blocked when {describe_expression(req.blocked_when)}"
         return None
 
     def is_applicable_reason(self, key: str) -> str | None:
@@ -474,14 +429,12 @@ class RequirementGraph:
             if actual is None:
                 return None
             if actual not in triggering_values:
-                return req.why_applies or f"Not applicable when {condition_key}={actual}"
+                return f"Not applicable when {condition_key}={actual}"
         if req.applies_when is not None and not evaluate_expression(
             req.applies_when,
             self._decisions,
         ):
-            return req.why_applies or (
-                f"Not applicable unless {describe_expression(req.applies_when)}"
-            )
+            return f"Not applicable unless {describe_expression(req.applies_when)}"
         return None
 
     def pending(self) -> list[str]:

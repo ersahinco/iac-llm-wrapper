@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, Field
-
-FrameworkLabel = Literal["SOC2", "PCI", "HIPAA", "NIST"]
 
 
 class PolicyCheckRef(BaseModel):
@@ -90,25 +88,6 @@ def policy_pack_inventory(packs: Iterable[PolicyPack]) -> list[dict[str, Any]]:
             }
         )
     return inventory
-
-
-def select_policy_packs(
-    available: Iterable[PolicyPack],
-    requested_names: Iterable[str] | None,
-) -> tuple[list[PolicyPack], list[str]]:
-    available_by_name = {pack.name: pack for pack in available}
-    requested = [name for name in (requested_names or []) if name]
-    if not requested:
-        return list(available_by_name.values()), []
-    selected: list[PolicyPack] = []
-    missing: list[str] = []
-    for name in requested:
-        pack = available_by_name.get(name)
-        if pack is None:
-            missing.append(name)
-        elif pack not in selected:
-            selected.append(pack)
-    return selected, missing
 
 
 def map_findings_to_controls(

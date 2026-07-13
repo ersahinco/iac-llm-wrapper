@@ -88,6 +88,9 @@ def build_battle_summary(
     repo_root: Path,
     git_commit: str,
 ) -> dict[str, Any]:
+    from .patterns import GLOBAL_REGISTRY
+
+    pattern = GLOBAL_REGISTRY.get(case.pattern)
     trace = load_optional_yaml(output_dir / "llm-trace-summary.yaml")
     validation = load_optional_yaml(output_dir / "contract-validation.yaml")
     handoff = load_optional_yaml(output_dir / "handoff-plan.yaml")
@@ -128,14 +131,17 @@ def build_battle_summary(
     contradictions = trace.get("contradictions", {})
     if not isinstance(accepted, dict) or not accepted:
         findings.append(_finding("fail", "extraction", "No accepted decisions captured."))
-    if case.pattern == "aws-lza" and isinstance(accepted, dict):
-        missing = sorted(key for key in _AWS_LZA_REQUIRED_KEYS if key not in accepted)
+    if isinstance(accepted, dict):
+        required_decisions = {
+            key for contract in pattern.contracts for key in contract.required_decisions
+        }
+        missing = sorted(key for key in required_decisions if key not in accepted)
         if missing and expected_pass:
             findings.append(
                 _finding(
                     "fail",
                     "extraction",
-                    f"Required enterprise decisions missing: {', '.join(missing)}.",
+                    f"Required target decisions missing: {', '.join(missing)}.",
                 )
             )
     if isinstance(raw_llm, dict):
@@ -221,16 +227,15 @@ def build_battle_summary(
                     _finding("fail", "handoff", f"Review page missing section: {marker}.")
                 )
 
-    if case.pattern == "aws-lza":
-        for forbidden in ("terraform.tfvars", "main.tf", "terragrunt.hcl"):
-            if (output_dir / forbidden).exists():
-                findings.append(
-                    _finding(
-                        "fail",
-                        "safety",
-                        f"Unexpected deployable scaffold emitted: {forbidden}.",
-                    )
+    for forbidden in pattern.forbidden_artifacts:
+        if (output_dir / forbidden).exists():
+            findings.append(
+                _finding(
+                    "fail",
+                    "safety",
+                    f"Unexpected forbidden artifact emitted: {forbidden}.",
                 )
+            )
     if use_llm and not (output_dir / "raw-evidence.yaml").exists():
         findings.append(_finding("fail", "safety", "Raw LLM evidence was not preserved."))
 
@@ -283,13 +288,6 @@ def build_battle_summary(
             dict(item) for item in findings if item["type"] in {"improvement", "expected-weakness"}
         ],
     }
-
-
-_AWS_LZA_REQUIRED_KEYS = {
-    "network_account",
-    "identity_center_permission_sets",
-    "identity_center_assignments",
-}
 
 
 def _artifact_status(output_dir: Path, expected_artifacts: tuple[str, ...]) -> list[dict[str, str]]:

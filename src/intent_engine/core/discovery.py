@@ -23,14 +23,6 @@ class RequirementGap:
 
 
 @dataclass
-class Ambiguity:
-    key: str
-    label: str
-    reason: str
-    clarification: str
-
-
-@dataclass
 class Inconsistency:
     key_a: str
     key_b: str
@@ -47,35 +39,15 @@ class DetectedSignal:
 @dataclass
 class DiscoveryResult:
     missing: list[RequirementGap] = field(default_factory=list)
-    ambiguous: list[Ambiguity] = field(default_factory=list)
     inconsistent: list[Inconsistency] = field(default_factory=list)
     signals: list[DetectedSignal] = field(default_factory=list)
     synced: list[str] = field(default_factory=list)
 
     def is_complete(self) -> bool:
-        return len(self.missing) == 0 and len(self.ambiguous) == 0 and len(self.inconsistent) == 0
+        return not self.missing and not self.inconsistent
 
     def total_gaps(self) -> int:
-        return len(self.missing) + len(self.ambiguous) + len(self.inconsistent)
-
-    def summarize(self) -> dict[str, Any]:
-        missing_by_priority: dict[int, list[str]] = {}
-        for gap in self.missing:
-            missing_by_priority.setdefault(gap.priority, []).append(gap.label)
-
-        return {
-            "complete": self.is_complete(),
-            "total_gaps": self.total_gaps(),
-            "missing_count": len(self.missing),
-            "ambiguous_count": len(self.ambiguous),
-            "inconsistent_count": len(self.inconsistent),
-            "missing_by_priority": missing_by_priority,
-            "top_priority_gaps": [
-                {"key": g.key, "label": g.label, "reason": g.reason, "suggestion": g.suggestion}
-                for g in self.missing
-                if g.priority == 1
-            ],
-        }
+        return len(self.missing) + len(self.inconsistent)
 
 
 class DiscoveryEngine:
@@ -174,8 +146,8 @@ class DiscoveryEngine:
 
         result.synced = self.sync_intent_to_graph(intent)
         self._check_graph_gaps(result)
-        self._check_cross_field_consistency(intent, result)
-        self._detect_signals(intent, text, result)
+        self._check_cross_field_consistency(result)
+        self._detect_signals(text, result)
 
         result.missing.sort(key=lambda x: x.priority)
         return result
@@ -205,7 +177,7 @@ class DiscoveryEngine:
                 )
             )
 
-    def _check_cross_field_consistency(self, intent: Any, result: DiscoveryResult) -> None:
+    def _check_cross_field_consistency(self, result: DiscoveryResult) -> None:
         """Check for inconsistencies between intent fields.
 
         Checks graph relationships that are violated by intent values.
@@ -264,7 +236,7 @@ class DiscoveryEngine:
                     )
                 )
 
-    def _detect_signals(self, intent: Any, text: str, result: DiscoveryResult) -> None:
+    def _detect_signals(self, text: str, result: DiscoveryResult) -> None:
         """Detect migration/compliance signals in design doc text.
 
         Uses graph metadata (signals field on requirements) to auto-detect
@@ -281,22 +253,6 @@ class DiscoveryEngine:
                 req_by_signal.setdefault(sig, []).append(key)
                 keywords = sig.replace("-", " ").replace("_", " ").split()
                 signal_keywords.setdefault(sig, []).extend(keywords)
-                if sig == "on-prem-ad":
-                    signal_keywords[sig].extend(["active directory", "ad domain"])
-                elif sig == "mpls":
-                    signal_keywords[sig].extend(["mpls", "direct connect"])
-                elif sig == "pci-scope":
-                    signal_keywords[sig].extend(["pci", "compliance scope", "regulated"])
-                elif sig == "regulated-industry":
-                    signal_keywords[sig].extend(["regulated", "compliance", "pci", "sox", "hipaa"])
-                elif sig == "sap-workload":
-                    signal_keywords[sig].extend(["sap", "s/4hana", "sap hana", "sap ecc"])
-                elif sig == "oracle-workload":
-                    signal_keywords[sig].extend(["oracle", "oracle database", "oracle ebs"])
-                elif sig == "mainframe-integration":
-                    signal_keywords[sig].extend(["mainframe", "z/os", "zos", "cobol", "cics"])
-                elif sig == "multi-cloud":
-                    signal_keywords[sig].extend(["multi-cloud", "multicloud", "gcp", "azure"])
 
         for sig, keywords in signal_keywords.items():
             if any(kw in text_lower for kw in keywords):
@@ -338,7 +294,6 @@ class DiscoveryEngine:
 
 def generate_clarifying_questions(
     result: DiscoveryResult,
-    intent: Any,
     graph: RequirementGraph | None = None,
 ) -> list[dict[str, Any]]:
     """Convert discovery result into structured clarifying questions for LLM or UI.
@@ -372,22 +327,9 @@ def generate_clarifying_questions(
                 question["context"] = req.hint
             if req.default:
                 question["default"] = req.default
-            if req.wa_pillars:
-                question["wa_pillars"] = req.wa_pillars
             if req.compliance_controls:
                 question["compliance_controls"] = req.compliance_controls
 
         questions.append(question)
-
-    for amb in result.ambiguous:
-        questions.append(
-            {
-                "key": amb.key,
-                "label": amb.label,
-                "question": f"Clarify: {amb.clarification}",
-                "reason": amb.reason,
-                "type": "clarify",
-            }
-        )
 
     return questions

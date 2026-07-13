@@ -33,7 +33,6 @@ class TestCLIDiscover:
                 "--input",
                 "fixtures/usability/architect-incomplete-lza.md",
                 "--no-llm",
-                "--suggest",
             ],
         )
         assert result.exit_code == 0, result.output
@@ -49,22 +48,6 @@ class TestCLIDiscover:
         assert result.output.count("  [1] ") == 1
         assert "[network_account] Which account owns shared networking?" in result.output
         assert "[network_account]What" not in result.output
-
-    def test_discover_with_path(self):
-        result = runner.invoke(
-            app,
-            [
-                "discover",
-                "--input",
-                "fixtures/usability/engineer-handoff-lza.md",
-                "--no-llm",
-                "--path",
-            ],
-        )
-        assert result.exit_code == 0, result.output
-        assert "Next Steps" in result.output
-        assert "--no-raw-evidence" in result.output
-        assert "network_account" in result.output
 
     def test_discover_with_decisions_shows_simulated_values(self):
         result = runner.invoke(

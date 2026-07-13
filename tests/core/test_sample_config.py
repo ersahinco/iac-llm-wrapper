@@ -85,47 +85,6 @@ class TestSampleConfig:
         )
         assert cfg.fixture_name == "custom-fixture"
 
-    def test_diff_identical(self):
-        cfg = SampleConfig(
-            name="test",
-            pattern="test-pattern",
-            version="1.0.0",
-            release_date="2025-01-01",
-            source_url="https://example.com",
-            decisions={"a": "x", "b": "y"},
-        )
-        changes = cfg.diff({"a": "x", "b": "y"})
-        assert changes == {}
-
-    def test_diff_different(self):
-        cfg = SampleConfig(
-            name="test",
-            pattern="test-pattern",
-            version="1.0.0",
-            release_date="2025-01-01",
-            source_url="https://example.com",
-            decisions={"a": "x", "b": "y"},
-        )
-        changes = cfg.diff({"a": "z"})
-        assert "a" in changes
-        assert changes["a"]["sample"] == "x"
-        assert changes["a"]["current"] == "z"
-        assert "b" in changes
-        assert changes["b"]["current"] is None
-
-    def test_diff_missing_key(self):
-        cfg = SampleConfig(
-            name="test",
-            pattern="test-pattern",
-            version="1.0.0",
-            release_date="2025-01-01",
-            source_url="https://example.com",
-            decisions={"a": "x"},
-        )
-        changes = cfg.diff({"b": "y"})
-        assert "a" in changes
-        assert changes["a"]["current"] is None
-
 
 class TestSampleConfigQueries:
     def test_find_samples_sorts_by_name(self):

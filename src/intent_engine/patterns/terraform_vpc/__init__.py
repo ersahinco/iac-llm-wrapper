@@ -32,11 +32,13 @@ from intent_engine.core.yaml_utils import write_yaml_artifact
 from .models import TerraformVpcIntent
 
 
-def _intent(payload: Any) -> TerraformVpcIntent | None:
+def _intent(payload: Any) -> TerraformVpcIntent:
     intent = getattr(payload, "intent", payload)
-    if isinstance(intent, TerraformVpcIntent):
-        return intent
-    return None
+    if not isinstance(intent, TerraformVpcIntent):
+        raise TypeError(
+            f"Terraform VPC generator requires TerraformVpcIntent, got {type(intent).__name__}."
+        )
+    return intent
 
 
 def _graph_factory() -> RequirementGraph:
@@ -386,8 +388,6 @@ _REGULATED_VPC_POLICY_PACK = PolicyPack(
 
 def _validate_intent(intent: Any) -> list[Violation]:
     model = _intent(intent)
-    if model is None:
-        return []
     violations: list[Violation] = []
     if len(model.public_subnet_cidrs) != model.az_count:
         violations.append(
@@ -413,8 +413,6 @@ def _az_names(region: str, az_count: int) -> list[str]:
 
 def map_terraform_vpc_modules(intent: Any) -> list[ModuleInputs]:
     model = _intent(intent)
-    if model is None:
-        return []
     return [
         ModuleInputs(
             module_name="terraform-aws-vpc",
@@ -435,8 +433,6 @@ def map_terraform_vpc_modules(intent: Any) -> list[ModuleInputs]:
 def gen_decision_report(intent: Any, output_dir: Path) -> None:
     readiness = getattr(intent, "handoff_readiness", {})
     model = _intent(intent)
-    if model is None:
-        return
     data = {
         "pattern": "terraform-vpc",
         "vpc": {
@@ -505,6 +501,7 @@ GLOBAL_REGISTRY.register(
         validators=[_validate_intent],
         contracts=[_CONTRACT],
         policy_packs=[_REGULATED_VPC_POLICY_PACK],
+        reconfirmation_categories=("network",),
         samples=[
             SampleConfig(
                 name="terraform-vpc-basic-v1",
@@ -520,7 +517,7 @@ GLOBAL_REGISTRY.register(
                     "vpc_name": "orders-vpc",
                     "primary_region": "eu-central-1",
                     "cidr": "10.30.0.0/16",
-                    "az_count": "2",
+                    "az_count": 2,
                     "public_subnet_cidrs": "10.30.0.0/24,10.30.1.0/24",
                     "private_subnet_cidrs": "10.30.10.0/24,10.30.11.0/24",
                     "enable_nat_gateway": "true",

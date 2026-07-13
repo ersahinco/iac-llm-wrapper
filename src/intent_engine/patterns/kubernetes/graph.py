@@ -5,8 +5,8 @@ from __future__ import annotations
 from intent_engine.core.requirements import Requirement, RequirementGraph
 
 K8S_SECTION_MAP: dict[str, tuple[str, str | None]] = {
-    "cluster_name": ("Cluster", "name"),
-    "cluster_version": ("Cluster", "version"),
+    "cluster_name": ("Cluster", "cluster_name"),
+    "cluster_version": ("Cluster", "cluster_version"),
     "network_policy_enabled": ("Network", "network_policy_enabled"),
     "pod_cidr": ("Network", "pod_cidr"),
     "service_cidr": ("Network", "service_cidr"),
@@ -23,15 +23,6 @@ K8S_SECTION_ORDER = [
     "Node Pools",
     "Namespaces",
 ]
-
-K8S_FREE_FORM_EXAMPLES: dict[str, list[str]] = {
-    "Node Pools": [
-        "primary: instance_type=t3.large, min_size=2, max_size=5",
-    ],
-    "Namespaces": [
-        "production: labels=env=prod,team=platform",
-    ],
-}
 
 
 def build_k8s_graph() -> RequirementGraph:

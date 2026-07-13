@@ -84,7 +84,7 @@ def build_aws_lza_semantic_model(intent: AwsLzaIntent) -> SemanticModel:
                 ),
                 properties={
                     "principal": assignment.principal,
-                    "principalType": assignment.principal_type,
+                    "principalType": "GROUP",
                     "permissionSet": assignment.permission_set,
                     "targetAccount": assignment.target_account,
                 },
@@ -165,6 +165,9 @@ def _constraints(
     account_names = {item.name for item in accounts}
     account_ous = {item.name: item.ou for item in accounts}
     permission_set_names = {item.name for item in permission_sets}
+    workload_ous = {
+        account_ous.get(account_name, _WORKLOADS_OU) for account_name in intent.workload_accounts
+    }
     constraints = [
         _constraint(
             key="security-ou-present",
@@ -188,16 +191,22 @@ def _constraints(
             message="Hub-spoke topology requires an Infrastructure OU for the network account.",
         ),
         _constraint(
-            key="workload-accounts-workloads-ou",
-            label="Workload accounts have Workloads OU",
+            key="workload-account-ous-exist",
+            label="Workload account OUs exist",
             expression={
                 "applies_when": {"present": {"decision": "workload_accounts"}},
-                "requires_entity": {"kind": "OU", "name": _WORKLOADS_OU},
+                "requires_entity": {"kind": "OU", "names": sorted(workload_ous)},
             },
-            passed=not intent.workload_accounts or _WORKLOADS_OU in ou_names,
-            evidence=f"workload_accounts={intent.workload_accounts}; ous={sorted(ou_names)}",
+            passed=workload_ous.issubset(ou_names),
+            evidence=(
+                f"workload_accounts={intent.workload_accounts}; "
+                f"required_ous={sorted(workload_ous)}; ous={sorted(ou_names)}"
+            ),
             code="AWS_LZA_WORKLOADS_OU_REQUIRED",
-            message="Workload accounts require a Workloads OU in organization-config.yaml.",
+            message=(
+                "Workload account OU placements must reference organizational units "
+                "defined in organization-config.yaml."
+            ),
         ),
         _constraint(
             key="centralized-logging-log-archive-account",
@@ -302,7 +311,7 @@ def _constraints(
                         "format": "Principal:PermissionSet:Account",
                     }
                 },
-                passed=len(parts) >= 3,
+                passed=len(parts) == 3 and all(parts),
                 evidence=raw_assignment,
                 code="AWS_LZA_IDENTITY_CENTER_ASSIGNMENT_FORMAT_INVALID",
                 message=(
@@ -310,7 +319,7 @@ def _constraints(
                 ),
             )
         )
-        if len(parts) < 3:
+        if len(parts) != 3 or not all(parts):
             continue
         constraints.append(
             _constraint(
@@ -449,10 +458,7 @@ def _account_conflict_constraints(intent: AwsLzaIntent) -> list[PredicateConstra
 
 
 def _permission_sets(intent: AwsLzaIntent) -> list[LzaPermissionSet]:
-    items = [
-        *(LzaPermissionSet(name=name) for name in intent.identity_center_permission_sets),
-        *intent.permission_sets,
-    ]
+    items = [LzaPermissionSet(name=name) for name in intent.identity_center_permission_sets]
     return _dedupe_by_name(item for item in items if item.name.strip())
 
 
@@ -460,7 +466,7 @@ def _assignments(intent: AwsLzaIntent) -> list[LzaIdentityCenterAssignment]:
     parsed = []
     for raw_assignment in intent.identity_center_assignments:
         parts = _assignment_parts(raw_assignment)
-        if len(parts) < 3:
+        if len(parts) != 3 or not all(parts):
             continue
         parsed.append(
             LzaIdentityCenterAssignment(
@@ -469,7 +475,6 @@ def _assignments(intent: AwsLzaIntent) -> list[LzaIdentityCenterAssignment]:
                 target_account=parts[2],
             )
         )
-    parsed.extend(intent.assignments)
     return parsed
 
 
@@ -483,7 +488,6 @@ def _controls(intent: AwsLzaIntent) -> list[LzaControl]:
             enabled=str(intent.compliance_overlay) != "none",
             category="compliance",
         ),
-        *intent.controls,
     ]
     return _dedupe_by_name(items)
 
@@ -510,7 +514,7 @@ def _constraint(
 
 
 def _assignment_parts(value: str) -> list[str]:
-    return [part.strip() for part in value.split(":") if part.strip()]
+    return [part.strip() for part in value.split(":")]
 
 
 def _assignment_key(assignment: LzaIdentityCenterAssignment) -> str:

@@ -48,8 +48,6 @@ def gen_lza_target_capability_graph(intent: Any, output_dir: Path) -> None:
 
 def gen_lza_organization_config(intent: Any, output_dir: Path) -> None:
     intent = _aws_lza_intent(intent)
-    if intent is None:
-        return
     data = {
         "enable": True,
         "organizationalUnits": [{"name": name} for name in intent.organizational_units],
@@ -62,8 +60,6 @@ def gen_lza_organization_config(intent: Any, output_dir: Path) -> None:
 
 def gen_lza_accounts_config(intent: Any, output_dir: Path) -> None:
     intent = _aws_lza_intent(intent)
-    if intent is None:
-        return
     _write_yaml(
         output_dir,
         "accounts-config.yaml",
@@ -76,8 +72,6 @@ def gen_lza_accounts_config(intent: Any, output_dir: Path) -> None:
 
 def gen_lza_global_config(intent: Any, output_dir: Path) -> None:
     intent = _aws_lza_intent(intent)
-    if intent is None:
-        return
     data = {
         "homeRegion": intent.home_region,
         "enabledRegions": intent.enabled_regions,
@@ -114,8 +108,6 @@ def gen_lza_global_config(intent: Any, output_dir: Path) -> None:
 
 def gen_lza_security_config(intent: Any, output_dir: Path) -> None:
     intent = _aws_lza_intent(intent)
-    if intent is None:
-        return
     data = {
         "homeRegion": intent.home_region,
         "accessAnalyzer": {"enable": True},
@@ -158,8 +150,6 @@ def gen_lza_security_config(intent: Any, output_dir: Path) -> None:
 
 def gen_lza_iam_config(intent: Any, output_dir: Path) -> None:
     intent = _aws_lza_intent(intent)
-    if intent is None:
-        return
     data = {
         "homeRegion": intent.home_region,
         "identityCenter": _identity_center_config(intent),
@@ -169,8 +159,6 @@ def gen_lza_iam_config(intent: Any, output_dir: Path) -> None:
 
 def gen_lza_network_config(intent: Any, output_dir: Path) -> None:
     intent = _aws_lza_intent(intent)
-    if intent is None:
-        return
     data = {
         "homeRegion": intent.home_region,
         "defaultVpc": {"delete": True, "excludeAccounts": []},
@@ -201,8 +189,6 @@ def gen_lza_network_config(intent: Any, output_dir: Path) -> None:
 
 def gen_lza_lineage_manifest(intent: Any, output_dir: Path) -> None:
     intent = _aws_lza_intent(intent)
-    if intent is None:
-        return
     data = {
         "sourceContract": {
             "name": _LZA_CONTRACT.name,
@@ -220,8 +206,6 @@ def gen_lza_lineage_manifest(intent: Any, output_dir: Path) -> None:
 def gen_lza_deployment_runbook(intent: Any, output_dir: Path) -> None:
     readiness = getattr(intent, "handoff_readiness", {})
     intent = _aws_lza_intent(intent)
-    if intent is None:
-        return
     output_dir.mkdir(parents=True, exist_ok=True)
     lines = [
         "# AWS LZA Deployment Runbook",
@@ -404,8 +388,6 @@ def _lza_plan_readiness(intent: Any) -> dict[str, Any]:
 
 def enrich_lza_handoff_readiness(intent: Any, readiness: dict[str, Any]) -> dict[str, Any]:
     lza_intent = _aws_lza_intent(intent)
-    if lza_intent is None:
-        return readiness
     enriched = dict(readiness)
     enriched["planReady"] = _lza_plan_readiness(lza_intent)
     return enriched
@@ -414,8 +396,6 @@ def enrich_lza_handoff_readiness(intent: Any, readiness: dict[str, Any]) -> dict
 def gen_lza_plan_manifest(payload: Any, output_dir: Path) -> None:
     readiness = getattr(payload, "handoff_readiness", {})
     intent = _aws_lza_intent(payload)
-    if intent is None:
-        return
     immutable_inputs = [
         {
             "artifact": name,
@@ -494,8 +474,6 @@ def gen_lza_plan_manifest(payload: Any, output_dir: Path) -> None:
 def gen_lza_decision_report(intent: Any, output_dir: Path) -> None:
     readiness = getattr(intent, "handoff_readiness", {})
     intent = _aws_lza_intent(intent)
-    if intent is None:
-        return
     data = {
         "pattern": "aws-lza",
         "baseline": str(intent.baseline),
