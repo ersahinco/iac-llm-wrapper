@@ -160,11 +160,10 @@ AWS LZA owner-validation readiness audit and lean repair.
   ignored `tests/results/owner-readiness-banking-lza/`; handoff is allowed, but
   downstream plan readiness is blocked on owner account emails and explicit
   network/TGW plan inputs.
-- **Fixes in progress**: pattern-owned readiness enrichment now makes
-  `handoff-plan.yaml` agree with AWS LZA `decision-report.yaml` and
-  `plan-manifest.yaml`: default sample bundles show plan readiness blocked on
-  concrete plan input blockers, while explicit private plan inputs show
-  `planAllowed: true`.
+- **Committed plan-readiness fix**: `a593ef7` makes `handoff-plan.yaml` agree
+  with AWS LZA `decision-report.yaml` and `plan-manifest.yaml`: default sample
+  bundles show plan readiness blocked on concrete plan input blockers, while
+  explicit private plan inputs show `planAllowed: true`.
 - **Evidence**: the base packet official LZA validation now reports
   `owner-account-email-required` (`Default email (audit@example.com) found.`).
   An ignored private plan-input variant with non-placeholder emails and
