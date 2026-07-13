@@ -216,6 +216,14 @@ def summarize_lza_validation_output(
             "Attach this evidence as validation output; manual owner gates still apply.",
         )
 
+    default_email = _first_line_containing(lines, "Default email")
+    if default_email:
+        return _diagnostic(
+            "owner-account-email-required",
+            default_email[default_email.find("Default email") :],
+            "Replace generated placeholder emails with owner-approved account vending emails.",
+        )
+
     access_denied = _first_line_containing(lines, "AccessDeniedException")
     if access_denied:
         return _diagnostic(
@@ -225,14 +233,6 @@ def summarize_lza_validation_output(
                 "Run with an AWS/LZA validation context that can perform the official "
                 "account lookup, or send this failure to the downstream owner."
             ),
-        )
-
-    default_email = _first_line_containing(lines, "Default email")
-    if default_email:
-        return _diagnostic(
-            "owner-account-email-required",
-            default_email[default_email.find("Default email") :],
-            "Replace generated placeholder emails with owner-approved account vending emails.",
         )
 
     toolchain_missing = _first_line_containing(lines, "yarn/corepack executable not found")

@@ -23,6 +23,7 @@ _ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 def write_review_html(input_dir: Path, output: Path) -> None:
     """Write a portable static HTML review page for a generated handoff bundle."""
     output.parent.mkdir(parents=True, exist_ok=True)
+    contract_validation_path = _existing_contract_validation(input_dir)
     context = build_review_context(
         input_dir,
         link_base_dir=output.parent,
@@ -31,7 +32,7 @@ def write_review_html(input_dir: Path, output: Path) -> None:
             output.parent,
             _existing_graph_exports(input_dir),
         ),
-        contract_validation_path=None,
+        contract_validation_path=contract_validation_path,
     )
     output.write_text(render_review_html_context(context))
 
@@ -46,7 +47,7 @@ def render_review_html(
         input_dir,
         link_base_dir=link_base_dir or input_dir,
         graph_exports=graph_exports or _existing_graph_exports(input_dir),
-        contract_validation_path=None,
+        contract_validation_path=_existing_contract_validation(input_dir),
     )
     return render_review_html_context(context)
 
@@ -200,6 +201,11 @@ def _relative_graph_exports(
         for key, value in graph_exports.items()
         if value
     }
+
+
+def _existing_contract_validation(input_dir: Path) -> Path | None:
+    path = input_dir / "contract-validation.yaml"
+    return path if path.exists() else None
 
 
 def _read_yaml(path: Path | None) -> dict[str, Any]:
@@ -563,11 +569,11 @@ def _lza_validation_failure_excerpt(command: dict[str, Any]) -> str:
     text = "\n".join(str(command.get(key, "") or "") for key in ("stdout", "stderr"))
     lines = [_ANSI_ESCAPE_RE.sub("", line).strip() for line in text.splitlines()]
     for line in lines:
-        if "AccessDeniedException" in line:
-            return line[line.find("AccessDeniedException") :]
-    for line in lines:
         if "Default email" in line:
             return line[line.find("Default email") :]
+    for line in lines:
+        if "AccessDeniedException" in line:
+            return line[line.find("AccessDeniedException") :]
     for line in lines:
         if " has " in line and " issues:" in line:
             return line.rsplit("|", 1)[-1].strip()

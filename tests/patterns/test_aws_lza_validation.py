@@ -84,6 +84,22 @@ def test_summarize_lza_validation_output_classifies_common_blockers(
     assert diagnostic["nextAction"]
 
 
+def test_summarize_lza_validation_output_prioritizes_default_email():
+    diagnostic = summarize_lza_validation_output(
+        exit_code=1,
+        stdout=(
+            "AccessDeniedException: account lookup permission denied in "
+            "accounts-config.yaml config file\n"
+            "accounts-config.yaml has 1 issues:\n"
+            "Default email (audit@example.com) found."
+        ),
+        stderr="",
+    )
+
+    assert diagnostic["category"] == "owner-account-email-required"
+    assert diagnostic["summary"] == "Default email (audit@example.com) found."
+
+
 def test_validate_lza_config_bundle_writes_validation_only_evidence(
     tmp_path: Path,
     monkeypatch,

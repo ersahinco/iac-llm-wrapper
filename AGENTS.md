@@ -147,24 +147,33 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, pytest, ruff, mypy, pyright.
 
 ### Current Goal
 
-Repository AI-slop audit and lean repair.
+AWS LZA owner-validation readiness audit and lean repair.
 
 ### Status
 
-- **Complete**: removed leftover YAML writer/dumper duplication, removed an
-  unused hook-wrapper field, trimmed a generic test docstring, and compressed
-  stale historical session memory.
-- **Tests**: `uv run pytest` passed (450 passed, 1 skipped); targeted touched
-  tests passed before the full suite.
-- **Lint/format/type**: `uv run ruff check .`, `uv run ruff format --check .`,
-  `uv run --extra dev mypy`, and `uv run --extra dev pyright .` passed.
-- **Product/eval gates**: fixture drift check passed; golden journey passed;
-  extraction eval passed (8 passed); usability eval passed (8 passed);
-  product-language guardrails passed.
-- **Hooks**: `uv run --extra dev prek run --all-files` and
-  `uv run --extra dev prek run --all-files --hook-stage manual` passed,
-  including optional native shift-left scans.
-- **Diff hygiene**: `git diff --check` passed.
+- **Committed cleanup**: `606bd3e` removed redundant YAML helpers, unused hook
+  metadata, a generic test docstring, and stale session memory.
+- **Customer packet**: the banking AWS LZA packet compiles and reviews in
+  ignored `tests/results/owner-readiness-banking-lza/`; handoff is allowed, but
+  downstream plan readiness is blocked on owner account emails and explicit
+  network/TGW plan inputs.
+- **Fixes in progress**: static review links existing `contract-validation.yaml`;
+  LZA diagnostics and review fallbacks prioritize placeholder account-email
+  failures before AWS account lookup permission.
+- **Evidence**: the base packet official LZA validation now reports
+  `owner-account-email-required` (`Default email (audit@example.com) found.`).
+  An ignored private plan-input variant with non-placeholder emails and
+  network/TGW details reaches `aws-account-lookup-permission`, proving the repo
+  side clears plan inputs before the owner AWS context gate.
+- **Tests**: `uv run pytest` passed (452 passed, 1 skipped); focused review/LZA
+  and review CLI tests passed.
+- **Lint/format/type/hooks**: `uv run ruff check .`,
+  `uv run ruff format --check .`, `uv run --extra dev mypy`,
+  `uv run --extra dev pyright .`, and
+  `uv run --extra dev prek run --all-files` passed.
+- **Remaining blocker**: downstream-clean AWS LZA evidence requires
+  owner-approved account emails and an AWS/LZA validation context with read-only
+  account lookup permission; no deploy/apply path was added.
 
 ### Durable Decisions
 
@@ -177,5 +186,7 @@ Repository AI-slop audit and lean repair.
 
 ### Next
 
-1. Keep future cleanup packet- or test-driven; prefer deletion when behavior is
-   already covered by shared helpers.
+1. Re-run official `iac-llm-wrapper lza validate` with owner-approved account
+   emails and an AWS/LZA lookup-capable validation context.
+2. If validation still fails, fix only packet-backed repo issues or record
+   owner-side failures as downstream evidence.

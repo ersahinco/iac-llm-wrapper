@@ -333,6 +333,37 @@ def test_review_context_surfaces_lza_validation_evidence(tmp_path: Path):
     ) in context["reviewerNextActions"]
 
 
+def test_review_context_prioritizes_default_email_validation_fallback(tmp_path: Path):
+    input_dir = tmp_path / "out"
+    validation_path = _write_review_bundle(input_dir)
+    _write_yaml(
+        input_dir / "lza-validation-evidence.yaml",
+        {
+            "status": "fail",
+            "diagnostic": {"category": "owner-account-email-required"},
+            "command": {
+                "exitCode": 1,
+                "stdout": (
+                    "AccessDeniedException: account lookup permission denied in "
+                    "accounts-config.yaml config file\n"
+                    "Default email (audit@example.com) found."
+                ),
+            },
+        },
+    )
+
+    context = build_review_context(
+        input_dir,
+        link_base_dir=input_dir,
+        graph_exports={},
+        contract_validation_path=validation_path,
+    )
+
+    assert context["lzaValidationSummary"]["failureExcerpt"] == (
+        "Default email (audit@example.com) found."
+    )
+
+
 def test_review_context_warns_on_llm_parse_errors(tmp_path: Path):
     input_dir = tmp_path / "out"
     validation_path = _write_review_bundle(input_dir, parse_error_count=2)
@@ -482,6 +513,7 @@ def test_render_review_html_uses_existing_graph_exports(tmp_path: Path):
     assert "Requirement key" in html
     assert "Which account owns shared networking?" in html
     assert "Contract status" in html
+    assert "contract-validation.yaml" in html
     assert "Target Capability Graph" in html
     assert "Selected target path" in html
     assert "bespoke-workload-infrastructure" in html
