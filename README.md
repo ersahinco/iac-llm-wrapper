@@ -11,8 +11,11 @@ The repository and package are named `iac-llm-wrapper`. The core is
 **intent-engine**. Today it wraps LLM extraction with deterministic decision
 validation and emits registered-target configuration artifacts. Direct
 deployment, dashboards, and cloud changes stay downstream; the tool can say when
-a bundle is ready for an existing deployment mechanism, but it does not invoke
-that mechanism. It also does not generate whole IaC from scratch.
+a bundle is ready for an existing deployment mechanism. The single
+`terraform-vpc` proof path may invoke an exact code-owned module for a temporary,
+speculative plan; it cannot apply, retain state, or generate whole IaC from
+scratch.
+Outside that fixed adapter, the product does not generate whole IaC from scratch.
 
 AWS Landing Zone Accelerator is the reference path and downstream authority:
 collected and validated inputs become LZA YAML/config files consumed by the
@@ -32,8 +35,11 @@ greenfield environments. Deployment still belongs to those downstream
 mechanisms; the core should not become the deploy runner.
 
 For smaller workload practice, the `terraform-vpc` pattern captures inputs for
-an approved Terraform VPC module in an existing AWS account, including the
-owner-controlled deployment pipeline reference. Git-aware incremental runs use
+the pinned `terraform-aws-modules/vpc/aws` `6.6.1` module in an existing AWS
+account, including the owner-controlled deployment pipeline reference. Its
+approved adapter pins Terraform `1.15.8` and AWS provider `6.53.0`, verifies the
+bundle replay identities, and can emit sanitized account-bound speculative-plan
+evidence. Git-aware incremental runs use
 `compile-git` to rebuild only bundles whose design docs changed. Optional
 Checkov evidence can be captured with `shift-left checkov` against an
 owner-provided IaC/module path; generated `terraform.tfvars` alone is not treated
@@ -56,7 +62,9 @@ flowchart TD
     G -- "No" --> E
     G -- "Yes" --> H["Deterministic target artifacts"]
     H --> I["handoff-plan.yaml / plan-manifest.yaml"]
-    I --> J["Existing downstream deployment mechanism"]
+    I --> P["Optional approved terraform-vpc speculative plan proof"]
+    P --> J["Existing downstream deployment mechanism"]
+    I --> J
     J -. "outside this tool: no apply" .-> K["Owner-controlled deployment"]
 ```
 
@@ -125,6 +133,20 @@ mutate AWS. Depending on the AWS LZA version and local validation path, the
 official validator may perform read-only AWS account lookup through your
 configured AWS/LZA context.
 
+For a requirement-complete `terraform-vpc` bundle, use standard AWS environment
+or profile credentials for the declared non-production account:
+
+```bash
+iac-llm-wrapper terraform plan --bundle out/terraform-vpc
+```
+
+The command verifies contracts and replay hashes, requires Terraform `1.15.8`,
+runs locked init/validate/plan/show in a temporary local workspace, and writes
+`terraform-plan-evidence.yaml`. It rejects a caller-account mismatch and delete
+or replace actions. It never invokes `apply` or `destroy`, owns a backend, keeps
+state, retains the binary plan, or records raw plan values or credentials. The
+owner pipeline must re-plan against its real backend before any future apply.
+
 ## Patterns
 
 Patterns define questions, defaults, contracts, validators, and output files.
@@ -135,16 +157,17 @@ Recommended product paths stay thin and contract-backed:
 | `aws-lza` | Contract-backed AWS Landing Zone Accelerator registered-target configuration using official-style LZA YAML artifacts |
 | `cloudformation-parameters` | BYOM CloudFormation parameter handoff for an existing template |
 | `kubernetes-cluster` | Kubernetes cluster handoff with optional Terraform EKS module input references |
-| `terraform-vpc` | BYOM Terraform AWS VPC module input capture for existing accounts/pipelines |
+| `terraform-vpc` | Exact approved Terraform AWS VPC module input capture and account-bound speculative plan proof |
 
 ## Why Not Terraform, CDK, Or CloudFormation?
 
 Those tools provision infrastructure. This tool captures and validates the
-decisions that must be made before provisioning. Today it emits deterministic
-target configuration artifacts engineers use with existing accelerators, sample
-configurations, and IaC modules. AWS LZA YAML is the canonical example: the tool
-can assemble contract-checked config files for the registered target, but the LZA
-deployment process remains downstream.
+decisions that must be made before provisioning. It emits deterministic target
+configuration artifacts engineers use with existing accelerators, sample
+configurations, and IaC modules. The narrow Terraform VPC adapter proves that
+one exact module can produce an account-bound speculative plan; it is not an
+apply path or a general IaC generator. AWS LZA remains configuration-only and
+the downstream LZA deployment process remains authoritative.
 
 ## Project Status
 

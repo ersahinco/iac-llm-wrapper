@@ -11,8 +11,9 @@ Existing deployment mechanisms remain downstream.
 | `context-manifest.yaml` | Code-owned context inventory: pattern metadata, prompt context digest/text, requirement graph, target contracts, samples, policy packs, target capabilities, runtime extraction summary, expected artifacts, and guardrails. | Core | Pattern-backed successful handoffs. | No |
 | `policy-graph.yaml` | Registered policy pack metadata mapping compliance/client controls to requirements, target contracts, artifacts, module variables, Checkov IDs, and owner custom-policy references. | Core + pattern | Successful handoffs for patterns declaring policy packs. | No |
 | `handoff-plan.yaml` | Ordered review/handoff steps, owners, dependencies, manual gates, rollback, boundary, `handoffAllowed`, and allowed next action. | Core | Contract-backed successful handoffs. | No |
-| `plan-manifest.yaml` | Registered target plan metadata: immutable input artifacts, plan readiness, plan-only command text, expected plan outputs, blockers, and no-apply boundary. | Pattern + core contract | Plan-ready registered targets such as AWS LZA. | No |
+| `plan-manifest.yaml` | Registered target plan metadata: exact target/tool identities, immutable inputs, plan readiness, expected plan outputs, blockers, and no-apply boundary. | Pattern + core contract | Plan-ready registered targets such as AWS LZA and Terraform VPC. | No |
 | `replay-manifest.yaml` | Source, target contract, and artifact digests for deterministic replay and bundle comparison. | Core | Plan-ready registered targets. | No |
+| `terraform-plan-evidence.yaml` | Sanitized Terraform VPC speculative-plan proof: bundle/replay identities, exact target/tool versions, requested and observed account IDs, stage results, sorted resource actions, aggregate counts, blockers, and no-retention/no-apply boundary. | Terraform VPC plan adapter | `iac-llm-wrapper terraform plan --bundle`. | No |
 | `missing-inputs.yaml` | Durable architect/client question packet for blocked compiles, keyed by requirement graph nodes. | Core | Blocked compiles. | No |
 | `llm-trace-summary.yaml` | Provider/model, latency, raw and accepted decisions, applied decisions, gaps, contradictions, and raw evidence status. | Core | Every compile. | No |
 | `model-benchmark.yaml` | Mode, provider/model, latency, token availability, raw LLM coverage, conformance, quality counts, readiness, cost status, and external-observability boundary. | Core | Every compile. | No |
@@ -42,6 +43,9 @@ Existing deployment mechanisms remain downstream.
 - Plan reviewers use `plan-manifest.yaml` and `replay-manifest.yaml` to see
   whether a registered target has enough immutable input for a downstream
   plan/diff without interpretation. These files do not invoke the plan.
+- Terraform VPC reviewers use `terraform-plan-evidence.yaml` to verify the exact
+  approved module planned in the requested AWS account without retaining raw
+  plan data, state, or the plan binary.
 - Reviewers use `handoff-comparison.yaml` to inspect readiness, decision,
   input, downstream artifact, model, and sample deltas from a document or
   sample-configuration update.
@@ -61,9 +65,12 @@ Existing deployment mechanisms remain downstream.
 
 ## Boundary
 
-Artifacts may describe a downstream delivery path, but they do not run Terraform,
+Artifacts may describe a downstream delivery path, but they do not authorize
 CloudFormation, AWS LZA deploy/synth commands, Kubernetes, pipelines, or cloud
-mutation. The AWS LZA validation adapter may run the official local config
+mutation. The Terraform VPC plan adapter is the single narrow exception: it may
+run locked init/validate and a temporary speculative plan/show for the exact
+approved module, but never apply/destroy, retain state or plan files, or own a
+backend. The AWS LZA validation adapter may run the official local config
 validator against generated config files and record evidence, but it must not
 clone, install, synth, deploy, or mutate AWS. Depending on the AWS LZA version
 and local validation path, the official validator may perform read-only AWS

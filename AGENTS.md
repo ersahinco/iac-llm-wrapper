@@ -63,7 +63,8 @@ uv run --locked --extra dev prek run --all-files
   AWS CLI, and Ollama backends with retry/backoff and evidence capture.
 - **CLI** (`cli.py`): `compile`, `compile-git`, `interview`, `validate`,
   `explain`, `sample`, `contract`, `graph`, `discover`, `template`, `review`,
-  `shift-left`, and AWS LZA validation helpers. Default pattern is `aws-lza`.
+  `shift-left`, the Terraform VPC speculative plan proof, and AWS LZA validation
+  helpers. Default pattern is `aws-lza`.
 
 ## Current Pattern Surface
 
@@ -77,9 +78,11 @@ uv run --locked --extra dev prek run --all-files
   or deployment.
 - `kubernetes-cluster`: Contract-backed Kubernetes handoff for
   cluster/namespace config with optional Terraform EKS module input references.
-- `terraform-vpc`: BYOM Terraform AWS VPC module input capture. Emits module
-  variables/tfvars handoff plus delivery metadata for an existing module,
-  account, and owner pipeline; it does not emit root deployment scaffolding.
+- `terraform-vpc`: Exact approved Terraform AWS VPC module input capture and
+  speculative plan proof. Emits module variables/tfvars, plan/replay manifests,
+  and sanitized account-bound plan evidence. Its code-owned root pins Terraform
+  1.15.8, module 6.6.1, and AWS provider 6.53.0; it never applies or retains
+  state or a plan binary.
 
 ## Key Decisions
 
@@ -91,6 +94,11 @@ uv run --locked --extra dev prek run --all-files
 - Current compile/generation paths make no AWS API calls and do not deploy. The
   AWS LZA validation-only adapter may run the official local validator, which can
   perform read-only account lookup through the provided AWS/LZA context.
+- The Terraform VPC plan adapter is deliberately target-specific. It may run a
+  temporary speculative plan for the exact approved module and compare caller
+  identity with the packet account; it cannot apply, destroy, own a backend, or
+  retain state/raw plan data. Extract a shared execution protocol only after a
+  second real target proves the same boundary.
 - "Wrapper" means architect exchange to registered target configuration, not
   bypassing IaC tools, accelerators, owner pipelines, or gates.
 - Sample recommendations must persist as artifacts, not terminal-only hints.
@@ -147,8 +155,9 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, pytest, ruff, mypy, pyright.
 
 ### Current Goal
 
-Keep the registered-target handoff product lean and evidence-backed while
-continuing minimum-cost validation across local and AWS LZA owner boundaries.
+Prove one controlled requirements-to-plan path for the exact approved Terraform
+VPC module while keeping LLM guidance advisory, target code authoritative, and
+all deployment authority downstream.
 
 ### Status
 
@@ -223,14 +232,30 @@ continuing minimum-cost validation across local and AWS LZA owner boundaries.
   review mapping, LZA validation evidence, artifact review owners, incremental
   reconfirmation policy, and forbidden artifact checks now live on the AWS LZA
   pattern instead of generic core branches.
-- **Validation**: 484 tests passed with five optional real-Ollama tests skipped
-  when the local service was unavailable; coverage is 90.75%. Ruff, Ruff
+- **Terraform VPC plan proof**: `terraform-vpc` now emits exact target/toolchain
+  identities, three distinct maturity states, immutable input digests, and a
+  replay manifest. `iac-llm-wrapper terraform plan --bundle` verifies those
+  contracts, stages the code-owned root in a temporary workspace, runs locked
+  init/validate/plan/show, binds success to the requested AWS account, blocks
+  delete/replace actions, and emits sanitized evidence without apply, state,
+  credentials, raw values, or retained plan files.
+- **Plan trust and cohesion**: shared replay verification rejects missing,
+  changed, unsafe, or symlinked bundle inputs and changed contracts. Terraform
+  VPC compile metadata, execution, and evidence shaping remain separate cohesive
+  pattern modules; no generic executor or new Python dependency was added.
+- **Terraform build proof**: the packaged root pins Terraform 1.15.8,
+  `terraform-aws-modules/vpc/aws` 6.6.1, and `hashicorp/aws` 6.53.0 with a
+  four-platform provider lockfile. The real credential-free locked init and JSON
+  validate passed; CI and release jobs run the same proof through the pinned
+  setup-terraform action.
+- **Validation**: 513 tests passed with one optional real-Ollama test skipped;
+  coverage is 90.54%. Ruff, Ruff
   format, mypy, Pyright, fixture drift, golden journey, extraction (8/8),
   usability (8/8), all-files `prek`, lock check, Bandit, runtime `pip-audit`,
   full-development `pip-audit`, CycloneDX export, constrained package build,
-  and both installed CLI entry points in a clean Python 3.11 environment
-  passed. The first dependency checkpoint passed the complete GitHub Python
-  3.11-3.14 matrix; no fixture drift or known dependency vulnerabilities remain.
+  both installed CLI entry points, and all three packaged Terraform root assets
+  in a clean Python 3.11 environment passed. No fixture drift or known dependency
+  vulnerabilities remain.
 - **Model comparison**: the historical implicit local Ollama fallback used
   `llama3.2:3b`, took about 79 seconds, and produced a graph delta from the
   deterministic bundle. It inferred `SandboxDev` belongs to the `Sandbox` OU,
@@ -242,7 +267,10 @@ continuing minimum-cost validation across local and AWS LZA owner boundaries.
   ceiling. Current AWS guidance estimates the sample LZA environment at roughly
   $430.22/month even with no activity or workloads, so full personal-account LZA
   deployment is not a minimum-cost test.
-- **Remaining blocker**: downstream-clean AWS LZA evidence still requires
+- **Remaining blockers**: the requested Terraform owner acceptance plan needs an
+  owner-approved non-production packet/account and matching read-only AWS
+  credentials; the local environment does not establish that authorization, so
+  no cloud plan was attempted. Downstream-clean AWS LZA evidence still requires
   owner-approved account emails and an AWS/LZA validation context with read-only
   account lookup permission; no deploy/apply path was added.
 
@@ -278,6 +306,15 @@ continuing minimum-cost validation across local and AWS LZA owner boundaries.
   retry only explicitly transient failures within bounded attempts and delays.
 - Keep pattern-specific review, extraction, and validation behavior on the
   owning pattern rather than branching in generic core.
+- Keep LLMs out of HCL and version selection. Approved roots, modules, providers,
+  contracts, and replay identities are code-owned and human-reviewed.
+- Treat configuration readiness, plan invocation allowance, and a proven plan as
+  separate states. A speculative plan never grants apply authority.
+- Keep Terraform plan evidence value-free and portable: record identities,
+  actions, counts, blockers, and account match only; discard temporary state,
+  raw plan JSON, and the binary plan.
+- Do not create an executor registry for one target. Generalize only after a
+  second real plan-capable target demonstrates the same protocol.
 - Keep generated/ignored evidence out of committed source unless it is an
   intentional fixture or contract artifact.
 - Treat deterministic compile as the local product baseline and explicit,
@@ -290,10 +327,14 @@ continuing minimum-cost validation across local and AWS LZA owner boundaries.
 
 ### Next
 
-1. Clarify the intended OU for each workload account in the banking customer
+1. Run the explicit Terraform owner acceptance trial only after receiving an
+   owner-approved non-production packet/account and matching read-only AWS
+   credentials; require passing account-bound evidence and verify no state or
+   plan binary remains.
+2. Clarify the intended OU for each workload account in the banking customer
    packet and record the mappings under an account inventory; compilation now
    fails closed until that evidence exists.
-2. Re-run official `iac-llm-wrapper lza validate` with owner-approved account
+3. Re-run official `iac-llm-wrapper lza validate` with owner-approved account
    emails and an AWS/LZA lookup-capable validation context.
-3. If validation still fails, fix only packet-backed repo issues or record
+4. If validation still fails, fix only packet-backed repo issues or record
    owner-side failures as downstream evidence.

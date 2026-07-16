@@ -38,3 +38,7 @@ tests/results/*
 raw-evidence.yaml
 *.evidence.yaml
 iac-llm-evidence/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan

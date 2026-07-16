@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Account-bound speculative plan proof for the exact approved Terraform VPC module, including replay verification, sanitized `terraform-plan-evidence.yaml`, static review evidence, and the no-apply `terraform plan --bundle` command.
+- A packaged Terraform VPC root pinned to Terraform 1.15.8, `terraform-aws-modules/vpc/aws` 6.6.1, and `hashicorp/aws` 6.53.0 with a multi-platform provider lockfile and real CI init/validate proof.
 - Intent-to-IaC orchestration framework with a model-driven decision core.
 - Built-in product paths: aws-lza, cloudformation-parameters, kubernetes-cluster, terraform-vpc.
 - Contract-backed sample recommendations for known-good handoff bundles.

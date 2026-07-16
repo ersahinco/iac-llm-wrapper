@@ -97,3 +97,34 @@ def test_dependabot_tracks_uv_without_grouping_major_updates():
     assert "- minor" in dependabot
     assert "- patch" in dependabot
     assert "- major" not in dependabot
+
+
+def test_terraform_plan_root_is_packaged_and_ci_validated_with_exact_toolchain():
+    project = _project()
+    package_data = project["tool"]["setuptools"]["package-data"]  # type: ignore[index]
+    assert package_data["intent_engine.patterns.terraform_vpc.plan_root"] == [
+        "main.tf",
+        "variables.tf",
+        ".terraform.lock.hcl",
+    ]
+
+    workflows = _read(".github/workflows/ci.yml") + _read(".github/workflows/release.yml")
+    action = "hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1"
+    assert workflows.count(action) == 2
+    assert workflows.count('terraform_version: "1.15.8"') == 2
+    assert workflows.count("terraform_wrapper: false") == 2
+    assert workflows.count("python scripts/validate-terraform-vpc-plan-root.py") == 2
+
+
+def test_terraform_root_and_lock_pin_the_approved_module_and_provider():
+    main = _read("src/intent_engine/patterns/terraform_vpc/plan_root/main.tf")
+    lock = _read("src/intent_engine/patterns/terraform_vpc/plan_root/.terraform.lock.hcl")
+
+    assert 'required_version = "= 1.15.8"' in main
+    assert 'source  = "terraform-aws-modules/vpc/aws"' in main
+    assert 'version = "6.6.1"' in main
+    assert 'source  = "hashicorp/aws"' in main
+    assert 'version = "= 6.53.0"' in main
+    assert 'provider "registry.terraform.io/hashicorp/aws"' in lock
+    assert 'version     = "6.53.0"' in lock
+    assert lock.count('"h1:') == 4

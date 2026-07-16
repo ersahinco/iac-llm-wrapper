@@ -26,13 +26,14 @@ def _ollama_available() -> bool:
 OLLAMA_AVAILABLE = _ollama_available()
 
 
+@pytest.fixture(scope="class")
+def llm_caller() -> LLMCaller:
+    backend = create_backend("ollama", base_url="http://localhost:11434/v1")
+    return LLMCaller(backend)
+
+
 @pytest.mark.skipif(not OLLAMA_AVAILABLE, reason="Ollama not available")
 class TestRealLLMExtract:
-    @pytest.fixture(scope="class")
-    def llm_caller(self) -> LLMCaller:
-        backend = create_backend("ollama", base_url="http://localhost:11434/v1")
-        return LLMCaller(backend)
-
     def test_aws_lza_pipeline_runs_without_crash(self, llm_caller: LLMCaller, tmp_path: Path):
         output = tmp_path / "output"
         compile_design(

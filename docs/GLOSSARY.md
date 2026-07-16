@@ -41,6 +41,8 @@ must not receive generated IaC from prose.
 A deterministic file emitted for a registered target, such as AWS LZA YAML,
 CloudFormation parameter values, Kubernetes cluster/namespace config, or
 Terraform module input variables. These files are not executed by this tool.
+The Terraform VPC plan adapter may copy verified values into its code-owned
+temporary root solely to produce speculative-plan evidence.
 
 ## Deployment Target Contract
 
@@ -53,6 +55,8 @@ bundle can move to an existing deployment mechanism.
 The downstream system that applies reviewed target configuration artifacts, such
 as AWS LZA, a provisioning pipeline, CloudFormation, Terraform, or a platform
 workflow. Current built-ins do not invoke these mechanisms.
+The Terraform VPC adapter invokes only a local speculative plan for one exact
+approved module; the owner pipeline remains the deployment mechanism.
 
 ## Handoff Artifact
 

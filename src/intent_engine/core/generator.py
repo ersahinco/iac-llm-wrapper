@@ -11,14 +11,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from pathlib import Path
 from typing import Any
 
-from .contracts import TargetContract
 from .module_mapping import IaCIntentPayload
 from .patterns import PatternGenerator
 from .policy import policy_pack_inventory, policy_packs_to_dict
+from .replay import contract_digest, replay_artifact_digest
 from .yaml_utils import write_yaml_artifact
 
 # ---------------------------------------------------------------------------
@@ -177,28 +176,6 @@ def gen_decision_audit(payload: IaCIntentPayload, output_dir: Path) -> None:
 
 def _sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
-
-
-def _sha256_file(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def _sha256_replay_artifact(path: Path) -> str:
-    if path.name != "decision-audit.yaml":
-        return _sha256_file(path)
-    text = re.sub(
-        r"(^\s*-?\s*timestamp:\s*).+$",
-        r"\1<TIMESTAMP>",
-        path.read_text(),
-        flags=re.MULTILINE,
-    )
-    return _sha256_text(text)
-
-
-def _contract_digest(contract: TargetContract) -> str:
-    payload = contract.model_dump(by_alias=True)
-    rendered = json.dumps(payload, sort_keys=True, default=str)
-    return _sha256_text(rendered)
 
 
 def _model_name(model: Any) -> str:
@@ -480,7 +457,7 @@ def gen_replay_manifest(payload: IaCIntentPayload, output_dir: Path) -> None:
     files = [
         {
             "name": item.name,
-            "sha256": _sha256_replay_artifact(item),
+            "sha256": replay_artifact_digest(item),
         }
         for item in sorted(output_dir.iterdir())
         if item.is_file() and not item.name.startswith(".") and item.name != "replay-manifest.yaml"
@@ -493,7 +470,7 @@ def gen_replay_manifest(payload: IaCIntentPayload, output_dir: Path) -> None:
                 "name": contract.name,
                 "kind": contract.kind,
                 "sourceUrl": contract.source_url,
-                "sha256": _contract_digest(contract),
+                "sha256": contract_digest(contract),
             }
             for contract in contracts
         ],

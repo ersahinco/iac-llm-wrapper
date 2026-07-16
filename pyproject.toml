@@ -100,3 +100,10 @@ ignore_missing_imports = true
 [tool.setuptools.packages.find]
 where = ["src"]
 namespaces = false
+
+[tool.setuptools.package-data]
+"intent_engine.patterns.terraform_vpc.plan_root" = [
+    "main.tf",
+    "variables.tf",
+    ".terraform.lock.hcl",
+]

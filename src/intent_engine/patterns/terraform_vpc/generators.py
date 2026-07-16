@@ -10,6 +10,7 @@ from intent_engine.core.validator import Violation
 from intent_engine.core.yaml_utils import write_yaml_artifact
 
 from .models import TerraformVpcIntent
+from .target import MODULE_SOURCE, MODULE_VERSION, PROVIDER_SOURCE, PROVIDER_VERSION
 
 
 def _intent(payload: Any) -> TerraformVpcIntent:
@@ -83,14 +84,20 @@ def gen_decision_report(intent: Any, output_dir: Path) -> None:
         },
         "targetModule": {
             "name": "terraform-aws-vpc",
-            "source": "terraform-aws-modules/vpc/aws",
+            "source": MODULE_SOURCE,
+            "version": MODULE_VERSION,
+            "provider": {
+                "source": PROVIDER_SOURCE,
+                "version": PROVIDER_VERSION,
+            },
         },
         "delivery": {
             "targetAccountId": model.target_account_id,
             "deploymentPipelineRef": model.deployment_pipeline_ref,
             "boundary": (
                 "Account and pipeline routing are handoff metadata for owner-controlled "
-                "automation; generated module inputs do not invoke deployment."
+                "automation. The approved local adapter may prove a speculative plan, but "
+                "it cannot apply or own state."
             ),
         },
     }

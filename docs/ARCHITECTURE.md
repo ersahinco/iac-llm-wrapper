@@ -26,6 +26,9 @@ Architect packet / Markdown / Interview
   -> artifact generators
      - emit decision reports, handoff plans, trace summaries, benchmark files,
        review files, and pattern-specific target configuration files
+  -> optional target proof
+     - terraform-vpc alone verifies replay identities and the code-owned root
+     - runs a temporary account-bound speculative plan with no apply or retained state
   -> confidence loop
      - evals compare expected decisions and artifacts
      - battle tests produce verdicts and improvement items
@@ -39,8 +42,10 @@ Architect packet / Markdown / Interview
 - Patterns own domain models, requirement graphs, validators, deployment target
   contracts, sample configs, semantic model derivation, predicate constraints,
   and pattern-specific target configuration emitters.
-- Existing deployment mechanisms own deployment. Current compile/generation
-  paths do not call cloud APIs or invoke pipelines; the AWS LZA validation-only
+- Existing deployment mechanisms own deployment. Compile/generation paths do not
+  call cloud APIs or invoke pipelines. The Terraform VPC plan adapter may use
+  standard AWS credentials for caller identity and a temporary speculative plan
+  against one exact approved module; it cannot apply or retain state. The AWS LZA validation-only
   adapter may run the official local validator, which can require read-only
   account lookup through the provided AWS/LZA context.
 

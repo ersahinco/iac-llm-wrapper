@@ -5,10 +5,13 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import pytest
 import ruamel.yaml
 from typer.testing import CliRunner
 
+import intent_engine.cli as cli_module
 from intent_engine.cli import app
+from intent_engine.patterns.terraform_vpc.plan import TerraformPlanError
 
 runner = CliRunner()
 
@@ -22,6 +25,63 @@ def _git(repo: Path, *args: str) -> str:
     )
     assert proc.returncode == 0, proc.stderr or proc.stdout
     return proc.stdout.strip()
+
+
+class TestCLITerraformPlan:
+    def test_plan_renders_passing_evidence(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        bundle = tmp_path / "bundle"
+        bundle.mkdir()
+        monkeypatch.setattr(
+            cli_module,
+            "run_terraform_vpc_plan",
+            lambda _: {"status": "pass", "blockers": []},
+        )
+
+        result = runner.invoke(app, ["terraform", "plan", "--bundle", str(bundle)])
+
+        assert result.exit_code == 0, result.output
+        assert "Terraform plan status: pass" in result.output
+        assert "terraform-plan-evidence.yaml" in result.output
+
+    def test_plan_renders_blocker_and_next_action(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        bundle = tmp_path / "bundle"
+        bundle.mkdir()
+        monkeypatch.setattr(
+            cli_module,
+            "run_terraform_vpc_plan",
+            lambda _: {
+                "status": "fail",
+                "blockers": [
+                    {
+                        "code": "AWS_ACCOUNT_MISMATCH",
+                        "message": "Wrong account.",
+                        "nextAction": "Select the intended account.",
+                    }
+                ],
+            },
+        )
+
+        result = runner.invoke(app, ["terraform", "plan", "--bundle", str(bundle)])
+
+        assert result.exit_code == 1
+        assert "AWS_ACCOUNT_MISMATCH: Wrong account." in result.output
+        assert "Next action: Select the intended account." in result.output
+
+    def test_plan_renders_unsafe_bundle_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(
+            cli_module,
+            "run_terraform_vpc_plan",
+            lambda _: (_ for _ in ()).throw(TerraformPlanError("unsafe bundle")),
+        )
+
+        result = runner.invoke(app, ["terraform", "plan", "--bundle", str(tmp_path)])
+
+        assert result.exit_code == 1
+        assert "Error: unsafe bundle" in result.output
 
 
 class TestCLIDiscover:

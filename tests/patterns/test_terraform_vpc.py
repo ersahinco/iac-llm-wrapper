@@ -74,6 +74,23 @@ class TestTerraformVpcPattern:
             "regulated-vpc-baseline-v1"
         )
         assert "policy-graph.yaml" in context_manifest["outputs"]["expectedArtifacts"]
+        plan_manifest = _yaml_load(tmp_path / "plan-manifest.yaml")
+        assert plan_manifest["target"]["module"]["version"] == "6.6.1"
+        assert plan_manifest["target"]["provider"]["version"] == "6.53.0"
+        assert plan_manifest["toolchain"]["terraformVersion"] == "1.15.8"
+        assert plan_manifest["maturity"]["planReady"]["planAllowed"] is True
+        assert plan_manifest["maturity"]["planProven"]["proven"] is False
+        assert plan_manifest["planInvocation"]["applyAllowed"] is False
+        replay = _yaml_load(tmp_path / "replay-manifest.yaml")
+        assert replay["pattern"] == "terraform-vpc"
+        assert {item["name"] for item in replay["contracts"]} == {
+            "terraform-aws-vpc-module",
+            "generic-plan-ready-bundle",
+        }
+        target_capability = _yaml_load(tmp_path / "target-capability-graph.yaml")
+        assert target_capability["coverage"]["unhandledAcceptedDecisions"] == []
+        sample = GLOBAL_REGISTRY.get("terraform-vpc").samples[0]
+        assert sample.module_refs[0].version == "6.6.1"
 
     def test_subnet_count_mismatch_fails(self, tmp_path: Path):
         decisions = {

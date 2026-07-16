@@ -30,7 +30,7 @@ SAMPLES = [
             ModuleRef(
                 module_name="terraform-aws-vpc",
                 source="terraform-aws-modules/vpc/aws",
-                version="~> 5.0",
+                version="6.6.1",
                 description="Community Terraform VPC module fed by intent-engine decisions.",
             )
         ],

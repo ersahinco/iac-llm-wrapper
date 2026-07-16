@@ -51,14 +51,19 @@ def test_agents_context_uses_registered_target_language():
     assert "Current built-ins make no cloud API calls" not in text
 
 
-def test_pattern_authoring_keeps_deployment_invocation_out_of_scope():
+def test_pattern_authoring_keeps_plan_proof_separate_from_deployment():
     text = _read("docs/PATTERN_AUTHORING.md")
+    normalized = " ".join(text.split())
 
     assert "registered target pattern" in text
     assert "deterministic target configuration artifacts" in text
     assert "deployment target contracts" in text
     assert "Do not invoke cloud APIs, Terraform, CloudFormation, AWS LZA, apply commands" in text
-    assert "plan invocation must be registered, plan-only, contract-backed" in text
+    assert "target-specific plan adapter" in text
+    assert "replay verification" in text
+    assert "contract-backed evidence" in text
+    assert "hard no-apply boundary" in text
+    assert "do not extract a generic executor before a second real target" in normalized
 
 
 def test_public_surfaces_avoid_intent_to_iac_positioning():

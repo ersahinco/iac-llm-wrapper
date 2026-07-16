@@ -1,6 +1,11 @@
 """Target contract and policy mappings for Terraform VPC handoff."""
 
-from intent_engine.core.contracts import ArtifactContract, DecisionLineage, TargetContract
+from intent_engine.core.contracts import (
+    ArtifactContract,
+    ArtifactValueAssertion,
+    DecisionLineage,
+    TargetContract,
+)
 from intent_engine.core.policy import (
     PolicyCheckRef,
     PolicyControl,
@@ -31,6 +36,19 @@ CONTRACT = TargetContract(
                 "vpc.privateSubnetCidrs[]",
                 "delivery.targetAccountId",
                 "delivery.deploymentPipelineRef",
+                "targetModule.source",
+                "targetModule.version",
+                "targetModule.provider.source",
+                "targetModule.provider.version",
+            ],
+            value_assertions=[
+                ArtifactValueAssertion(
+                    path="targetModule.source",
+                    equals="terraform-aws-modules/vpc/aws",
+                ),
+                ArtifactValueAssertion(path="targetModule.version", equals="6.6.1"),
+                ArtifactValueAssertion(path="targetModule.provider.source", equals="hashicorp/aws"),
+                ArtifactValueAssertion(path="targetModule.provider.version", equals="6.53.0"),
             ],
         ),
         ArtifactContract(
@@ -48,6 +66,44 @@ CONTRACT = TargetContract(
             name="terraform.tfvars",
             required=False,
             description="Reference Terraform variable file generated from module inputs.",
+        ),
+        ArtifactContract(
+            name="plan-manifest.yaml",
+            required_paths=[
+                "schemaVersion",
+                "target.module.source",
+                "target.module.version",
+                "target.provider.source",
+                "target.provider.version",
+                "toolchain.terraformVersion",
+                "toolchain.wrapperVersion",
+                "approvedRoot.files[]",
+                "approvedRoot.files[].name",
+                "approvedRoot.files[].sha256",
+                "approvedRoot.sha256",
+                "sourceDocument.mode",
+                "sourceDocument.sha256",
+                "maturity.configReady.status",
+                "maturity.planReady.status",
+                "maturity.planReady.planAllowed",
+                "maturity.planProven.status",
+                "maturity.planProven.proven",
+            ],
+            value_assertions=[
+                ArtifactValueAssertion(
+                    path="schemaVersion",
+                    equals="intent-engine/plan-manifest/v1",
+                ),
+                ArtifactValueAssertion(
+                    path="target.module.source",
+                    equals="terraform-aws-modules/vpc/aws",
+                ),
+                ArtifactValueAssertion(path="target.module.version", equals="6.6.1"),
+                ArtifactValueAssertion(path="target.provider.source", equals="hashicorp/aws"),
+                ArtifactValueAssertion(path="target.provider.version", equals="6.53.0"),
+                ArtifactValueAssertion(path="toolchain.terraformVersion", equals="1.15.8"),
+                ArtifactValueAssertion(path="maturity.planProven.proven", equals=False),
+            ],
         ),
     ],
     lineage=[
@@ -81,6 +137,56 @@ CONTRACT = TargetContract(
             artifact="decision-report.yaml",
             path="delivery.deploymentPipelineRef",
         ),
+    ],
+)
+
+PLAN_EVIDENCE_CONTRACT = TargetContract(
+    name="terraform-vpc-plan-evidence",
+    kind="terraform-speculative-plan-evidence",
+    source_url="intent-engine://contracts/terraform-vpc-plan-evidence/v1",
+    required_decisions=["terraformPlanEvidence"],
+    artifacts=[
+        ArtifactContract(
+            name="terraform-plan-evidence.yaml",
+            required_paths=[
+                "schemaVersion",
+                "timestamp",
+                "status",
+                "pattern",
+                "target.moduleSource",
+                "target.moduleVersion",
+                "target.providerSource",
+                "target.providerVersion",
+                "toolchain.terraformVersion",
+                "toolchain.wrapperVersion",
+                "toolchain.approvedRootSha256",
+                "plan.status",
+                "stages[]",
+                "stages[].name",
+                "stages[].status",
+                "resourceChanges",
+                "changeSummary.create",
+                "changeSummary.update",
+                "changeSummary.delete",
+                "changeSummary.replace",
+                "changeSummary.noOp",
+                "blockers",
+                "guidance[]",
+                "applyAllowed",
+                "boundary",
+            ],
+            value_assertions=[
+                ArtifactValueAssertion(
+                    path="schemaVersion",
+                    equals="intent-engine/terraform-plan-evidence/v1",
+                ),
+                ArtifactValueAssertion(path="pattern", equals="terraform-vpc"),
+                ArtifactValueAssertion(path="target.moduleVersion", equals="6.6.1"),
+                ArtifactValueAssertion(path="target.providerVersion", equals="6.53.0"),
+                ArtifactValueAssertion(path="toolchain.terraformVersion", equals="1.15.8"),
+                ArtifactValueAssertion(path="applyAllowed", equals=False),
+            ],
+        )
     ],
 )
 
