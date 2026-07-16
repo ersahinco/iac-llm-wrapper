@@ -50,7 +50,31 @@ def generate_all(payload: IaCIntentPayload, output_dir: Path) -> None:
         pattern_generators = pattern.generators
     generators = [*CORE_GENERATORS, *pattern_generators]
     for generator in sorted(generators, key=lambda item: item.priority):
+        before = _artifact_fingerprints(output_dir)
         generator.fn(payload, output_dir)
+        after = _artifact_fingerprints(output_dir)
+        changed = {
+            path for path in before.keys() | after.keys() if before.get(path) != after.get(path)
+        }
+        unexpected = sorted(changed - set(generator.outputs))
+        if unexpected:
+            raise ValueError(
+                f"Generator '{generator.name}' changed undeclared artifacts: "
+                f"{', '.join(unexpected)}."
+            )
+
+
+def _artifact_fingerprints(output_dir: Path) -> dict[str, str]:
+    if not output_dir.exists():
+        return {}
+    fingerprints: dict[str, str] = {}
+    for item in output_dir.rglob("*"):
+        relative = item.relative_to(output_dir).as_posix()
+        if item.is_symlink():
+            raise ValueError(f"Generated artifact must not be a symlink: {relative}.")
+        if item.is_file():
+            fingerprints[relative] = hashlib.sha256(item.read_bytes()).hexdigest()
+    return fingerprints
 
 
 def gen_module_inputs(payload: IaCIntentPayload, output_dir: Path) -> None:
@@ -503,13 +527,45 @@ def _replay_artifact_paths(output_dir: Path) -> list[Path]:
 
 
 CORE_GENERATORS = [
-    PatternGenerator("context-manifest", gen_context_manifest, priority=4),
-    PatternGenerator("policy-graph", gen_policy_graph, priority=4),
-    PatternGenerator("module-inputs", gen_module_inputs, priority=5),
-    PatternGenerator("llm-trace-summary", gen_llm_trace_summary, priority=5),
-    PatternGenerator("model-benchmark", gen_model_benchmark, priority=5),
-    PatternGenerator("decision-audit", gen_decision_audit, priority=5),
-    PatternGenerator("sample-recommendations", gen_sample_recommendations, priority=5),
-    PatternGenerator("handoff-plan", gen_handoff_plan, priority=6),
-    PatternGenerator("replay-manifest", gen_replay_manifest, priority=100),
+    PatternGenerator(
+        "context-manifest",
+        gen_context_manifest,
+        priority=4,
+        outputs=("context-manifest.yaml",),
+    ),
+    PatternGenerator("policy-graph", gen_policy_graph, priority=4, outputs=("policy-graph.yaml",)),
+    PatternGenerator(
+        "module-inputs", gen_module_inputs, priority=5, outputs=("module-inputs.yaml",)
+    ),
+    PatternGenerator(
+        "llm-trace-summary",
+        gen_llm_trace_summary,
+        priority=5,
+        outputs=("llm-trace-summary.yaml",),
+    ),
+    PatternGenerator(
+        "model-benchmark",
+        gen_model_benchmark,
+        priority=5,
+        outputs=("model-benchmark.yaml",),
+    ),
+    PatternGenerator(
+        "decision-audit",
+        gen_decision_audit,
+        priority=5,
+        outputs=("decision-audit.yaml",),
+    ),
+    PatternGenerator(
+        "sample-recommendations",
+        gen_sample_recommendations,
+        priority=5,
+        outputs=("sample-recommendations.yaml",),
+    ),
+    PatternGenerator("handoff-plan", gen_handoff_plan, priority=6, outputs=("handoff-plan.yaml",)),
+    PatternGenerator(
+        "replay-manifest",
+        gen_replay_manifest,
+        priority=100,
+        outputs=("replay-manifest.yaml",),
+    ),
 ]

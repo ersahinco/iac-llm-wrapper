@@ -246,8 +246,14 @@ GLOBAL_REGISTRY.register(
                 "cloudformation-parameters",
                 gen_cloudformation_parameters,
                 priority=10,
+                outputs=("cloudformation-parameters.yaml",),
             ),
-            PatternGenerator("cloudformation-decision-report", gen_decision_report, priority=11),
+            PatternGenerator(
+                "cloudformation-decision-report",
+                gen_decision_report,
+                priority=11,
+                outputs=("decision-report.yaml",),
+            ),
         ],
         contracts=[_CONTRACT],
     )

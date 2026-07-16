@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from intent_engine.core.contracts import ArtifactContract, TargetContract
 from intent_engine.core.pattern_check import check_pattern, validate_pattern_references
-from intent_engine.core.patterns import Pattern, PatternRegistry
+from intent_engine.core.patterns import Pattern, PatternGenerator, PatternRegistry
 from intent_engine.core.policy import PolicyControl, PolicyPack, PolicyRequirementMapping
 from intent_engine.core.requirements import Requirement, RequirementGraph
 from intent_engine.core.sample_config import SampleConfig
@@ -58,6 +58,10 @@ def _requirement(
     )
 
 
+def _noop_generator(_payload: object, _output_dir: Path) -> None:
+    return None
+
+
 def test_check_pattern_passes_for_minimal_valid_pattern(tmp_path: Path):
     pattern = Pattern(
         name="valid-pattern",
@@ -77,6 +81,7 @@ def test_check_pattern_passes_for_minimal_valid_pattern(tmp_path: Path):
                 required_decisions=["region"],
             )
         ],
+        generators=[PatternGenerator("config", _noop_generator, outputs=("config.yaml",))],
     )
 
     result = check_pattern(pattern, fixtures_root=tmp_path)
@@ -341,6 +346,7 @@ def test_registry_and_pattern_check_share_reference_validation(tmp_path: Path):
                 required_decisions=["missing"],
             )
         ],
+        generators=[PatternGenerator("config", _noop_generator, outputs=("config.yaml",))],
     )
     graph = pattern.create_graph()
     references = validate_pattern_references(pattern, graph)
@@ -388,3 +394,90 @@ def test_registry_and_pattern_check_reject_unsafe_paths_consistently(tmp_path: P
     assert any("invalid forbidden artifact path /tmp/main.tf" in item for item in result.violations)
     with pytest.raises(ValueError, match="invalid path"):
         PatternRegistry().register(pattern)
+
+
+def test_pattern_generators_must_own_safe_unique_outputs(tmp_path: Path):
+    pattern = Pattern(
+        name="invalid-generators",
+        description="Invalid generator ownership",
+        graph_factory=lambda: _graph(_requirement()),
+        intent_factory=_TestIntent,
+        prompt_context=(
+            "This pattern captures approved region handoff context only. "
+            "Extract the region decision for an existing target contract."
+        ),
+        generators=[
+            PatternGenerator("missing", _noop_generator),
+            PatternGenerator("duplicate-a", _noop_generator, outputs=("config.yaml",)),
+            PatternGenerator("duplicate-b", _noop_generator, outputs=("config.yaml",)),
+            PatternGenerator("unsafe", _noop_generator, outputs=("../outside.yaml",)),
+            PatternGenerator(
+                "context-manifest",
+                _noop_generator,
+                outputs=("context-manifest.yaml",),
+            ),
+        ],
+    )
+
+    violations = check_pattern(pattern, fixtures_root=tmp_path).violations
+
+    assert "generator missing: no declared outputs" in violations
+    assert "artifact config.yaml has multiple generators: duplicate-a, duplicate-b" in violations
+    assert any("invalid output path ../outside.yaml" in item for item in violations)
+    assert "duplicate generator name context-manifest" in violations
+    assert "generator context-manifest: output context-manifest.yaml is owned by core" in violations
+
+
+def test_required_contract_artifact_must_have_a_generator(tmp_path: Path):
+    pattern = Pattern(
+        name="missing-generator",
+        description="Missing contract artifact generator",
+        graph_factory=lambda: _graph(_requirement()),
+        intent_factory=_TestIntent,
+        prompt_context=(
+            "This pattern captures approved region handoff context only. "
+            "Extract the region decision for an existing target contract."
+        ),
+        contracts=[
+            TargetContract(
+                name="missing-generator-contract",
+                kind="yaml",
+                source_url="https://example.com",
+                artifacts=[ArtifactContract(name="config.yaml")],
+                required_decisions=["region"],
+            )
+        ],
+    )
+
+    result = check_pattern(pattern, fixtures_root=tmp_path)
+
+    assert (
+        "missing-generator-contract: required artifact config.yaml has no generator"
+        in result.violations
+    )
+    with pytest.raises(ValueError, match="required artifact 'config.yaml' has no generator"):
+        PatternRegistry().register(pattern)
+
+
+def test_core_generator_can_satisfy_required_contract_artifact(tmp_path: Path):
+    pattern = Pattern(
+        name="core-generated-contract",
+        description="Core generated contract artifact",
+        graph_factory=lambda: _graph(_requirement()),
+        intent_factory=_TestIntent,
+        prompt_context=(
+            "This pattern captures approved region handoff context only. "
+            "Extract the region decision for an existing target contract."
+        ),
+        contracts=[
+            TargetContract(
+                name="core-generated",
+                kind="yaml",
+                source_url="https://example.com",
+                artifacts=[ArtifactContract(name="module-inputs.yaml")],
+                required_decisions=["region"],
+            )
+        ],
+    )
+
+    assert check_pattern(pattern, fixtures_root=tmp_path).passed

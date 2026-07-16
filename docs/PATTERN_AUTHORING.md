@@ -16,7 +16,8 @@ an existing deployment mechanism. The detailed API contract lives in
    artifact ownership.
 5. Define bounded `Pattern.prompt_context` using
    [context-as-code rules](CONTEXT_AS_CODE.md).
-6. Attach target configuration emitters to `Pattern.generators`.
+6. Attach target configuration emitters to `Pattern.generators` and declare
+   every emitted file in `PatternGenerator.outputs`.
 7. Add sample configs only when they represent a reusable reference bundle.
 8. Add extraction fixtures for ready and blocked cases.
 9. Add usability or battle tests when the change affects handoff quality.
@@ -57,6 +58,9 @@ an existing deployment mechanism. The detailed API contract lives in
   existing approved root and keeps backend, credentials, state, workspace,
   approval, and apply downstream. Do not add a core integration registry for one
   consumer.
+- Prefer the target's native artifact and official schema or validator. Keep
+  orchestration, API clients, credentials, and lifecycle ownership in the OSS
+  tool or owner platform instead of reproducing them here.
 - A second orchestration bridge, portal integration, MCP facade, or new semantic
   plan evaluator requires repeated owner demand. If each target needs another
   thousand-line evaluator, keep it configuration-only or stop.
@@ -71,6 +75,7 @@ A healthy pattern has:
 - typed entities and predicate constraints for important relationship rules
 - clear blocked reasons for missing enterprise values
 - required artifacts checked by contracts
+- one declared pattern or core generator owner for every required artifact
 - target configuration artifacts that match the registered deployment target
 - `context-manifest.yaml` with graph, prompt context, contract, sample, target,
   runtime, and expected-artifact context

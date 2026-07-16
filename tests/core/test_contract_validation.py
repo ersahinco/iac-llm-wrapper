@@ -14,7 +14,7 @@ from intent_engine.core.contract_validation import (
     write_contract_validation,
 )
 from intent_engine.core.contracts import ArtifactContract, TargetContract
-from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern
+from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern, PatternGenerator
 from intent_engine.core.requirements import Requirement, RequirementGraph
 from intent_engine.core.yaml_utils import write_yaml_artifact
 
@@ -73,6 +73,13 @@ def _register_example_pattern() -> dict[str, Pattern]:
                         ArtifactContract(name="config.yaml", required_paths=["region"]),
                     ],
                     required_decisions=["region"],
+                )
+            ],
+            generators=[
+                PatternGenerator(
+                    "config",
+                    lambda _payload, _output_dir: None,
+                    outputs=("config.yaml",),
                 )
             ],
         )

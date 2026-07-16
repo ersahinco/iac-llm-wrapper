@@ -157,11 +157,10 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, pytest, ruff, mypy, pyright.
 
 ### Current Goal
 
-Keep the product at the native requirements-to-target handoff boundary: validated
-intent becomes target-native configuration, evidence, and a PR-ready packet;
-owner repositories and OSS execution platforms retain every backend, credential,
-workspace, approval, apply, drift, and audit decision. AFT is the next candidate,
-not an authorized implementation.
+Keep the requirements-to-target foundation maintainable and extensible for OSS
+composition: emit native, contract-backed artifacts while owner repositories and
+OSS platforms retain every backend, credential, workspace, approval, apply,
+drift, and audit decision. Treat OSS as leverage, not territory to absorb.
 
 ### Status
 
@@ -281,6 +280,13 @@ not an authorized implementation.
   candidate only after an owner supplies its repository contract, approved
   account/SSO email handling, one real request, and repeat use. Score workloads
   and Crossplane XRs remain demand-gated.
+- **Explicit artifact ownership**: every core and pattern generator declares its
+  portable output paths. Pattern registration now rejects missing or unsafe
+  declarations, duplicate generator names, ambiguous file ownership, attempts
+  to replace core-owned outputs, and required contract artifacts with no
+  producer. Generation also blocks undeclared file changes and symlinked
+  artifacts. Target contracts remain the external native-file inventory; no
+  integration registry, runner, API client, or dependency was added.
 - **Module-content identity**: locked init must produce the reviewed module
   6.6.1 portable source tree at release commit
   `3ffbd46fb1c7733e1b34d8666893280454e27436`, SHA-256
@@ -296,7 +302,7 @@ not an authorized implementation.
   four-platform provider lockfile. The real credential-free locked init and JSON
   validate passed; CI and release jobs run the same proof through the pinned
   setup-terraform action.
-- **Validation**: 545 tests passed with five optional integration tests skipped.
+- **Validation**: 551 tests passed with five optional integration tests skipped.
   Under uv 0.11.29, Ruff, Ruff
   format, mypy, Pyright, fixture drift, golden journey, extraction (8/8),
   usability (8/8), all-files `prek`, the credential-free approved-root proof,
@@ -380,6 +386,9 @@ not an authorized implementation.
 - Use Git plus contract-backed artifacts as the integration protocol. Atmos is
   the first pattern-local bridge. Repository ownership ends after target-native
   configuration, evidence, and a PR-ready handoff; it does not create the PR.
+- Require each generator to declare its output paths and each required contract
+  artifact to have exactly one core or pattern producer. This is a maintainability
+  invariant, not a generic integration runtime or a new artifact format.
 - Require a self-hosted, OSI-licensed path for every mandatory integration;
   proprietary services may remain optional owner choices only.
 - Keep Atlantis downstream; owner-defined custom workflows may call Atmos

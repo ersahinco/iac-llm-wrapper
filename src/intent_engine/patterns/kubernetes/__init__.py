@@ -31,10 +31,25 @@ def map_k8s_intent_to_modules(intent: K8sIntent) -> list[ModuleInputs]:
 
 
 _K8S_GENERATORS = [
-    PatternGenerator("k8s-decision-report", gen_k8s_decision_report, priority=5),
-    PatternGenerator("terraform-tfvars", gen_tfvars, priority=5),
-    PatternGenerator("k8s-cluster-config", gen_cluster_config, priority=10),
-    PatternGenerator("k8s-namespace-config", gen_namespace_config, priority=11),
+    PatternGenerator(
+        "k8s-decision-report",
+        gen_k8s_decision_report,
+        priority=5,
+        outputs=("decision-report.yaml",),
+    ),
+    PatternGenerator("terraform-tfvars", gen_tfvars, priority=5, outputs=("terraform.tfvars",)),
+    PatternGenerator(
+        "k8s-cluster-config",
+        gen_cluster_config,
+        priority=10,
+        outputs=("cluster-config.yaml",),
+    ),
+    PatternGenerator(
+        "k8s-namespace-config",
+        gen_namespace_config,
+        priority=11,
+        outputs=("namespace-config.yaml",),
+    ),
 ]
 
 

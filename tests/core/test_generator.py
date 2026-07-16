@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import ruamel.yaml
 from pydantic import BaseModel
 
 from intent_engine.core.contracts import ArtifactContract, TargetContract
 from intent_engine.core.generator import (
+    CORE_GENERATORS,
     _hcl_value,
     gen_context_manifest,
     gen_handoff_plan,
@@ -17,6 +19,7 @@ from intent_engine.core.generator import (
     generate_all,
 )
 from intent_engine.core.module_mapping import IaCIntentPayload, ModuleInputs
+from intent_engine.core.paths import relative_path_error
 from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern, PatternGenerator
 from intent_engine.core.requirements import Requirement, RequirementGraph
 from intent_engine.core.sample_config import SampleConfig
@@ -75,12 +78,28 @@ def _register_handoff_pattern() -> dict[str, Pattern]:
                     required_decisions=["region"],
                 )
             ],
+            generators=[
+                PatternGenerator(
+                    "handoff-configs",
+                    lambda _payload, _output_dir: None,
+                    outputs=("network-config.yaml", "security-config.yaml"),
+                )
+            ],
         )
     )
     return original
 
 
 class TestPatternOwnedGenerators:
+    def test_core_generators_declare_safe_unique_outputs(self):
+        names = [generator.name for generator in CORE_GENERATORS]
+        outputs = [output for generator in CORE_GENERATORS for output in generator.outputs]
+
+        assert all(generator.outputs for generator in CORE_GENERATORS)
+        assert len(names) == len(set(names))
+        assert len(outputs) == len(set(outputs))
+        assert not [output for output in outputs if relative_path_error(output)]
+
     def test_generate_all_runs_active_pattern_generators_in_priority_order(
         self,
         tmp_path: Path,
@@ -102,8 +121,8 @@ class TestPatternOwnedGenerators:
                     graph_factory=_handoff_graph,
                     intent_factory=_TestIntent,
                     generators=[
-                        PatternGenerator("b", gen_b, priority=20),
-                        PatternGenerator("a", gen_a, priority=10),
+                        PatternGenerator("b", gen_b, priority=20, outputs=("b.yaml",)),
+                        PatternGenerator("a", gen_a, priority=10, outputs=("a.yaml",)),
                     ],
                 )
             )
@@ -136,7 +155,7 @@ class TestPatternOwnedGenerators:
                     description="Active pattern generator test",
                     graph_factory=_handoff_graph,
                     intent_factory=_TestIntent,
-                    generators=[PatternGenerator("active", active_gen)],
+                    generators=[PatternGenerator("active", active_gen, outputs=("active.yaml",))],
                 )
             )
             GLOBAL_REGISTRY.register(
@@ -145,7 +164,9 @@ class TestPatternOwnedGenerators:
                     description="Inactive pattern generator test",
                     graph_factory=_handoff_graph,
                     intent_factory=_TestIntent,
-                    generators=[PatternGenerator("inactive", inactive_gen)],
+                    generators=[
+                        PatternGenerator("inactive", inactive_gen, outputs=("inactive.yaml",))
+                    ],
                 )
             )
             payload = IaCIntentPayload(
@@ -157,6 +178,81 @@ class TestPatternOwnedGenerators:
             generate_all(payload, tmp_path)
 
             assert called == ["active"]
+        finally:
+            GLOBAL_REGISTRY._patterns = original
+
+    def test_generate_all_rejects_undeclared_artifact_changes(self, tmp_path: Path):
+        original = _registry_snapshot()
+
+        def unsafe_gen(_intent: object, output_dir: Path) -> None:
+            (output_dir / "declared.yaml").write_text("declared")
+            (output_dir / "undeclared.yaml").write_text("undeclared")
+
+        try:
+            GLOBAL_REGISTRY.register(
+                Pattern(
+                    name="unsafe-generator-test",
+                    description="Unsafe generator test",
+                    graph_factory=_handoff_graph,
+                    intent_factory=_TestIntent,
+                    generators=[
+                        PatternGenerator(
+                            "unsafe",
+                            unsafe_gen,
+                            outputs=("declared.yaml",),
+                        )
+                    ],
+                )
+            )
+            payload = IaCIntentPayload(
+                module_inputs=[],
+                intent=None,
+                pattern="unsafe-generator-test",
+            )
+
+            with pytest.raises(
+                ValueError,
+                match="Generator 'unsafe' changed undeclared artifacts: undeclared.yaml",
+            ):
+                generate_all(payload, tmp_path)
+        finally:
+            GLOBAL_REGISTRY._patterns = original
+
+    def test_generate_all_rejects_symlinked_artifacts(self, tmp_path: Path):
+        original = _registry_snapshot()
+
+        def symlink_gen(_intent: object, output_dir: Path) -> None:
+            target = output_dir / "target.yaml"
+            target.write_text("target")
+            (output_dir / "declared.yaml").symlink_to(target)
+
+        try:
+            GLOBAL_REGISTRY.register(
+                Pattern(
+                    name="symlink-generator-test",
+                    description="Symlink generator test",
+                    graph_factory=_handoff_graph,
+                    intent_factory=_TestIntent,
+                    generators=[
+                        PatternGenerator(
+                            "symlink",
+                            symlink_gen,
+                            outputs=("declared.yaml", "target.yaml"),
+                        )
+                    ],
+                )
+            )
+            payload = IaCIntentPayload(
+                module_inputs=[],
+                intent=None,
+                pattern="symlink-generator-test",
+            )
+
+            with pytest.raises(
+                ValueError,
+                match="Generated artifact must not be a symlink: declared.yaml",
+            ):
+                generate_all(payload, tmp_path)
         finally:
             GLOBAL_REGISTRY._patterns = original
 

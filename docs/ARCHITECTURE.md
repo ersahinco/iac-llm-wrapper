@@ -70,6 +70,14 @@ workflow. Terramate and Terragrunt are alternative Terraform orchestrators.
 Score and Crossplane require independent target demand. None is a runtime
 dependency, and no MCP facade exists in this slice.
 
+Every registered generator declares its output paths. Registration rejects
+unsafe paths, ambiguous ownership, core-output replacement, and required target
+artifacts with no producer. Target contracts already expose the required native
+file inventory; generation rejects undeclared file changes and symlinked
+artifacts. This is the shared composition seam: native files are discoverable
+and contract-backed, without teaching core how Atmos, LZA, AFT, Crossplane, or
+an executor works.
+
 LLM providers remain supported for compatibility, but provider expansion is
 frozen. Model output may propose decisions; it may not select target versions,
 weaken contracts, construct the Atmos root, or authorize a state transition.
@@ -107,6 +115,19 @@ deployment format:
 | AWS Control Tower AFT | Fixed-template `account-request.tf` module call | Candidate only |
 | Score | Workload specification | Demand-gated |
 | Crossplane | XR matching an owner XRD/Composition | Demand-gated |
+
+The durable value hypothesis is not "AI writes configuration." It is that an
+architecture exchange reaches an existing OSS delivery path with unresolved
+decisions, contradictions, applicability, provenance, and target shape made
+explicit before runtime authority is involved. Native schemas and validators
+remain authoritative for their own formats; this repository earns its place
+only when the requirements and evidence sidecar changes a real review outcome.
+
+Composition is admitted target by target: require an owner contract, emit the
+native artifact, reuse the official validator, keep lifecycle authority
+downstream, and prove repeated PR use. If a form is equivalent, evidence is
+ignored, or use does not repeat, remove the bridge instead of expanding the
+framework.
 
 ### Next candidate: AFT, not another executor
 

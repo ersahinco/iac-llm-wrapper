@@ -31,6 +31,7 @@ class PatternGenerator:
     name: str
     fn: GeneratorFn
     priority: int = 50
+    outputs: tuple[str, ...] = ()
 
 
 @dataclass

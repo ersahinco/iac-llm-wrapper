@@ -116,7 +116,11 @@ def gen_cluster_config(intent, output_dir: Path) -> None:
 ```
 
 Attach generators to the owning `Pattern`. Keep lightweight runtime guards only
-as fallback safety.
+as fallback safety. Each generator must declare every regular file it can emit.
+Declared paths are portable, relative bundle paths; pattern registration rejects
+unsafe paths, duplicate ownership, core-owned paths, and required contract
+artifacts with no producer. Generation also rejects undeclared file changes and
+symlinked artifacts.
 
 ### 4. Register the Pattern
 
@@ -135,10 +139,6 @@ contract = TargetContract(
         ArtifactContract(
             name="cluster-config.yaml",
             required_paths=["cluster.name", "cluster.version"],
-        ),
-        ArtifactContract(
-            name="decision-report.yaml",
-            required_paths=["clusterName"],
         ),
     ],
     required_decisions=["cluster_name", "cluster_version"],
@@ -159,7 +159,12 @@ GLOBAL_REGISTRY.register(Pattern(
     ),
     contracts=[contract],
     generators=[
-        PatternGenerator("k8s-cluster", gen_cluster_config, priority=10),
+        PatternGenerator(
+            "k8s-cluster",
+            gen_cluster_config,
+            priority=10,
+            outputs=("cluster-config.yaml",),
+        ),
     ],
 ))
 ```
@@ -171,7 +176,7 @@ Pattern metadata fields:
 - `section_map` — Maps requirement keys to template sections
 - `free_form_examples` — Free-form Markdown examples for templates
 - `validators` — List of extra validator functions `intent -> list[Violation]`
-- `generators` — Pattern-owned artifact emitters declared as `PatternGenerator`
+- `generators` — Pattern-owned artifact emitters with explicit `outputs`
 - `contracts` — Deployment target contracts for required files, required paths,
   value assertions, decisions, and lineage
 - `context-manifest.yaml` — Generic context-as-code inventory emitted automatically for
@@ -222,3 +227,25 @@ def test_k8s_compiles(tmp_path):
 4. **Defaults are explicit** — Put defaults in the model or requirement graph so prompts, interviews, validation, and artifacts agree.
 5. **Validators are layered** — Graph-driven rules come from `Requirement` metadata; pattern-specific rules come from `Pattern.validators`.
 6. **No core code changes for new target patterns** — If you find yourself editing `extractor.py`, `compiler.py`, `validator.py`, `interview.py`, or `cli.py`, the framework is leaking domain assumptions. Move them to the pattern layer.
+
+## OSS Composition Admission Test
+
+An open-source tool is leverage when the handoff can use its native artifact and
+official validation while leaving its runtime authority intact. Register a new
+target or bridge only when all of these are true:
+
+1. An owner supplies the real target contract and can review the emitted native
+   artifact.
+2. The artifact is more than generic configuration text: the requirement graph
+   finds gaps, blocks contradictions, or preserves provenance the target's own
+   form does not.
+3. The official schema, parser, or validator is reused where available. Do not
+   reproduce it in Python.
+4. Credentials, backend/state, workspaces, approvals, apply, drift, and audit
+   remain in the owner repository or execution platform.
+5. One owner uses the handoff in a real PR and repeats it before a second bridge,
+   service API, MCP facade, or semantic evaluator is added.
+
+If a native schema or form produces the same practical result, reviewers ignore
+the evidence, or use does not repeat, simplify to target-shaped configuration
+generation or remove the bridge. OSS names do not justify framework surface.

@@ -89,6 +89,82 @@ def _policy_reference_violations(
     return violations
 
 
+def _generator_reference_violations(pattern: Pattern) -> list[PatternReferenceViolation]:
+    from .generator import CORE_GENERATORS
+
+    violations: list[PatternReferenceViolation] = []
+    core_names = {generator.name for generator in CORE_GENERATORS}
+    core_outputs = {output for generator in CORE_GENERATORS for output in generator.outputs}
+    names: set[str] = set()
+    output_owners: dict[str, str] = {}
+
+    for generator in pattern.generators:
+        if not generator.name.strip():
+            violations.append(
+                PatternReferenceViolation(
+                    "generator name is missing",
+                    "Generator name must not be empty",
+                )
+            )
+        elif generator.name in names or generator.name in core_names:
+            violations.append(
+                PatternReferenceViolation(
+                    f"duplicate generator name {generator.name}",
+                    f"Generator name '{generator.name}' is already registered",
+                )
+            )
+        names.add(generator.name)
+
+        if not generator.outputs:
+            violations.append(
+                PatternReferenceViolation(
+                    f"generator {generator.name}: no declared outputs",
+                    f"Generator '{generator.name}' must declare at least one output",
+                )
+            )
+        for output in generator.outputs:
+            path_error = relative_path_error(output)
+            if path_error:
+                violations.append(
+                    PatternReferenceViolation(
+                        f"generator {generator.name}: invalid output path {output}: {path_error}",
+                        f"Generator '{generator.name}' output '{output}' has an invalid path: "
+                        f"{path_error}",
+                    )
+                )
+                continue
+            if output in core_outputs:
+                violations.append(
+                    PatternReferenceViolation(
+                        f"generator {generator.name}: output {output} is owned by core",
+                        f"Generator '{generator.name}' output '{output}' is owned by core",
+                    )
+                )
+                continue
+            owner = output_owners.setdefault(output, generator.name)
+            if owner != generator.name:
+                violations.append(
+                    PatternReferenceViolation(
+                        f"artifact {output} has multiple generators: {owner}, {generator.name}",
+                        f"Artifact '{output}' is declared by generators '{owner}' and "
+                        f"'{generator.name}'",
+                    )
+                )
+
+    produced_outputs = core_outputs | set(output_owners)
+    for contract in pattern.contracts:
+        for artifact in contract.required_artifacts:
+            if relative_path_error(artifact) or artifact in produced_outputs:
+                continue
+            violations.append(
+                PatternReferenceViolation(
+                    f"{contract.name}: required artifact {artifact} has no generator",
+                    f"Contract '{contract.name}' required artifact '{artifact}' has no generator",
+                )
+            )
+    return violations
+
+
 def _metadata_reference_violations(
     pattern: Pattern,
     graph: RequirementGraph,
@@ -160,6 +236,7 @@ def validate_pattern_references(
     """Validate model, contract, policy, and pattern metadata references once."""
     return [
         *_model_and_contract_reference_violations(pattern, graph),
+        *_generator_reference_violations(pattern),
         *_policy_reference_violations(pattern, graph),
         *_metadata_reference_violations(pattern, graph),
     ]

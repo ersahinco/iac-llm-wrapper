@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Explicit generator-to-artifact ownership for OSS composition: core and
+  pattern generators declare portable outputs, registration requires every
+  contract artifact to have one producer, and generation rejects undeclared
+  file changes or symlinks without adding an integration runtime.
 - OSS-native Atmos bridge for every successful `terraform-vpc` compile: an
   importable abstract intent-defaults catalog, a digest-checked byte-for-byte
   approved Terraform root, a second pattern-owned target contract, and recursive
@@ -39,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD: lint, format, type check, tests, extraction/usability evals, coverage gate, dependency audit, and static security scan.
 
 ### Changed
+- `PatternGenerator` registrations must declare their emitted files with
+  `outputs=(...)`; private patterns must add the declaration before registration.
 - Terraform VPC plan conformance now uses the lean
   `terraform-vpc/plan-conformance/v2` specification: requirement-observable VPC,
   subnet, and NAT sentinels plus compact reviewed resource families replace the
