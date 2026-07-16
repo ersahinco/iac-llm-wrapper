@@ -21,11 +21,11 @@ from intent_engine.core.replay import sha256_file, verify_replay_manifest
 from intent_engine.core.yaml_utils import load_bundle_yaml_mapping, write_yaml_artifact
 
 from .conformance import (
-    ConformanceResult,
-    conformance_identities,
     empty_conformance,
     evaluate_plan_conformance,
 )
+from .conformance_models import ConformanceResult
+from .conformance_spec import conformance_identities
 from .contracts import PLAN_EVIDENCE_CONTRACT
 from .evidence import (
     PlanBlocker as _Blocker,

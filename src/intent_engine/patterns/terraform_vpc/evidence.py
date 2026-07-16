@@ -11,11 +11,12 @@ from pydantic import BaseModel, ConfigDict, Field
 from intent_engine.core.package_version import installed_version
 from intent_engine.core.yaml_utils import load_bundle_yaml_mapping
 
-from .conformance import (
+from .conformance_models import ConformanceResult
+from .conformance_spec import (
     CONTROL_IDS,
+    LEGACY_CONFORMANCE_SPEC_ID,
     REQUIREMENT_KEYS,
     REQUIREMENT_SET_ID,
-    ConformanceResult,
     conformance_spec_digest,
 )
 from .target import (
@@ -351,19 +352,31 @@ def load_review_evidence(bundle: Path) -> dict[str, Any]:
     toolchain = toolchain_value if isinstance(toolchain_value, dict) else {}
     legacy = evidence.get("schemaVersion") == "intent-engine/terraform-plan-evidence/v1"
     conformance = evidence.get("conformance")
+    specification = conformance.get("specification") if isinstance(conformance, dict) else None
+    legacy_spec = (
+        evidence.get("schemaVersion") == "intent-engine/terraform-plan-evidence/v2"
+        and isinstance(specification, dict)
+        and specification.get("id") == LEGACY_CONFORMANCE_SPEC_ID
+    )
     conformance_status = (
         conformance.get("status", "incomplete") if isinstance(conformance, dict) else "incomplete"
     )
+    legacy_label = "Terraform legacy plan evidence" if legacy else "Terraform legacy conformance"
+    legacy_title = (
+        "Terraform Legacy Plan Evidence" if legacy else "Terraform Legacy Conformance Evidence"
+    )
     return {
-        "label": "Terraform legacy plan evidence" if legacy else "Terraform plan conformance",
-        "sectionTitle": (
-            "Terraform Legacy Plan Evidence" if legacy else "Terraform Plan Conformance Evidence"
-        ),
+        "label": legacy_label if legacy or legacy_spec else "Terraform plan conformance",
+        "sectionTitle": legacy_title
+        if legacy or legacy_spec
+        else "Terraform Plan Conformance Evidence",
         "artifactName": PLAN_EVIDENCE_NAME,
         "evidence": evidence,
         "summary": {
             "status": "legacy-plan-only"
             if legacy
+            else "legacy-conformance-spec"
+            if legacy_spec
             else conformance_status
             if evidence
             else "not-run",

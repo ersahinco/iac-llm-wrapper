@@ -357,7 +357,7 @@ PLAN_EVIDENCE_CONTRACT = TargetContract(
                 ),
                 ArtifactValueAssertion(
                     path="conformance.specification.id",
-                    equals="terraform-vpc/plan-conformance/v1",
+                    equals="terraform-vpc/plan-conformance/v2",
                 ),
                 ArtifactValueAssertion(path="ownerReviewRequired", equals=True),
                 ArtifactValueAssertion(path="conformance.ownerReviewRequired", equals=True),

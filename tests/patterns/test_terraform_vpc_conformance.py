@@ -11,13 +11,13 @@ import pytest
 from pydantic import ValidationError
 
 from intent_engine.core.yaml_utils import load_yaml_mapping
-from intent_engine.patterns.terraform_vpc.conformance import (
+from intent_engine.patterns.terraform_vpc.conformance import evaluate_plan_conformance
+from intent_engine.patterns.terraform_vpc.conformance_spec import (
     CONFORMANCE_SPEC_ID,
     CONTROL_IDS,
     REQUIREMENT_KEYS,
     REQUIREMENT_SET_ID,
     conformance_spec_digest,
-    evaluate_plan_conformance,
 )
 from intent_engine.patterns.terraform_vpc.evidence import (
     PlanEvidence,
@@ -276,7 +276,8 @@ def test_unsupported_or_incomplete_plan_metadata_is_untrusted(
         "module-address",
         "provider",
         "data-provider",
-        "missing-resource",
+        "missing-sentinel",
+        "unknown-family",
         "duplicate-resource",
     ],
 )
@@ -303,10 +304,12 @@ def test_resource_origin_and_inventory_drift_is_unresolved(
         _change(plan, "data.aws_caller_identity.current")["provider_name"] = (
             "registry.terraform.io/example/aws"
         )
-    elif mutation == "missing-resource":
-        plan["resource_changes"].remove(
-            _change(plan, "module.vpc.aws_default_security_group.this[0]")
-        )
+    elif mutation == "missing-sentinel":
+        plan["resource_changes"].remove(_change(plan, "module.vpc.aws_vpc.this[0]"))
+    elif mutation == "unknown-family":
+        unknown = _change(plan, "module.vpc.aws_default_security_group.this[0]")
+        unknown["address"] = "module.vpc.aws_security_group.unexpected[0]"
+        unknown["type"] = "aws_security_group"
     else:
         plan["resource_changes"].append(deepcopy(_change(plan, "module.vpc.aws_vpc.this[0]")))
 

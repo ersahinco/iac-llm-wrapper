@@ -1,291 +1,43 @@
-"""Requirement-to-plan conformance for the approved Terraform VPC target."""
+"""Requirement-focused plan conformance for the approved Terraform VPC target."""
 
 from __future__ import annotations
 
-import hashlib
-import json
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, cast
 
-from pydantic import BaseModel, ConfigDict, Field
-
-from intent_engine.core.replay import contract_digest
-
-from .contracts import CONTRACT, POLICY_PACK
+from . import conformance_spec as spec
+from .conformance_models import (
+    ConformanceIdentities,
+    ConformanceIssue,
+    ConformanceResult,
+    ConformanceSpecification,
+    ConformanceStatus,
+    ControlOutcome,
+    DeferredGate,
+    Observation,
+    ObservationStatus,
+    Outcome,
+    ProofClass,
+    RequirementOutcome,
+    ResourceProvenance,
+)
+from .contracts import POLICY_PACK
 from .graph import build_graph
 from .models import TerraformVpcIntent
 from .target import MODULE_SOURCE, MODULE_VARIABLES, PROVIDER_SOURCE, TERRAFORM_VERSION
 
-REQUIREMENT_SET_ID = "terraform-vpc/requirements/v1"
-CONFORMANCE_SPEC_ID = "terraform-vpc/plan-conformance/v1"
-REQUIREMENT_KEYS = (
-    "vpc_name",
-    "primary_region",
-    "cidr",
-    "az_count",
-    "public_subnet_cidrs",
-    "private_subnet_cidrs",
-    "enable_nat_gateway",
-    "single_nat_gateway",
-    "enable_dns_hostnames",
-    "target_account_id",
-    "deployment_pipeline_ref",
-)
-CONTROL_IDS = (
-    "VPC-DELIVERY-001",
-    "VPC-NETWORK-001",
-    "VPC-EGRESS-001",
-    "VPC-DNS-001",
-    "VPC-ATTACHMENT-001",
-)
-
-Outcome = Literal[
-    "proven",
-    "failed",
-    "unknown",
-    "not-observable",
-    "attested",
-    "unresolved",
-]
-ProofClass = Literal["immutable-input", "plan-observation", "owner-attestation", "none"]
-ObservationStatus = Literal["match", "mismatch", "unknown", "missing", "sensitive"]
+_MISSING = object()
+_UNKNOWN = object()
+_SENSITIVE = object()
+_CHECK_EXPECTED = object()
 
 
-class _StrictModel(BaseModel):
-    model_config = ConfigDict(extra="forbid", validate_by_alias=True, validate_by_name=True)
-
-
-class Observation(_StrictModel):
-    reference: str
-    status: ObservationStatus
-    value: Any = None
-
-
-class RequirementOutcome(_StrictModel):
-    requirement_id: str = Field(alias="requirementId")
-    graph_key: str = Field(alias="graphKey")
-    outcome: Outcome
-    proof_class: ProofClass = Field(alias="proofClass")
-    expected: Any = None
-    observations: list[Observation]
-    message: str
-
-
-class ControlOutcome(_StrictModel):
-    control_id: str = Field(alias="controlId")
-    outcome: Outcome
-    proof_class: ProofClass = Field(alias="proofClass")
-    evidence_references: list[str] = Field(alias="evidenceReferences")
-    deferred_to: str | None = Field(default=None, alias="deferredTo")
-    message: str
-
-
-class DeferredGate(_StrictModel):
-    id: str
-    control_id: str = Field(alias="controlId")
-    later_phase: str = Field(alias="laterPhase")
-    required_evidence: str = Field(alias="requiredEvidence")
-
-
-class ResourceProvenance(_StrictModel):
-    address: str
-    mode: Literal["managed", "data"]
-    provider: str
-    resource_type: str = Field(alias="resourceType")
-    target_contract: Literal["terraform-aws-vpc-module"] = Field(
-        default="terraform-aws-vpc-module", alias="targetContract"
-    )
-    requirement_ids: list[str] = Field(alias="requirementIds")
-    control_ids: list[str] = Field(alias="controlIds")
-
-
-class ConformanceIssue(_StrictModel):
-    code: str
-    message: str
-    next_action: str = Field(alias="nextAction")
-
-
-class ConformanceSpecification(_StrictModel):
-    id: Literal["terraform-vpc/plan-conformance/v1"]
-    sha256: str
-
-
-class ConformanceIdentities(_StrictModel):
-    requirement_graph_sha256: str = Field(alias="requirementGraphSha256")
-    decision_audit_sha256: str = Field(alias="decisionAuditSha256")
-    policy_graph_sha256: str = Field(alias="policyGraphSha256")
-    plan_manifest_sha256: str = Field(alias="planManifestSha256")
-    decision_report_sha256: str = Field(alias="decisionReportSha256")
-    module_inputs_sha256: str = Field(alias="moduleInputsSha256")
-    target_contract_sha256: str = Field(alias="targetContractSha256")
-    policy_pack_sha256: str = Field(alias="policyPackSha256")
-
-
-class ConformanceResult(_StrictModel):
-    status: Literal["conformant", "conformant-with-deferred-gates", "nonconformant", "incomplete"]
-    requirement_set_id: Literal["terraform-vpc/requirements/v1"] = Field(
-        default="terraform-vpc/requirements/v1", alias="requirementSetId"
-    )
-    specification: ConformanceSpecification
-    identities: ConformanceIdentities
-    requirements: list[RequirementOutcome]
-    controls: list[ControlOutcome]
-    not_applicable_requirement_ids: list[str] = Field(alias="notApplicableRequirementIds")
-    deferred_gates: list[DeferredGate] = Field(alias="deferredGates")
-    resources: list[ResourceProvenance]
-    owner_review_required: Literal[True] = Field(default=True, alias="ownerReviewRequired")
-
-
-_REQUIREMENT_SPEC = {
-    "vpc_name": ("name", "module.vpc.aws_vpc.this[0].tags.Name"),
-    "primary_region": ("region", "provider.aws.region", "planned subnet AZ set"),
-    "cidr": ("cidr", "module.vpc.aws_vpc.this[0].cidr_block"),
-    "az_count": ("azs", "planned public/private subnet counts"),
-    "public_subnet_cidrs": ("public_subnets", "planned public subnet CIDR set"),
-    "private_subnet_cidrs": ("private_subnets", "planned private subnet CIDR set"),
-    "enable_nat_gateway": ("enable_nat_gateway", "planned NAT resource count"),
-    "single_nat_gateway": ("single_nat_gateway", "planned NAT resource count"),
-    "enable_dns_hostnames": (
-        "enable_dns_hostnames",
-        "module.vpc.aws_vpc.this[0].enable_dns_hostnames",
-    ),
-    "target_account_id": ("delivery.targetAccountId", "aws_caller_identity output"),
-    "deployment_pipeline_ref": ("delivery.deploymentPipelineRef", "immutable input"),
-}
-
-_CONTROL_SPEC = {
-    "VPC-DELIVERY-001": ("target_account_id", "deployment_pipeline_ref"),
-    "VPC-NETWORK-001": ("cidr", "public_subnet_cidrs", "private_subnet_cidrs"),
-    "VPC-EGRESS-001": ("enable_nat_gateway", "single_nat_gateway"),
-    "VPC-DNS-001": ("enable_dns_hostnames",),
-    "VPC-ATTACHMENT-001": ("vpc_name", "cidr"),
-}
-
-_RESOURCE_SPEC = (
-    (
-        "aws_vpc.this",
-        "aws_vpc",
-        ("vpc_name", "primary_region", "cidr", "enable_dns_hostnames"),
-        ("VPC-NETWORK-001", "VPC-DNS-001", "VPC-ATTACHMENT-001"),
-        "one",
-    ),
-    (
-        "aws_internet_gateway.this",
-        "aws_internet_gateway",
-        ("cidr", "public_subnet_cidrs"),
-        ("VPC-NETWORK-001",),
-        "one",
-    ),
-    (
-        "aws_route_table.public",
-        "aws_route_table",
-        ("public_subnet_cidrs",),
-        ("VPC-NETWORK-001",),
-        "one",
-    ),
-    (
-        "aws_route.public_internet_gateway",
-        "aws_route",
-        ("public_subnet_cidrs",),
-        ("VPC-NETWORK-001",),
-        "one",
-    ),
-    (
-        "aws_default_security_group.this",
-        "aws_default_security_group",
-        ("vpc_name", "cidr"),
-        ("VPC-ATTACHMENT-001",),
-        "one",
-    ),
-    (
-        "aws_default_network_acl.this",
-        "aws_default_network_acl",
-        ("vpc_name", "cidr"),
-        ("VPC-ATTACHMENT-001",),
-        "one",
-    ),
-    (
-        "aws_default_route_table.default",
-        "aws_default_route_table",
-        ("vpc_name", "cidr"),
-        ("VPC-ATTACHMENT-001",),
-        "one",
-    ),
-    (
-        "aws_subnet.public",
-        "aws_subnet",
-        ("primary_region", "az_count", "public_subnet_cidrs"),
-        ("VPC-NETWORK-001",),
-        "az_count",
-    ),
-    (
-        "aws_subnet.private",
-        "aws_subnet",
-        ("primary_region", "az_count", "private_subnet_cidrs"),
-        ("VPC-NETWORK-001",),
-        "az_count",
-    ),
-    (
-        "aws_route_table_association.public",
-        "aws_route_table_association",
-        ("az_count", "public_subnet_cidrs"),
-        ("VPC-NETWORK-001",),
-        "az_count",
-    ),
-    (
-        "aws_route_table_association.private",
-        "aws_route_table_association",
-        ("az_count", "private_subnet_cidrs"),
-        ("VPC-NETWORK-001",),
-        "az_count",
-    ),
-    (
-        "aws_route_table.private",
-        "aws_route_table",
-        ("private_subnet_cidrs", "enable_nat_gateway", "single_nat_gateway"),
-        ("VPC-NETWORK-001", "VPC-EGRESS-001"),
-        "private_route_count",
-    ),
-    (
-        "aws_eip.nat",
-        "aws_eip",
-        ("enable_nat_gateway", "single_nat_gateway"),
-        ("VPC-EGRESS-001",),
-        "nat_count",
-    ),
-    (
-        "aws_nat_gateway.this",
-        "aws_nat_gateway",
-        ("enable_nat_gateway", "single_nat_gateway"),
-        ("VPC-EGRESS-001",),
-        "nat_count",
-    ),
-    (
-        "aws_route.private_nat_gateway",
-        "aws_route",
-        ("enable_nat_gateway", "single_nat_gateway"),
-        ("VPC-EGRESS-001",),
-        "nat_count",
-    ),
-)
-
-
-def conformance_spec_digest() -> str:
-    """Return the canonical identity of the code-owned observation specification."""
-    encoded = json.dumps(
-        {
-            "id": CONFORMANCE_SPEC_ID,
-            "requirements": _REQUIREMENT_SPEC,
-            "controls": _CONTROL_SPEC,
-            "resources": _RESOURCE_SPEC,
-            "rootDataSource": "data.aws_caller_identity.current",
-            "resourceProvider": f"registry.terraform.io/{PROVIDER_SOURCE}",
-            "module": MODULE_SOURCE,
-        },
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-    return hashlib.sha256(encoded.encode()).hexdigest()
+@dataclass
+class _Check:
+    key: str
+    expected: Any
+    proof_class: ProofClass = "plan-observation"
+    observations: list[Observation] = field(default_factory=list)
 
 
 def evaluate_plan_conformance(
@@ -297,11 +49,10 @@ def evaluate_plan_conformance(
 ) -> tuple[ConformanceResult, list[ConformanceIssue]]:
     """Compare one Terraform plan with replay-bound VPC decisions and inputs."""
     applicable, not_applicable, coverage_issue = _applicability(intent)
-    if coverage_issue is not None:
-        result = empty_conformance(identities=identities, applicable=applicable)
-        return result, [coverage_issue]
-    metadata_issues = _plan_metadata_issues(plan)
-    if metadata_issues:
+    if coverage_issue:
+        return empty_conformance(identities=identities, applicable=applicable), [coverage_issue]
+    issues = _plan_metadata_issues(plan)
+    if issues:
         return (
             empty_conformance(
                 identities=identities,
@@ -309,31 +60,29 @@ def evaluate_plan_conformance(
                 not_applicable=not_applicable,
                 intent=intent,
             ),
-            metadata_issues,
+            issues,
         )
-
-    checks = _new_checks(intent, applicable)
-    issues = _record_input_and_configuration_checks(plan, intent, module_inputs, checks)
+    checks = _checks(intent, applicable)
+    issues = _record_inputs(plan, intent, module_inputs, checks)
     changes, change_issues = _resource_changes(plan)
     issues.extend(change_issues)
-    provenance, inventory_issues = _resource_provenance(changes, module_inputs, set(applicable))
-    issues.extend(inventory_issues)
-    _record_resource_observations(plan, changes, intent, module_inputs, checks)
-    requirements = [_finish_check(checks[key]) for key in applicable]
+    resources, provenance_issues = _resource_provenance(changes, set(applicable))
+    issues.extend(provenance_issues)
+    _record_plan_observations(plan, changes, intent, checks, issues)
+    requirements = [_finish(checks[key]) for key in applicable]
     issues.extend(_requirement_issues(requirements))
-    controls = _control_outcomes(requirements)
-    status = _overall_status(requirements, controls, issues)
+    controls = _controls(requirements)
     result = ConformanceResult(
-        status=status,
-        specification=ConformanceSpecification.model_validate(
-            {"id": CONFORMANCE_SPEC_ID, "sha256": conformance_spec_digest()}
+        status=_overall_status(requirements, controls, issues),
+        specification=ConformanceSpecification(
+            id="terraform-vpc/plan-conformance/v2", sha256=spec.conformance_spec_digest()
         ),
         identities=ConformanceIdentities.model_validate(identities),
         requirements=requirements,
         controls=controls,
-        notApplicableRequirementIds=[_requirement_id(key) for key in not_applicable],
+        notApplicableRequirementIds=[spec.requirement_id(key) for key in not_applicable],
         deferredGates=_deferred_gates(controls),
-        resources=provenance,
+        resources=resources,
     )
     return result, issues
 
@@ -345,13 +94,11 @@ def empty_conformance(
     not_applicable: list[str] | None = None,
     intent: TerraformVpcIntent | None = None,
 ) -> ConformanceResult:
-    """Build complete fail-closed outcomes when no trusted plan is available."""
-    applicable = list(applicable or REQUIREMENT_KEYS)
-    not_applicable = list(not_applicable or [])
-    expected = _expected_values(intent) if intent is not None else {}
+    applicable = list(applicable or spec.REQUIREMENT_KEYS)
+    expected = intent.model_dump() if intent else {}
     requirements = [
         RequirementOutcome(
-            requirementId=_requirement_id(key),
+            requirementId=spec.requirement_id(key),
             graphKey=key,
             outcome="unresolved",
             proofClass="none",
@@ -369,46 +116,20 @@ def empty_conformance(
             evidenceReferences=[],
             message="No trusted conformance result is available.",
         )
-        for control_id in CONTROL_IDS
+        for control_id in spec.CONTROL_IDS
     ]
     return ConformanceResult(
         status="incomplete",
-        specification=ConformanceSpecification.model_validate(
-            {"id": CONFORMANCE_SPEC_ID, "sha256": conformance_spec_digest()}
+        specification=ConformanceSpecification(
+            id="terraform-vpc/plan-conformance/v2", sha256=spec.conformance_spec_digest()
         ),
         identities=ConformanceIdentities.model_validate(identities),
         requirements=requirements,
         controls=controls,
-        notApplicableRequirementIds=[_requirement_id(key) for key in not_applicable],
+        notApplicableRequirementIds=[spec.requirement_id(key) for key in not_applicable or []],
         deferredGates=[],
         resources=[],
     )
-
-
-@dataclass
-class _Check:
-    key: str
-    expected: Any
-    proof_class: ProofClass = "plan-observation"
-    observations: list[Observation] = field(default_factory=list)
-
-
-def _new_checks(intent: TerraformVpcIntent, applicable: list[str]) -> dict[str, _Check]:
-    expected = _expected_values(intent)
-    return {
-        key: _Check(
-            key=key,
-            expected=expected[key],
-            proof_class="immutable-input"
-            if key == "deployment_pipeline_ref"
-            else "plan-observation",
-        )
-        for key in applicable
-    }
-
-
-def _expected_values(intent: TerraformVpcIntent | None) -> dict[str, Any]:
-    return intent.model_dump() if intent is not None else {}
 
 
 def _applicability(
@@ -416,39 +137,39 @@ def _applicability(
 ) -> tuple[list[str], list[str], ConformanceIssue | None]:
     graph = build_graph()
     graph_keys = graph.topological_order()
-    policy_ids = tuple(control.id for control in POLICY_PACK.controls)
-    if set(graph_keys) != set(REQUIREMENT_KEYS) or set(policy_ids) != set(CONTROL_IDS):
+    if set(graph_keys) != set(spec.REQUIREMENT_KEYS) or {
+        control.id for control in POLICY_PACK.controls
+    } != set(spec.CONTROL_IDS):
         return (
             graph_keys,
             [],
             _issue(
                 "TERRAFORM_CONFORMANCE_SPEC_DRIFT",
-                "The Terraform VPC graph or policy controls are not fully covered by "
-                "the plan specification.",
-                "Update and review the target-local conformance specification before planning.",
+                "The VPC plan specification does not cover the current graph or controls.",
+                "Update and review the target-local specification before planning.",
             ),
         )
     values = intent.model_dump()
-    applicable_set: set[str] = set()
-    not_applicable_set: set[str] = set()
+    applicable: set[str] = set()
+    skipped: set[str] = set()
     for key in graph_keys:
         if graph.is_applicable(key):
-            applicable_set.add(key)
+            applicable.add(key)
             graph.decide(key, _graph_value(values[key]))
         else:
-            not_applicable_set.add(key)
+            skipped.add(key)
             graph.skip(key, "not applicable during plan conformance")
-    applicable = [key for key in REQUIREMENT_KEYS if key in applicable_set]
-    not_applicable = [key for key in REQUIREMENT_KEYS if key in not_applicable_set]
-    return applicable, not_applicable, None
+    return (
+        [key for key in spec.REQUIREMENT_KEYS if key in applicable],
+        [key for key in spec.REQUIREMENT_KEYS if key in skipped],
+        None,
+    )
 
 
 def _graph_value(value: Any) -> str:
     if isinstance(value, bool):
         return str(value).lower()
-    if isinstance(value, list):
-        return ",".join(str(item) for item in value)
-    return str(value)
+    return ",".join(str(item) for item in value) if isinstance(value, list) else str(value)
 
 
 def _plan_metadata_issues(plan: dict[str, Any]) -> list[ConformanceIssue]:
@@ -463,59 +184,38 @@ def _plan_metadata_issues(plan: dict[str, Any]) -> list[ConformanceIssue]:
                 "Use the approved Terraform version and adapter.",
             )
         )
-    if plan.get("terraform_version") != TERRAFORM_VERSION:
-        issues.append(
-            _issue(
-                "TERRAFORM_PLAN_TOOLCHAIN_MISMATCH",
-                "Terraform plan JSON does not identify the approved Terraform version.",
-                "Use the exact approved Terraform binary.",
-            )
-        )
-    for field_name, required in (("errored", False), ("complete", True), ("applyable", True)):
-        if plan.get(field_name) is not required:
-            issues.append(
-                _issue(
-                    f"TERRAFORM_PLAN_{field_name.upper()}_INVALID",
-                    f"Terraform plan field {field_name!r} must be {required}.",
-                    "Produce a complete, non-errored plan with the approved adapter.",
-                )
-            )
-    return issues
-
-
-def _record_input_and_configuration_checks(
-    plan: dict[str, Any],
-    intent: TerraformVpcIntent,
-    module_inputs: dict[str, Any],
-    checks: dict[str, _Check],
-) -> list[ConformanceIssue]:
-    issues: list[ConformanceIssue] = []
-    expected_variables = _expected_root_variables(intent)
-    _record_module_inputs(module_inputs, expected_variables, checks)
-    variables = plan.get("variables")
-    if not isinstance(variables, dict) or set(variables) != {"region", *MODULE_VARIABLES}:
-        issues.append(
-            _issue(
-                "TERRAFORM_PLAN_VARIABLES_INVALID",
-                "Terraform plan variables do not exactly match the approved root input set.",
-                "Re-plan from the replay-verified module inputs.",
-            )
-        )
-    else:
-        _record_plan_variables(variables, expected_variables, checks)
-    issues.extend(_configuration_issues(plan))
-    provider_refs = _provider_region_references(plan)
-    _record(
-        checks,
-        "primary_region",
-        "plan.configuration.provider.aws.region",
-        ["var.region"],
-        provider_refs,
+    checks = (
+        ("terraform_version", TERRAFORM_VERSION, "TOOLCHAIN_MISMATCH"),
+        ("errored", False, "ERRORED_INVALID"),
+        ("complete", True, "COMPLETE_INVALID"),
+        ("applyable", True, "APPLYABLE_INVALID"),
     )
+    for name, expected, code in checks:
+        if plan.get(name) == expected:
+            continue
+        issues.append(
+            _issue(
+                f"TERRAFORM_PLAN_{code}",
+                f"Terraform plan field {name!r} must be {expected!r}.",
+                "Produce a complete plan with the exact approved Terraform adapter.",
+            )
+        )
     return issues
 
 
-def _expected_root_variables(intent: TerraformVpcIntent) -> dict[str, Any]:
+def _checks(intent: TerraformVpcIntent, applicable: list[str]) -> dict[str, _Check]:
+    expected = intent.model_dump()
+    return {
+        key: _Check(
+            key,
+            expected[key],
+            "immutable-input" if key == "deployment_pipeline_ref" else "plan-observation",
+        )
+        for key in applicable
+    }
+
+
+def _expected_variables(intent: TerraformVpcIntent) -> dict[str, Any]:
     return {
         "region": intent.primary_region,
         "name": intent.vpc_name,
@@ -529,128 +229,125 @@ def _expected_root_variables(intent: TerraformVpcIntent) -> dict[str, Any]:
     }
 
 
-def _record_module_inputs(
-    actual: dict[str, Any], expected: dict[str, Any], checks: dict[str, _Check]
-) -> None:
-    for variable in MODULE_VARIABLES:
-        _record_variable_observations(
-            checks,
-            f"module-inputs.yaml:variables.{variable}",
-            variable,
-            expected[variable],
-            actual.get(variable, _MISSING),
-        )
-
-
-def _record_plan_variables(
-    variables: dict[str, Any], expected: dict[str, Any], checks: dict[str, _Check]
-) -> None:
-    for variable in expected:
-        entry = variables.get(variable)
-        actual = entry.get("value", _MISSING) if isinstance(entry, dict) else _MISSING
-        _record_variable_observations(
-            checks,
-            f"plan.variables.{variable}",
-            variable,
-            expected[variable],
-            actual,
-        )
-
-
-def _record_variable_observations(
+def _record_inputs(
+    plan: dict[str, Any],
+    intent: TerraformVpcIntent,
+    module_inputs: dict[str, Any],
     checks: dict[str, _Check],
-    reference: str,
-    variable: str,
-    expected: Any,
-    actual: Any,
+) -> list[ConformanceIssue]:
+    expected = _expected_variables(intent)
+    issues: list[ConformanceIssue] = []
+    if set(module_inputs) != MODULE_VARIABLES:
+        issues.append(
+            _issue(
+                "TERRAFORM_MODULE_INPUTS_INVALID",
+                "Replay-bound module inputs do not match the approved module variable set.",
+                "Recompile the source packet with the registered target.",
+            )
+        )
+    for name in MODULE_VARIABLES:
+        _record_variable(
+            checks,
+            f"module-inputs.yaml:variables.{name}",
+            name,
+            expected[name],
+            module_inputs.get(name, _MISSING),
+        )
+    variables = plan.get("variables")
+    if not isinstance(variables, dict) or set(variables) != spec.ROOT_VARIABLES:
+        issues.append(
+            _issue(
+                "TERRAFORM_PLAN_VARIABLES_INVALID",
+                "Terraform plan variables do not exactly match the approved root input set.",
+                "Re-plan from the replay-verified module inputs.",
+            )
+        )
+    else:
+        for name, expected_value in expected.items():
+            entry = variables.get(name)
+            actual = entry.get("value", _MISSING) if isinstance(entry, dict) else _MISSING
+            _record_variable(checks, f"plan.variables.{name}", name, expected_value, actual)
+    configuration_issue = _configuration_issue(plan)
+    if configuration_issue:
+        issues.append(configuration_issue)
+    _record(
+        checks,
+        "primary_region",
+        "plan.configuration.provider.aws.region",
+        ["var.region"],
+        _provider_region_references(plan),
+    )
+    return issues
+
+
+def _record_variable(
+    checks: dict[str, _Check], reference: str, name: str, expected: Any, actual: Any
 ) -> None:
-    key_by_variable = {
-        "region": "primary_region",
-        "name": "vpc_name",
-        "cidr": "cidr",
-        "public_subnets": "public_subnet_cidrs",
-        "private_subnets": "private_subnet_cidrs",
-        "enable_nat_gateway": "enable_nat_gateway",
-        "single_nat_gateway": "single_nat_gateway",
-        "enable_dns_hostnames": "enable_dns_hostnames",
-    }
-    if variable == "azs":
-        _record(checks, "primary_region", reference, sorted(expected), _sorted_value(actual))
+    if name == "azs":
+        _record(
+            checks,
+            "primary_region",
+            reference,
+            sorted(expected),
+            sorted(actual) if isinstance(actual, list) else actual,
+        )
         count = len(actual) if isinstance(actual, list) else _MISSING
         _record(checks, "az_count", reference + ".count", len(expected), count)
         return
-    key = key_by_variable[variable]
-    normalized_expected = sorted(expected) if isinstance(expected, list) else expected
-    _record(checks, key, reference, normalized_expected, _sorted_value(actual))
+    normalized = sorted(expected) if isinstance(expected, list) else expected
+    observed = sorted(actual) if isinstance(actual, list) else actual
+    _record(checks, spec.VARIABLE_REQUIREMENT[name], reference, normalized, observed)
 
 
-def _configuration_issues(plan: dict[str, Any]) -> list[ConformanceIssue]:
+def _configuration_issue(plan: dict[str, Any]) -> ConformanceIssue | None:
     configuration = plan.get("configuration")
     root = configuration.get("root_module") if isinstance(configuration, dict) else None
-    if not isinstance(root, dict):
-        return [
-            _issue(
-                "TERRAFORM_PLAN_CONFIGURATION_MISSING",
-                "Terraform plan JSON has no root configuration.",
-                "Produce plan JSON with the approved Terraform adapter.",
-            )
-        ]
-    module_calls = root.get("module_calls")
-    resources = root.get("resources")
-    provider = configuration.get("provider_config") if isinstance(configuration, dict) else None
-    checks = [
-        isinstance(module_calls, dict) and set(module_calls) == {"vpc"},
-        _approved_module_call(module_calls.get("vpc") if isinstance(module_calls, dict) else None),
-        _approved_root_resources(resources),
-        _approved_provider_configuration(provider),
-    ]
-    if all(checks):
-        return []
-    return [
-        _issue(
-            "TERRAFORM_PLAN_CONFIGURATION_UNAPPROVED",
-            "Terraform plan configuration is not the exact approved root/module/provider shape.",
-            "Restore the code-owned root and re-plan.",
-        )
-    ]
-
-
-def _approved_module_call(call: Any) -> bool:
-    if not isinstance(call, dict):
-        return False
-    source = call.get("source") or call.get("resolved_source")
-    expressions = call.get("expressions")
-    if source not in {MODULE_SOURCE, f"registry.terraform.io/{MODULE_SOURCE}"}:
-        return False
-    if not isinstance(expressions, dict) or set(expressions) != MODULE_VARIABLES:
-        return False
-    return all(
-        isinstance(expressions[name], dict)
-        and expressions[name].get("references") == [f"var.{name}"]
-        for name in MODULE_VARIABLES
+    calls = root.get("module_calls") if isinstance(root, dict) else None
+    call = calls.get("vpc") if isinstance(calls, dict) else None
+    expressions = call.get("expressions") if isinstance(call, dict) else None
+    resources = root.get("resources") if isinstance(root, dict) else None
+    providers = configuration.get("provider_config") if isinstance(configuration, dict) else None
+    provider = (
+        next(iter(providers.values()))
+        if isinstance(providers, dict) and len(providers) == 1
+        else None
     )
-
-
-def _approved_root_resources(resources: Any) -> bool:
-    return (
+    source = call.get("source") or call.get("resolved_source") if isinstance(call, dict) else None
+    module_ok = (
+        isinstance(calls, dict)
+        and set(calls) == {"vpc"}
+        and source in {MODULE_SOURCE, f"registry.terraform.io/{MODULE_SOURCE}"}
+        and isinstance(expressions, dict)
+        and set(expressions) == MODULE_VARIABLES
+        and all(
+            isinstance(expressions[name], dict)
+            and expressions[name].get("references") == [f"var.{name}"]
+            for name in MODULE_VARIABLES
+        )
+    )
+    resource_ok = (
         isinstance(resources, list)
         and len(resources) == 1
         and isinstance(resources[0], dict)
-        and resources[0].get("address") == "data.aws_caller_identity.current"
-        and resources[0].get("mode") == "data"
-        and resources[0].get("type") == "aws_caller_identity"
-        and resources[0].get("provider_config_key") == "aws"
+        and (
+            resources[0].get("address"),
+            resources[0].get("mode"),
+            resources[0].get("type"),
+            resources[0].get("provider_config_key"),
+        )
+        == ("data.aws_caller_identity.current", "data", "aws_caller_identity", "aws")
     )
-
-
-def _approved_provider_configuration(provider: Any) -> bool:
-    if not isinstance(provider, dict) or len(provider) != 1:
-        return False
-    value = next(iter(provider.values()))
-    return (
-        isinstance(value, dict)
-        and value.get("full_name") == f"registry.terraform.io/{PROVIDER_SOURCE}"
-        and isinstance(value.get("expressions"), dict)
+    provider_ok = (
+        isinstance(provider, dict)
+        and provider.get("full_name") == f"registry.terraform.io/{PROVIDER_SOURCE}"
+        and isinstance(provider.get("expressions"), dict)
+    )
+    if module_ok and resource_ok and provider_ok:
+        return None
+    return _issue(
+        "TERRAFORM_PLAN_CONFIGURATION_UNAPPROVED",
+        "Terraform plan configuration is not the exact approved root/module/provider shape.",
+        "Restore the code-owned root and re-plan.",
     )
 
 
@@ -670,119 +367,62 @@ def _resource_changes(
 ) -> tuple[list[dict[str, Any]], list[ConformanceIssue]]:
     raw = plan.get("resource_changes")
     if not isinstance(raw, list):
-        return [], [
-            _issue(
-                "TERRAFORM_PLAN_RESOURCE_CHANGES_INVALID",
-                "Terraform plan JSON has no resource change inventory.",
-                "Produce complete plan JSON with the approved adapter.",
-            )
-        ]
+        return [], [_resource_issue("Terraform plan JSON has no resource change inventory.")]
     changes = [item for item in raw if isinstance(item, dict)]
     if len(changes) != len(raw):
-        return changes, [
-            _issue(
-                "TERRAFORM_PLAN_RESOURCE_CHANGE_INVALID",
-                "Terraform plan JSON contains a malformed resource change.",
-                "Produce complete plan JSON with the approved adapter.",
-            )
-        ]
+        return changes, [_resource_issue("Terraform plan contains a malformed resource change.")]
     return changes, []
 
 
-@dataclass(frozen=True)
-class _ResourceRule:
-    resource_type: str
-    requirements: tuple[str, ...]
-    controls: tuple[str, ...]
-
-
-def _expected_resources(module_inputs: dict[str, Any]) -> dict[str, _ResourceRule]:
-    azs = module_inputs.get("azs")
-    az_count = len(azs) if isinstance(azs, list) else 0
-    single_nat = module_inputs.get("single_nat_gateway") is True
-    nat_enabled = module_inputs.get("enable_nat_gateway") is True
-    nat_count = (1 if single_nat else az_count) if nat_enabled else 0
-    private_route_count = 1 if single_nat else az_count
-    counts = {
-        "one": 1,
-        "az_count": az_count,
-        "private_route_count": private_route_count,
-        "nat_count": nat_count,
-    }
-    return {
-        f"module.vpc.{name}[{index}]": _ResourceRule(resource_type, requirements, controls)
-        for name, resource_type, requirements, controls, count_driver in _RESOURCE_SPEC
-        for index in range(counts[count_driver])
-    }
-
-
 def _resource_provenance(
-    changes: list[dict[str, Any]],
-    module_inputs: dict[str, Any],
-    applicable: set[str],
+    changes: list[dict[str, Any]], applicable: set[str]
 ) -> tuple[list[ResourceProvenance], list[ConformanceIssue]]:
-    expected = _expected_resources(module_inputs)
     provider = f"registry.terraform.io/{PROVIDER_SOURCE}"
-    provenance: list[ResourceProvenance] = []
+    resources: list[ResourceProvenance] = []
     issues: list[ConformanceIssue] = []
-    observed_managed: set[str] = set()
     seen: set[str] = set()
+    data_seen = False
     for change in changes:
         address = change.get("address")
-        mode = change.get("mode")
         if not isinstance(address, str) or address in seen:
-            issues.append(
-                _resource_issue("Terraform plan resource addresses are missing or duplicated.")
-            )
+            issues.append(_resource_issue("Resource addresses are missing or duplicated."))
             continue
         seen.add(address)
-        if mode == "data":
-            if not _approved_data_change(change, provider):
-                issues.append(
-                    _resource_issue(f"Root data resource {address!r} has unapproved provenance.")
-                )
+        if change.get("mode") == "data":
+            if _approved_data_change(change, provider):
+                data_seen = True
+            else:
+                issues.append(_resource_issue(f"Data resource {address!r} is not approved."))
             continue
-        rule = expected.get(address)
-        if mode != "managed" or rule is None:
-            issues.append(_resource_issue(f"Managed resource {address!r} is not approved."))
-            continue
-        observed_managed.add(address)
+        family = _resource_family(change)
+        change_block = change.get("change")
+        actions = change_block.get("actions") if isinstance(change_block, dict) else None
         if (
-            change.get("module_address") != "module.vpc"
+            change.get("mode") != "managed"
+            or change.get("module_address") != "module.vpc"
             or change.get("provider_name") != provider
-            or change.get("type") != rule.resource_type
+            or not address.startswith("module.vpc.")
+            or family is None
+            or actions != ["create"]
         ):
-            issues.append(
-                _resource_issue(f"Managed resource {address!r} has unapproved provenance.")
-            )
+            issues.append(_resource_issue(f"Managed resource {address!r} has unapproved origin."))
             continue
-        actions = (
-            change.get("change", {}).get("actions")
-            if isinstance(change.get("change"), dict)
-            else None
-        )
-        if actions != ["create"]:
-            issues.append(
-                _resource_issue(f"Managed resource {address!r} is not a greenfield create.")
-            )
-        provenance.append(
+        requirements, controls = spec.RESOURCE_FAMILIES[family]
+        resources.append(
             ResourceProvenance(
                 address=address,
                 mode="managed",
                 provider=provider,
-                resourceType=rule.resource_type,
+                resourceType=str(change.get("type", "")),
                 requirementIds=[
-                    _requirement_id(key) for key in rule.requirements if key in applicable
+                    spec.requirement_id(key) for key in requirements if key in applicable
                 ],
-                controlIds=list(rule.controls),
+                controlIds=list(controls),
             )
         )
-    missing = sorted(set(expected) - observed_managed)
-    if missing:
-        issues.append(
-            _resource_issue("Approved managed resources are missing: " + ", ".join(missing))
-        )
-    return sorted(provenance, key=lambda item: item.address), issues
+    if not data_seen:
+        issues.append(_resource_issue("The approved caller-identity data read is missing."))
+    return sorted(resources, key=lambda item: item.address), issues
 
 
 def _approved_data_change(change: dict[str, Any], provider: str) -> bool:
@@ -797,62 +437,79 @@ def _approved_data_change(change: dict[str, Any], provider: str) -> bool:
     )
 
 
-def _resource_issue(message: str) -> ConformanceIssue:
-    return _issue(
-        "TERRAFORM_RESOURCE_PROVENANCE_UNRESOLVED",
-        message,
-        "Restore the approved root/module invocation and re-plan.",
+def _resource_family(change: dict[str, Any]) -> str | None:
+    address = str(change.get("address", ""))
+    resource_type = change.get("type")
+    if resource_type == "aws_vpc":
+        return "vpc" if address == "module.vpc.aws_vpc.this[0]" else None
+    return next(
+        (
+            family
+            for prefix, expected_type, family in spec.RESOURCE_RULES
+            if address.startswith(prefix) and resource_type == expected_type
+        ),
+        None,
     )
 
 
-def _record_resource_observations(
+def _record_plan_observations(
     plan: dict[str, Any],
     changes: list[dict[str, Any]],
     intent: TerraformVpcIntent,
-    module_inputs: dict[str, Any],
     checks: dict[str, _Check],
+    issues: list[ConformanceIssue],
 ) -> None:
     by_address = {
         item.get("address"): item for item in changes if isinstance(item.get("address"), str)
     }
     vpc = by_address.get("module.vpc.aws_vpc.this[0]")
-    _record_change_attribute(checks, "vpc_name", vpc, ("tags", "Name"))
-    _record_change_attribute(checks, "primary_region", vpc, ("region",))
-    _record_change_attribute(checks, "cidr", vpc, ("cidr_block",))
-    _record_change_attribute(checks, "enable_dns_hostnames", vpc, ("enable_dns_hostnames",))
-    public = _changes_with_prefix(changes, "module.vpc.aws_subnet.public[")
-    private = _changes_with_prefix(changes, "module.vpc.aws_subnet.private[")
-    _record_subnet_observations(checks, "public_subnet_cidrs", public, intent.az_count)
-    _record_subnet_observations(checks, "private_subnet_cidrs", private, intent.az_count)
-    az_values = _attribute_set(public + private, ("availability_zone",))
+    for key, path in (
+        ("vpc_name", ("tags", "Name")),
+        ("primary_region", ("region",)),
+        ("cidr", ("cidr_block",)),
+        ("enable_dns_hostnames", ("enable_dns_hostnames",)),
+    ):
+        _record(
+            checks,
+            key,
+            f"plan.resources.module.vpc.aws_vpc.this[0].{'.'.join(path)}",
+            _CHECK_EXPECTED,
+            _change_value(vpc, path),
+        )
+    public = _with_prefix(changes, "module.vpc.aws_subnet.public[")
+    private = _with_prefix(changes, "module.vpc.aws_subnet.private[")
+    _record_subnets(checks, "public_subnet_cidrs", public, intent.az_count)
+    _record_subnets(checks, "private_subnet_cidrs", private, intent.az_count)
     _record(
         checks,
         "primary_region",
         "plan.resources.aws_subnet.availability_zone.set",
-        sorted(_expected_root_variables(intent)["azs"]),
-        az_values,
+        sorted(_expected_variables(intent)["azs"]),
+        _attribute_set(public + private, ("availability_zone",)),
     )
-    nat_count = len(_changes_with_prefix(changes, "module.vpc.aws_nat_gateway.this["))
+    nat = _with_prefix(changes, "module.vpc.aws_nat_gateway.this[")
     expected_nat = (
         (1 if intent.single_nat_gateway else intent.az_count) if intent.enable_nat_gateway else 0
     )
-    observed_nat_count: Any = nat_count if nat_count or expected_nat == 0 else _MISSING
+    topology = (int(vpc is not None), len(public), len(private), len(nat))
+    if topology != (1, intent.az_count, intent.az_count, expected_nat):
+        issues.append(_resource_issue("VPC, subnet, or NAT topology does not match the intent."))
+    observed_nat: Any = len(nat) if nat or expected_nat == 0 else _MISSING
     _record(
         checks,
         "enable_nat_gateway",
         "plan.resources.aws_nat_gateway.count",
         expected_nat,
-        observed_nat_count,
+        observed_nat,
     )
-    if "single_nat_gateway" in checks:
-        _record(
-            checks,
-            "single_nat_gateway",
-            "plan.resources.aws_nat_gateway.count",
-            expected_nat,
-            observed_nat_count,
-        )
-    _record_account_output(plan, checks)
+    _record(
+        checks,
+        "single_nat_gateway",
+        "plan.resources.aws_nat_gateway.count",
+        expected_nat,
+        observed_nat,
+    )
+    _record_account(plan, checks)
     _record(
         checks,
         "deployment_pipeline_ref",
@@ -862,21 +519,21 @@ def _record_resource_observations(
     )
 
 
-def _record_subnet_observations(
-    checks: dict[str, _Check], key: str, changes: list[dict[str, Any]], az_count: int
+def _record_subnets(
+    checks: dict[str, _Check], key: str, changes: list[dict[str, Any]], count: int
 ) -> None:
     observed_count: Any = len(changes) if changes else _MISSING
-    _record(checks, "az_count", f"plan.resources.{key}.count", az_count, observed_count)
+    _record(checks, "az_count", f"plan.resources.{key}.count", count, observed_count)
     _record(
         checks,
         key,
         f"plan.resources.{key}.cidr_block.set",
-        _EXPECTED_FROM_CHECK,
+        _CHECK_EXPECTED,
         _attribute_set(changes, ("cidr_block",)),
     )
 
 
-def _record_account_output(plan: dict[str, Any], checks: dict[str, _Check]) -> None:
+def _record_account(plan: dict[str, Any], checks: dict[str, _Check]) -> None:
     planned = plan.get("planned_values")
     outputs = planned.get("outputs") if isinstance(planned, dict) else None
     output = outputs.get("aws_caller_identity") if isinstance(outputs, dict) else None
@@ -888,51 +545,33 @@ def _record_account_output(plan: dict[str, Any], checks: dict[str, _Check]) -> N
         value = _UNKNOWN
     else:
         value = output.get("value", _MISSING)
-    _record(
-        checks, "target_account_id", "plan.outputs.aws_caller_identity", _EXPECTED_FROM_CHECK, value
-    )
+    _record(checks, "target_account_id", "plan.outputs.aws_caller_identity", _CHECK_EXPECTED, value)
 
 
-def _changes_with_prefix(changes: list[dict[str, Any]], prefix: str) -> list[dict[str, Any]]:
+def _with_prefix(changes: list[dict[str, Any]], prefix: str) -> list[dict[str, Any]]:
     return sorted(
         [item for item in changes if str(item.get("address", "")).startswith(prefix)],
         key=lambda item: str(item.get("address", "")),
     )
 
 
-def _record_change_attribute(
-    checks: dict[str, _Check], key: str, change: dict[str, Any] | None, path: tuple[str, ...]
-) -> None:
-    value = _change_attribute(change, path)
-    _record(
-        checks,
-        key,
-        f"plan.resources.module.vpc.aws_vpc.this[0].{'.'.join(path)}",
-        _EXPECTED_FROM_CHECK,
-        value,
-    )
-
-
 def _attribute_set(changes: list[dict[str, Any]], path: tuple[str, ...]) -> Any:
     if not changes:
         return _MISSING
-    values = [_change_attribute(change, path) for change in changes]
-    if any(value is _SENSITIVE for value in values):
-        return _SENSITIVE
-    if any(value is _UNKNOWN for value in values):
-        return _UNKNOWN
-    if any(value is _MISSING for value in values):
-        return _MISSING
+    values = [_change_value(change, path) for change in changes]
+    for marker in (_SENSITIVE, _UNKNOWN, _MISSING):
+        if any(value is marker for value in values):
+            return marker
     return sorted(dict.fromkeys(values))
 
 
-def _change_attribute(change: dict[str, Any] | None, path: tuple[str, ...]) -> Any:
+def _change_value(change: dict[str, Any] | None, path: tuple[str, ...]) -> Any:
     if not isinstance(change, dict) or not isinstance(change.get("change"), dict):
         return _MISSING
     payload = change["change"]
-    if _mask_value(payload.get("after_sensitive"), path):
+    if _masked(payload.get("after_sensitive"), path):
         return _SENSITIVE
-    if _mask_value(payload.get("after_unknown"), path):
+    if _masked(payload.get("after_unknown"), path):
         return _UNKNOWN
     value: Any = payload.get("after", _MISSING)
     for part in path:
@@ -942,7 +581,7 @@ def _change_attribute(change: dict[str, Any] | None, path: tuple[str, ...]) -> A
     return value
 
 
-def _mask_value(mask: Any, path: tuple[str, ...]) -> bool:
+def _masked(mask: Any, path: tuple[str, ...]) -> bool:
     value = mask
     for part in path:
         if value is True:
@@ -957,31 +596,32 @@ def _record(
     checks: dict[str, _Check], key: str, reference: str, expected: Any, observed: Any
 ) -> None:
     check = checks.get(key)
-    if check is None:
+    if not check:
         return
-    if expected is _EXPECTED_FROM_CHECK:
-        expected = check.expected
-    if observed is _MISSING:
-        check.observations.append(Observation(reference=reference, status="missing"))
-    elif observed is _UNKNOWN:
-        check.observations.append(Observation(reference=reference, status="unknown"))
-    elif observed is _SENSITIVE:
-        check.observations.append(Observation(reference=reference, status="sensitive"))
-    else:
-        check.observations.append(
-            Observation(
-                reference=reference,
-                status="match" if _equal(expected, observed) else "mismatch",
-                value=observed,
-            )
+    expected = check.expected if expected is _CHECK_EXPECTED else expected
+    markers: dict[int, ObservationStatus] = {
+        id(_MISSING): "missing",
+        id(_UNKNOWN): "unknown",
+        id(_SENSITIVE): "sensitive",
+    }
+    status = markers.get(id(observed))
+    if status:
+        check.observations.append(Observation(reference=reference, status=status))
+        return
+    check.observations.append(
+        Observation(
+            reference=reference,
+            status="match" if _equal(expected, observed) else "mismatch",
+            value=observed,
         )
+    )
 
 
-def _finish_check(check: _Check) -> RequirementOutcome:
+def _finish(check: _Check) -> RequirementOutcome:
     statuses = {item.status for item in check.observations}
     if "mismatch" in statuses:
         outcome: Outcome = "failed"
-        message = "Known immutable input or plan observations contradict the accepted requirement."
+        message = "Known immutable input or plan observations contradict the requirement."
     elif "unknown" in statuses:
         outcome = "unknown"
         message = "Terraform marks a required plan observation as unknown."
@@ -992,7 +632,7 @@ def _finish_check(check: _Check) -> RequirementOutcome:
         outcome = "proven"
         message = "Immutable input and required plan observations agree."
     return RequirementOutcome(
-        requirementId=_requirement_id(check.key),
+        requirementId=spec.requirement_id(check.key),
         graphKey=check.key,
         outcome=outcome,
         proofClass=check.proof_class,
@@ -1003,93 +643,79 @@ def _finish_check(check: _Check) -> RequirementOutcome:
 
 
 def _requirement_issues(requirements: list[RequirementOutcome]) -> list[ConformanceIssue]:
-    issues: list[ConformanceIssue] = []
-    labels = {
+    codes = {
         "failed": "TERRAFORM_REQUIREMENT_FAILED",
         "unknown": "TERRAFORM_REQUIREMENT_UNKNOWN",
         "unresolved": "TERRAFORM_REQUIREMENT_UNRESOLVED",
     }
-    for requirement in requirements:
-        code = labels.get(requirement.outcome)
-        if code is not None:
-            issues.append(
-                _issue(
-                    code,
-                    f"{requirement.requirement_id}: {requirement.message}",
-                    "Correct the source packet or code-owned target, then recompile and re-plan.",
-                )
-            )
-    return issues
+    return [
+        _issue(
+            codes[item.outcome],
+            f"{item.requirement_id}: {item.message}",
+            "Correct the source packet or code-owned target, then recompile and re-plan.",
+        )
+        for item in requirements
+        if item.outcome in codes
+    ]
 
 
-def _control_outcomes(requirements: list[RequirementOutcome]) -> list[ControlOutcome]:
+def _controls(requirements: list[RequirementOutcome]) -> list[ControlOutcome]:
     by_key = {item.graph_key: item for item in requirements}
     controls: list[ControlOutcome] = []
-    for control_id in CONTROL_IDS:
-        members = [by_key[key] for key in _CONTROL_SPEC[control_id] if key in by_key]
-        blocking = _blocking_outcome(members)
-        if blocking is not None:
-            controls.append(
-                ControlOutcome(
-                    controlId=control_id,
-                    outcome=blocking,
-                    proofClass="none",
-                    evidenceReferences=[member.requirement_id for member in members],
-                    message="A mapped requirement has no passing terminal outcome.",
-                )
-            )
-        elif control_id in {"VPC-DELIVERY-001", "VPC-NETWORK-001", "VPC-ATTACHMENT-001"}:
-            controls.append(_deferred_control(control_id, members))
-        else:
-            controls.append(
-                ControlOutcome(
-                    controlId=control_id,
-                    outcome="proven",
-                    proofClass="plan-observation",
-                    evidenceReferences=[member.requirement_id for member in members],
-                    message="All plan-observable mapped requirements are proven.",
-                )
-            )
-    return controls
-
-
-def _blocking_outcome(requirements: list[RequirementOutcome]) -> Outcome | None:
-    outcomes = {item.outcome for item in requirements}
-    if "failed" in outcomes:
-        return "failed"
-    if "unknown" in outcomes:
-        return "unknown"
-    if "unresolved" in outcomes:
-        return "unresolved"
-    return None
-
-
-def _deferred_control(control_id: str, requirements: list[RequirementOutcome]) -> ControlOutcome:
-    later = {
+    deferred = {
         "VPC-DELIVERY-001": "owner pipeline-control review",
         "VPC-NETWORK-001": "owner IPAM/allocation review",
         "VPC-ATTACHMENT-001": "downstream attachment review",
-    }[control_id]
-    return ControlOutcome(
-        controlId=control_id,
-        outcome="not-observable",
-        proofClass="owner-attestation",
-        evidenceReferences=[item.requirement_id for item in requirements],
-        deferredTo=later,
-        message="Plan-observable subclaims pass; independent owner evidence is still required.",
-    )
+    }
+    for control_id in spec.CONTROL_IDS:
+        members = [by_key[key] for key in spec.CONTROL_SPEC[control_id] if key in by_key]
+        outcomes = {item.outcome for item in members}
+        blocking: Outcome | None = None
+        for candidate in ("failed", "unknown", "unresolved"):
+            if candidate in outcomes:
+                blocking = cast(Outcome, candidate)
+                break
+        if blocking:
+            outcome, proof, message = (
+                blocking,
+                "none",
+                "A mapped requirement has no passing terminal outcome.",
+            )
+        elif control_id in deferred:
+            outcome, proof, message = (
+                "not-observable",
+                "owner-attestation",
+                "Plan-observable subclaims pass; independent owner evidence is still required.",
+            )
+        else:
+            outcome, proof, message = (
+                "proven",
+                "plan-observation",
+                "All plan-observable mapped requirements are proven.",
+            )
+        controls.append(
+            ControlOutcome(
+                controlId=control_id,
+                outcome=outcome,
+                proofClass=cast(ProofClass, proof),
+                evidenceReferences=[item.requirement_id for item in members],
+                deferredTo=deferred.get(control_id) if outcome == "not-observable" else None,
+                message=message,
+            )
+        )
+    return controls
 
 
 def _deferred_gates(controls: list[ControlOutcome]) -> list[DeferredGate]:
     return [
         DeferredGate(
-            id=f"terraform-vpc/deferred-gates/v1/{control.control_id.lower()}",
-            controlId=control.control_id,
-            laterPhase=control.deferred_to or "owner review",
+            id=f"terraform-vpc/deferred-gates/v1/{item.control_id.lower()}",
+            controlId=item.control_id,
+            laterPhase=item.deferred_to or "owner review",
             requiredEvidence="Independent owner evidence bound to the exact v2 evidence digest.",
         )
-        for control in controls
-        if control.outcome == "not-observable"
+        for item in controls
+        if item.outcome == "not-observable"
     ]
 
 
@@ -1097,15 +723,13 @@ def _overall_status(
     requirements: list[RequirementOutcome],
     controls: list[ControlOutcome],
     issues: list[ConformanceIssue],
-) -> Literal["conformant", "conformant-with-deferred-gates", "nonconformant", "incomplete"]:
+) -> ConformanceStatus:
     outcomes = {item.outcome for item in requirements} | {item.outcome for item in controls}
     if "failed" in outcomes:
         return "nonconformant"
     if outcomes & {"unknown", "unresolved"} or issues:
         return "incomplete"
-    if "not-observable" in outcomes:
-        return "conformant-with-deferred-gates"
-    return "conformant"
+    return "conformant-with-deferred-gates" if "not-observable" in outcomes else "conformant"
 
 
 def _equal(expected: Any, observed: Any) -> bool:
@@ -1114,31 +738,13 @@ def _equal(expected: Any, observed: Any) -> bool:
     return bool(expected == observed)
 
 
-def _sorted_value(value: Any) -> Any:
-    return sorted(value) if isinstance(value, list) else value
-
-
-def _requirement_id(key: str) -> str:
-    return f"{REQUIREMENT_SET_ID}/{key}"
+def _resource_issue(message: str) -> ConformanceIssue:
+    return _issue(
+        "TERRAFORM_RESOURCE_PROVENANCE_UNRESOLVED",
+        message,
+        "Restore the approved root/module invocation and re-plan.",
+    )
 
 
 def _issue(code: str, message: str, next_action: str) -> ConformanceIssue:
     return ConformanceIssue(code=code, message=message, nextAction=next_action)
-
-
-_MISSING = object()
-_UNKNOWN = object()
-_SENSITIVE = object()
-_EXPECTED_FROM_CHECK = object()
-
-
-def conformance_identities(identities: dict[str, str]) -> dict[str, str]:
-    """Add code-owned contract and policy identities to bundle artifact identities."""
-    policy = json.dumps(
-        POLICY_PACK.model_dump(by_alias=True), sort_keys=True, separators=(",", ":")
-    )
-    return {
-        **identities,
-        "targetContractSha256": contract_digest(CONTRACT),
-        "policyPackSha256": hashlib.sha256(policy.encode()).hexdigest(),
-    }

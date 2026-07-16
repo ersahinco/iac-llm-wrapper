@@ -21,7 +21,11 @@ from intent_engine.patterns.terraform_vpc.atmos import (
     ATMOS_CATALOG_ARTIFACT,
     ATMOS_COMPONENT_ROOT,
 )
-from intent_engine.patterns.terraform_vpc.conformance import CONTROL_IDS, REQUIREMENT_KEYS
+from intent_engine.patterns.terraform_vpc.conformance_spec import (
+    CONTROL_IDS,
+    LEGACY_CONFORMANCE_SPEC_ID,
+    REQUIREMENT_KEYS,
+)
 from intent_engine.patterns.terraform_vpc.contracts import PLAN_EVIDENCE_CONTRACT
 from intent_engine.patterns.terraform_vpc.evidence import load_review_evidence
 from intent_engine.patterns.terraform_vpc.plan import (
@@ -490,6 +494,29 @@ def test_static_review_never_upgrades_v1_evidence_to_conformant(bundle: Path) ->
 
     assert review["summary"]["status"] == "legacy-plan-only"
     assert review["label"] == "Terraform legacy plan evidence"
+
+
+def test_static_review_never_upgrades_legacy_conformance_spec(bundle: Path) -> None:
+    write_yaml_artifact(
+        bundle / PLAN_EVIDENCE_NAME,
+        {
+            "schemaVersion": "intent-engine/terraform-plan-evidence/v2",
+            "status": "pass",
+            "conformance": {
+                "status": "conformant-with-deferred-gates",
+                "specification": {"id": LEGACY_CONFORMANCE_SPEC_ID, "sha256": "0" * 64},
+            },
+            "plan": {"exitCode": 2},
+            "toolchain": {"wrapperVersion": "legacy"},
+            "blockers": [],
+        },
+        "",
+    )
+
+    review = load_review_evidence(bundle)
+
+    assert review["summary"]["status"] == "legacy-conformance-spec"
+    assert review["label"] == "Terraform legacy conformance"
 
 
 def test_validate_approved_root_runs_only_locked_init_and_validate(

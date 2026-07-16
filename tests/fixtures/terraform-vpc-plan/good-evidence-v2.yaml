@@ -213,8 +213,8 @@ conformance:
   status: conformant-with-deferred-gates
   requirementSetId: terraform-vpc/requirements/v1
   specification:
-    id: terraform-vpc/plan-conformance/v1
-    sha256: 6f140d1279391366ae318224734a588e6e6a0de7956b8f7171574ad80d653f5b
+    id: terraform-vpc/plan-conformance/v2
+    sha256: 9ed5a35deddfbc9a0462d3243694b08de3bbaa4a411a8c96f19b21a940dfa176
   identities:
     requirementGraphSha256: '1111111111111111111111111111111111111111111111111111111111111111'
     decisionAuditSha256: '1111111111111111111111111111111111111111111111111111111111111111'
