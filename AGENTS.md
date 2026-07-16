@@ -157,10 +157,11 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, pytest, ruff, mypy, pyright.
 
 ### Current Goal
 
-Deliver the OSS-native Atmos bridge as a stateless `terraform-vpc`
-requirements-to-target handoff while keeping LLM guidance advisory, target code
-authoritative, and every backend, credential, workspace, approval, plan, and
-apply decision downstream. Real owner use remains separately authorization-gated.
+Keep the product at the native requirements-to-target handoff boundary: validated
+intent becomes target-native configuration, evidence, and a PR-ready packet;
+owner repositories and OSS execution platforms retain every backend, credential,
+workspace, approval, apply, drift, and audit decision. AFT is the next candidate,
+not an authorized implementation.
 
 ### Status
 
@@ -251,6 +252,14 @@ apply decision downstream. Real owner use remains separately authorization-gated
   sensitive required values, missing observations, unexpected origins, or
   incomplete/errored plans. Normal success is
   `conformant-with-deferred-gates`, not global policy compliance.
+- **Lean conformance repair**: the Terraform VPC evaluator is now exactly 750
+  physical lines, down from 1,144. Strict evidence models and the immutable
+  observation specification remain pattern-local; specification v2 verifies
+  requirement-observable VPC/subnet/NAT sentinels plus reviewed resource
+  families without treating incidental default ACL, security-group, or route
+  table counts as business requirements. Evidence-schema v1 renders as
+  `legacy-plan-only`; v2 evidence using conformance specification v1 renders as
+  `legacy-conformance-spec`. Both fail current conformance.
 - **OSS-native Atmos bridge**: every successful `terraform-vpc` compile emits an
   abstract `terraform-vpc/intent-defaults` catalog plus a byte-for-byte copy of
   the approved Terraform root and provider lockfile. A second pattern-owned
@@ -265,6 +274,13 @@ apply decision downstream. Real owner use remains separately authorization-gated
   owner project disables workspaces and backend generation; those choices are
   not embedded in the generated bridge. No plan, apply, destroy, credentials, or
   cloud API is used.
+- **Native OSS owner boundary**: this repository stops after native target
+  artifacts, an evidence sidecar, and a PR-ready handoff. AWS LZA configuration,
+  Atmos catalog/component configuration, and CloudFormation parameters are
+  current native outputs. A fixed-template AFT `account-request.tf` is the next
+  candidate only after an owner supplies its repository contract, approved
+  account/SSO email handling, one real request, and repeat use. Score workloads
+  and Crossplane XRs remain demand-gated.
 - **Module-content identity**: locked init must produce the reviewed module
   6.6.1 portable source tree at release commit
   `3ffbd46fb1c7733e1b34d8666893280454e27436`, SHA-256
@@ -280,8 +296,8 @@ apply decision downstream. Real owner use remains separately authorization-gated
   four-platform provider lockfile. The real credential-free locked init and JSON
   validate passed; CI and release jobs run the same proof through the pinned
   setup-terraform action.
-- **Validation**: 547 tests passed with one optional integration test skipped;
-  coverage is 90.76%. Under uv 0.11.29, Ruff, Ruff
+- **Validation**: 545 tests passed with five optional integration tests skipped.
+  Under uv 0.11.29, Ruff, Ruff
   format, mypy, Pyright, fixture drift, golden journey, extraction (8/8),
   usability (8/8), all-files `prek`, the credential-free approved-root proof,
   checksum-pinned Atmos 1.223.0 integration proof, constrained package build,
@@ -362,9 +378,27 @@ apply decision downstream. Real owner use remains separately authorization-gated
 - Do not create an executor registry for one target. Generalize only after a
   second real plan-capable target demonstrates the same protocol.
 - Use Git plus contract-backed artifacts as the integration protocol. Atmos is
-  the first pattern-local bridge; Backstage, Atlantis, Terramate, Terragrunt,
-  Score, and Crossplane remain optional consumers or future targets rather than
-  runtime dependencies.
+  the first pattern-local bridge. Repository ownership ends after target-native
+  configuration, evidence, and a PR-ready handoff; it does not create the PR.
+- Require a self-hosted, OSI-licensed path for every mandatory integration;
+  proprietary services may remain optional owner choices only.
+- Keep Atlantis downstream; owner-defined custom workflows may call Atmos
+  without any API integration here. Defer Terramate because it duplicates the
+  unproven Atmos bridge. Terragrunt remains an owner-selected alternative.
+- Select AFT as the next native target candidate, not the next implementation.
+  Require an owner AFT repository contract, one real request, approved account
+  and SSO email handling, and repeat use before registration. Any future emitter
+  renders only the owner-approved fixed module call; it never pushes Git, invokes
+  CodePipeline, obtains credentials, or adds plan conformance. Required identity
+  and email fields are explicit owner input and never LLM-inferred.
+- Add cfn-lint/cfn-guard to `cloudformation-parameters` only when an owner supplies
+  the approved local template and rules. They validate template/policy while the
+  intent-engine contract continues to own parameter correctness. The AWS IaC MCP
+  server may expose those tools conversationally but remains optional and
+  non-authoritative.
+- Score and Crossplane remain demand-gated. Do not emit a Crossplane XR until an
+  owner supplies the exact XRD/Composition contract, including organization-owned
+  `apiVersion`, `kind`, and schema.
 - Require one owner PR, one repeated use, and a material review benefit before
   adding MCP, portal code, service APIs, a second orchestration bridge, or a new
   semantic evaluator. Remove the Atmos bridge if schema/form generation proves
@@ -385,15 +419,21 @@ apply decision downstream. Real owner use remains separately authorization-gated
    material benefit—missing decision discovery, contradiction blocking,
    misleading-plan rejection, or evidence used in review—and one repeat use
    before expanding the integration surface.
-2. Run the explicit Terraform owner acceptance trial only after receiving an
+2. Do not register AFT until an owner supplies the AFT request-repository
+   contract, one approved real account request, approved handling for account and
+   SSO emails, and repeat demand. If those gates are met, review a fixed-template
+   configuration-only proposal; do not implement Git push or CodePipeline calls.
+3. Add cfn-lint/cfn-guard validation only when an owner provides an approved
+   CloudFormation template and rules with a concrete review failure to address.
+4. Run the explicit Terraform owner acceptance trial only after receiving an
    owner-approved non-production packet/account and matching restricted AWS
    credentials; require v2 `conformant-with-deferred-gates` evidence, validate
    cloud-audit read scope out of band, and verify no state, raw JSON, or plan
    binary remains.
-3. Clarify the intended OU for each workload account in the banking customer
+5. Clarify the intended OU for each workload account in the banking customer
    packet and record the mappings under an account inventory; compilation now
    fails closed until that evidence exists.
-4. Re-run official `iac-llm-wrapper lza validate` with owner-approved account
+6. Re-run official `iac-llm-wrapper lza validate` with owner-approved account
    emails and an AWS/LZA lookup-capable validation context.
-5. If validation still fails, fix only packet-backed repo issues or record
+7. If validation still fails, fix only packet-backed repo issues or record
    owner-side failures as downstream evidence.

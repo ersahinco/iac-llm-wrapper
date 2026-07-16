@@ -90,6 +90,11 @@ accelerators, modules, and provisioning pipelines remain the delivery layer.
 This project is not an LZA replacement, LZA CLI wrapper, Terraform/NTC
 alternative, or deployment pipeline.
 
+The repository owns the path from architecture exchange to validated intent,
+then to native target artifacts, an evidence sidecar, and a PR-ready handoff.
+The owner creates the PR and owns every later transition: orchestration, state,
+policy, approval, apply, drift, and audit.
+
 ## Five-Minute Local Run
 
 Run a small local model path with Ollama and `uv`:
@@ -198,12 +203,26 @@ APIs. These projects are optional downstream choices:
 - [Backstage](https://backstage.io/) may collect known inputs, invoke the existing
   CLI, and commit its output; it does not replace decision discovery or evidence.
 - [Atlantis](https://www.runatlantis.io/) may execute the owner repository's Atmos
-  workflow and approval rules.
-- [Terramate](https://terramate.io/) and
-  [Terragrunt](https://terragrunt.gruntwork.io/) remain alternative Terraform
-  orchestration targets; no adapter is added without repeated owner demand.
+  workflow and approval rules through an owner-defined custom workflow; no API
+  integration belongs here.
+- [AWS Control Tower AFT](https://docs.aws.amazon.com/controltower/latest/userguide/aft-provision-account.html)
+  is the next configuration-only target candidate, not an implementation. It
+  requires an owner AFT repository contract, explicit account and SSO inputs,
+  approved email-data handling, one real account request, and repeat use first.
+- [cfn-lint](https://github.com/aws-cloudformation/cfn-lint) and
+  [cfn-guard](https://github.com/aws-cloudformation/cloudformation-guard) are the
+  smallest possible enhancement to `cloudformation-parameters` when an owner
+  provides the approved template and rules. Parameter contracts remain this
+  project's responsibility.
+- [Terragrunt](https://terragrunt.gruntwork.io/) remains an alternative
+  Terraform orchestration target. Terramate is deferred because another bridge
+  would duplicate the still-unproven Atmos workflow.
 - [Score](https://score.dev/) and [Crossplane](https://www.crossplane.io/) need
-  separate target contracts and real use cases before implementation.
+  separate owner contracts and real use cases before implementation; Crossplane
+  additionally requires the exact organization-owned XRD and Composition.
+- The [AWS IaC MCP server](https://github.com/awslabs/mcp/tree/main/src/aws-iac-mcp-server)
+  may expose CloudFormation validation conversationally, but remains optional
+  and non-authoritative.
 
 No Backstage portal, Atlantis API, MCP server, second orchestration adapter, or
 new LLM provider belongs in this slice. Add one only after an owner uses the

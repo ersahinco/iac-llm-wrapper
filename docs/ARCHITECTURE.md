@@ -79,6 +79,80 @@ interpretation and resource provenance. `policy-graph.yaml` remains control
 mapping metadata, not an evaluator. State, locking, drift, approval, signed
 attestation, and any fresh downstream plan remain owner-platform concerns.
 
+## Native OSS owner handoff
+
+The repository owns only the transition from an architecture exchange into a
+validated intent packet, and the transition from that packet into native target
+artifacts, an evidence sidecar, and a PR-ready handoff. It does not open the PR
+or cross into the owner execution boundary.
+
+```text
+Architect / ticket / optional AI conversation
+  -> intent-engine
+     requirements, applicability, gaps, provenance, target contract
+  -> native target artifact + evidence sidecar + PR-ready handoff
+  -> Atmos / AWS LZA / AFT / Crossplane / Terramate       [owner repository]
+  -> Atlantis or another owner-controlled executor        [owner platform]
+  -> state, policy, approval, apply, drift, and audit      [owner platform]
+```
+
+Target outputs stay native rather than converging on an intent-engine-specific
+deployment format:
+
+| Target | Native handoff | Status |
+| --- | --- | --- |
+| AWS Landing Zone Accelerator | Official-style LZA configuration | Implemented |
+| Atmos | Abstract catalog plus approved Terraform component root | Implemented for `terraform-vpc` |
+| CloudFormation | Parameters for an owner-approved existing template | Implemented |
+| AWS Control Tower AFT | Fixed-template `account-request.tf` module call | Candidate only |
+| Score | Workload specification | Demand-gated |
+| Crossplane | XR matching an owner XRD/Composition | Demand-gated |
+
+### Next candidate: AFT, not another executor
+
+[AWS documents](https://docs.aws.amazon.com/controltower/latest/userguide/aft-provision-account.html)
+an account request Terraform file committed to the AFT account-request
+repository, with `git push` invoking the downstream AFT CodePipeline. That is a
+natural configuration-only handoff, so AFT is the next native target candidate.
+It is not the next implementation.
+
+Before registering an AFT pattern, require an owner-provided AFT repository
+contract, one real account request, approved handling of account and SSO email
+data, and repeat use. Account name, email, managed OU, SSO user fields, change
+reason, requester, tags, custom fields, and customization selection must be
+explicit owner input; an LLM must never infer identity or email data. A future
+emitter may render only the official owner-approved fixed module call. It must
+not push Git, invoke CodePipeline, obtain credentials, provision AFT, or add a
+plan-conformance evaluator.
+
+### Smallest adjacent OSS integrations
+
+Only self-hosted, OSI-licensed paths are eligible for required integrations;
+hosted or proprietary features may be optional downstream owner choices but
+cannot become compile or validation dependencies.
+
+- For `cloudformation-parameters`, add
+  [cfn-lint](https://github.com/aws-cloudformation/cfn-lint) template validation
+  and [cfn-guard](https://github.com/aws-cloudformation/cloudformation-guard)
+  owner-rule validation only when an owner supplies the local approved template
+  and rules. These tools validate template shape and policy; the intent-engine
+  contract remains authoritative for the parameter artifact. Their result is
+  validation evidence, not deployment authority. cfn-lint describes complex
+  dynamic values as best-effort validation, so its success is not semantic proof.
+- The [AWS IaC MCP server](https://github.com/awslabs/mcp/tree/main/src/aws-iac-mcp-server)
+  can expose cfn-lint and cfn-guard conversationally, but remains optional and
+  non-authoritative. It must not become the contract, credential, or execution
+  boundary.
+- Keep Atlantis downstream. Its
+  [custom workflows](https://www.runatlantis.io/docs/custom-workflows.html) can
+  call Atmos from the owner repository; this project needs no Atlantis API.
+- Defer Terramate because a second Terraform orchestration bridge would
+  duplicate the still-unproven Atmos workflow.
+- Defer Crossplane until an owner supplies the exact XRD and Composition. An XR
+  is an organization-defined custom API whose schema comes from its XRD, so
+  `apiVersion`, `kind`, and accepted fields cannot be guessed generically. See
+  the [Crossplane composite-resource model](https://docs.crossplane.io/latest/composition/composite-resources/).
+
 AWS Landing Zone Accelerator is the reference target: accepted decisions produce
 contract-checked LZA YAML/config files, and the downstream LZA process remains
 responsible for validating and applying them.

@@ -39,12 +39,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD: lint, format, type check, tests, extraction/usability evals, coverage gate, dependency audit, and static security scan.
 
 ### Changed
+- Terraform VPC plan conformance now uses the lean
+  `terraform-vpc/plan-conformance/v2` specification: requirement-observable VPC,
+  subnet, and NAT sentinels plus compact reviewed resource families replace the
+  exhaustive incidental module-resource inventory. The evaluator is capped at
+  750 physical lines without a new runtime or generic policy framework.
+- The OSS owner boundary now ends at target-native configuration, evidence, and
+  a PR-ready handoff. AFT is recorded as the next configuration-only candidate
+  behind owner repository, privacy, real-request, and repeat-use gates;
+  Atlantis remains downstream, while Terramate, Score, and Crossplane stay
+  deferred until target-specific owner demand exists.
 - Product positioning is now “requirements-to-target handoff compiler.” The
   historical package name remains compatibility-safe; LLMs are optional
   conversational adapters and provider expansion is frozen.
 - Terraform plan success is now `produced`; only the pattern-owned evaluator can
   emit `conformant` or `conformant-with-deferred-gates`. V1 action-only evidence
-  renders as `legacy-plan-only` and cannot satisfy the new milestone.
+  renders as `legacy-plan-only`, and evidence v2 using conformance specification
+  v1 renders as `legacy-conformance-spec`; neither satisfies current conformance.
 - Primary project and CLI name is `iac-llm-wrapper`; `intent-engine` remains the core engine and optional CLI alias.
 - Structured Markdown decisions take precedence over direct LLM decisions, direct LLM decisions take precedence over signal decisions, and defaults fill only remaining gaps.
 - LLM-reported gaps and contradictions only block when they target known applicable requirement graph nodes.
