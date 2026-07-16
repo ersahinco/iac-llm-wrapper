@@ -77,6 +77,7 @@ def build_incremental_llm_context(
 
 def incremental_decision_report(
     *,
+    graph,
     baseline_decisions: dict[str, Any],
     final_decisions: dict[str, Any],
     input_diff_report: dict[str, Any],
@@ -91,7 +92,7 @@ def incremental_decision_report(
             added.append({"key": key, "value": SampleConfig.to_builtin(final_decisions[key])})
         elif key not in final_decisions:
             removed.append({"key": key, "value": SampleConfig.to_builtin(baseline_decisions[key])})
-        elif not _values_match(baseline_decisions[key], final_decisions[key]):
+        elif not graph.values_match(key, baseline_decisions[key], final_decisions[key]):
             changed.append(
                 {
                     "key": key,
@@ -138,7 +139,7 @@ def _changed_structured_decisions(
                     "change": "added",
                 }
             )
-        elif not _values_match(before_value, after_value):
+        elif not graph.values_match(key, baseline_decisions[key], after_decisions[key]):
             changed.append(
                 {
                     "key": key,
@@ -264,16 +265,3 @@ def _yaml_like(data: Any) -> str:
 
 def _coerce_list(value: Any) -> list[Any]:
     return value if isinstance(value, list) else []
-
-
-def _values_match(before: Any, after: Any) -> bool:
-    return SampleConfig._values_match(
-        _normalize_list_like(before, after),
-        _normalize_list_like(after, before),
-    )
-
-
-def _normalize_list_like(value: Any, peer: Any) -> Any:
-    if isinstance(peer, list) and isinstance(value, str):
-        return [part.strip() for part in value.split(",") if part.strip()]
-    return value

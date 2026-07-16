@@ -40,7 +40,7 @@ downstream owner, command, pipeline, or schema result produced it.
 
 | Change | Start here | Usual checks |
 | --- | --- | --- |
-| Docs only | `README.md`, `docs/`, product-language tests | `uv run pytest tests/core/test_product_language.py`, `uv run ruff format --check .`, `uv run ruff check .` |
+| Docs only | `README.md`, `docs/`, product-language tests | `uv run --locked --extra dev pytest tests/core/test_product_language.py`, `uv run --locked --extra dev ruff format --check .`, `uv run --locked --extra dev ruff check .` |
 | AWS LZA field or validation | `src/intent_engine/patterns/aws_lza/` | Pattern tests, golden journey, fixture drift |
 | Generic graph or validation behavior | `src/intent_engine/core/requirements.py`, `validator.py`, `compiler.py` | Core tests, pattern tests, extraction/usability evals |
 | Artifact shape | `contracts.py`, `generator.py`, pattern generators | Contract tests, fixture drift, golden journey |
@@ -50,25 +50,23 @@ downstream owner, command, pipeline, or schema result produced it.
 ## Local Setup
 
 ```bash
-uv venv
-source .venv/bin/activate
-uv pip install -e ".[dev]"
-uv run pytest
+uv sync --locked --extra dev
+uv run --locked --extra dev pytest
 ```
 
 ## Full Gate
 
 ```bash
-uv run pytest
-uv run ruff check .
-uv run ruff format --check .
-uv run --extra dev mypy
-uv run --extra dev pyright .
-uv run python scripts/sync-sample-fixtures.py --check
-uv run python scripts/evaluate-golden-journey.py
-uv run python scripts/evaluate-extraction.py
-uv run python scripts/evaluate-usability.py
-uv run --extra dev prek run --all-files
+uv run --locked --extra dev pytest
+uv run --locked --extra dev ruff check .
+uv run --locked --extra dev ruff format --check .
+uv run --locked --extra dev mypy
+uv run --locked --extra dev pyright .
+uv run --locked --extra dev python scripts/sync-sample-fixtures.py --check
+uv run --locked --extra dev python scripts/evaluate-golden-journey.py
+uv run --locked --extra dev python scripts/evaluate-extraction.py
+uv run --locked --extra dev python scripts/evaluate-usability.py
+uv run --locked --extra dev prek run --all-files
 ```
 
 For small changes, run the smallest relevant subset from the change matrix.
@@ -96,7 +94,9 @@ installs, configures, and enforces them.
 
 ## Code conventions
 
-- **Type safety**: Pydantic v2 models for all data structures. No `dict` for domain objects.
+- **Type safety**: Use Pydantic v2 models at domain and untrusted-input boundaries.
+  Use dataclasses or typed mappings for cohesive internal state, and plain mappings
+  for serialized artifact payloads where the target contract owns the shape.
 - **Pattern-driven**: New target path = new pattern, not modifications to core code.
 - **Data-driven**: New requirement = new `Requirement` node. The LLM prompt, interview questions, defaults, validation, and artifact emission all update automatically.
 - **No arbitrary IaC generation**: Current paths emit validated handoff artifacts,

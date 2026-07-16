@@ -12,52 +12,81 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .requirements import RequirementGraph, describe_expression
 
+_JSON_FENCE = re.compile(
+    r"\A```(?:json)?[ \t]*\r?\n(?P<body>.*)\r?\n```[ \t]*\Z",
+    re.IGNORECASE | re.DOTALL,
+)
+_JSON_WRAPPER_CHARS = frozenset("{}[]")
 
-def _normalized_json_text(raw: str) -> str:
+
+class _GraphResponse(BaseModel):
+    """Strict shape for the graph-aware model response boundary."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    decisions: dict[str, Any] = Field(default_factory=dict)
+    signal_decisions: dict[str, Any] = Field(default_factory=dict)
+    gaps: list[dict[str, Any]] = Field(default_factory=list)
+    contradictions: list[dict[str, Any]] = Field(default_factory=list)
+
+
+def _load_json_object(text: str) -> tuple[dict[str, Any] | None, str | None]:
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as exc:
+        return None, f"LLM response is not valid JSON: {exc.msg}"
+    if not isinstance(parsed, dict):
+        return None, "LLM response must be a JSON object"
+    return parsed, None
+
+
+def _is_non_json_prose(value: str) -> bool:
+    text = value.strip()
+    if not text:
+        return True
+    if any(char in text for char in _JSON_WRAPPER_CHARS):
+        return False
+    try:
+        json.loads(text)
+    except json.JSONDecodeError:
+        return any(char.isalpha() for char in text)
+    return False
+
+
+def _safe_json_parse(raw: str) -> tuple[dict[str, Any] | None, str | None]:
+    """Parse valid JSON while removing only harmless presentation wrappers."""
     text = raw.strip()
-    if text.startswith("```"):
-        lines = text.splitlines()
-        if len(lines) >= 2:
-            text = "\n".join(lines[1:-1]).strip()
-    if text.startswith("json"):
-        text = text[4:].strip()
-    if text.startswith("```"):
-        text = text.strip("`").strip()
-    return text
+    if not text:
+        return None, "LLM response is empty"
 
+    if "```" in text:
+        fence = _JSON_FENCE.fullmatch(text)
+        if fence is None:
+            return None, "LLM response contains an incomplete JSON code fence"
+        return _load_json_object(fence.group("body").strip())
 
-def _json_candidates(text: str) -> list[str]:
-    """Return ordered recovery candidates without parsing policy duplication."""
-    candidates = [text]
-    brace_match = re.search(r"\{.*\}", text, re.DOTALL)
-    if brace_match:
-        candidates.append(brace_match.group())
-    candidates.extend(
-        [
-            re.sub(r'([}\]])[\t\n ]+(?=")', r"\1, ", text),
-            re.sub(r",\s*([}\]])", r"\1", text),
-        ]
-    )
-    candidates.extend(
-        text[: index + 1] for index in range(len(text) - 1, 0, -1) if text[index] == "}"
-    )
-    return list(dict.fromkeys(candidates))
+    parsed, error = _load_json_object(text)
+    if parsed is not None:
+        return parsed, None
 
-
-def _safe_json_parse(raw: str) -> dict[str, Any] | None:
-    """Parse a JSON mapping through ordered, reviewable recovery candidates."""
-    for candidate in _json_candidates(_normalized_json_text(raw)):
-        try:
-            parsed = json.loads(candidate)
-            if isinstance(parsed, dict):
-                return parsed
-        except json.JSONDecodeError:
-            continue
-    return None
+    object_start = text.find("{")
+    if object_start < 0:
+        return None, error
+    try:
+        recovered, object_end = json.JSONDecoder().raw_decode(text[object_start:])
+    except json.JSONDecodeError:
+        return None, error
+    prefix = text[:object_start]
+    suffix = text[object_start + object_end :]
+    if not _is_non_json_prose(prefix) or not _is_non_json_prose(suffix):
+        return None, "LLM response contains additional JSON structure"
+    if not isinstance(recovered, dict):
+        return None, "LLM response must contain one JSON object"
+    return recovered, None
 
 
 @dataclass
@@ -69,6 +98,7 @@ class LLMGraphResult:
     gaps: list[dict[str, Any]] = field(default_factory=list)
     contradictions: list[dict[str, Any]] = field(default_factory=list)
     raw_response: str = ""
+    parse_error: str | None = None
 
     def to_intent(self, extractor: Extractor) -> Any:
         """Convert the decision map to a type-safe intent model."""
@@ -242,15 +272,23 @@ class Extractor:
         Supports graph-aware format (with decisions/signals/gaps) and flat
         decision maps from simpler backends.
         """
-        data: dict[str, Any] = _safe_json_parse(response) or {}
         result = LLMGraphResult(raw_response=response)
+        data, result.parse_error = _safe_json_parse(response)
+        if data is None:
+            return result
 
         # Graph-aware format
-        if "decisions" in data or "signal_decisions" in data:
-            result.decisions = self._stringify_decisions(data.get("decisions", {}))
-            result.signal_decisions = self._stringify_decisions(data.get("signal_decisions", {}))
-            result.gaps = data.get("gaps", [])
-            result.contradictions = data.get("contradictions", [])
+        reserved_fields = {"decisions", "signal_decisions", "gaps", "contradictions"}
+        if reserved_fields.intersection(data):
+            try:
+                graph_response = _GraphResponse.model_validate(data)
+            except ValidationError as exc:
+                result.parse_error = f"Invalid graph response shape: {exc.errors()[0]['msg']}"
+                return result
+            result.decisions = self._stringify_decisions(graph_response.decisions)
+            result.signal_decisions = self._stringify_decisions(graph_response.signal_decisions)
+            result.gaps = graph_response.gaps
+            result.contradictions = graph_response.contradictions
             return result
 
         # Flat format: treat entire response as decisions.

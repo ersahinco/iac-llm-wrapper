@@ -13,7 +13,7 @@ def test_github_actions_runs_golden_journey_shift_left_check():
     ci = _read(".github/workflows/ci.yml")
     pr_template = _read(".github/pull_request_template.md")
 
-    command = "uv run python scripts/evaluate-golden-journey.py"
+    command = "uv run --locked --extra dev python scripts/evaluate-golden-journey.py"
     assert "Golden journey shift-left check" in ci
     assert command in ci
     assert command in pr_template

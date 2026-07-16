@@ -349,3 +349,42 @@ def test_registry_and_pattern_check_share_reference_validation(tmp_path: Path):
     assert references[0].check_message in check_pattern(pattern, fixtures_root=tmp_path).violations
     with pytest.raises(ValueError, match="requires decision 'missing'"):
         PatternRegistry().register(pattern)
+
+
+def test_registry_and_pattern_check_reject_unsafe_paths_consistently(tmp_path: Path):
+    pattern = Pattern(
+        name="unsafe-paths",
+        description="Unsafe path references",
+        graph_factory=lambda: _graph(_requirement()),
+        intent_factory=_TestIntent,
+        contracts=[
+            TargetContract(
+                name="valid-contract",
+                kind="yaml",
+                source_url="https://example.com",
+                artifacts=[ArtifactContract(name="config.yaml")],
+                required_decisions=["region"],
+            )
+        ],
+        samples=[
+            SampleConfig(
+                name="unsafe-sample",
+                pattern="unsafe-paths",
+                version="1.0.0",
+                release_date="2026-01-01",
+                source_url="https://example.com",
+                fixture_dir="../outside",
+                decisions={"region": "eu-central-1"},
+            )
+        ],
+        artifact_review_owners={"../review.yaml": "owner"},
+        forbidden_artifacts=("/tmp/main.tf",),
+    )
+
+    result = check_pattern(pattern, fixtures_root=tmp_path)
+
+    assert any("invalid fixture path ../outside" in item for item in result.violations)
+    assert any("invalid artifact owner path ../review.yaml" in item for item in result.violations)
+    assert any("invalid forbidden artifact path /tmp/main.tf" in item for item in result.violations)
+    with pytest.raises(ValueError, match="invalid path"):
+        PatternRegistry().register(pattern)

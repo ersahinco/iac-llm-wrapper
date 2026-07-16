@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import ruamel.yaml
+from ruamel.yaml.error import YAMLError
 
 
 def dump_yaml(data: Any, *, indent: bool = True) -> str:
@@ -27,7 +28,10 @@ def write_yaml_artifact(path: Path, data: Any, header: str, *, indent: bool = Tr
 def load_yaml_mapping(path: Path) -> dict[str, Any]:
     """Load a required YAML mapping and reject other document shapes."""
     yaml = ruamel.yaml.YAML(typ="safe")
-    data = yaml.load(path.read_text())
+    try:
+        data = yaml.load(path.read_text())
+    except (OSError, UnicodeError, YAMLError) as exc:
+        raise ValueError(f"{path}: invalid YAML: {exc}") from exc
     if not isinstance(data, dict):
         raise ValueError(f"{path}: expected YAML mapping")
     return data

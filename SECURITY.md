@@ -2,7 +2,10 @@
 
 ## Scope and threat model
 
-`iac-llm-wrapper` is a design-time decision harness. It does not make cloud API calls and does not deploy infrastructure directly. Security focus is therefore:
+`iac-llm-wrapper` is a design-time decision harness. Compile and generation paths
+do not make cloud API calls or deploy infrastructure. The optional AWS LZA
+validation-only adapter may perform read-only account lookup through the supplied
+AWS/LZA context; it does not deploy or mutate accounts. Security focus is therefore:
 
 - software supply chain risk in dependencies
 - insecure coding patterns in repository code
@@ -14,8 +17,9 @@ LLM-backed runs can preserve raw prompt/response evidence for auditability. That
 evidence is useful and should be kept with the handoff bundle, but it can contain
 customer design prose, account names, topology, control requirements, and model
 outputs. Store it in restricted output locations, keep secrets out of design
-docs, pass API keys through environment variables or `--api-key`, and redact raw
-evidence before sharing outside the project team.
+docs, pass API keys through environment variables, and redact raw evidence before
+sharing outside the project team. The compatible `--api-key` option is discouraged
+because command arguments can remain visible in shell history and process listings.
 
 ## Secret references
 
@@ -32,7 +36,7 @@ responsible for resolving those references under its own access controls.
 
 The `security` CI job runs:
 
-- `pip-audit --skip-editable`
+- `pip-audit` against a locked export of the shipped runtime dependencies
 - `bandit -c bandit.yaml -r src -q -ll`
 
 Policy:

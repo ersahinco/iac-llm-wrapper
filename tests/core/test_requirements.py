@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
+
 import pytest
+from pydantic import BaseModel
 
 from intent_engine.core.requirements import (
     Requirement,
@@ -390,3 +393,49 @@ class TestRequirementGraph:
             "regions": ["eu-central-1", "eu-west-1"],
             "enabled": True,
         }
+
+    def test_values_match_uses_declared_types_without_folding_strings(self):
+        class Mode(StrEnum):
+            SAFE = "safe"
+            STRICT = "strict"
+
+        class Intent(BaseModel):
+            name: str = ""
+            enabled: bool = False
+            count: int | None = None
+            regions: list[str] = []
+            mode: Mode = Mode.SAFE
+
+        graph = RequirementGraph()
+        graph._intent_model = Intent
+        graph.add(Requirement("name", "Name", "Name?", target_field="name"))
+        graph.add(
+            Requirement(
+                "enabled", "Enabled", "Enabled?", target_field="enabled", target_type="bool"
+            )
+        )
+        graph.add(Requirement("count", "Count", "Count?", target_field="count", target_type="int"))
+        graph.add(
+            Requirement(
+                "regions",
+                "Regions",
+                "Regions?",
+                target_field="regions",
+                target_type="string_list",
+            )
+        )
+        graph.add(Requirement("mode", "Mode", "Mode?", target_field="mode"))
+
+        assert not graph.values_match("name", "Prod", "prod")
+        assert graph.values_match("name", " Prod ", "Prod")
+        assert graph.values_match("enabled", "true", True)
+        assert not graph.values_match("enabled", "truthy", "truthy")
+        assert graph.values_match("count", "2", 2)
+        assert graph.values_match("count", None, None)
+        assert not graph.values_match("count", "1.5", "1.5")
+        assert graph.values_match(
+            "regions", "eu-central-1,eu-west-1", ["eu-central-1", "eu-west-1"]
+        )
+        assert graph.values_match("regions", "eu-central-1", ["eu-central-1"])
+        assert not graph.values_match("regions", 3, 3)
+        assert graph.values_match("mode", "strict", Mode.STRICT)

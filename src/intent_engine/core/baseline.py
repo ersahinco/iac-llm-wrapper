@@ -2,10 +2,20 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .yaml_utils import read_yaml_mapping
+from .yaml_utils import load_yaml_mapping
+
+
+@dataclass(frozen=True)
+class BaselineBundle:
+    """Trusted fields read once from a generated incremental baseline."""
+
+    pattern: str
+    decisions: dict[str, Any]
+    summary: dict[str, Any]
 
 
 def without_locked_decisions(
@@ -15,32 +25,37 @@ def without_locked_decisions(
     return {key: value for key, value in decisions.items() if key not in locked_keys}
 
 
-def baseline_decisions_from_bundle(bundle: Path) -> dict[str, Any]:
-    trace = read_yaml_mapping(bundle / "llm-trace-summary.yaml")
+def load_baseline_bundle(bundle: Path) -> BaselineBundle:
+    """Load the required baseline reports without silent shape fallback."""
+    report = load_yaml_mapping(bundle / "decision-report.yaml")
+    trace = load_yaml_mapping(bundle / "llm-trace-summary.yaml")
+    benchmark = load_yaml_mapping(bundle / "model-benchmark.yaml")
+
     accepted = trace.get("acceptedDecisions")
     if isinstance(accepted, dict) and accepted:
-        return accepted
-    sample = read_yaml_mapping(bundle / "sample-recommendations.yaml")
-    current = sample.get("currentDecisions")
-    if isinstance(current, dict) and current:
-        return current
-    report = read_yaml_mapping(bundle / "decision-report.yaml")
-    decisions = report.get("decisions")
-    return decisions if isinstance(decisions, dict) else {}
+        decisions = accepted
+    else:
+        report_decisions = report.get("decisions")
+        decisions = report_decisions if isinstance(report_decisions, dict) else {}
 
-
-def baseline_summary_from_bundle(bundle: Path) -> dict[str, Any]:
-    report = read_yaml_mapping(bundle / "decision-report.yaml")
-    trace = read_yaml_mapping(bundle / "llm-trace-summary.yaml")
-    benchmark = read_yaml_mapping(bundle / "model-benchmark.yaml")
     readiness = report.get("handoffReadiness") or {}
     quality = benchmark.get("quality", {}) if isinstance(benchmark.get("quality"), dict) else {}
-    return {
-        "pattern": report.get("pattern", trace.get("pattern", benchmark.get("pattern", "unknown"))),
-        "readiness": readiness,
-        "acceptedDecisionCount": quality.get("acceptedDecisionCount"),
-        "rawLlmCoverage": {
-            "covered": quality.get("rawLlmAcceptedCoverageCount"),
-            "accepted": quality.get("acceptedDecisionCount"),
+    pattern = str(report.get("pattern") or "")
+    other_patterns = [
+        str(value) for value in (trace.get("pattern"), benchmark.get("pattern")) if value
+    ]
+    if pattern and any(value != pattern for value in other_patterns):
+        raise ValueError("incremental baseline reports declare different patterns")
+    return BaselineBundle(
+        pattern=pattern,
+        decisions=decisions,
+        summary={
+            "pattern": pattern,
+            "readiness": readiness,
+            "acceptedDecisionCount": quality.get("acceptedDecisionCount"),
+            "rawLlmCoverage": {
+                "covered": quality.get("rawLlmAcceptedCoverageCount"),
+                "accepted": quality.get("acceptedDecisionCount"),
+            },
         },
-    }
+    )

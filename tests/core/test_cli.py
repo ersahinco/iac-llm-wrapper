@@ -3,16 +3,22 @@
 from __future__ import annotations
 
 import json
+from importlib.metadata import version as distribution_version
 from pathlib import Path
 from typing import Any
 
+import pytest
 from typer.testing import CliRunner
 
-from intent_engine.cli import app
+from intent_engine.cli import APP_VERSION, app
 from intent_engine.core.llm_caller import LLMBackend, LLMCaller
 
 FIXTURES = Path(__file__).parent.parent.parent / "fixtures"
 runner = CliRunner()
+
+
+def test_cli_version_uses_installed_distribution_metadata():
+    assert APP_VERSION == distribution_version("iac-llm-wrapper")
 
 
 class _MockBackend(LLMBackend):
@@ -368,6 +374,27 @@ class TestExplainCommand:
     def test_explain_missing_report_fails(self, tmp_path: Path):
         result = runner.invoke(app, ["explain", "--report", str(tmp_path / "missing.yaml")])
         assert result.exit_code == 1
+
+    @pytest.mark.parametrize(
+        ("content", "message"),
+        [
+            ("region: [unterminated\n", "invalid YAML"),
+            ("- not\n- a\n- mapping\n", "expected YAML mapping"),
+        ],
+    )
+    def test_explain_rejects_invalid_yaml_mapping(
+        self,
+        tmp_path: Path,
+        content: str,
+        message: str,
+    ):
+        report = tmp_path / "decision-report.yaml"
+        report.write_text(content)
+
+        result = runner.invoke(app, ["explain", "--report", str(report)])
+
+        assert result.exit_code == 1
+        assert message in result.output
 
 
 class TestInterviewCommand:

@@ -487,6 +487,21 @@ class RequirementGraph:
                 typed[key] = value
         return typed
 
+    def values_match(self, key: str, left: Any, right: Any) -> bool:
+        """Compare two decision values through the requirement's declared type."""
+        if left is None or right is None:
+            return left is None and right is None
+        req = self._requirements.get(key)
+        if req is None:
+            return bool(left == right)
+        left_value = self._convert_value(left, req.target_type, req.target_field or key)
+        right_value = self._convert_value(right, req.target_type, req.target_field or key)
+        if left_value is None or right_value is None:
+            return False
+        if isinstance(left_value, str) and isinstance(right_value, str):
+            return left_value.strip() == right_value.strip()
+        return bool(left_value == right_value)
+
     def apply_defaults_for_remaining(self) -> None:
         while True:
             pending = self.pending()

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .contracts import ContractValidator
 from .model_introspection import validate_requirement_against_model
+from .paths import relative_path_error
 from .patterns import Pattern
 from .requirements import RequirementGraph, expression_dependencies, validate_expression
 
@@ -115,11 +116,38 @@ def _metadata_reference_violations(
         artifact.name for contract in pattern.contracts for artifact in contract.artifacts
     }
     for artifact_name in pattern.artifact_review_owners:
+        path_error = relative_path_error(artifact_name)
+        if path_error:
+            violations.append(
+                PatternReferenceViolation(
+                    f"invalid artifact owner path {artifact_name}: {path_error}",
+                    f"Artifact owner mapping '{artifact_name}' has an invalid path: {path_error}",
+                )
+            )
         if artifact_name not in known_artifacts:
             violations.append(
                 PatternReferenceViolation(
                     f"unknown artifact owner mapping {artifact_name}",
                     f"Artifact owner mapping references unknown artifact '{artifact_name}'",
+                )
+            )
+    for artifact_name in pattern.forbidden_artifacts:
+        path_error = relative_path_error(artifact_name)
+        if path_error:
+            violations.append(
+                PatternReferenceViolation(
+                    f"invalid forbidden artifact path {artifact_name}: {path_error}",
+                    f"Forbidden artifact '{artifact_name}' has an invalid path: {path_error}",
+                )
+            )
+    for sample in pattern.samples:
+        path_error = relative_path_error(sample.fixture_name)
+        if path_error:
+            violations.append(
+                PatternReferenceViolation(
+                    f"{sample.name}: invalid fixture path {sample.fixture_name}: {path_error}",
+                    f"Sample '{sample.name}' fixture path '{sample.fixture_name}' is invalid: "
+                    f"{path_error}",
                 )
             )
     return violations
@@ -211,6 +239,8 @@ def _check_samples(pattern: Pattern, fixtures_root: Path, violations: list[str])
     for sample in pattern.samples:
         if not sample.decisions:
             violations.append(f"{sample.name}: sample has no decisions")
+        if relative_path_error(sample.fixture_name):
+            continue
         if sample.fixture_dir or (fixtures_root / sample.fixture_name).exists():
             fixture_dir = fixtures_root / sample.fixture_name
             if not fixture_dir.exists():

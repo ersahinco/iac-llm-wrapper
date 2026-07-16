@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as distribution_version
 from pathlib import Path
 from typing import Any
 
@@ -65,7 +67,16 @@ from .patterns.aws_lza.validation import (
 load_builtin_patterns()
 
 APP_NAME = "iac-llm-wrapper"
-APP_VERSION = "0.1.0"
+
+
+def _installed_version() -> str:
+    try:
+        return distribution_version(APP_NAME)
+    except PackageNotFoundError:
+        return "0+unknown"
+
+
+APP_VERSION = _installed_version()
 
 app = typer.Typer(
     name=APP_NAME,
@@ -983,7 +994,7 @@ def compile(
     api_key: str = typer.Option(
         os.environ.get("OPENAI_API_KEY", ""),
         "--api-key",
-        help="API key for LLM provider",
+        help="API key for LLM provider; prefer OPENAI_API_KEY to avoid shell history exposure",
     ),
     evidence_output: Path = typer.Option(
         None,
@@ -1172,7 +1183,7 @@ def discover(
     api_key: str = typer.Option(
         os.environ.get("OPENAI_API_KEY", ""),
         "--api-key",
-        help="API key for LLM provider",
+        help="API key for LLM provider; prefer OPENAI_API_KEY to avoid shell history exposure",
     ),
     evidence_output: Path = typer.Option(
         None,
@@ -1465,7 +1476,11 @@ def explain(
         typer.echo(f"Error: report file does not exist: {report}", err=True)
         raise typer.Exit(1)
 
-    output = explain_report(report)
+    try:
+        output = explain_report(report)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
     typer.echo(output)
 
 

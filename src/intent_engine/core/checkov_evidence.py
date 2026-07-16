@@ -16,6 +16,14 @@ BOUNDARY = (
     "resources, install modules, clone repositories, or run apply commands."
 )
 
+_SUMMARY_FIELDS = {
+    "passed": "passed",
+    "failed": "failed",
+    "skipped": "skipped",
+    "parsing_errors": "parsingErrors",
+    "resource_count": "resourceCount",
+}
+
 
 def scan_path_is_tfvars_only(scan_path: Path) -> bool:
     return scan_path.is_file() and scan_path.suffix.lower() == ".tfvars"
@@ -102,7 +110,8 @@ def run_checkov_evidence(
     )
     evidence["tool"]["version"] = (version_proc.stdout or version_proc.stderr).strip()
 
-    argv = [executable, "-d", str(scan_path), "-o", "json"]
+    input_flag = "-f" if scan_path.is_file() else "-d"
+    argv = [executable, input_flag, str(scan_path), "-o", "json"]
     for checks_dir in external_checks_dirs:
         argv.extend(["--external-checks-dir", str(checks_dir)])
     if checkov_framework:
@@ -131,8 +140,28 @@ def run_checkov_evidence(
         }
         return evidence
 
-    summary, findings = _extract_checkov_payload(payload)
-    status = "pass" if summary["failed"] == 0 and proc.returncode == 0 else "fail"
+    extracted = _extract_checkov_payload(payload)
+    if extracted is None:
+        evidence["result"].update(
+            {
+                "status": "invalid-output",
+                "message": (
+                    "checkov JSON output did not contain complete summary and results mappings."
+                ),
+            }
+        )
+        evidence["rawOutput"] = {
+            "stdout": proc.stdout[:4000],
+            "stderr": proc.stderr[:4000],
+        }
+        return evidence
+
+    summary, findings = extracted
+    status = (
+        "pass"
+        if summary["failed"] == 0 and summary["parsingErrors"] == 0 and proc.returncode == 0
+        else "fail"
+    )
     evidence["result"]["status"] = status
     evidence["summary"] = summary
     evidence["findings"] = findings
@@ -188,29 +217,32 @@ def _input_block(
     }
 
 
-def _extract_checkov_payload(payload: Any) -> tuple[dict[str, int], list[dict[str, Any]]]:
+def _extract_checkov_payload(
+    payload: Any,
+) -> tuple[dict[str, int], list[dict[str, Any]]] | None:
     reports = payload if isinstance(payload, list) else [payload]
+    if not reports:
+        return None
     summary = _empty_summary()
     findings: list[dict[str, Any]] = []
     for report in reports:
         if not isinstance(report, dict):
-            continue
+            return None
         report_summary = report.get("summary")
-        if isinstance(report_summary, dict):
-            summary["passed"] += _int(report_summary.get("passed"))
-            summary["failed"] += _int(report_summary.get("failed"))
-            summary["skipped"] += _int(report_summary.get("skipped"))
-            summary["parsingErrors"] += _int(report_summary.get("parsing_errors"))
-            summary["resourceCount"] += _int(report_summary.get("resource_count"))
         results = report.get("results")
-        if not isinstance(results, dict):
-            continue
+        if not isinstance(report_summary, dict) or not isinstance(results, dict):
+            return None
+        counts = _summary_counts(report_summary)
+        if counts is None:
+            return None
+        for key, value in counts.items():
+            summary[key] += value
         failed_checks = results.get("failed_checks")
         if not isinstance(failed_checks, list):
-            continue
+            return None
         for check in failed_checks:
             if not isinstance(check, dict):
-                continue
+                return None
             findings.append(
                 {
                     "checkId": check.get("check_id", ""),
@@ -223,8 +255,11 @@ def _extract_checkov_payload(payload: Any) -> tuple[dict[str, int], list[dict[st
     return summary, findings[:50]
 
 
-def _int(value: Any) -> int:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return 0
+def _summary_counts(summary: dict[str, Any]) -> dict[str, int] | None:
+    counts: dict[str, int] = {}
+    for source, target in _SUMMARY_FIELDS.items():
+        value = summary.get(source)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            return None
+        counts[target] = value
+    return counts

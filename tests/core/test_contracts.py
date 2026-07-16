@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+from intent_engine.core.compile_artifacts import remove_generated_artifacts
 from intent_engine.core.contracts import (
     BLOCKED_ASSESSMENT_CONTRACT,
     CONTEXT_MANIFEST_CONTRACT,
@@ -71,6 +74,73 @@ def _yaml_contract() -> TargetContract:
 class TestContractValidator:
     def test_contract_definition_validates(self):
         assert ContractValidator(_contract()).validate_contract() == []
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "",
+            "../escape.yaml",
+            "/tmp/escape.yaml",
+            "nested//config.yaml",
+            "./config.yaml",
+            "C:/config.yaml",
+            "nested\\config.yaml",
+        ],
+    )
+    def test_contract_rejects_non_portable_artifact_paths(self, name: str):
+        contract = TargetContract(
+            name="unsafe-path",
+            kind="yaml",
+            source_url="https://example.com",
+            artifacts=[ArtifactContract(name=name)],
+            required_decisions=["region"],
+        )
+
+        codes = {violation.code for violation in ContractValidator(contract).validate_contract()}
+
+        assert "CONTRACT_ARTIFACT_PATH_INVALID" in codes
+
+    def test_contract_accepts_nested_relative_artifact_path(self):
+        contract = TargetContract(
+            name="nested-path",
+            kind="yaml",
+            source_url="https://example.com",
+            artifacts=[ArtifactContract(name="config/network/vpc.yaml")],
+            required_decisions=["region"],
+        )
+
+        assert ContractValidator(contract).validate_contract() == []
+
+    def test_artifact_validation_does_not_follow_unsafe_contract_path(self, tmp_path: Path):
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+        (tmp_path / "escape.yaml").write_text("secret: outside\n")
+        contract = TargetContract(
+            name="unsafe-path",
+            kind="yaml",
+            source_url="https://example.com",
+            artifacts=[ArtifactContract(name="../escape.yaml")],
+            required_decisions=["region"],
+        )
+
+        violations = ContractValidator(contract).validate_artifacts(input_dir)
+
+        assert [item.code for item in violations] == ["CONTRACT_ARTIFACT_PATH_INVALID"]
+
+    def test_generated_artifact_cleanup_unlinks_directory_symlink(self, tmp_path: Path):
+        target = tmp_path / "outside"
+        target.mkdir()
+        marker = target / "keep.txt"
+        marker.write_text("keep")
+        output = tmp_path / "output"
+        output.mkdir()
+        link = output / "decision-report.yaml"
+        link.symlink_to(target, target_is_directory=True)
+
+        remove_generated_artifacts(output, "aws-lza")
+
+        assert not link.exists()
+        assert marker.read_text() == "keep"
 
     def test_unknown_lineage_artifact_fails(self):
         contract = _contract()
@@ -219,6 +289,15 @@ class TestContractValidator:
         assert len(violations) == 1
         assert violations[0].code == "CONTRACT_ARTIFACT_SCHEMA_INVALID"
         assert "config.yaml is not valid YAML" in violations[0].message
+
+    def test_non_mapping_yaml_artifact_fails(self, tmp_path: Path):
+        (tmp_path / "config.yaml").write_text("- not\n- a\n- mapping\n")
+
+        violations = ContractValidator(_yaml_contract()).validate_artifacts(tmp_path)
+
+        assert len(violations) == 1
+        assert violations[0].code == "CONTRACT_ARTIFACT_SCHEMA_INVALID"
+        assert violations[0].message == "config.yaml must contain a YAML mapping."
 
     def test_lineage_path_missing_fails(self, tmp_path: Path):
         (tmp_path / "config.yaml").write_text("region: eu-central-1\naccounts:\n  - name: Prod\n")

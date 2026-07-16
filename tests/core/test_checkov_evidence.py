@@ -97,7 +97,10 @@ def test_shift_left_checkov_require_pass_fails_on_findings(tmp_path: Path):
     checkov = tmp_path / "checkov"
     _write_checkov_stub(
         checkov,
-        output='{"summary":{"failed":1},"results":{"failed_checks":[]}}',
+        output=(
+            '{"summary":{"passed":0,"failed":1,"skipped":0,"parsing_errors":0,'
+            '"resource_count":1},"results":{"failed_checks":[]}}'
+        ),
         exit_code=1,
     )
 
@@ -155,6 +158,84 @@ def test_checkov_evidence_handles_malformed_json(tmp_path: Path):
 
     assert evidence["result"]["status"] == "parse-error"
     assert "rawOutput" in evidence
+
+
+def test_checkov_evidence_uses_file_flag_for_iac_file(tmp_path: Path):
+    scan_path = tmp_path / "main.tf"
+    scan_path.write_text('resource "aws_vpc" "main" {}\n')
+    checkov = tmp_path / "checkov"
+    _write_checkov_stub(
+        checkov,
+        output=(
+            '{"summary":{"passed":1,"failed":0,"skipped":0,"parsing_errors":0,'
+            '"resource_count":1},"results":{"failed_checks":[]}}'
+        ),
+    )
+
+    evidence = run_checkov_evidence(
+        bundle=tmp_path,
+        scan_path=scan_path,
+        checkov_bin=str(checkov),
+    )
+
+    assert evidence["result"]["status"] == "pass"
+    assert evidence["command"]["argv"][1:3] == ["-f", str(scan_path)]
+
+
+def test_checkov_evidence_fails_on_parsing_errors(tmp_path: Path):
+    scan_path = tmp_path / "owner-module"
+    scan_path.mkdir()
+    checkov = tmp_path / "checkov"
+    _write_checkov_stub(
+        checkov,
+        output=(
+            '{"summary":{"passed":0,"failed":0,"skipped":0,"parsing_errors":1,'
+            '"resource_count":0},"results":{"failed_checks":[]}}'
+        ),
+    )
+
+    evidence = run_checkov_evidence(
+        bundle=tmp_path,
+        scan_path=scan_path,
+        checkov_bin=str(checkov),
+    )
+
+    assert evidence["result"]["status"] == "fail"
+    assert evidence["summary"]["parsingErrors"] == 1
+
+
+def test_checkov_evidence_rejects_structurally_invalid_json(tmp_path: Path):
+    scan_path = tmp_path / "owner-module"
+    scan_path.mkdir()
+    checkov = tmp_path / "checkov"
+    _write_checkov_stub(checkov, output="{}")
+
+    evidence = run_checkov_evidence(
+        bundle=tmp_path,
+        scan_path=scan_path,
+        checkov_bin=str(checkov),
+    )
+
+    assert evidence["result"]["status"] == "invalid-output"
+    assert "rawOutput" in evidence
+
+
+def test_checkov_evidence_rejects_incomplete_summary(tmp_path: Path):
+    scan_path = tmp_path / "owner-module"
+    scan_path.mkdir()
+    checkov = tmp_path / "checkov"
+    _write_checkov_stub(
+        checkov,
+        output='{"summary":{"passed":1,"failed":0},"results":{"failed_checks":[]}}',
+    )
+
+    evidence = run_checkov_evidence(
+        bundle=tmp_path,
+        scan_path=scan_path,
+        checkov_bin=str(checkov),
+    )
+
+    assert evidence["result"]["status"] == "invalid-output"
 
 
 def test_shift_left_checkov_maps_registered_policy_pack_and_owner_checks(tmp_path: Path):

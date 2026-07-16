@@ -96,7 +96,9 @@ def remove_generated_artifacts(output_dir: Path, pattern: str) -> None:
         return
     for name in generated_artifact_names(pattern):
         path = output_dir / name
-        if path.is_dir():
+        if path.is_symlink():
+            path.unlink()
+        elif path.is_dir():
             shutil.rmtree(path)
         elif path.exists():
             path.unlink()

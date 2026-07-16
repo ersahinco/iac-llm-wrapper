@@ -74,9 +74,7 @@ Run a small local model path with Ollama and `uv`:
 ollama pull qwen2.5:3b
 ollama serve
 
-uv venv
-source .venv/bin/activate
-uv pip install -e ".[dev]"
+uv sync --locked --extra dev
 
 iac-llm-wrapper compile -i fixtures/usability/engineer-handoff-lza.md \
   -o out/engineer-handoff-lza \

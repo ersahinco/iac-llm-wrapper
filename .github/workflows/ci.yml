@@ -10,99 +10,111 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.8"
+          python-version: "3.11"
 
       - name: Install dependencies
-        run: |
-          uv pip install --system -e ".[dev]"
+        run: uv sync --locked --extra dev
 
       - name: Lint
-        run: uv run ruff check .
+        run: uv run --locked --extra dev ruff check .
 
       - name: Format check
-        run: uv run ruff format --check .
+        run: uv run --locked --extra dev ruff format --check .
 
       - name: Type check
-        run: uv run --extra dev mypy
+        run: uv run --locked --extra dev mypy
 
       - name: Pylance/Pyright check
-        run: uv run --extra dev pyright .
+        run: uv run --locked --extra dev pyright .
 
       - name: Fixture drift check
-        run: uv run python scripts/sync-sample-fixtures.py --check
+        run: uv run --locked --extra dev python scripts/sync-sample-fixtures.py --check
 
       - name: Extraction eval check
-        run: uv run python scripts/evaluate-extraction.py
+        run: uv run --locked --extra dev python scripts/evaluate-extraction.py
 
       - name: Usability trial check
-        run: uv run python scripts/evaluate-usability.py
+        run: uv run --locked --extra dev python scripts/evaluate-usability.py
 
       - name: Golden journey shift-left check
-        run: uv run python scripts/evaluate-golden-journey.py
+        run: uv run --locked --extra dev python scripts/evaluate-golden-journey.py
 
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.8"
+          python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: |
-          uv pip install --system -e ".[dev]"
+        run: uv sync --locked --extra dev
 
       - name: Test
-        run: uv run pytest tests/ -v --tb=short --cov=src/intent_engine --cov-report=term-missing --cov-fail-under=80
+        run: uv run --locked --extra dev pytest tests/ -v --tb=short --cov=src/intent_engine --cov-report=term-missing --cov-fail-under=80
 
   security:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.8"
+          python-version: "3.11"
 
       - name: Install dependencies
-        run: |
-          uv pip install --system -e ".[dev]"
+        run: uv sync --locked --extra dev
 
       - name: Dependency audit
-        run: uv run pip-audit --skip-editable
+        run: |
+          uv export --locked --no-dev --no-emit-project --format requirements-txt --output-file runtime-requirements.txt
+          uv run --locked --extra dev pip-audit --requirement runtime-requirements.txt
 
       - name: Static security scan
-        run: uv run bandit -c bandit.yaml -r src -q -ll
+        run: uv run --locked --extra dev bandit -c bandit.yaml -r src -q -ll
 
       - name: Generate SBOM
-        run: |
-          uv pip install --system cyclonedx-bom
-          cyclonedx-py environment -o sbom.json --of json
+        run: uv export --preview-features sbom-export --locked --no-dev --format cyclonedx1.5 --output-file sbom.cdx.json
 
       - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sbom
-          path: sbom.json
+          path: sbom.cdx.json
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: "0.11.8"
+          python-version: "3.11"
+
+      - name: Build wheel and source distribution
+        run: uv build
+
+      - name: Smoke test installed entry points
+        run: |
+          uv venv .package-smoke
+          uv pip install --python .package-smoke/bin/python dist/*.whl
+          .package-smoke/bin/iac-llm-wrapper --version
+          .package-smoke/bin/intent-engine --version

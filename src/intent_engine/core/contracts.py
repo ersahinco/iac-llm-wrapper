@@ -12,7 +12,19 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from .paths import relative_path_error
 from .validator import Violation
+from .yaml_utils import load_yaml_mapping
+
+
+def _artifact_path_violation(name: str) -> Violation | None:
+    path_error = relative_path_error(name)
+    if path_error is None:
+        return None
+    return Violation(
+        code="CONTRACT_ARTIFACT_PATH_INVALID",
+        message=f"Artifact '{name}' has an invalid path: {path_error}.",
+    )
 
 
 class ArtifactContract(BaseModel):
@@ -74,6 +86,9 @@ class ContractValidator:
         known_artifacts = {artifact.name for artifact in self.contract.artifacts}
         known_decisions = set(self.contract.required_decisions)
         for artifact in self.contract.artifacts:
+            path_violation = _artifact_path_violation(artifact.name)
+            if path_violation:
+                violations.append(path_violation)
             for assertion in artifact.value_assertions:
                 if assertion.equals is None and not assertion.one_of:
                     violations.append(
@@ -155,6 +170,10 @@ class ContractValidator:
         schema_invalid_artifacts: set[str] = set()
         data_by_artifact: dict[str, dict[str, Any]] = {}
         for artifact in self.contract.artifacts:
+            path_violation = _artifact_path_violation(artifact.name)
+            if path_violation:
+                violations.append(path_violation)
+                continue
             if not artifact.required:
                 continue
             artifact_path = input_dir / artifact.name
@@ -284,27 +303,19 @@ class ContractValidator:
         artifact_name: str,
         artifact_path: Path,
     ) -> tuple[dict[str, Any], list[Violation]]:
-        import ruamel.yaml
-
-        yaml = ruamel.yaml.YAML(typ="safe")
         try:
-            data = yaml.load(artifact_path.read_text()) or {}
-        except Exception as exc:  # noqa: BLE001 - include parser-specific YAML errors.
+            data = load_yaml_mapping(artifact_path)
+        except ValueError as exc:
+            if str(exc).endswith("expected YAML mapping"):
+                message = f"{artifact_name} must contain a YAML mapping."
+            else:
+                message = f"{artifact_name} is not valid YAML: {exc}"
             return {}, [
                 Violation(
                     code="CONTRACT_ARTIFACT_SCHEMA_INVALID",
-                    message=f"{artifact_name} is not valid YAML: {exc}",
+                    message=message,
                 )
             ]
-
-        if not isinstance(data, dict):
-            return {}, [
-                Violation(
-                    code="CONTRACT_ARTIFACT_SCHEMA_INVALID",
-                    message=f"{artifact_name} must contain a YAML mapping.",
-                )
-            ]
-
         return data, []
 
     def _path_exists(self, data: Any, path: str) -> bool:

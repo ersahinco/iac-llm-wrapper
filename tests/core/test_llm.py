@@ -398,6 +398,23 @@ class TestEndToEndLLM:
         assert "status: not-estimated" in benchmark
         assert not (output / "terraform.tfvars").exists()
 
+    def test_llm_parse_failure_is_recorded_in_evidence(self, tmp_path: Path):
+        fixture = tmp_path / "design.md"
+        fixture.write_text(_complete_aws_lza_design())
+        output = tmp_path / "output"
+        evidence_store = LLMEvidenceStore()
+
+        compile_design(
+            fixture,
+            output,
+            llm_caller=LLMCaller(MockLLMBackend("not json")),
+            evidence_store=evidence_store,
+        )
+
+        assert evidence_store.entries[0]["parse_error"]
+        benchmark = (output / "model-benchmark.yaml").read_text()
+        assert "parseErrorCount: 1" in benchmark
+
     def test_llm_contradiction_blocks_compile_with_assessment(self, tmp_path: Path):
         fixture = tmp_path / "design.md"
         fixture.write_text(
@@ -555,6 +572,43 @@ availability zones, per-AZ NAT for resilience, and DNS hostnames enabled.
         assert benchmark["quality"]["rawContradictionCount"] == 1
         assert benchmark["quality"]["blockingContradictionCount"] == 0
 
+    def test_list_equivalent_locked_contradiction_is_non_blocking(self, tmp_path: Path):
+        fixture = tmp_path / "design.md"
+        fixture.write_text(_complete_aws_lza_design())
+        response = json.dumps(
+            {
+                "decisions": {"enabled_regions": ["eu-central-1"]},
+                "contradictions": [
+                    {"key": "enabled_regions", "reason": "reported despite equal values"}
+                ],
+            }
+        )
+
+        compile_design(
+            fixture,
+            tmp_path / "output",
+            llm_caller=LLMCaller(MockLLMBackend(response)),
+        )
+
+    def test_case_changed_locked_contradiction_remains_blocking(self, tmp_path: Path):
+        fixture = tmp_path / "design.md"
+        fixture.write_text(_complete_aws_lza_design())
+        response = json.dumps(
+            {
+                "decisions": {"network_account": "network"},
+                "contradictions": [
+                    {"key": "network_account", "reason": "account name case differs"}
+                ],
+            }
+        )
+
+        with pytest.raises(Exception, match="LLM_CONTRADICTION_NETWORK_ACCOUNT"):
+            compile_design(
+                fixture,
+                tmp_path / "output",
+                llm_caller=LLMCaller(MockLLMBackend(response)),
+            )
+
 
 class TestMalformedLLMResponse:
     def test_markdown_fence_recovery(self):
@@ -581,33 +635,45 @@ class TestMalformedLLMResponse:
         intent = result.to_intent(extractor)
         assert intent.home_region == "ap-southeast-1"
 
-    def test_missing_comma_recovery(self):
+    @pytest.mark.parametrize(
+        "response",
+        [
+            '{"decisions": {"home_region": "eu-west-1"} "gaps": []}',
+            '{"decisions": {"home_region": "eu-west-1"},}',
+            '{"decisions": {"home_region": "eu-west-1"}},',
+            '{"decisions": {"home_region": "eu-west-1"}}}',
+            '{"decisions": {"home_region": "eu-west-1"}} {"decisions": {}}',
+            '{"decisions": {"home_region": "eu-west-1"}} true',
+            '```json\n{"decisions": {"home_region": "eu-west-1"}}',
+        ],
+    )
+    def test_invalid_json_is_not_repaired(self, response: str):
         extractor = Extractor(pattern="aws-lza")
-        response = '{"decisions": {"home_region": "eu-west-1"} "gaps": [], "contradictions": []}'
 
         result = extractor.parse_response(response)
 
-        assert result.decisions["home_region"] == "eu-west-1"
+        assert result.decisions == {}
+        assert result.parse_error
 
-    def test_trailing_comma_recovery(self):
-        extractor = Extractor(pattern="aws-lza")
-        response = '{"decisions": {"home_region": "eu-west-1"},}'
+    @pytest.mark.parametrize(
+        "response",
+        [
+            '{"decisions": []}',
+            '{"decisions": {}, "extra": true}',
+            '{"gaps": {"key": "home_region"}}',
+        ],
+    )
+    def test_invalid_graph_shape_is_rejected(self, response: str):
+        result = Extractor(pattern="aws-lza").parse_response(response)
 
-        result = extractor.parse_response(response)
-
-        assert result.decisions["home_region"] == "eu-west-1"
-
-    def test_extra_closing_brace_recovery(self):
-        extractor = Extractor(pattern="aws-lza")
-        response = '{"decisions": {"home_region": "eu-west-1"}}}'
-
-        result = extractor.parse_response(response)
-
-        assert result.decisions["home_region"] == "eu-west-1"
+        assert result.decisions == {}
+        assert result.parse_error and result.parse_error.startswith("Invalid graph response shape")
 
     def test_invalid_json_returns_model_defaults(self):
         extractor = Extractor(pattern="aws-lza")
-        result = extractor.parse_response("not json").to_intent(extractor)
+        parsed = extractor.parse_response("not json")
+        result = parsed.to_intent(extractor)
+        assert parsed.parse_error
         assert result.home_region == "eu-central-1"
 
     def test_invalid_enum_is_skipped(self):

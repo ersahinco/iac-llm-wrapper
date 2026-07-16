@@ -36,7 +36,8 @@ The `Release` workflow will:
 
 For urgent fixes on the latest release:
 
-1. Branch from the release tag: `git checkout -b hotfix/vX.Y.Z+1 vX.Y.Z`
+1. Choose the next patch version (for example, `v1.2.3` becomes `v1.2.4`) and
+   branch from the current release tag: `git checkout -b hotfix/v1.2.4 v1.2.3`
 2. Apply fix, update version and changelog.
 3. Regenerate lock file: `uv lock`
-4. Tag `vX.Y.Z+1` and push.
+4. Tag the chosen patch version and push.

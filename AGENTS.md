@@ -17,16 +17,16 @@ samples, and target configuration emitters.
 ## Commands
 
 ```bash
-uv run pytest
-uv run ruff check .
-uv run ruff format --check .
-uv run --extra dev mypy
-uv run --extra dev pyright .
-uv run python scripts/sync-sample-fixtures.py --check
-uv run python scripts/evaluate-golden-journey.py
-uv run python scripts/evaluate-extraction.py
-uv run python scripts/evaluate-usability.py
-uv run --extra dev prek run --all-files
+uv run --locked --extra dev pytest
+uv run --locked --extra dev ruff check .
+uv run --locked --extra dev ruff format --check .
+uv run --locked --extra dev mypy
+uv run --locked --extra dev pyright .
+uv run --locked --extra dev python scripts/sync-sample-fixtures.py --check
+uv run --locked --extra dev python scripts/evaluate-golden-journey.py
+uv run --locked --extra dev python scripts/evaluate-extraction.py
+uv run --locked --extra dev python scripts/evaluate-usability.py
+uv run --locked --extra dev prek run --all-files
 ```
 
 ## Architecture
@@ -188,14 +188,36 @@ continuing minimum-cost validation across local and AWS LZA owner boundaries.
   linear AWS LZA end-to-end artifact contract test; argument and return counts
   remain deliberately ungated. Broad exception catches remain only at parser,
   plugin, evaluation, or external-backend boundaries.
+- **Trust-boundary repair**: LLM extraction now accepts valid JSON plus harmless
+  presentation wrappers only, validates graph responses with forbidden extras,
+  and records parse failures as evidence. Graph-owned typed equality preserves
+  account/name case while normalizing valid booleans, integers, lists, enums,
+  and optionals.
+- **Incremental and artifact safety**: incremental baselines must match the
+  requested pattern and pass the generated-bundle contract before seeding.
+  Registered artifact and fixture paths must be portable relative paths,
+  generated symlinks are unlinked without following them, required YAML fails
+  with path-specific errors, and malformed Checkov evidence cannot pass.
+- **Package cohesion and supply chain**: Terraform VPC graph, target contract,
+  generators, and samples now have separate pattern-owned modules. CLI version
+  comes from package metadata; CI and `prek` use the locked uv/Ruff toolchain,
+  actions are pinned to verified commit SHAs, Python 3.14 and clean-wheel smoke
+  tests are covered, and the SBOM comes directly from the lockfile.
 - **Pattern ownership**: AWS named-entity recovery, validator-to-requirement
   review mapping, LZA validation evidence, artifact review owners, incremental
   reconfirmation policy, and forbidden artifact checks now live on the AWS LZA
   pattern instead of generic core branches.
-- **Validation**: `uv run pytest` passed with 382 tests and one skipped. Ruff,
-  Ruff format, mypy, Pyright, fixture drift, golden journey, extraction (8/8),
-  usability (8/8), and `prek run --all-files` all passed. Registered AWS LZA and
-  Kubernetes fixtures remain synchronized with the audited behavior.
+- **Validation**: 413 tests passed with five optional real-Ollama tests skipped
+  when the local service was unavailable; coverage is 89.95%. Ruff, Ruff
+  format, mypy, Pyright, fixture drift, golden journey, extraction (8/8),
+  usability (8/8), all-files `prek`, lock check, Bandit, runtime `pip-audit`,
+  CycloneDX export, package build, and both installed CLI entry points passed.
+  No fixture drift was introduced.
+- **Deferred dependency maintenance**: routine dependency upgrades remain a
+  separate compatibility change. The shipped runtime lock export has no known
+  vulnerabilities; an environment-wide audit also sees advisories in
+  `pip-audit`'s own transitive `msgpack` and `pip` packages, so CI intentionally
+  audits the product runtime export rather than its auditor environment.
 - **Model comparison**: the historical implicit local Ollama fallback used
   `llama3.2:3b`, took about 79 seconds, and produced a graph delta from the
   deterministic bundle. It inferred `SandboxDev` belongs to the `Sandbox` OU,
@@ -225,6 +247,12 @@ continuing minimum-cost validation across local and AWS LZA owner boundaries.
 - Require a real packet, contract, review failure, or measured gap before adding
   a feature; do not preserve test-only feature families without product callers.
 - Do not register quality checks that pass when their required tool is absent.
+- Parse model output without syntax repair; invalid JSON is evidence, not a
+  decision source.
+- Validate incremental bundles and portable artifact paths before reading them
+  as trusted handoff state.
+- Keep CI dependency audits scoped to the locked dependencies shipped by the
+  product; update development tooling in explicit dependency-only changes.
 - Keep pattern-specific review, extraction, and validation behavior on the
   owning pattern rather than branching in generic core.
 - Keep generated/ignored evidence out of committed source unless it is an

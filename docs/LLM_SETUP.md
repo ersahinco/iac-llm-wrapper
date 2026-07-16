@@ -184,9 +184,10 @@ artifact. A service deployment can use `context-manifest.yaml`,
 show which code-owned context and LLM interpretation shaped the bundle without
 storing raw prompts and responses. Use a
 restricted output directory, avoid secrets in design docs, provide API keys
-through environment variables or `--api-key`, and redact evidence before sharing
+through environment variables, and redact evidence before sharing
 outside the project team. The repo ignores common raw-evidence file names to
-reduce accidental commits.
+reduce accidental commits. Keep `--api-key` for compatibility only; command-line
+secrets can remain visible in shell history and process listings.
 
 Do not place secret values in design docs, eval fixtures, prompts, raw evidence,
 or emitted handoff artifacts. Capture secret-store references plus expected

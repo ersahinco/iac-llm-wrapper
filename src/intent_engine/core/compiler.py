@@ -6,11 +6,7 @@ import hashlib
 from pathlib import Path
 from typing import Any, cast
 
-from .baseline import (
-    baseline_decisions_from_bundle,
-    baseline_summary_from_bundle,
-    without_locked_decisions,
-)
+from .baseline import BaselineBundle, load_baseline_bundle, without_locked_decisions
 from .compile_artifacts import (
     generate_validated_artifacts as _generate_validated_artifacts,
 )
@@ -50,7 +46,7 @@ from .readiness import (
     gap_is_resolved as _gap_is_resolved,
 )
 from .validator import Violation, validate
-from .yaml_utils import read_yaml_mapping
+from .yaml_utils import load_yaml_mapping
 
 
 class CompileError(Exception):
@@ -161,6 +157,7 @@ def _llm_result_violations(graph, llm_result: LLMGraphResult) -> list[Violation]
 
 
 def _llm_result_for_blocking(
+    graph,
     llm_result: LLMGraphResult,
     locked_decision_keys: set[str],
     accepted_decisions: dict[str, Any],
@@ -171,6 +168,7 @@ def _llm_result_for_blocking(
         contradiction
         for contradiction in llm_result.contradictions
         if not _locked_llm_contradiction_is_redundant(
+            graph,
             contradiction,
             llm_result,
             locked_decision_keys,
@@ -185,10 +183,12 @@ def _llm_result_for_blocking(
         gaps=llm_result.gaps,
         contradictions=contradictions,
         raw_response=llm_result.raw_response,
+        parse_error=llm_result.parse_error,
     )
 
 
 def _locked_llm_contradiction_is_redundant(
+    graph,
     contradiction: dict[str, Any],
     llm_result: LLMGraphResult,
     locked_decision_keys: set[str],
@@ -200,11 +200,7 @@ def _locked_llm_contradiction_is_redundant(
     raw_value = llm_result.decisions.get(key, llm_result.signal_decisions.get(key))
     if raw_value is None or key not in accepted_decisions:
         return False
-    return _same_decision_value(raw_value, accepted_decisions[key])
-
-
-def _same_decision_value(left: Any, right: Any) -> bool:
-    return str(left).strip().lower() == str(right).strip().lower()
+    return bool(graph.values_match(key, raw_value, accepted_decisions[key]))
 
 
 def _deterministic_applied_decision_keys(applied_decisions: dict[str, list[str]]) -> set[str]:
@@ -616,11 +612,47 @@ class LLMContextProvider:
 
         prompt = self.extractor.build_prompt(self.prose)
         response, evidence = self.llm_caller.call(prompt)
+        result = self.extractor.parse_response(response)
+        if result.parse_error is not None and evidence.parse_error is None:
+            evidence.parse_error = result.parse_error
         if self.evidence_store is not None:
             self.evidence_store.record(evidence)
-
-        result = self.extractor.parse_response(response)
         return result
+
+
+def _resolve_compilation_state(
+    *,
+    graph,
+    pattern_obj,
+    markdown_decisions: dict[str, Any],
+    markdown_entities: dict[str, Any],
+    llm_result: LLMGraphResult,
+    baseline_decisions: dict[str, Any] | None = None,
+) -> tuple[Any, dict[str, list[str]]]:
+    """Apply decision sources in precedence order and build the accepted intent."""
+    applied: dict[str, list[str]] = {}
+    if baseline_decisions is not None:
+        applied["baseline"] = graph.apply_decisions(baseline_decisions)
+    applied["markdown"] = graph.apply_decisions(markdown_decisions)
+
+    locked_keys = set(applied["markdown"])
+    llm_decisions = without_locked_decisions(llm_result.decisions, locked_keys)
+    applied["llm"] = graph.apply_decisions(llm_decisions)
+    locked_keys.update(applied["llm"])
+
+    signal_decisions = without_locked_decisions(llm_result.signal_decisions, locked_keys)
+    applied["signals"] = graph.apply_decisions(signal_decisions)
+
+    graph.apply_defaults_for_remaining()
+    applied["defaults"] = [
+        str(entry["key"]) for entry in graph.audit_log() if entry.get("how") == "defaulted"
+    ]
+
+    intent = pattern_obj.intent_factory()
+    if pattern_obj.markdown_entity_applier:
+        pattern_obj.markdown_entity_applier(markdown_entities, intent)
+    graph.apply_to_intent(intent)
+    return intent, applied
 
 
 def _validate_and_generate(
@@ -650,6 +682,7 @@ def _validate_and_generate(
     violations = validate(intent, graph=graph, extra_validators=pattern_obj.validators)
     violations.extend(_markdown_contradiction_violations(markdown_contradictions))
     blocking_llm_result = _llm_result_for_blocking(
+        graph,
         llm_result,
         _deterministic_applied_decision_keys(applied_decisions),
         graph.typed_decisions(),
@@ -784,14 +817,6 @@ def compile_design(
     markdown_entities = (
         pattern_obj.markdown_entity_extractor(text) if pattern_obj.markdown_entity_extractor else {}
     )
-    applied_decisions: dict[str, list[str]] = {
-        "markdown": [],
-        "llm": [],
-        "signals": [],
-        "defaults": [],
-    }
-    if markdown_decisions:
-        applied_decisions["markdown"] = graph.apply_decisions(markdown_decisions)
 
     # ------------------------------------------------------------------
     # Layer 1: Non-deterministic intent understanding (LLM)
@@ -807,39 +832,13 @@ def compile_design(
     # ------------------------------------------------------------------
     # Layer 2: Deterministic harness processing
     # ------------------------------------------------------------------
-    # 2a. Apply LLM-extracted decisions to the graph (gates + cascade)
-    locked_decision_keys = set(applied_decisions["markdown"])
-    if llm_result.decisions:
-        llm_decisions = without_locked_decisions(llm_result.decisions, locked_decision_keys)
-        applied_decisions["llm"] = graph.apply_decisions(llm_decisions)
-        locked_decision_keys.update(applied_decisions["llm"])
-
-    # 2b. Apply signal-triggered decisions
-    if llm_result.signal_decisions:
-        signal_decisions = without_locked_decisions(
-            llm_result.signal_decisions,
-            locked_decision_keys,
-        )
-        applied_decisions["signals"] = graph.apply_decisions(signal_decisions)
-
-    # 2c. Fill remaining gaps with defaults
-    graph.apply_defaults_for_remaining()
-    applied_decisions["defaults"] = [
-        str(entry["key"]) for entry in graph.audit_log() if entry.get("how") == "defaulted"
-    ]
-
-    # 2d. Build intent from LLM decisions (handles complex nested objects)
-    # then overlay graph cascade decisions onto the same intent
-    if llm_result.decisions or llm_result.signal_decisions:
-        extractor = Extractor(graph=graph, pattern=pattern)
-        intent = llm_result.to_intent(extractor)
-    else:
-        intent = pattern_obj.intent_factory()
-    # Deterministic entities backfill items that small models often omit.
-    if pattern_obj.markdown_entity_applier:
-        pattern_obj.markdown_entity_applier(markdown_entities, intent)
-    # Apply graph cascades (topology -> network.topology, etc.)
-    graph.apply_to_intent(intent)
+    intent, applied_decisions = _resolve_compilation_state(
+        graph=graph,
+        pattern_obj=pattern_obj,
+        markdown_decisions=markdown_decisions,
+        markdown_entities=markdown_entities,
+        llm_result=llm_result,
+    )
 
     _validate_and_generate(
         pattern=pattern,
@@ -856,6 +855,55 @@ def compile_design(
         applied_decisions=applied_decisions,
         dry_run=dry_run,
     )
+
+
+def _validated_baseline_bundle(bundle: Path, pattern: str) -> BaselineBundle:
+    try:
+        baseline = load_baseline_bundle(bundle)
+    except ValueError as exc:
+        raise CompileError(
+            [
+                Violation(
+                    code="INCREMENTAL_BASELINE_INVALID",
+                    message=f"Incremental baseline could not be loaded: {exc}",
+                )
+            ]
+        ) from exc
+
+    if not baseline.pattern:
+        raise CompileError(
+            [
+                Violation(
+                    code="INCREMENTAL_BASELINE_PATTERN_MISSING",
+                    message="Incremental baseline does not declare its pattern.",
+                )
+            ]
+        )
+    if baseline.pattern != pattern:
+        raise CompileError(
+            [
+                Violation(
+                    code="INCREMENTAL_BASELINE_PATTERN_MISMATCH",
+                    message=(
+                        f"Incremental baseline pattern '{baseline.pattern}' does not match "
+                        f"requested pattern '{pattern}'."
+                    ),
+                )
+            ]
+        )
+
+    contract_violations = _validate_generated_violations_impl(bundle, pattern)
+    if contract_violations:
+        raise CompileError(
+            [
+                Violation(
+                    code=f"INCREMENTAL_BASELINE_{violation.code}",
+                    message=f"Incremental baseline: {violation.message}",
+                )
+                for violation in contract_violations
+            ]
+        )
+    return baseline
 
 
 def compile_incremental_design(
@@ -896,8 +944,9 @@ def compile_incremental_design(
             "baselineDocument": str(baseline_doc) if baseline_doc is not None else "",
         },
     )
-    baseline_decisions = baseline_decisions_from_bundle(baseline_bundle)
-    baseline_summary = baseline_summary_from_bundle(baseline_bundle)
+    baseline = _validated_baseline_bundle(baseline_bundle, pattern)
+    baseline_decisions = baseline.decisions
+    baseline_summary = baseline.summary
     input_diff = build_input_diff_report(
         before_text=baseline_text,
         after_text=changed_text,
@@ -912,17 +961,6 @@ def compile_incremental_design(
         if pattern_obj.markdown_entity_extractor
         else {}
     )
-    applied_decisions: dict[str, list[str]] = {
-        "baseline": [],
-        "markdown": [],
-        "llm": [],
-        "signals": [],
-        "defaults": [],
-    }
-    if baseline_decisions:
-        applied_decisions["baseline"] = graph.apply_decisions(baseline_decisions)
-    if markdown_decisions:
-        applied_decisions["markdown"] = graph.apply_decisions(markdown_decisions)
 
     scoped_context = build_incremental_llm_context(
         input_diff_report=input_diff,
@@ -937,33 +975,17 @@ def compile_incremental_design(
         evidence_store=evidence_store,
     ).run()
 
-    locked_decision_keys = set(applied_decisions["markdown"])
-    if llm_result.decisions:
-        llm_decisions = without_locked_decisions(llm_result.decisions, locked_decision_keys)
-        applied_decisions["llm"] = graph.apply_decisions(llm_decisions)
-        locked_decision_keys.update(applied_decisions["llm"])
-    if llm_result.signal_decisions:
-        signal_decisions = without_locked_decisions(
-            llm_result.signal_decisions,
-            locked_decision_keys,
-        )
-        applied_decisions["signals"] = graph.apply_decisions(signal_decisions)
-
-    graph.apply_defaults_for_remaining()
-    applied_decisions["defaults"] = [
-        str(entry["key"]) for entry in graph.audit_log() if entry.get("how") == "defaulted"
-    ]
-
-    if llm_result.decisions or llm_result.signal_decisions:
-        extractor = Extractor(graph=graph, pattern=pattern)
-        intent = llm_result.to_intent(extractor)
-    else:
-        intent = pattern_obj.intent_factory()
-    if pattern_obj.markdown_entity_applier:
-        pattern_obj.markdown_entity_applier(markdown_entities, intent)
-    graph.apply_to_intent(intent)
+    intent, applied_decisions = _resolve_compilation_state(
+        graph=graph,
+        pattern_obj=pattern_obj,
+        markdown_decisions=markdown_decisions,
+        markdown_entities=markdown_entities,
+        llm_result=llm_result,
+        baseline_decisions=baseline_decisions,
+    )
 
     incremental_report = incremental_decision_report(
+        graph=graph,
         baseline_decisions=baseline_decisions,
         final_decisions=graph.typed_decisions(),
         input_diff_report=input_diff,
@@ -1160,7 +1182,7 @@ def generate_template(pattern: str = "aws-lza") -> str:
 
 
 def explain_report(report_path: Path) -> str:
-    report = read_yaml_mapping(report_path)
+    report = load_yaml_mapping(report_path)
 
     lines = ["=== Decision Report ===", ""]
 
