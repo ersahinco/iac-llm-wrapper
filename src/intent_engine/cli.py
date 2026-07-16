@@ -85,7 +85,7 @@ lza_app = typer.Typer(help="AWS LZA validation-only evidence helpers")
 app.add_typer(lza_app, name="lza")
 shift_left_app = typer.Typer(help="Shift-left evidence helpers")
 app.add_typer(shift_left_app, name="shift-left")
-terraform_app = typer.Typer(help="Approved Terraform speculative plan proof")
+terraform_app = typer.Typer(help="Approved Terraform speculative plan conformance")
 app.add_typer(terraform_app, name="terraform")
 
 DEFAULT_PATTERN = "aws-lza"
@@ -676,7 +676,7 @@ def _echo_lza_diagnostic(evidence: dict[str, Any]) -> None:
 def terraform_plan(
     bundle: Path = typer.Option(..., "--bundle", help="Generated terraform-vpc bundle."),
 ) -> None:
-    """Prove one approved Terraform VPC speculative plan without retaining state."""
+    """Evaluate one approved Terraform VPC speculative plan without retaining state."""
     # lean: keep this target-specific until a second proven target shares the protocol.
     evidence_path = bundle / PLAN_EVIDENCE_NAME
     try:
@@ -686,7 +686,9 @@ def terraform_plan(
         raise typer.Exit(1) from None
 
     typer.echo(f"Terraform plan evidence written to: {evidence_path}")
-    typer.echo(f"Terraform plan status: {evidence['status']}")
+    conformance = evidence.get("conformance")
+    status = conformance.get("status") if isinstance(conformance, dict) else evidence["status"]
+    typer.echo(f"Terraform plan conformance status: {status}")
     if evidence["status"] == "pass":
         return
     for blocker in evidence.get("blockers", []):

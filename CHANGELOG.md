@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- OSS-native Atmos bridge for every successful `terraform-vpc` compile: an
+  importable abstract intent-defaults catalog, a digest-checked byte-for-byte
+  approved Terraform root, a second pattern-owned target contract, and recursive
+  replay coverage for nested artifacts and the provider lockfile.
+- Credential-free Atmos 1.223.0 integration proof for stack validation,
+  inheritance/provenance, exact resolved variables, locked Terraform init,
+  approved module content, and Terraform validation. CI/release download the OSS
+  binary only after verifying its pinned Linux AMD64 checksum.
+- Requirement-to-Plan Conformance v1 for `terraform-vpc`: v2 plan evidence now
+  binds binary/JSON and graph/contract/policy identities, compares every
+  applicable requirement with immutable inputs and planned values, records all
+  registered control outcomes and deferred gates, and maps every managed
+  resource to approved provenance.
+- Content verification for the initialized VPC module 6.6.1 source tree at
+  release commit `3ffbd46fb1c7733e1b34d8666893280454e27436`, enforced in local
+  planning and credential-free CI/release root validation.
 - Account-bound speculative plan proof for the exact approved Terraform VPC module, including replay verification, sanitized `terraform-plan-evidence.yaml`, static review evidence, and the no-apply `terraform plan --bundle` command.
 - A packaged Terraform VPC root pinned to Terraform 1.15.8, `terraform-aws-modules/vpc/aws` 6.6.1, and `hashicorp/aws` 6.53.0 with a multi-platform provider lockfile and real CI init/validate proof.
 - Intent-to-IaC orchestration framework with a model-driven decision core.
@@ -23,6 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD: lint, format, type check, tests, extraction/usability evals, coverage gate, dependency audit, and static security scan.
 
 ### Changed
+- Product positioning is now “requirements-to-target handoff compiler.” The
+  historical package name remains compatibility-safe; LLMs are optional
+  conversational adapters and provider expansion is frozen.
+- Terraform plan success is now `produced`; only the pattern-owned evaluator can
+  emit `conformant` or `conformant-with-deferred-gates`. V1 action-only evidence
+  renders as `legacy-plan-only` and cannot satisfy the new milestone.
 - Primary project and CLI name is `iac-llm-wrapper`; `intent-engine` remains the core engine and optional CLI alias.
 - Structured Markdown decisions take precedence over direct LLM decisions, direct LLM decisions take precedence over signal decisions, and defaults fill only remaining gaps.
 - LLM-reported gaps and contradictions only block when they target known applicable requirement graph nodes.

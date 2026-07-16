@@ -34,13 +34,17 @@ class TestCLITerraformPlan:
         monkeypatch.setattr(
             cli_module,
             "run_terraform_vpc_plan",
-            lambda _: {"status": "pass", "blockers": []},
+            lambda _: {
+                "status": "pass",
+                "conformance": {"status": "conformant-with-deferred-gates"},
+                "blockers": [],
+            },
         )
 
         result = runner.invoke(app, ["terraform", "plan", "--bundle", str(bundle)])
 
         assert result.exit_code == 0, result.output
-        assert "Terraform plan status: pass" in result.output
+        assert "Terraform plan conformance status: conformant-with-deferred-gates" in result.output
         assert "terraform-plan-evidence.yaml" in result.output
 
     def test_plan_renders_blocker_and_next_action(

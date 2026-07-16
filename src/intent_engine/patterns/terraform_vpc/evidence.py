@@ -11,8 +11,17 @@ from pydantic import BaseModel, ConfigDict, Field
 from intent_engine.core.package_version import installed_version
 from intent_engine.core.yaml_utils import load_bundle_yaml_mapping
 
+from .conformance import (
+    CONTROL_IDS,
+    REQUIREMENT_KEYS,
+    REQUIREMENT_SET_ID,
+    ConformanceResult,
+    conformance_spec_digest,
+)
 from .target import (
+    MODULE_RELEASE_COMMIT,
     MODULE_SOURCE,
+    MODULE_TREE_SHA256,
     MODULE_VERSION,
     PLAN_EVIDENCE_NAME,
     PROVIDER_SOURCE,
@@ -23,50 +32,146 @@ from .target import (
 
 
 class _StrictModel(BaseModel):
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    model_config = ConfigDict(extra="forbid", validate_by_alias=True, validate_by_name=True)
 
 
 class PlanBlocker(_StrictModel):
     code: str
     message: str
-    next_action: str = Field(serialization_alias="nextAction")
+    next_action: str = Field(alias="nextAction")
 
 
 class PlanStage(_StrictModel):
     name: str
     status: Literal["pass", "fail", "not-run"]
-    exit_code: int | None = Field(default=None, serialization_alias="exitCode")
+    exit_code: int | None = Field(default=None, alias="exitCode")
 
 
 class ResourceChange(_StrictModel):
     address: str
+    mode: str
     provider: str
-    resource_type: str = Field(serialization_alias="resourceType")
+    resource_type: str = Field(alias="resourceType")
     actions: list[str]
 
 
+class BundleIdentity(_StrictModel):
+    replay_manifest_sha256: str = Field(alias="replayManifestSha256")
+    bundle_digest: str = Field(alias="bundleDigest")
+    source_sha256: str = Field(alias="sourceSha256")
+
+
+class TargetIdentity(_StrictModel):
+    module_source: Literal["terraform-aws-modules/vpc/aws"] = Field(alias="moduleSource")
+    module_version: Literal["6.6.1"] = Field(alias="moduleVersion")
+    module_release_commit: Literal["3ffbd46fb1c7733e1b34d8666893280454e27436"] = Field(
+        alias="moduleReleaseCommit"
+    )
+    module_tree_sha256: Literal[
+        "38386a5d1a9e99cc1fdf8273a70b25b6f9dddca836545a960159d019d193c807"
+    ] = Field(alias="moduleTreeSha256")
+    provider_source: Literal["hashicorp/aws"] = Field(alias="providerSource")
+    provider_version: Literal["6.53.0"] = Field(alias="providerVersion")
+    requested_account_id: str = Field(alias="requestedAccountId")
+    observed_account_id: str = Field(alias="observedAccountId")
+
+
+class ToolchainIdentity(_StrictModel):
+    terraform_version: Literal["1.15.8"] = Field(alias="terraformVersion")
+    wrapper_version: str = Field(alias="wrapperVersion")
+    approved_root_sha256: str = Field(alias="approvedRootSha256")
+
+
+class PlanIdentity(_StrictModel):
+    execution_status: Literal["not-run", "produced", "failed"] = Field(alias="executionStatus")
+    exit_code: int | None = Field(alias="exitCode")
+    has_changes: bool = Field(alias="hasChanges")
+    format_version: str = Field(alias="formatVersion")
+    terraform_version: str = Field(alias="terraformVersion")
+    applyable: bool
+    complete: bool
+    errored: bool
+    binary_plan_sha256: str = Field(alias="binaryPlanSha256")
+    plan_json_sha256: str = Field(alias="planJsonSha256")
+    module_content_verified: bool = Field(alias="moduleContentVerified")
+    temporary_workspace_retained: Literal[False] = Field(alias="temporaryWorkspaceRetained")
+    binary_plan_retained: Literal[False] = Field(alias="binaryPlanRetained")
+    state_retained: Literal[False] = Field(alias="stateRetained")
+
+
 class PlanEvidence(_StrictModel):
-    schema_version: Literal["intent-engine/terraform-plan-evidence/v1"] = Field(
-        serialization_alias="schemaVersion"
+    schema_version: Literal["intent-engine/terraform-plan-evidence/v2"] = Field(
+        alias="schemaVersion"
     )
     timestamp: str
     status: Literal["pass", "fail"]
     pattern: Literal["terraform-vpc"] = "terraform-vpc"
-    bundle: dict[str, str]
-    target: dict[str, Any]
-    toolchain: dict[str, str]
-    plan: dict[str, Any]
+    bundle: BundleIdentity
+    target: TargetIdentity
+    toolchain: ToolchainIdentity
+    plan: PlanIdentity
     stages: list[PlanStage]
-    resource_changes: list[ResourceChange] = Field(serialization_alias="resourceChanges")
-    change_summary: dict[str, int] = Field(serialization_alias="changeSummary")
+    resource_changes: list[ResourceChange] = Field(alias="resourceChanges")
+    change_summary: dict[str, int] = Field(alias="changeSummary")
     blockers: list[PlanBlocker]
+    conformance: ConformanceResult
     guidance: list[str]
-    apply_allowed: Literal[False] = Field(default=False, serialization_alias="applyAllowed")
+    owner_review_required: Literal[True] = Field(default=True, alias="ownerReviewRequired")
+    apply_allowed: Literal[False] = Field(default=False, alias="applyAllowed")
     boundary: str
 
 
 def blocker(code: str, message: str, next_action: str) -> PlanBlocker:
-    return PlanBlocker(code=code, message=message, next_action=next_action)
+    return PlanBlocker(code=code, message=message, nextAction=next_action)
+
+
+def evidence_semantic_violations(evidence: PlanEvidence) -> list[str]:
+    """Enforce v2 coverage and pass semantics beyond path-level artifact checks."""
+    violations: list[str] = []
+    expected_requirements = {f"{REQUIREMENT_SET_ID}/{key}" for key in REQUIREMENT_KEYS}
+    applicable = [item.requirement_id for item in evidence.conformance.requirements]
+    reported = applicable + evidence.conformance.not_applicable_requirement_ids
+    if len(reported) != len(set(reported)) or set(reported) != expected_requirements:
+        violations.append("Requirement outcomes do not cover the exact requirement set once.")
+    controls = [item.control_id for item in evidence.conformance.controls]
+    if len(controls) != len(set(controls)) or set(controls) != set(CONTROL_IDS):
+        violations.append("Control outcomes do not cover the exact registered control set once.")
+    outcomes = [item.outcome for item in evidence.conformance.requirements]
+    outcomes.extend(item.outcome for item in evidence.conformance.controls)
+    if "attested" in outcomes:
+        violations.append("Requirement-to-Plan Conformance v1 cannot emit attested outcomes.")
+    if evidence.conformance.specification.sha256 != conformance_spec_digest():
+        violations.append("Conformance specification identity does not match the code-owned spec.")
+    if evidence.status == "pass":
+        if evidence.conformance.status not in {
+            "conformant",
+            "conformant-with-deferred-gates",
+        }:
+            violations.append("Passing evidence requires a conformant terminal status.")
+        if set(outcomes) & {"failed", "unknown", "unresolved"}:
+            violations.append("Passing evidence cannot contain blocking terminal outcomes.")
+        if evidence.plan.execution_status != "produced":
+            violations.append("Passing evidence requires a produced Terraform plan.")
+        if evidence.plan.module_content_verified is not True:
+            violations.append("Passing evidence requires verified module content.")
+        identity_values = [
+            evidence.bundle.replay_manifest_sha256,
+            evidence.bundle.bundle_digest,
+            evidence.bundle.source_sha256,
+            evidence.target.module_tree_sha256,
+            evidence.toolchain.approved_root_sha256,
+            evidence.plan.binary_plan_sha256,
+            evidence.plan.plan_json_sha256,
+            evidence.conformance.specification.sha256,
+            *evidence.conformance.identities.model_dump().values(),
+        ]
+        if not all(_is_sha256(value) for value in identity_values):
+            violations.append("Passing evidence requires complete SHA-256 identities.")
+    return violations
+
+
+def _is_sha256(value: str) -> bool:
+    return len(value) == 64 and all(character in "0123456789abcdef" for character in value)
 
 
 def empty_change_summary() -> dict[str, int]:
@@ -120,8 +225,9 @@ def summarize_changes(
         rows.append(
             ResourceChange(
                 address=str(item.get("address", "")),
+                mode=str(item.get("mode", "")),
                 provider=str(item.get("provider_name", "")),
-                resource_type=str(item.get("type", "")),
+                resourceType=str(item.get("type", "")),
                 actions=actions,
             )
         )
@@ -162,41 +268,65 @@ def build_evidence(
     requested_account: str,
     observed_account_id: str,
     plan_exit_code: int | None,
+    plan_produced: bool,
+    plan_metadata: dict[str, Any],
+    module_tree_sha256: str,
     stages: list[PlanStage],
     resource_changes: list[ResourceChange],
     summary: dict[str, int],
     blockers: list[PlanBlocker],
+    conformance: ConformanceResult,
 ) -> PlanEvidence:
+    passed = not blockers and conformance.status in {
+        "conformant",
+        "conformant-with-deferred-gates",
+    }
     return PlanEvidence(
-        schema_version="intent-engine/terraform-plan-evidence/v1",
+        schemaVersion="intent-engine/terraform-plan-evidence/v2",
         timestamp=datetime.now(UTC).isoformat(),
-        status="fail" if blockers else "pass",
-        bundle=replay_identity,
-        target={
-            "moduleSource": MODULE_SOURCE,
-            "moduleVersion": MODULE_VERSION,
-            "providerSource": PROVIDER_SOURCE,
-            "providerVersion": PROVIDER_VERSION,
-            "requestedAccountId": requested_account,
-            "observedAccountId": observed_account_id,
-        },
-        toolchain={
-            "terraformVersion": TERRAFORM_VERSION,
-            "wrapperVersion": installed_version(),
-            "approvedRootSha256": approved_root_digest(),
-        },
-        plan={
-            "status": "not-run" if plan_exit_code is None else "proven",
-            "exitCode": plan_exit_code,
-            "hasChanges": plan_exit_code == 2,
-            "temporaryWorkspaceRetained": False,
-            "binaryPlanRetained": False,
-            "stateRetained": False,
-        },
+        status="pass" if passed else "fail",
+        bundle=BundleIdentity.model_validate(replay_identity),
+        target=TargetIdentity.model_validate(
+            {
+                "moduleSource": MODULE_SOURCE,
+                "moduleVersion": MODULE_VERSION,
+                "moduleReleaseCommit": MODULE_RELEASE_COMMIT,
+                "moduleTreeSha256": module_tree_sha256 or MODULE_TREE_SHA256,
+                "providerSource": PROVIDER_SOURCE,
+                "providerVersion": PROVIDER_VERSION,
+                "requestedAccountId": requested_account,
+                "observedAccountId": observed_account_id,
+            }
+        ),
+        toolchain=ToolchainIdentity.model_validate(
+            {
+                "terraformVersion": TERRAFORM_VERSION,
+                "wrapperVersion": installed_version(),
+                "approvedRootSha256": approved_root_digest(),
+            }
+        ),
+        plan=PlanIdentity.model_validate(
+            {
+                "executionStatus": (
+                    "produced"
+                    if plan_produced
+                    else "failed"
+                    if plan_exit_code is not None
+                    else "not-run"
+                ),
+                "exitCode": plan_exit_code,
+                "hasChanges": plan_exit_code == 2,
+                **plan_metadata,
+                "temporaryWorkspaceRetained": False,
+                "binaryPlanRetained": False,
+                "stateRetained": False,
+            }
+        ),
         stages=_complete_stages(stages),
-        resource_changes=resource_changes,
-        change_summary=summary,
+        resourceChanges=resource_changes,
+        changeSummary=summary,
         blockers=blockers,
+        conformance=conformance,
         guidance=[
             "Fix the source requirement and recompile when an input is wrong.",
             "Select credentials for the intended AWS account when identity does not match.",
@@ -204,8 +334,10 @@ def build_evidence(
             "Seek owner review when destructive intent cannot be removed from the design.",
         ],
         boundary=(
-            "Sanitized speculative-plan evidence only. Credentials, environment variables, "
-            "raw plan JSON, resource values, binary plans, and Terraform state are excluded."
+            "Sanitized speculative-plan evidence only. It retains approved non-secret VPC "
+            "observations, identities, outcomes, actions, counts, and hashes. Credentials, "
+            "environment variables, generic/raw resource values, raw plan JSON, binary plans, "
+            "and Terraform state are excluded."
         ),
     )
 
@@ -217,13 +349,24 @@ def load_review_evidence(bundle: Path) -> dict[str, Any]:
     first = blockers[0] if blockers and isinstance(blockers[0], dict) else {}
     toolchain_value = evidence.get("toolchain")
     toolchain = toolchain_value if isinstance(toolchain_value, dict) else {}
+    legacy = evidence.get("schemaVersion") == "intent-engine/terraform-plan-evidence/v1"
+    conformance = evidence.get("conformance")
+    conformance_status = (
+        conformance.get("status", "incomplete") if isinstance(conformance, dict) else "incomplete"
+    )
     return {
-        "label": "Terraform plan proof",
-        "sectionTitle": "Terraform Plan Evidence",
+        "label": "Terraform legacy plan evidence" if legacy else "Terraform plan conformance",
+        "sectionTitle": (
+            "Terraform Legacy Plan Evidence" if legacy else "Terraform Plan Conformance Evidence"
+        ),
         "artifactName": PLAN_EVIDENCE_NAME,
         "evidence": evidence,
         "summary": {
-            "status": evidence.get("status", "not-run") if evidence else "not-run",
+            "status": "legacy-plan-only"
+            if legacy
+            else conformance_status
+            if evidence
+            else "not-run",
             "exitCode": evidence.get("plan", {}).get("exitCode", "unknown")
             if isinstance(evidence.get("plan"), dict)
             else "unknown",
@@ -261,6 +404,7 @@ def _complete_stages(stages: list[PlanStage]) -> list[PlanStage]:
         for name in (
             "terraform-version",
             "terraform-init",
+            "terraform-module",
             "terraform-validate",
             "terraform-plan",
             "terraform-show",

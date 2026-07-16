@@ -13,7 +13,9 @@ Existing deployment mechanisms remain downstream.
 | `handoff-plan.yaml` | Ordered review/handoff steps, owners, dependencies, manual gates, rollback, boundary, `handoffAllowed`, and allowed next action. | Core | Contract-backed successful handoffs. | No |
 | `plan-manifest.yaml` | Registered target plan metadata: exact target/tool identities, immutable inputs, plan readiness, expected plan outputs, blockers, and no-apply boundary. | Pattern + core contract | Plan-ready registered targets such as AWS LZA and Terraform VPC. | No |
 | `replay-manifest.yaml` | Source, target contract, and artifact digests for deterministic replay and bundle comparison. | Core | Plan-ready registered targets. | No |
-| `terraform-plan-evidence.yaml` | Sanitized Terraform VPC speculative-plan proof: bundle/replay identities, exact target/tool versions, requested and observed account IDs, stage results, sorted resource actions, aggregate counts, blockers, and no-retention/no-apply boundary. | Terraform VPC plan adapter | `iac-llm-wrapper terraform plan --bundle`. | No |
+| `atmos/stacks/catalog/terraform-vpc-intent.yaml` | Importable Atmos abstract component `terraform-vpc/intent-defaults` containing only replay-bound region and VPC module variables. It deliberately omits owner stack, backend, workspace, identity, environment, secret, and apply configuration. | Terraform VPC pattern | Every successful `terraform-vpc` compile. | No; abstract |
+| `atmos/components/terraform/terraform-vpc/{main.tf,variables.tf,.terraform.lock.hcl}` | Byte-for-byte copy of the approved Terraform VPC root and provider lockfile, verified against the code-owned root digest and included in replay. | Terraform VPC pattern | Every successful `terraform-vpc` compile. | Handoff root; execution remains downstream |
+| `terraform-plan-evidence.yaml` | Sanitized Terraform VPC v2 conformance evidence: exact source/bundle/graph/contract/policy/root/module/provider/tool/plan identities; plan-format flags and digests; requirement/control outcomes; declared deferred gates; resource provenance; actions/counts/blockers; and no-retention/no-apply boundary. V1 remains reviewable only as `legacy-plan-only`. | Terraform VPC plan adapter | `iac-llm-wrapper terraform plan --bundle`. | No |
 | `missing-inputs.yaml` | Durable architect/client question packet for blocked compiles, keyed by requirement graph nodes. | Core | Blocked compiles. | No |
 | `llm-trace-summary.yaml` | Provider/model, latency, raw and accepted decisions, applied decisions, gaps, contradictions, and raw evidence status. | Core | Every compile. | No |
 | `model-benchmark.yaml` | Mode, provider/model, latency, token availability, raw LLM coverage, conformance, quality counts, readiness, cost status, and external-observability boundary. | Core | Every compile. | No |
@@ -28,7 +30,7 @@ Existing deployment mechanisms remain downstream.
 | `lza-validation-evidence.yaml` | Validation-only AWS LZA config-validator command, no-mutation/read-only lookup boundary, temporary-staging/replay boundary, source metadata, config digests, exit code, diagnostic summary, and captured stdout/stderr. | AWS LZA validation adapter | `iac-llm-wrapper lza validate`. | No |
 | `battle-summary.yaml` | Battle-test verdict, confidence categories, findings, and improvement items. | Battle harness | `scripts/battle-test.py`. | No |
 | `handoff-review.html` | Static human review page summarizing readiness, contract status, allowed next action, reviewer next actions, blocker traceability, raw LLM coverage, expected weaknesses, requirement graph links, evidence, benchmark, contract validation, handoff plan, and target artifacts. | Core review tooling | `iac-llm-wrapper review html`. | No |
-| `requirement-graph.json` | Machine-readable graph export for external viewers and tools. | Core graph tooling | `iac-llm-wrapper graph export`. | No |
+| `requirement-graph.json` | Machine-readable graph export for external viewers and tools; `terraform-vpc` also emits and replay-binds its resolved graph as a required conformance input. | Core graph tooling or Terraform VPC pattern | `iac-llm-wrapper graph export`, or a successful `terraform-vpc` compile. | No |
 | `requirement-graph.mmd` | Mermaid graph export for lightweight visual inspection. | Core graph tooling | `iac-llm-wrapper graph export`. | No |
 | Pattern-specific target configuration files | Target-shaped config or parameter handoff, such as AWS LZA YAML or CloudFormation parameters. | Pattern | Successful contract-backed handoffs. | No |
 
@@ -43,9 +45,15 @@ Existing deployment mechanisms remain downstream.
 - Plan reviewers use `plan-manifest.yaml` and `replay-manifest.yaml` to see
   whether a registered target has enough immutable input for a downstream
   plan/diff without interpretation. These files do not invoke the plan.
-- Terraform VPC reviewers use `terraform-plan-evidence.yaml` to verify the exact
-  approved module planned in the requested AWS account without retaining raw
-  plan data, state, or the plan binary.
+- Terraform VPC reviewers use `terraform-plan-evidence.yaml` to inspect whether
+  the exact approved module plan matches all applicable plan-observable
+  requirements, which controls remain deferred, and how every managed resource
+  traces to the target contract and code-reviewed mappings. It retains no raw
+  plan data, state, or plan binary.
+- Atmos owners import the generated abstract catalog and component root, define a
+  real component inheriting `terraform-vpc/intent-defaults`, and add backend,
+  authentication, workspace, approval, and environment configuration in their
+  repository. They validate provenance in a reviewed PR and re-plan downstream.
 - Reviewers use `handoff-comparison.yaml` to inspect readiness, decision,
   input, downstream artifact, model, and sample deltas from a document or
   sample-configuration update.
@@ -69,8 +77,9 @@ Artifacts may describe a downstream delivery path, but they do not authorize
 CloudFormation, AWS LZA deploy/synth commands, Kubernetes, pipelines, or cloud
 mutation. The Terraform VPC plan adapter is the single narrow exception: it may
 run locked init/validate and a temporary speculative plan/show for the exact
-approved module, but never apply/destroy, retain state or plan files, or own a
-backend. The AWS LZA validation adapter may run the official local config
+approved module, and its v2 evidence may report plan-time conformance with named
+deferred owner gates. It never applies/destroys, retains state or plan files, or
+owns a backend. The AWS LZA validation adapter may run the official local config
 validator against generated config files and record evidence, but it must not
 clone, install, synth, deploy, or mutate AWS. Depending on the AWS LZA version
 and local validation path, the official validator may perform read-only AWS

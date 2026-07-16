@@ -26,9 +26,13 @@ Architect packet / Markdown / Interview
   -> artifact generators
      - emit decision reports, handoff plans, trace summaries, benchmark files,
        review files, and pattern-specific target configuration files
-  -> optional target proof
-     - terraform-vpc alone verifies replay identities and the code-owned root
+     - terraform-vpc emits an abstract Atmos catalog and byte-identical approved root
+       as an optional Git/contract handoff, without owner runtime configuration
+  -> optional target conformance
+     - terraform-vpc alone verifies replay, root, module-tree, provider, and tool identities
      - runs a temporary account-bound speculative plan with no apply or retained state
+     - gives every applicable requirement/control a plan, input, or deferred-gate outcome
+     - fails on contradictions, unknowns, incomplete plans, or untraceable resources
   -> confidence loop
      - evals compare expected decisions and artifacts
      - battle tests produce verdicts and improvement items
@@ -44,16 +48,36 @@ Architect packet / Markdown / Interview
   and pattern-specific target configuration emitters.
 - Existing deployment mechanisms own deployment. Compile/generation paths do not
   call cloud APIs or invoke pipelines. The Terraform VPC plan adapter may use
-  standard AWS credentials for caller identity and a temporary speculative plan
-  against one exact approved module; it cannot apply or retain state. The AWS LZA validation-only
+  owner-approved AWS credentials for caller identity and a temporary speculative
+  plan against one exact approved module; it observes the account, not credential
+  scope, and cannot apply or retain state. The AWS LZA validation-only
   adapter may run the official local validator, which can require read-only
   account lookup through the provided AWS/LZA context.
+- Atmos owns no state here. The `terraform-vpc` pattern emits an abstract catalog
+  component and the already-approved root. Owner repositories supply real stack
+  names, backend, authentication, workspace, approvals, and execution. The bridge
+  adds no core callback, service API, or Python dependency.
 
 ## Boundary
 
 The model can suggest. The requirement graph and target contracts decide.
 Artifacts can be consumed by another UI or tool, but this repo remains
 CLI-first, artifact-first, and handoff-first.
+
+The integration protocol is generated files plus target contracts and replay
+digests. Backstage may invoke the CLI, and Atlantis may execute an owner's Atmos
+workflow. Terramate and Terragrunt are alternative Terraform orchestrators.
+Score and Crossplane require independent target demand. None is a runtime
+dependency, and no MCP facade exists in this slice.
+
+LLM providers remain supported for compatibility, but provider expansion is
+frozen. Model output may propose decisions; it may not select target versions,
+weaken contracts, construct the Atmos root, or authorize a state transition.
+
+For `terraform-vpc`, the pattern-local conformance specification owns plan JSON
+interpretation and resource provenance. `policy-graph.yaml` remains control
+mapping metadata, not an evaluator. State, locking, drift, approval, signed
+attestation, and any fresh downstream plan remain owner-platform concerns.
 
 AWS Landing Zone Accelerator is the reference target: accepted decisions produce
 contract-checked LZA YAML/config files, and the downstream LZA process remains

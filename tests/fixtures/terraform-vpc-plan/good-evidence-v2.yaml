@@ -1,0 +1,743 @@
+schemaVersion: intent-engine/terraform-plan-evidence/v2
+timestamp: '2026-07-16T00:00:00+00:00'
+status: pass
+pattern: terraform-vpc
+bundle:
+  replayManifestSha256: '2222222222222222222222222222222222222222222222222222222222222222'
+  bundleDigest: '3333333333333333333333333333333333333333333333333333333333333333'
+  sourceSha256: '4444444444444444444444444444444444444444444444444444444444444444'
+target:
+  moduleSource: terraform-aws-modules/vpc/aws
+  moduleVersion: 6.6.1
+  moduleReleaseCommit: 3ffbd46fb1c7733e1b34d8666893280454e27436
+  moduleTreeSha256:
+    38386a5d1a9e99cc1fdf8273a70b25b6f9dddca836545a960159d019d193c807
+  providerSource: hashicorp/aws
+  providerVersion: 6.53.0
+  requestedAccountId: '111122223333'
+  observedAccountId: '111122223333'
+toolchain:
+  terraformVersion: 1.15.8
+  wrapperVersion: fixture
+  approvedRootSha256:
+    5986a358169a90b2f22be1afc04319c923332d848ed4641359d7f7db7a0dc5f4
+plan:
+  executionStatus: produced
+  exitCode: 2
+  hasChanges: true
+  formatVersion: '1.2'
+  terraformVersion: 1.15.8
+  applyable: true
+  complete: true
+  errored: false
+  binaryPlanSha256: '5555555555555555555555555555555555555555555555555555555555555555'
+  planJsonSha256:
+    c4c60cee89ba2a4afb2a63ed1e37bb8e1729ff4cf6afc8704a0731e1ae4f7715
+  moduleContentVerified: true
+  temporaryWorkspaceRetained: false
+  binaryPlanRetained: false
+  stateRetained: false
+stages:
+  - name: terraform-version
+    status: pass
+    exitCode: 0
+  - name: terraform-init
+    status: pass
+    exitCode: 0
+  - name: terraform-module
+    status: pass
+    exitCode: 0
+  - name: terraform-validate
+    status: pass
+    exitCode: 0
+  - name: terraform-plan
+    status: pass
+    exitCode: 2
+  - name: terraform-show
+    status: pass
+    exitCode: 0
+resourceChanges:
+  - address: data.aws_caller_identity.current
+    mode: data
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_caller_identity
+    actions:
+      - read
+  - address: module.vpc.aws_default_network_acl.this[0]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_default_network_acl
+    actions:
+      - create
+  - address: module.vpc.aws_default_route_table.default[0]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_default_route_table
+    actions:
+      - create
+  - address: module.vpc.aws_default_security_group.this[0]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_default_security_group
+    actions:
+      - create
+  - address: module.vpc.aws_eip.nat[0]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_eip
+    actions:
+      - create
+  - address: module.vpc.aws_eip.nat[1]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_eip
+    actions:
+      - create
+  - address: module.vpc.aws_internet_gateway.this[0]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_internet_gateway
+    actions:
+      - create
+  - address: module.vpc.aws_nat_gateway.this[0]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_nat_gateway
+    actions:
+      - create
+  - address: module.vpc.aws_nat_gateway.this[1]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_nat_gateway
+    actions:
+      - create
+  - address: module.vpc.aws_route.private_nat_gateway[0]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_route
+    actions:
+      - create
+  - address: module.vpc.aws_route.private_nat_gateway[1]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_route
+    actions:
+      - create
+  - address: module.vpc.aws_route.public_internet_gateway[0]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_route
+    actions:
+      - create
+  - address: module.vpc.aws_route_table.private[0]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_route_table
+    actions:
+      - create
+  - address: module.vpc.aws_route_table.private[1]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_route_table
+    actions:
+      - create
+  - address: module.vpc.aws_route_table.public[0]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_route_table
+    actions:
+      - create
+  - address: module.vpc.aws_route_table_association.private[0]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_route_table_association
+    actions:
+      - create
+  - address: module.vpc.aws_route_table_association.private[1]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_route_table_association
+    actions:
+      - create
+  - address: module.vpc.aws_route_table_association.public[0]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_route_table_association
+    actions:
+      - create
+  - address: module.vpc.aws_route_table_association.public[1]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_route_table_association
+    actions:
+      - create
+  - address: module.vpc.aws_subnet.private[0]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_subnet
+    actions:
+      - create
+  - address: module.vpc.aws_subnet.private[1]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_subnet
+    actions:
+      - create
+  - address: module.vpc.aws_subnet.public[0]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_subnet
+    actions:
+      - create
+  - address: module.vpc.aws_subnet.public[1]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_subnet
+    actions:
+      - create
+  - address: module.vpc.aws_vpc.this[0]
+    mode: managed
+    provider: registry.terraform.io/hashicorp/aws
+    resourceType: aws_vpc
+    actions:
+      - create
+changeSummary:
+  create: 23
+  update: 0
+  delete: 0
+  replace: 0
+  noOp: 0
+  other: 1
+blockers: []
+conformance:
+  status: conformant-with-deferred-gates
+  requirementSetId: terraform-vpc/requirements/v1
+  specification:
+    id: terraform-vpc/plan-conformance/v1
+    sha256: 6f140d1279391366ae318224734a588e6e6a0de7956b8f7171574ad80d653f5b
+  identities:
+    requirementGraphSha256: '1111111111111111111111111111111111111111111111111111111111111111'
+    decisionAuditSha256: '1111111111111111111111111111111111111111111111111111111111111111'
+    policyGraphSha256: '1111111111111111111111111111111111111111111111111111111111111111'
+    planManifestSha256: '1111111111111111111111111111111111111111111111111111111111111111'
+    decisionReportSha256: '1111111111111111111111111111111111111111111111111111111111111111'
+    moduleInputsSha256: '1111111111111111111111111111111111111111111111111111111111111111'
+    targetContractSha256: '1111111111111111111111111111111111111111111111111111111111111111'
+    policyPackSha256: '1111111111111111111111111111111111111111111111111111111111111111'
+  requirements:
+    - requirementId: terraform-vpc/requirements/v1/vpc_name
+      graphKey: vpc_name
+      outcome: proven
+      proofClass: plan-observation
+      expected: orders-vpc
+      observations:
+        - reference: module-inputs.yaml:variables.name
+          status: match
+          value: orders-vpc
+        - reference: plan.variables.name
+          status: match
+          value: orders-vpc
+        - reference: plan.resources.module.vpc.aws_vpc.this[0].tags.Name
+          status: match
+          value: orders-vpc
+      message: Immutable input and required plan observations agree.
+    - requirementId: terraform-vpc/requirements/v1/primary_region
+      graphKey: primary_region
+      outcome: proven
+      proofClass: plan-observation
+      expected: eu-central-1
+      observations:
+        - reference: module-inputs.yaml:variables.azs
+          status: match
+          value:
+            - eu-central-1a
+            - eu-central-1b
+        - reference: plan.variables.region
+          status: match
+          value: eu-central-1
+        - reference: plan.variables.azs
+          status: match
+          value:
+            - eu-central-1a
+            - eu-central-1b
+        - reference: plan.configuration.provider.aws.region
+          status: match
+          value:
+            - var.region
+        - reference: plan.resources.module.vpc.aws_vpc.this[0].region
+          status: match
+          value: eu-central-1
+        - reference: plan.resources.aws_subnet.availability_zone.set
+          status: match
+          value:
+            - eu-central-1a
+            - eu-central-1b
+      message: Immutable input and required plan observations agree.
+    - requirementId: terraform-vpc/requirements/v1/cidr
+      graphKey: cidr
+      outcome: proven
+      proofClass: plan-observation
+      expected: 10.30.0.0/16
+      observations:
+        - reference: module-inputs.yaml:variables.cidr
+          status: match
+          value: 10.30.0.0/16
+        - reference: plan.variables.cidr
+          status: match
+          value: 10.30.0.0/16
+        - reference: plan.resources.module.vpc.aws_vpc.this[0].cidr_block
+          status: match
+          value: 10.30.0.0/16
+      message: Immutable input and required plan observations agree.
+    - requirementId: terraform-vpc/requirements/v1/az_count
+      graphKey: az_count
+      outcome: proven
+      proofClass: plan-observation
+      expected: 2
+      observations:
+        - reference: module-inputs.yaml:variables.azs.count
+          status: match
+          value: 2
+        - reference: plan.variables.azs.count
+          status: match
+          value: 2
+        - reference: plan.resources.public_subnet_cidrs.count
+          status: match
+          value: 2
+        - reference: plan.resources.private_subnet_cidrs.count
+          status: match
+          value: 2
+      message: Immutable input and required plan observations agree.
+    - requirementId: terraform-vpc/requirements/v1/public_subnet_cidrs
+      graphKey: public_subnet_cidrs
+      outcome: proven
+      proofClass: plan-observation
+      expected:
+        - 10.30.0.0/24
+        - 10.30.1.0/24
+      observations:
+        - reference: module-inputs.yaml:variables.public_subnets
+          status: match
+          value:
+            - 10.30.0.0/24
+            - 10.30.1.0/24
+        - reference: plan.variables.public_subnets
+          status: match
+          value:
+            - 10.30.0.0/24
+            - 10.30.1.0/24
+        - reference: plan.resources.public_subnet_cidrs.cidr_block.set
+          status: match
+          value:
+            - 10.30.0.0/24
+            - 10.30.1.0/24
+      message: Immutable input and required plan observations agree.
+    - requirementId: terraform-vpc/requirements/v1/private_subnet_cidrs
+      graphKey: private_subnet_cidrs
+      outcome: proven
+      proofClass: plan-observation
+      expected:
+        - 10.30.10.0/24
+        - 10.30.11.0/24
+      observations:
+        - reference: module-inputs.yaml:variables.private_subnets
+          status: match
+          value:
+            - 10.30.10.0/24
+            - 10.30.11.0/24
+        - reference: plan.variables.private_subnets
+          status: match
+          value:
+            - 10.30.10.0/24
+            - 10.30.11.0/24
+        - reference: plan.resources.private_subnet_cidrs.cidr_block.set
+          status: match
+          value:
+            - 10.30.10.0/24
+            - 10.30.11.0/24
+      message: Immutable input and required plan observations agree.
+    - requirementId: terraform-vpc/requirements/v1/enable_nat_gateway
+      graphKey: enable_nat_gateway
+      outcome: proven
+      proofClass: plan-observation
+      expected: true
+      observations:
+        - reference: module-inputs.yaml:variables.enable_nat_gateway
+          status: match
+          value: true
+        - reference: plan.variables.enable_nat_gateway
+          status: match
+          value: true
+        - reference: plan.resources.aws_nat_gateway.count
+          status: match
+          value: 2
+      message: Immutable input and required plan observations agree.
+    - requirementId: terraform-vpc/requirements/v1/single_nat_gateway
+      graphKey: single_nat_gateway
+      outcome: proven
+      proofClass: plan-observation
+      expected: false
+      observations:
+        - reference: module-inputs.yaml:variables.single_nat_gateway
+          status: match
+          value: false
+        - reference: plan.variables.single_nat_gateway
+          status: match
+          value: false
+        - reference: plan.resources.aws_nat_gateway.count
+          status: match
+          value: 2
+      message: Immutable input and required plan observations agree.
+    - requirementId: terraform-vpc/requirements/v1/enable_dns_hostnames
+      graphKey: enable_dns_hostnames
+      outcome: proven
+      proofClass: plan-observation
+      expected: true
+      observations:
+        - reference: module-inputs.yaml:variables.enable_dns_hostnames
+          status: match
+          value: true
+        - reference: plan.variables.enable_dns_hostnames
+          status: match
+          value: true
+        - reference:
+            plan.resources.module.vpc.aws_vpc.this[0].enable_dns_hostnames
+          status: match
+          value: true
+      message: Immutable input and required plan observations agree.
+    - requirementId: terraform-vpc/requirements/v1/target_account_id
+      graphKey: target_account_id
+      outcome: proven
+      proofClass: plan-observation
+      expected: '111122223333'
+      observations:
+        - reference: plan.outputs.aws_caller_identity
+          status: match
+          value: '111122223333'
+      message: Immutable input and required plan observations agree.
+    - requirementId: terraform-vpc/requirements/v1/deployment_pipeline_ref
+      graphKey: deployment_pipeline_ref
+      outcome: proven
+      proofClass: immutable-input
+      expected: github://platform-networking/vpc-deploy
+      observations:
+        - reference: decision-report.yaml:delivery.deploymentPipelineRef
+          status: match
+          value: github://platform-networking/vpc-deploy
+      message: Immutable input and required plan observations agree.
+  controls:
+    - controlId: VPC-DELIVERY-001
+      outcome: not-observable
+      proofClass: owner-attestation
+      evidenceReferences:
+        - terraform-vpc/requirements/v1/target_account_id
+        - terraform-vpc/requirements/v1/deployment_pipeline_ref
+      deferredTo: owner pipeline-control review
+      message: Plan-observable subclaims pass; independent owner evidence is
+        still required.
+    - controlId: VPC-NETWORK-001
+      outcome: not-observable
+      proofClass: owner-attestation
+      evidenceReferences:
+        - terraform-vpc/requirements/v1/cidr
+        - terraform-vpc/requirements/v1/public_subnet_cidrs
+        - terraform-vpc/requirements/v1/private_subnet_cidrs
+      deferredTo: owner IPAM/allocation review
+      message: Plan-observable subclaims pass; independent owner evidence is
+        still required.
+    - controlId: VPC-EGRESS-001
+      outcome: proven
+      proofClass: plan-observation
+      evidenceReferences:
+        - terraform-vpc/requirements/v1/enable_nat_gateway
+        - terraform-vpc/requirements/v1/single_nat_gateway
+      deferredTo:
+      message: All plan-observable mapped requirements are proven.
+    - controlId: VPC-DNS-001
+      outcome: proven
+      proofClass: plan-observation
+      evidenceReferences:
+        - terraform-vpc/requirements/v1/enable_dns_hostnames
+      deferredTo:
+      message: All plan-observable mapped requirements are proven.
+    - controlId: VPC-ATTACHMENT-001
+      outcome: not-observable
+      proofClass: owner-attestation
+      evidenceReferences:
+        - terraform-vpc/requirements/v1/vpc_name
+        - terraform-vpc/requirements/v1/cidr
+      deferredTo: downstream attachment review
+      message: Plan-observable subclaims pass; independent owner evidence is
+        still required.
+  notApplicableRequirementIds: []
+  deferredGates:
+    - id: terraform-vpc/deferred-gates/v1/vpc-delivery-001
+      controlId: VPC-DELIVERY-001
+      laterPhase: owner pipeline-control review
+      requiredEvidence: Independent owner evidence bound to the exact v2
+        evidence digest.
+    - id: terraform-vpc/deferred-gates/v1/vpc-network-001
+      controlId: VPC-NETWORK-001
+      laterPhase: owner IPAM/allocation review
+      requiredEvidence: Independent owner evidence bound to the exact v2
+        evidence digest.
+    - id: terraform-vpc/deferred-gates/v1/vpc-attachment-001
+      controlId: VPC-ATTACHMENT-001
+      laterPhase: downstream attachment review
+      requiredEvidence: Independent owner evidence bound to the exact v2
+        evidence digest.
+  resources:
+    - address: module.vpc.aws_default_network_acl.this[0]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_default_network_acl
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/vpc_name
+        - terraform-vpc/requirements/v1/cidr
+      controlIds:
+        - VPC-ATTACHMENT-001
+    - address: module.vpc.aws_default_route_table.default[0]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_default_route_table
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/vpc_name
+        - terraform-vpc/requirements/v1/cidr
+      controlIds:
+        - VPC-ATTACHMENT-001
+    - address: module.vpc.aws_default_security_group.this[0]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_default_security_group
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/vpc_name
+        - terraform-vpc/requirements/v1/cidr
+      controlIds:
+        - VPC-ATTACHMENT-001
+    - address: module.vpc.aws_eip.nat[0]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_eip
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/enable_nat_gateway
+        - terraform-vpc/requirements/v1/single_nat_gateway
+      controlIds:
+        - VPC-EGRESS-001
+    - address: module.vpc.aws_eip.nat[1]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_eip
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/enable_nat_gateway
+        - terraform-vpc/requirements/v1/single_nat_gateway
+      controlIds:
+        - VPC-EGRESS-001
+    - address: module.vpc.aws_internet_gateway.this[0]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_internet_gateway
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/cidr
+        - terraform-vpc/requirements/v1/public_subnet_cidrs
+      controlIds:
+        - VPC-NETWORK-001
+    - address: module.vpc.aws_nat_gateway.this[0]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_nat_gateway
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/enable_nat_gateway
+        - terraform-vpc/requirements/v1/single_nat_gateway
+      controlIds:
+        - VPC-EGRESS-001
+    - address: module.vpc.aws_nat_gateway.this[1]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_nat_gateway
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/enable_nat_gateway
+        - terraform-vpc/requirements/v1/single_nat_gateway
+      controlIds:
+        - VPC-EGRESS-001
+    - address: module.vpc.aws_route.private_nat_gateway[0]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_route
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/enable_nat_gateway
+        - terraform-vpc/requirements/v1/single_nat_gateway
+      controlIds:
+        - VPC-EGRESS-001
+    - address: module.vpc.aws_route.private_nat_gateway[1]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_route
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/enable_nat_gateway
+        - terraform-vpc/requirements/v1/single_nat_gateway
+      controlIds:
+        - VPC-EGRESS-001
+    - address: module.vpc.aws_route.public_internet_gateway[0]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_route
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/public_subnet_cidrs
+      controlIds:
+        - VPC-NETWORK-001
+    - address: module.vpc.aws_route_table.private[0]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_route_table
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/private_subnet_cidrs
+        - terraform-vpc/requirements/v1/enable_nat_gateway
+        - terraform-vpc/requirements/v1/single_nat_gateway
+      controlIds:
+        - VPC-NETWORK-001
+        - VPC-EGRESS-001
+    - address: module.vpc.aws_route_table.private[1]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_route_table
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/private_subnet_cidrs
+        - terraform-vpc/requirements/v1/enable_nat_gateway
+        - terraform-vpc/requirements/v1/single_nat_gateway
+      controlIds:
+        - VPC-NETWORK-001
+        - VPC-EGRESS-001
+    - address: module.vpc.aws_route_table.public[0]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_route_table
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/public_subnet_cidrs
+      controlIds:
+        - VPC-NETWORK-001
+    - address: module.vpc.aws_route_table_association.private[0]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_route_table_association
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/az_count
+        - terraform-vpc/requirements/v1/private_subnet_cidrs
+      controlIds:
+        - VPC-NETWORK-001
+    - address: module.vpc.aws_route_table_association.private[1]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_route_table_association
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/az_count
+        - terraform-vpc/requirements/v1/private_subnet_cidrs
+      controlIds:
+        - VPC-NETWORK-001
+    - address: module.vpc.aws_route_table_association.public[0]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_route_table_association
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/az_count
+        - terraform-vpc/requirements/v1/public_subnet_cidrs
+      controlIds:
+        - VPC-NETWORK-001
+    - address: module.vpc.aws_route_table_association.public[1]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_route_table_association
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/az_count
+        - terraform-vpc/requirements/v1/public_subnet_cidrs
+      controlIds:
+        - VPC-NETWORK-001
+    - address: module.vpc.aws_subnet.private[0]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_subnet
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/primary_region
+        - terraform-vpc/requirements/v1/az_count
+        - terraform-vpc/requirements/v1/private_subnet_cidrs
+      controlIds:
+        - VPC-NETWORK-001
+    - address: module.vpc.aws_subnet.private[1]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_subnet
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/primary_region
+        - terraform-vpc/requirements/v1/az_count
+        - terraform-vpc/requirements/v1/private_subnet_cidrs
+      controlIds:
+        - VPC-NETWORK-001
+    - address: module.vpc.aws_subnet.public[0]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_subnet
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/primary_region
+        - terraform-vpc/requirements/v1/az_count
+        - terraform-vpc/requirements/v1/public_subnet_cidrs
+      controlIds:
+        - VPC-NETWORK-001
+    - address: module.vpc.aws_subnet.public[1]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_subnet
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/primary_region
+        - terraform-vpc/requirements/v1/az_count
+        - terraform-vpc/requirements/v1/public_subnet_cidrs
+      controlIds:
+        - VPC-NETWORK-001
+    - address: module.vpc.aws_vpc.this[0]
+      mode: managed
+      provider: registry.terraform.io/hashicorp/aws
+      resourceType: aws_vpc
+      targetContract: terraform-aws-vpc-module
+      requirementIds:
+        - terraform-vpc/requirements/v1/vpc_name
+        - terraform-vpc/requirements/v1/primary_region
+        - terraform-vpc/requirements/v1/cidr
+        - terraform-vpc/requirements/v1/enable_dns_hostnames
+      controlIds:
+        - VPC-NETWORK-001
+        - VPC-DNS-001
+        - VPC-ATTACHMENT-001
+  ownerReviewRequired: true
+guidance:
+  - Fix the source requirement and recompile when an input is wrong.
+  - Select credentials for the intended AWS account when identity does not
+    match.
+  - Correct the code-owned approved adapter when tool or schema validation
+    fails.
+  - Seek owner review when destructive intent cannot be removed from the design.
+ownerReviewRequired: true
+applyAllowed: false
+boundary: Sanitized speculative-plan evidence only. It retains approved
+  non-secret VPC observations, identities, outcomes, actions, counts, and hashes.
+  Credentials, environment variables, generic/raw resource values, raw plan
+  JSON, binary plans, and Terraform state are excluded.

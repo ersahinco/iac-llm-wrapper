@@ -3,7 +3,8 @@
 from intent_engine.core.generator import gen_tfvars
 from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern, PatternGenerator
 
-from .contracts import CONTRACT, POLICY_PACK
+from .atmos import gen_atmos_handoff
+from .contracts import ATMOS_CONTRACT, CONTRACT, POLICY_PACK
 from .evidence import load_review_evidence
 from .generators import gen_decision_report, map_terraform_vpc_modules, validate_intent
 from .graph import build_graph
@@ -13,6 +14,7 @@ from .target import (
     build_target_report,
     enrich_handoff_readiness,
     gen_plan_manifest,
+    gen_requirement_graph,
     gen_target_capability_graph,
 )
 
@@ -33,7 +35,9 @@ SECTION_MAP: dict[str, tuple[str, str | None]] = {
 GLOBAL_REGISTRY.register(
     Pattern(
         name="terraform-vpc",
-        description="Approved Terraform AWS VPC module input capture and speculative plan proof",
+        description=(
+            "Approved Terraform AWS VPC module input capture and requirement-to-plan conformance"
+        ),
         graph_factory=build_graph,
         intent_factory=TerraformVpcIntent,
         section_map=SECTION_MAP,
@@ -53,18 +57,30 @@ GLOBAL_REGISTRY.register(
                 gen_target_capability_graph,
                 priority=5,
             ),
+            PatternGenerator(
+                "terraform-vpc-requirement-graph",
+                gen_requirement_graph,
+                priority=5,
+            ),
             PatternGenerator("terraform-tfvars", gen_tfvars, priority=5),
             PatternGenerator("terraform-vpc-decision-report", gen_decision_report, priority=10),
+            PatternGenerator("terraform-vpc-atmos-handoff", gen_atmos_handoff, priority=20),
             PatternGenerator("terraform-vpc-plan-manifest", gen_plan_manifest, priority=29),
         ],
         validators=[validate_intent],
-        contracts=[CONTRACT],
+        contracts=[CONTRACT, ATMOS_CONTRACT],
         policy_packs=[POLICY_PACK],
         readiness_enricher=enrich_handoff_readiness,
         review_evidence_loader=load_review_evidence,
         artifact_review_owners={
             "module-inputs.yaml": "network-platform-owner",
             "plan-manifest.yaml": "network-platform-owner",
+            "atmos/stacks/catalog/terraform-vpc-intent.yaml": "network-platform-owner",
+            "atmos/components/terraform/terraform-vpc/main.tf": "network-platform-owner",
+            "atmos/components/terraform/terraform-vpc/variables.tf": "network-platform-owner",
+            "atmos/components/terraform/terraform-vpc/.terraform.lock.hcl": (
+                "network-platform-owner"
+            ),
         },
         reconfirmation_categories=("network",),
         samples=SAMPLES,

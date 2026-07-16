@@ -7,14 +7,16 @@ capture and handoff-readiness layer: it extracts structured decisions, checks
 them against requirement graphs and target contracts, and emits traceable target
 configuration artifacts for engineers and existing deployment mechanisms.
 
-The repository and package are named `iac-llm-wrapper`. The core is
-**intent-engine**. Today it wraps LLM extraction with deterministic decision
-validation and emits registered-target configuration artifacts. Direct
+The repository and package retain the historical name `iac-llm-wrapper`. The
+product is a **requirements-to-target handoff compiler** and its core is
+**intent-engine**. An LLM is an optional conversational adapter; deterministic
+decision validation and registered-target contracts remain authoritative, and
+the compiler emits registered-target configuration artifacts. Direct
 deployment, dashboards, and cloud changes stay downstream; the tool can say when
 a bundle is ready for an existing deployment mechanism. The single
-`terraform-vpc` proof path may invoke an exact code-owned module for a temporary,
-speculative plan; it cannot apply, retain state, or generate whole IaC from
-scratch.
+`terraform-vpc` conformance path may invoke an exact code-owned module for a
+temporary speculative plan and compare plan-observable values with accepted
+requirements; it cannot apply, retain state, or generate whole IaC from scratch.
 Outside that fixed adapter, the product does not generate whole IaC from scratch.
 
 AWS Landing Zone Accelerator is the reference path and downstream authority:
@@ -37,9 +39,11 @@ mechanisms; the core should not become the deploy runner.
 For smaller workload practice, the `terraform-vpc` pattern captures inputs for
 the pinned `terraform-aws-modules/vpc/aws` `6.6.1` module in an existing AWS
 account, including the owner-controlled deployment pipeline reference. Its
-approved adapter pins Terraform `1.15.8` and AWS provider `6.53.0`, verifies the
-bundle replay identities, and can emit sanitized account-bound speculative-plan
-evidence. Git-aware incremental runs use
+approved adapter pins Terraform `1.15.8`, AWS provider `6.53.0`, and the reviewed
+module `6.6.1` source tree, verifies bundle replay identities, and emits
+sanitized account-bound requirement-to-plan conformance evidence. The policy
+pack remains mapping metadata; the target-local Python evaluator owns these
+comparisons. Git-aware incremental runs use
 `compile-git` to rebuild only bundles whose design docs changed. Optional
 Checkov evidence can be captured with `shift-left checkov` against an
 owner-provided IaC/module path; generated `terraform.tfvars` alone is not treated
@@ -48,6 +52,16 @@ metadata that maps client/platform controls, framework labels such as SOC 2,
 PCI, HIPAA, and NIST, target contracts, module variables, and owner Checkov
 policy references. That evidence is shift-left input for owner CI/CD gates, not
 compliance attestation or deployment approval.
+
+Every successful `terraform-vpc` compile also emits a self-hosted Atmos bridge:
+an abstract `terraform-vpc/intent-defaults` catalog component plus a byte-for-byte
+copy of the approved Terraform root and provider lockfile. The catalog contains
+only replay-bound Terraform variables. It intentionally contains no backend,
+workspace, credentials, roles, environment, secrets, owner stack name, or apply
+configuration. Owners import the artifacts, create a real named component that
+inherits the abstract defaults, add runtime controls in their repository, and
+open a reviewed PR. Atmos is validated in CI with a checksum-pinned OSS binary;
+it is not a Python or runtime dependency of this package.
 
 ## Core Flow
 
@@ -62,13 +76,15 @@ flowchart TD
     G -- "No" --> E
     G -- "Yes" --> H["Deterministic target artifacts"]
     H --> I["handoff-plan.yaml / plan-manifest.yaml"]
-    I --> P["Optional approved terraform-vpc speculative plan proof"]
+    H --> A1["Atmos abstract catalog + approved root"]
+    I --> P["Optional approved terraform-vpc plan conformance"]
     P --> J["Existing downstream deployment mechanism"]
     I --> J
+    A1 --> J
     J -. "outside this tool: no apply" .-> K["Owner-controlled deployment"]
 ```
 
-LLMs help read intent. Human-owned models, requirement graphs, contracts,
+LLMs may help read intent. Human-owned models, requirement graphs, contracts,
 validators, lineage, runbooks, and evals decide what is acceptable. Existing
 accelerators, modules, and provisioning pipelines remain the delivery layer.
 This project is not an LZA replacement, LZA CLI wrapper, Terraform/NTC
@@ -140,12 +156,62 @@ or profile credentials for the declared non-production account:
 iac-llm-wrapper terraform plan --bundle out/terraform-vpc
 ```
 
-The command verifies contracts and replay hashes, requires Terraform `1.15.8`,
-runs locked init/validate/plan/show in a temporary local workspace, and writes
-`terraform-plan-evidence.yaml`. It rejects a caller-account mismatch and delete
-or replace actions. It never invokes `apply` or `destroy`, owns a backend, keeps
-state, retains the binary plan, or records raw plan values or credentials. The
-owner pipeline must re-plan against its real backend before any future apply.
+The command verifies contracts, replay hashes, the initialized module tree, and
+Terraform `1.15.8`; then it runs locked validate/plan/show in a temporary local
+workspace and writes `terraform-plan-evidence.yaml` v2. Every applicable graph
+requirement and registered control receives a terminal outcome. Known
+contradictions, unknown or sensitive required values, incomplete plans,
+untraceable resources, account mismatches, and delete/replace actions fail
+closed. A normal passing result is `conformant-with-deferred-gates` because
+pipeline ownership, organizational IPAM approval, and downstream attachment
+checks require independent owner evidence.
+
+The operator must supply owner-approved restricted credentials. The core checks
+the observed account identity but cannot prove the credential permission scope.
+It never invokes `apply` or `destroy`, owns a backend, keeps state, retains the
+binary plan/raw plan JSON, or records credentials. The owner pipeline must
+re-plan against its real backend before any future apply. Synthetic fixtures and
+credential-free module/root CI prove the local boundary; a real owner-account
+acceptance run remains separate and authorization-gated.
+
+### Atmos owner handoff
+
+For `terraform-vpc`, copy or import these generated paths into an owner Atmos
+repository:
+
+- `atmos/stacks/catalog/terraform-vpc-intent.yaml`
+- `atmos/components/terraform/terraform-vpc/`
+
+Create a real owner-named component whose `metadata.inherits` contains
+`terraform-vpc/intent-defaults`. Configure backend, authentication, workspace,
+approval, and environment details only in the owner repository. Use
+`atmos validate stacks` and `atmos describe component ... --provenance` in the
+reviewed PR, then let Atlantis or another owner-controlled OSS pipeline create a
+fresh downstream plan. The generated component is abstract, and this repository
+does not provide an apply command.
+
+### Optional OSS consumers
+
+The integration protocol is Git plus contract-backed artifacts, not service
+APIs. These projects are optional downstream choices:
+
+- [Backstage](https://backstage.io/) may collect known inputs, invoke the existing
+  CLI, and commit its output; it does not replace decision discovery or evidence.
+- [Atlantis](https://www.runatlantis.io/) may execute the owner repository's Atmos
+  workflow and approval rules.
+- [Terramate](https://terramate.io/) and
+  [Terragrunt](https://terragrunt.gruntwork.io/) remain alternative Terraform
+  orchestration targets; no adapter is added without repeated owner demand.
+- [Score](https://score.dev/) and [Crossplane](https://www.crossplane.io/) need
+  separate target contracts and real use cases before implementation.
+
+No Backstage portal, Atlantis API, MCP server, second orchestration adapter, or
+new LLM provider belongs in this slice. Add one only after an owner uses the
+Atmos bundle in a PR, repeats the workflow, and demonstrates a material review
+benefit. Remove the bridge if official schemas/forms produce the same practical
+result, reviewers ignore its evidence, or nobody repeats the workflow. A future
+target that needs another large bespoke semantic evaluator stays
+configuration-only unless a genuinely shared protocol has been proven.
 
 ## Patterns
 
@@ -157,16 +223,17 @@ Recommended product paths stay thin and contract-backed:
 | `aws-lza` | Contract-backed AWS Landing Zone Accelerator registered-target configuration using official-style LZA YAML artifacts |
 | `cloudformation-parameters` | BYOM CloudFormation parameter handoff for an existing template |
 | `kubernetes-cluster` | Kubernetes cluster handoff with optional Terraform EKS module input references |
-| `terraform-vpc` | Exact approved Terraform AWS VPC module input capture and account-bound speculative plan proof |
+| `terraform-vpc` | Exact approved Terraform AWS VPC module input capture, abstract Atmos handoff, and account-bound requirement-to-plan conformance |
 
 ## Why Not Terraform, CDK, Or CloudFormation?
 
 Those tools provision infrastructure. This tool captures and validates the
 decisions that must be made before provisioning. It emits deterministic target
 configuration artifacts engineers use with existing accelerators, sample
-configurations, and IaC modules. The narrow Terraform VPC adapter proves that
-one exact module can produce an account-bound speculative plan; it is not an
-apply path or a general IaC generator. AWS LZA remains configuration-only and
+configurations, and IaC modules. The narrow Terraform VPC adapter establishes
+only that one exact speculative plan matches the requirements observable at plan
+time, with named deferred gates; it is not an apply path or a general IaC
+generator. AWS LZA remains configuration-only and
 the downstream LZA deployment process remains authoritative.
 
 ## Project Status

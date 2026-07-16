@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 from collections.abc import Callable
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -14,14 +16,23 @@ from intent_engine.core.compiler import compile_from_interview
 from intent_engine.core.replay import verify_replay_manifest
 from intent_engine.core.yaml_utils import load_bundle_yaml_mapping, write_yaml_artifact
 from intent_engine.patterns.terraform_vpc import plan as plan_module
+from intent_engine.patterns.terraform_vpc import target as target_module
+from intent_engine.patterns.terraform_vpc.atmos import (
+    ATMOS_CATALOG_ARTIFACT,
+    ATMOS_COMPONENT_ROOT,
+)
+from intent_engine.patterns.terraform_vpc.conformance import CONTROL_IDS, REQUIREMENT_KEYS
 from intent_engine.patterns.terraform_vpc.contracts import PLAN_EVIDENCE_CONTRACT
+from intent_engine.patterns.terraform_vpc.evidence import load_review_evidence
 from intent_engine.patterns.terraform_vpc.plan import (
     TerraformPlanError,
     run_plan,
     validate_approved_root,
 )
 from intent_engine.patterns.terraform_vpc.target import (
+    MODULE_RELEASE_COMMIT,
     MODULE_SOURCE,
+    MODULE_TREE_SHA256,
     MODULE_VERSION,
     PLAN_EVIDENCE_NAME,
     PROVIDER_VERSION,
@@ -41,6 +52,16 @@ _DECISIONS = {
     "target_account_id": "111122223333",
     "deployment_pipeline_ref": "github://platform-networking/vpc-deploy",
 }
+_GOOD_PLAN = Path(__file__).parents[1] / "fixtures" / "terraform-vpc-plan" / "good-two-az.json"
+
+
+@pytest.fixture(autouse=True)
+def approved_module_tree(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        plan_module,
+        "installed_module_tree_digest",
+        lambda _: MODULE_TREE_SHA256,
+    )
 
 
 @pytest.fixture
@@ -89,16 +110,16 @@ def _fake_terraform(
                 return _result(argv, stdout="not-json")
             if fail_stage == stage:
                 return _result(argv, 1)
-            outputs = {"aws_caller_identity": {"value": account}} if account is not None else {}
-            return _result(
-                argv,
-                stdout=json.dumps(
-                    {
-                        "planned_values": {"outputs": outputs},
-                        "resource_changes": changes or [],
-                    }
-                ),
+            plan = deepcopy(json.loads(_GOOD_PLAN.read_text()))
+            outputs = (
+                {"aws_caller_identity": {"sensitive": False, "value": account, "type": "string"}}
+                if account is not None
+                else {}
             )
+            plan["planned_values"]["outputs"] = outputs
+            if changes is not None:
+                plan["resource_changes"] = changes
+            return _result(argv, stdout=json.dumps(plan))
         raise AssertionError(f"Unexpected Terraform command: {argv}")
 
     return fake
@@ -123,7 +144,29 @@ def test_plan_accepts_terraform_detailed_success_codes_and_cleans_temp(
     evidence = run_plan(bundle)
 
     assert evidence["status"] == "pass"
-    assert evidence["plan"]["status"] == "proven"
+    assert evidence["plan"]["executionStatus"] == "produced"
+    assert evidence["conformance"]["status"] == "conformant-with-deferred-gates"
+    assert evidence["schemaVersion"] == "intent-engine/terraform-plan-evidence/v2"
+    assert evidence["plan"]["moduleContentVerified"] is True
+    assert len(evidence["plan"]["binaryPlanSha256"]) == 64
+    assert len(evidence["plan"]["planJsonSha256"]) == 64
+    assert evidence["target"]["moduleTreeSha256"] == MODULE_TREE_SHA256
+    assert [item["graphKey"] for item in evidence["conformance"]["requirements"]] == list(
+        REQUIREMENT_KEYS
+    )
+    assert [item["controlId"] for item in evidence["conformance"]["controls"]] == list(CONTROL_IDS)
+    assert set(evidence["conformance"]["identities"]) == {
+        "requirementGraphSha256",
+        "decisionAuditSha256",
+        "policyGraphSha256",
+        "planManifestSha256",
+        "decisionReportSha256",
+        "moduleInputsSha256",
+        "targetContractSha256",
+        "policyPackSha256",
+    }
+    assert all(len(value) == 64 for value in evidence["conformance"]["identities"].values())
+    assert len(evidence["bundle"]["sourceSha256"]) == 64
     assert evidence["plan"]["hasChanges"] is (plan_exit == 2)
     assert [call[1] for call in calls] == ["version", "init", "validate", "plan", "show"]
     assert calls[1][2:] == ["-input=false", "-lockfile=readonly", "-no-color"]
@@ -165,6 +208,8 @@ def test_plan_records_sorted_sanitized_resource_changes(
     assert "resource values" in rendered
     assert "planned_values" not in rendered
     assert "secret-value" not in rendered
+    assert "after_unknown" not in rendered
+    assert "after_sensitive" not in rendered
     assert str(bundle) not in rendered
 
 
@@ -196,7 +241,7 @@ def test_plan_fails_closed_at_each_terraform_stage(
 
     assert evidence["status"] == "fail"
     assert expected_code in {item["code"] for item in evidence["blockers"]}
-    assert len(evidence["stages"]) == 5
+    assert len(evidence["stages"]) == 6
     assert "secret-value" not in json.dumps(evidence)
 
 
@@ -309,6 +354,43 @@ def test_replay_rejects_unsafe_names_and_wrong_patterns(
     assert {item["code"] for item in evidence["blockers"]} == {"TERRAFORM_PLAN_PATTERN_UNSUPPORTED"}
 
 
+@pytest.mark.parametrize(
+    "name",
+    [
+        ATMOS_CATALOG_ARTIFACT,
+        f"{ATMOS_COMPONENT_ROOT}/main.tf",
+        f"{ATMOS_COMPONENT_ROOT}/variables.tf",
+        f"{ATMOS_COMPONENT_ROOT}/.terraform.lock.hcl",
+    ],
+)
+def test_replay_binds_every_nested_atmos_artifact(bundle: Path, tmp_path: Path, name: str):
+    path = bundle / name
+    original = path.read_bytes()
+    path.write_bytes(original + b"\n# changed\n")
+    assert "REPLAY_ARTIFACT_CHANGED" in {
+        item.code for item in verify_replay_manifest(bundle, "terraform-vpc")
+    }
+
+    path.write_bytes(original)
+    path.unlink()
+    assert "REPLAY_FILE_MISSING" in {
+        item.code for item in verify_replay_manifest(bundle, "terraform-vpc")
+    }
+
+    outside = tmp_path / path.name
+    outside.write_bytes(original)
+    path.symlink_to(outside)
+    assert "REPLAY_FILE_UNSAFE" in {
+        item.code for item in verify_replay_manifest(bundle, "terraform-vpc")
+    }
+
+    path.unlink()
+    path.mkdir()
+    assert "REPLAY_FILE_UNSAFE" in {
+        item.code for item in verify_replay_manifest(bundle, "terraform-vpc")
+    }
+
+
 def test_approved_root_or_lock_drift_blocks_execution(
     bundle: Path, monkeypatch: pytest.MonkeyPatch
 ):
@@ -322,6 +404,22 @@ def test_approved_root_or_lock_drift_blocks_execution(
     evidence = run_plan(bundle)
 
     assert "TERRAFORM_APPROVED_ROOT_CHANGED" in {item["code"] for item in evidence["blockers"]}
+
+
+def test_approved_root_identity_rejects_symlinks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    approved = tmp_path / "approved"
+    approved.mkdir()
+    source = target_module.approved_root_path()
+    for name in target_module.ROOT_FILES:
+        (approved / name).write_bytes((source / name).read_bytes())
+    outside = tmp_path / "outside.tf"
+    outside.write_bytes((source / "main.tf").read_bytes())
+    (approved / "main.tf").unlink()
+    (approved / "main.tf").symlink_to(outside)
+    monkeypatch.setattr(target_module, "approved_root_path", lambda: approved)
+
+    with pytest.raises(ValueError, match="missing or unsafe: main.tf"):
+        target_module.approved_root_identities()
 
 
 def test_plan_invocation_requires_configuration_and_plan_readiness(bundle: Path):
@@ -339,6 +437,10 @@ def test_manifest_and_evidence_pin_the_exact_approved_target(bundle: Path):
 
     assert manifest["target"]["module"] == {"source": MODULE_SOURCE, "version": MODULE_VERSION}
     assert manifest["target"]["provider"]["version"] == PROVIDER_VERSION
+    assert manifest["approvedModule"] == {
+        "releaseCommit": MODULE_RELEASE_COMMIT,
+        "treeSha256": MODULE_TREE_SHA256,
+    }
     assert manifest["toolchain"]["terraformVersion"] == TERRAFORM_VERSION
     assert manifest["maturity"]["configReady"]["allowed"] is True
     assert manifest["maturity"]["planReady"]["planAllowed"] is True
@@ -364,11 +466,30 @@ def test_static_review_surfaces_plan_evidence_and_actionable_guidance(
 
     html = render_review_html(bundle)
 
-    assert "Terraform Plan Evidence" in html
+    assert "Terraform Plan Conformance Evidence" in html
     assert "AWS_ACCOUNT_MISMATCH" in html
     assert "Select credentials for the intended account" in html
     assert "Fix the source requirement and recompile" in html
     assert "Seek owner review" in html
+
+
+def test_static_review_never_upgrades_v1_evidence_to_conformant(bundle: Path) -> None:
+    write_yaml_artifact(
+        bundle / PLAN_EVIDENCE_NAME,
+        {
+            "schemaVersion": "intent-engine/terraform-plan-evidence/v1",
+            "status": "pass",
+            "plan": {"exitCode": 2},
+            "toolchain": {"wrapperVersion": "legacy"},
+            "blockers": [],
+        },
+        "",
+    )
+
+    review = load_review_evidence(bundle)
+
+    assert review["summary"]["status"] == "legacy-plan-only"
+    assert review["label"] == "Terraform legacy plan evidence"
 
 
 def test_validate_approved_root_runs_only_locked_init_and_validate(
@@ -391,6 +512,59 @@ def test_validate_approved_root_runs_only_locked_init_and_validate(
     assert [call[1] for call in calls] == ["version", "init", "validate"]
     assert calls[1][2:] == ["-backend=false", "-input=false", "-lockfile=readonly"]
     assert not any("plan" in call or "apply" in call for call in calls)
+
+
+def test_initialized_module_tree_is_content_pinned_and_rejects_symlinks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = tmp_path / ".terraform" / "modules" / "vpc"
+    module.mkdir(parents=True)
+    (module / "main.tf").write_text("module-content\n")
+    git_dir = module / ".git"
+    git_dir.mkdir()
+    (git_dir / "config").write_text("transport-metadata\n")
+    manifest = {
+        "Modules": [
+            {
+                "Key": "vpc",
+                "Source": f"registry.terraform.io/{MODULE_SOURCE}",
+                "Version": MODULE_VERSION,
+                "Dir": ".terraform/modules/vpc",
+            }
+        ]
+    }
+    (module.parent / "modules.json").write_text(json.dumps(manifest))
+    digest = hashlib.sha256(b"main.tf\0module-content\n\0").hexdigest()
+    monkeypatch.setattr(target_module, "MODULE_TREE_SHA256", digest)
+
+    assert target_module.installed_module_tree_digest(tmp_path) == digest
+
+    (module / "main.tf").write_text("substituted\n")
+    with pytest.raises(ValueError, match="does not match"):
+        target_module.installed_module_tree_digest(tmp_path)
+    (module / "main.tf").write_text("module-content\n")
+    (module / "unsafe").symlink_to(module / "main.tf")
+    with pytest.raises(ValueError, match="symlink"):
+        target_module.installed_module_tree_digest(tmp_path)
+
+
+def test_terraform_environment_ignores_cli_and_variable_overrides(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TF_CLI_ARGS_plan", "-destroy")
+    monkeypatch.setenv("TF_VAR_cidr", "0.0.0.0/0")
+    monkeypatch.setenv("TF_WORKSPACE", "foreign")
+    monkeypatch.setenv("TF_CLI_CONFIG_FILE", "/tmp/untrusted.tfrc")
+    monkeypatch.setenv("TF_REATTACH_PROVIDERS", "untrusted-provider")
+
+    environment = plan_module._terraform_environment(tmp_path)
+
+    assert "TF_CLI_ARGS_plan" not in environment
+    assert "TF_VAR_cidr" not in environment
+    assert "TF_WORKSPACE" not in environment
+    assert "TF_REATTACH_PROVIDERS" not in environment
+    assert environment["TF_CLI_CONFIG_FILE"] == str(tmp_path / "terraform-cli.tfrc")
+    assert (tmp_path / "terraform-cli.tfrc").read_text() == "disable_checkpoint = true\n"
 
 
 def test_invalid_bundle_root_cannot_create_evidence(tmp_path: Path):

@@ -66,6 +66,17 @@ def test_wheel_smoke_uses_locked_hashed_runtime_and_no_deps_install():
         assert "uv pip install --no-deps" in workflow
         assert ".package-smoke/bin/iac-llm-wrapper --version" in workflow
         assert ".package-smoke/bin/intent-engine --version" in workflow
+        assert ".package-smoke/bin/iac-llm-wrapper compile" in workflow
+        assert ".package-smoke-output/atmos/stacks/catalog/terraform-vpc-intent.yaml" in workflow
+        assert ".package-smoke-output/atmos/components/terraform/terraform-vpc/main.tf" in workflow
+        assert (
+            ".package-smoke-output/atmos/components/terraform/terraform-vpc/variables.tf"
+            in workflow
+        )
+        assert (
+            ".package-smoke-output/atmos/components/terraform/terraform-vpc/.terraform.lock.hcl"
+            in workflow
+        )
 
 
 def test_release_rejects_mismatched_tags_and_keeps_sbom_out_of_pypi():
@@ -116,6 +127,20 @@ def test_terraform_plan_root_is_packaged_and_ci_validated_with_exact_toolchain()
     assert workflows.count("python scripts/validate-terraform-vpc-plan-root.py") == 2
 
 
+def test_atmos_handoff_is_ci_validated_with_a_checksum_pinned_binary():
+    workflows = _read(".github/workflows/ci.yml") + _read(".github/workflows/release.yml")
+
+    assert workflows.count('ATMOS_VERSION: "1.223.0"') == 2
+    assert (
+        workflows.count(
+            'ATMOS_SHA256: "f898d4aaef4d52666f12eb652dc54b5a143f1c14e1c669fed736fd8c20fc0e41"'
+        )
+        == 2
+    )
+    assert workflows.count("sha256sum --check --strict") == 2
+    assert workflows.count("python scripts/validate-atmos-terraform-vpc-handoff.py") == 2
+
+
 def test_terraform_root_and_lock_pin_the_approved_module_and_provider():
     main = _read("src/intent_engine/patterns/terraform_vpc/plan_root/main.tf")
     lock = _read("src/intent_engine/patterns/terraform_vpc/plan_root/.terraform.lock.hcl")
@@ -126,5 +151,11 @@ def test_terraform_root_and_lock_pin_the_approved_module_and_provider():
     assert 'source  = "hashicorp/aws"' in main
     assert 'version = "= 6.53.0"' in main
     assert 'provider "registry.terraform.io/hashicorp/aws"' in lock
+    target = _read("src/intent_engine/patterns/terraform_vpc/target.py")
+    assert 'MODULE_RELEASE_COMMIT = "3ffbd46fb1c7733e1b34d8666893280454e27436"' in target
+    assert (
+        'MODULE_TREE_SHA256 = "38386a5d1a9e99cc1fdf8273a70b25b6f9dddca836545a960159d019d193c807"'
+        in target
+    )
     assert 'version     = "6.53.0"' in lock
     assert lock.count('"h1:') == 4

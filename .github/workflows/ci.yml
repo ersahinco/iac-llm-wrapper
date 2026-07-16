@@ -87,6 +87,19 @@ jobs:
           terraform_version: "1.15.8"
           terraform_wrapper: false
 
+      - name: Install pinned Atmos
+        env:
+          ATMOS_VERSION: "1.223.0"
+          ATMOS_SHA256: "f898d4aaef4d52666f12eb652dc54b5a143f1c14e1c669fed736fd8c20fc0e41"
+        run: |
+          mkdir -p .tools
+          curl --fail --location --silent --show-error \
+            --output .tools/atmos \
+            "https://github.com/cloudposse/atmos/releases/download/v${ATMOS_VERSION}/atmos_${ATMOS_VERSION}_linux_amd64"
+          echo "${ATMOS_SHA256}  .tools/atmos" | sha256sum --check --strict
+          chmod 0755 .tools/atmos
+          echo "$PWD/.tools" >> "$GITHUB_PATH"
+
       - name: Set up uv
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
@@ -97,6 +110,9 @@ jobs:
 
       - name: Validate approved Terraform VPC root
         run: uv run --locked python scripts/validate-terraform-vpc-plan-root.py
+
+      - name: Validate Atmos Terraform VPC handoff
+        run: uv run --locked python scripts/validate-atmos-terraform-vpc-handoff.py
 
   security:
     runs-on: ubuntu-latest
@@ -157,3 +173,17 @@ jobs:
           uv pip install --no-deps --python .package-smoke/bin/python dist/*.whl
           .package-smoke/bin/iac-llm-wrapper --version
           .package-smoke/bin/intent-engine --version
+          .package-smoke/bin/iac-llm-wrapper compile \
+            --input fixtures/usability/byom-terraform-vpc.md \
+            --output .package-smoke-output \
+            --pattern terraform-vpc
+          test -f .package-smoke-output/atmos/stacks/catalog/terraform-vpc-intent.yaml
+          cmp \
+            src/intent_engine/patterns/terraform_vpc/plan_root/main.tf \
+            .package-smoke-output/atmos/components/terraform/terraform-vpc/main.tf
+          cmp \
+            src/intent_engine/patterns/terraform_vpc/plan_root/variables.tf \
+            .package-smoke-output/atmos/components/terraform/terraform-vpc/variables.tf
+          cmp \
+            src/intent_engine/patterns/terraform_vpc/plan_root/.terraform.lock.hcl \
+            .package-smoke-output/atmos/components/terraform/terraform-vpc/.terraform.lock.hcl

@@ -63,7 +63,7 @@ uv run --locked --extra dev prek run --all-files
   AWS CLI, and Ollama backends with retry/backoff and evidence capture.
 - **CLI** (`cli.py`): `compile`, `compile-git`, `interview`, `validate`,
   `explain`, `sample`, `contract`, `graph`, `discover`, `template`, `review`,
-  `shift-left`, the Terraform VPC speculative plan proof, and AWS LZA validation
+  `shift-left`, Terraform VPC speculative plan conformance, and AWS LZA validation
   helpers. Default pattern is `aws-lza`.
 
 ## Current Pattern Surface
@@ -79,10 +79,12 @@ uv run --locked --extra dev prek run --all-files
 - `kubernetes-cluster`: Contract-backed Kubernetes handoff for
   cluster/namespace config with optional Terraform EKS module input references.
 - `terraform-vpc`: Exact approved Terraform AWS VPC module input capture and
-  speculative plan proof. Emits module variables/tfvars, plan/replay manifests,
-  and sanitized account-bound plan evidence. Its code-owned root pins Terraform
-  1.15.8, module 6.6.1, and AWS provider 6.53.0; it never applies or retains
-  state or a plan binary.
+  requirement-to-plan conformance. Emits module variables/tfvars, an abstract
+  Atmos catalog plus approved component root, plan/replay manifests, and
+  sanitized account-bound v2 evidence with requirement/control outcomes,
+  deferred gates, and resource provenance. Its code-owned root pins Terraform
+  1.15.8, module 6.6.1 by source-tree digest, and AWS provider 6.53.0; it never
+  applies or retains state, raw plan JSON, or a plan binary.
 
 ## Key Decisions
 
@@ -96,9 +98,9 @@ uv run --locked --extra dev prek run --all-files
   perform read-only account lookup through the provided AWS/LZA context.
 - The Terraform VPC plan adapter is deliberately target-specific. It may run a
   temporary speculative plan for the exact approved module and compare caller
-  identity with the packet account; it cannot apply, destroy, own a backend, or
-  retain state/raw plan data. Extract a shared execution protocol only after a
-  second real target proves the same boundary.
+  identity and plan-observable values with accepted requirements; it cannot
+  apply, destroy, own a backend, or retain state/raw plan data. Extract a shared
+  execution protocol only after a second real target proves the same boundary.
 - "Wrapper" means architect exchange to registered target configuration, not
   bypassing IaC tools, accelerators, owner pipelines, or gates.
 - Sample recommendations must persist as artifacts, not terminal-only hints.
@@ -155,9 +157,10 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, pytest, ruff, mypy, pyright.
 
 ### Current Goal
 
-Prove one controlled requirements-to-plan path for the exact approved Terraform
-VPC module while keeping LLM guidance advisory, target code authoritative, and
-all deployment authority downstream.
+Deliver the OSS-native Atmos bridge as a stateless `terraform-vpc`
+requirements-to-target handoff while keeping LLM guidance advisory, target code
+authoritative, and every backend, credential, workspace, approval, plan, and
+apply decision downstream. Real owner use remains separately authorization-gated.
 
 ### Status
 
@@ -232,13 +235,42 @@ all deployment authority downstream.
   review mapping, LZA validation evidence, artifact review owners, incremental
   reconfirmation policy, and forbidden artifact checks now live on the AWS LZA
   pattern instead of generic core branches.
-- **Terraform VPC plan proof**: `terraform-vpc` now emits exact target/toolchain
+- **Terraform VPC plan foundation**: `terraform-vpc` emits exact target/toolchain
   identities, three distinct maturity states, immutable input digests, and a
   replay manifest. `iac-llm-wrapper terraform plan --bundle` verifies those
   contracts, stages the code-owned root in a temporary workspace, runs locked
   init/validate/plan/show, binds success to the requested AWS account, blocks
   delete/replace actions, and emits sanitized evidence without apply, state,
   credentials, raw values, or retained plan files.
+- **Requirement-to-Plan Conformance v1**: the unchanged Terraform plan command
+  now writes strict `intent-engine/terraform-plan-evidence/v2`. A pattern-local
+  evaluator recomputes graph applicability, verifies plan JSON/tool/configuration
+  shape, compares replay-bound inputs with VPC/subnet/AZ/NAT/DNS/account
+  observations, maps every managed resource to the approved module, target
+  contract, requirements, and controls, and fails on contradictions, unknowns,
+  sensitive required values, missing observations, unexpected origins, or
+  incomplete/errored plans. Normal success is
+  `conformant-with-deferred-gates`, not global policy compliance.
+- **OSS-native Atmos bridge**: every successful `terraform-vpc` compile emits an
+  abstract `terraform-vpc/intent-defaults` catalog plus a byte-for-byte copy of
+  the approved Terraform root and provider lockfile. A second pattern-owned
+  contract validates exact variables and the abstract boundary; recursive replay
+  now binds nested regular files and rejects missing, changed, unsafe, or
+  symlinked entries. Generated artifacts contain no owner backend, authentication,
+  workspace, environment, secret, stack name, approval, or apply configuration.
+- **Real credential-free interoperability proof**: checksum-pinned Atmos 1.223.0
+  validates the synthetic owner stack, resolves inherited variables exactly,
+  emits provenance, initializes the locked component through Atmos, reproduces
+  the approved module-tree digest, and validates Terraform 1.15.8. The synthetic
+  owner project disables workspaces and backend generation; those choices are
+  not embedded in the generated bridge. No plan, apply, destroy, credentials, or
+  cloud API is used.
+- **Module-content identity**: locked init must produce the reviewed module
+  6.6.1 portable source tree at release commit
+  `3ffbd46fb1c7733e1b34d8666893280454e27436`, SHA-256
+  `38386a5d1a9e99cc1fdf8273a70b25b6f9dddca836545a960159d019d193c807`.
+  Local planning, CI/release root validation, and the installed-wheel proof use
+  the same check; Terraform transport `.git` metadata is deliberately excluded.
 - **Plan trust and cohesion**: shared replay verification rejects missing,
   changed, unsafe, or symlinked bundle inputs and changed contracts. Terraform
   VPC compile metadata, execution, and evidence shaping remain separate cohesive
@@ -248,13 +280,15 @@ all deployment authority downstream.
   four-platform provider lockfile. The real credential-free locked init and JSON
   validate passed; CI and release jobs run the same proof through the pinned
   setup-terraform action.
-- **Validation**: 513 tests passed with one optional real-Ollama test skipped;
-  coverage is 90.54%. Ruff, Ruff
+- **Validation**: 547 tests passed with one optional integration test skipped;
+  coverage is 90.76%. Under uv 0.11.29, Ruff, Ruff
   format, mypy, Pyright, fixture drift, golden journey, extraction (8/8),
-  usability (8/8), all-files `prek`, lock check, Bandit, runtime `pip-audit`,
-  full-development `pip-audit`, CycloneDX export, constrained package build,
-  both installed CLI entry points, and all three packaged Terraform root assets
-  in a clean Python 3.11 environment passed. No fixture drift or known dependency
+  usability (8/8), all-files `prek`, the credential-free approved-root proof,
+  checksum-pinned Atmos 1.223.0 integration proof, constrained package build,
+  both installed CLI entry points, and wheel-installed Atmos artifact generation
+  with all three byte-identical root assets in a clean Python 3.14 environment
+  passed. Previously recorded Bandit, runtime/development `pip-audit`, and
+  CycloneDX checks remain green; no fixture drift or known dependency
   vulnerabilities remain.
 - **Model comparison**: the historical implicit local Ollama fallback used
   `llama3.2:3b`, took about 79 seconds, and produced a graph delta from the
@@ -268,16 +302,23 @@ all deployment authority downstream.
   $430.22/month even with no activity or workloads, so full personal-account LZA
   deployment is not a minimum-cost test.
 - **Remaining blockers**: the requested Terraform owner acceptance plan needs an
-  owner-approved non-production packet/account and matching read-only AWS
-  credentials; the local environment does not establish that authorization, so
-  no cloud plan was attempted. Downstream-clean AWS LZA evidence still requires
+  owner-approved non-production packet/account and matching restricted AWS
+  credentials; the core can observe account identity but cannot prove permission
+  scope, and the local environment does not establish that authorization, so no
+  cloud plan was attempted. Downstream-clean AWS LZA evidence still requires
   owner-approved account emails and an AWS/LZA validation context with read-only
   account lookup permission; no deploy/apply path was added.
+  The Atmos bridge also lacks its required real owner PR and repeat use, so no
+  portal, MCP facade, second orchestrator, or additional semantic evaluator is
+  justified.
 
 ### Durable Decisions
 
 - Keep the product boundary narrow: registered target configuration handoff,
   contract checks, review evidence, and owner-controlled downstream execution.
+- Position the product as a requirements-to-target handoff compiler. Keep the
+  historical package name for compatibility and treat LLMs only as optional
+  conversational adapters; freeze provider expansion.
 - Prefer packet-driven fixes over imagined platform features.
 - Prefer deletion and shared local helpers over new abstractions.
 - Share domain knowledge only when its meaning and change boundary are the same;
@@ -308,13 +349,26 @@ all deployment authority downstream.
   owning pattern rather than branching in generic core.
 - Keep LLMs out of HCL and version selection. Approved roots, modules, providers,
   contracts, and replay identities are code-owned and human-reviewed.
-- Treat configuration readiness, plan invocation allowance, and a proven plan as
-  separate states. A speculative plan never grants apply authority.
-- Keep Terraform plan evidence value-free and portable: record identities,
-  actions, counts, blockers, and account match only; discard temporary state,
-  raw plan JSON, and the binary plan.
+- Treat configuration readiness, plan invocation allowance, plan production,
+  and plan conformance as separate states. A speculative plan never grants apply
+  authority.
+- Keep Terraform plan evidence portable and allowlisted: record only approved
+  non-secret VPC observations, identities, outcomes, actions, counts, blockers,
+  and hashes; discard temporary state, generic/raw resource values, raw plan
+  JSON, environment, credentials, and the binary plan.
+- Keep requirement/control outcome semantics and resource provenance on the
+  owning Terraform VPC pattern. Policy-pack metadata is not an evaluator, and a
+  shared policy/execution protocol is premature before a second real target.
 - Do not create an executor registry for one target. Generalize only after a
   second real plan-capable target demonstrates the same protocol.
+- Use Git plus contract-backed artifacts as the integration protocol. Atmos is
+  the first pattern-local bridge; Backstage, Atlantis, Terramate, Terragrunt,
+  Score, and Crossplane remain optional consumers or future targets rather than
+  runtime dependencies.
+- Require one owner PR, one repeated use, and a material review benefit before
+  adding MCP, portal code, service APIs, a second orchestration bridge, or a new
+  semantic evaluator. Remove the Atmos bridge if schema/form generation proves
+  equivalent in practice or reviewers ignore its evidence.
 - Keep generated/ignored evidence out of committed source unless it is an
   intentional fixture or contract artifact.
 - Treat deterministic compile as the local product baseline and explicit,
@@ -327,14 +381,19 @@ all deployment authority downstream.
 
 ### Next
 
-1. Run the explicit Terraform owner acceptance trial only after receiving an
-   owner-approved non-production packet/account and matching read-only AWS
-   credentials; require passing account-bound evidence and verify no state or
-   plan binary remains.
-2. Clarify the intended OU for each workload account in the banking customer
+1. Run one owner-authorized PR using the Atmos bundle. Require at least one
+   material benefit—missing decision discovery, contradiction blocking,
+   misleading-plan rejection, or evidence used in review—and one repeat use
+   before expanding the integration surface.
+2. Run the explicit Terraform owner acceptance trial only after receiving an
+   owner-approved non-production packet/account and matching restricted AWS
+   credentials; require v2 `conformant-with-deferred-gates` evidence, validate
+   cloud-audit read scope out of band, and verify no state, raw JSON, or plan
+   binary remains.
+3. Clarify the intended OU for each workload account in the banking customer
    packet and record the mappings under an account inventory; compilation now
    fails closed until that evidence exists.
-3. Re-run official `iac-llm-wrapper lza validate` with owner-approved account
+4. Re-run official `iac-llm-wrapper lza validate` with owner-approved account
    emails and an AWS/LZA lookup-capable validation context.
-4. If validation still fails, fix only packet-backed repo issues or record
+5. If validation still fails, fix only packet-backed repo issues or record
    owner-side failures as downstream evidence.

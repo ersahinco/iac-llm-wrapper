@@ -362,7 +362,7 @@ def gen_handoff_plan(payload: IaCIntentPayload, output_dir: Path) -> None:
 
     review_steps = [
         {
-            "id": f"review-{artifact_name.replace('.', '-').replace('_', '-')}",
+            "id": f"review-{artifact_name.replace('/', '-').replace('.', '-').replace('_', '-')}",
             "title": f"Review {artifact_name}",
             "owner": pattern_obj.artifact_review_owners.get(artifact_name, "target-owner"),
             "dependsOn": ["validate-target-contracts"],
@@ -456,11 +456,10 @@ def gen_replay_manifest(payload: IaCIntentPayload, output_dir: Path) -> None:
     contracts = [*pattern_obj.contracts, PLAN_READY_BUNDLE_CONTRACT]
     files = [
         {
-            "name": item.name,
+            "name": item.relative_to(output_dir).as_posix(),
             "sha256": replay_artifact_digest(item),
         }
-        for item in sorted(output_dir.iterdir())
-        if item.is_file() and not item.name.startswith(".") and item.name != "replay-manifest.yaml"
+        for item in _replay_artifact_paths(output_dir)
     ]
     data = {
         "pattern": pattern,
@@ -483,6 +482,24 @@ def gen_replay_manifest(payload: IaCIntentPayload, output_dir: Path) -> None:
         ),
     }
     _write(output_dir, "replay-manifest.yaml", data, "intent-engine/replay-manifest/v1")
+
+
+def _replay_artifact_paths(output_dir: Path) -> list[Path]:
+    paths: list[Path] = []
+    for item in sorted(
+        output_dir.rglob("*"), key=lambda path: path.relative_to(output_dir).as_posix()
+    ):
+        relative = item.relative_to(output_dir).as_posix()
+        if relative == "replay-manifest.yaml":
+            continue
+        if item.is_symlink():
+            raise ValueError(f"Generated replay artifact is a symlink: {relative}.")
+        if item.is_dir():
+            continue
+        if not item.is_file():
+            raise ValueError(f"Generated replay artifact is unsafe: {relative}.")
+        paths.append(item)
+    return paths
 
 
 CORE_GENERATORS = [

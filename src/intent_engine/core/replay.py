@@ -149,7 +149,8 @@ def _verify_files(bundle: Path, value: Any) -> list[Violation]:
         try:
             path = resolve_bundle_file(bundle, name)
         except BundleFileError as exc:
-            violations.append(_violation("REPLAY_FILE_UNSAFE", str(exc)))
+            code = "REPLAY_FILE_MISSING" if exc.reason == "missing" else "REPLAY_FILE_UNSAFE"
+            violations.append(_violation(code, str(exc)))
             continue
         assert path is not None
         if replay_artifact_digest(path) != digest:

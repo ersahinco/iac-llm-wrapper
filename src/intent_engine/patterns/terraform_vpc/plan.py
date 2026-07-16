@@ -11,6 +11,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from pydantic import ValidationError
+
 from intent_engine.core.compile_artifacts import validate_generated_violations
 from intent_engine.core.contracts import ContractValidator
 from intent_engine.core.package_version import installed_version
@@ -18,6 +20,12 @@ from intent_engine.core.paths import BundleFileError, resolve_bundle_file
 from intent_engine.core.replay import sha256_file, verify_replay_manifest
 from intent_engine.core.yaml_utils import load_bundle_yaml_mapping, write_yaml_artifact
 
+from .conformance import (
+    ConformanceResult,
+    conformance_identities,
+    empty_conformance,
+    evaluate_plan_conformance,
+)
 from .contracts import PLAN_EVIDENCE_CONTRACT
 from .evidence import (
     PlanBlocker as _Blocker,
@@ -40,14 +48,19 @@ from .evidence import (
 from .evidence import (
     empty_change_summary as _empty_change_summary,
 )
+from .evidence import evidence_semantic_violations as _evidence_semantic_violations
 from .evidence import (
     observed_account as _observed_account,
 )
 from .evidence import (
     summarize_changes as _summarize_changes,
 )
+from .models import TerraformVpcIntent
 from .target import (
+    APPROVED_ROOT_SHA256,
+    MODULE_RELEASE_COMMIT,
     MODULE_SOURCE,
+    MODULE_TREE_SHA256,
     MODULE_VARIABLES,
     MODULE_VERSION,
     PLAN_EVIDENCE_NAME,
@@ -58,6 +71,8 @@ from .target import (
     approved_root_digest,
     approved_root_identities,
     approved_root_path,
+    assert_approved_root_identity,
+    installed_module_tree_digest,
 )
 
 
@@ -76,15 +91,34 @@ def run_plan(bundle: Path, *, terraform_command: str = "terraform") -> dict[str,
     requested_account = ""
     observed_account = ""
     plan_exit_code: int | None = None
+    plan_produced = False
+    module_tree_sha256 = ""
+    plan_metadata: dict[str, Any] = {
+        "formatVersion": "not-produced",
+        "terraformVersion": "not-produced",
+        "applyable": False,
+        "complete": False,
+        "errored": False,
+        "binaryPlanSha256": "not-produced",
+        "planJsonSha256": "not-produced",
+        "moduleContentVerified": False,
+    }
+    intent: TerraformVpcIntent | None = None
 
     pattern = _bundle_pattern(bundle, blockers)
     if pattern == "terraform-vpc":
         blockers.extend(_bundle_blockers(bundle))
     if not blockers:
-        requested_account, variables = _plan_inputs(bundle, blockers)
+        intent, variables = _plan_inputs(bundle, blockers)
+        requested_account = intent.target_account_id if intent is not None else ""
     else:
         variables = {}
     replay_identity = _replay_identity(bundle)
+    identities = conformance_identities(_conformance_artifact_identities(bundle))
+    conformance: ConformanceResult = empty_conformance(
+        identities=identities,
+        intent=intent,
+    )
 
     if not blockers:
         try:
@@ -94,12 +128,15 @@ def run_plan(bundle: Path, *, terraform_command: str = "terraform") -> dict[str,
                 (workspace / "terraform.auto.tfvars.json").write_text(
                     json.dumps(variables, sort_keys=True)
                 )
-                environment = {**os.environ, "TF_IN_AUTOMATION": "1"}
+                environment = _terraform_environment(workspace)
                 _require_terraform_version(
                     terraform_command, workspace, environment, stages, blockers
                 )
                 if not blockers:
                     _run_init(terraform_command, workspace, environment, stages, blockers)
+                if not blockers:
+                    module_tree_sha256 = _verify_module(workspace, stages, blockers)
+                    plan_metadata["moduleContentVerified"] = bool(module_tree_sha256)
                 if not blockers:
                     _run_validate(terraform_command, workspace, environment, stages, blockers)
                 plan_path = workspace / "terraform.plan"
@@ -113,7 +150,7 @@ def run_plan(bundle: Path, *, terraform_command: str = "terraform") -> dict[str,
                         blockers,
                     )
                 if not blockers:
-                    plan_json = _show_plan(
+                    plan_json, raw_plan_json = _show_plan(
                         terraform_command,
                         workspace,
                         plan_path,
@@ -121,9 +158,34 @@ def run_plan(bundle: Path, *, terraform_command: str = "terraform") -> dict[str,
                         stages,
                         blockers,
                     )
-                    if plan_json:
+                    if plan_json is not None:
+                        plan_produced = True
+                        plan_metadata.update(
+                            {
+                                "formatVersion": plan_json.get("format_version", ""),
+                                "terraformVersion": plan_json.get("terraform_version", ""),
+                                "applyable": plan_json.get("applyable") is True,
+                                "complete": plan_json.get("complete") is True,
+                                "errored": plan_json.get("errored") is True,
+                                "binaryPlanSha256": (
+                                    sha256_file(plan_path) if plan_path.is_file() else ""
+                                ),
+                                "planJsonSha256": hashlib.sha256(raw_plan_json).hexdigest(),
+                            }
+                        )
                         observed_account = _observed_account(plan_json)
                         resource_changes, summary = _summarize_changes(plan_json, blockers)
+                        if intent is not None:
+                            conformance, issues = evaluate_plan_conformance(
+                                plan_json,
+                                intent=intent,
+                                module_inputs={key: variables[key] for key in MODULE_VARIABLES},
+                                identities=identities,
+                            )
+                            blockers.extend(
+                                _blocker(issue.code, issue.message, issue.next_action)
+                                for issue in issues
+                            )
         except OSError as exc:
             blockers.append(
                 _blocker(
@@ -140,27 +202,42 @@ def run_plan(bundle: Path, *, terraform_command: str = "terraform") -> dict[str,
         requested_account=requested_account,
         observed_account_id=observed_account,
         plan_exit_code=plan_exit_code,
+        plan_produced=plan_produced,
+        plan_metadata=plan_metadata,
+        module_tree_sha256=module_tree_sha256,
         stages=stages,
         resource_changes=resource_changes,
         summary=summary,
         blockers=blockers,
+        conformance=conformance,
     )
-    write_yaml_artifact(
-        evidence_path,
-        evidence.model_dump(by_alias=True, mode="json"),
-        "",
-    )
-    evidence_violations = ContractValidator(PLAN_EVIDENCE_CONTRACT).validate_artifacts(bundle)
-    if evidence_violations:
+    return _persist_evidence(bundle, evidence_path, evidence)
+
+
+def _persist_evidence(bundle: Path, evidence_path: Path, evidence: Any) -> dict[str, Any]:
+    semantic_violations = _evidence_semantic_violations(evidence)
+    if semantic_violations:
         raise TerraformPlanError(
-            "Generated Terraform plan evidence violated its schema: "
-            + "; ".join(item.message for item in evidence_violations)
+            "Generated Terraform plan evidence violated v2 semantics: "
+            + "; ".join(semantic_violations)
         )
-    return evidence.model_dump(by_alias=True, mode="json")
+    payload: dict[str, Any] = evidence.model_dump(by_alias=True, mode="json")
+    write_yaml_artifact(evidence_path, payload, "")
+    violations = ContractValidator(PLAN_EVIDENCE_CONTRACT).validate_artifacts(bundle)
+    if violations:
+        messages = "; ".join(item.message for item in violations)
+        raise TerraformPlanError(
+            f"Generated Terraform plan evidence violated its schema: {messages}"
+        )
+    return payload
 
 
 def validate_approved_root(*, terraform_command: str = "terraform") -> None:
     """Run the credential-free CI init/validate proof for the approved root."""
+    try:
+        assert_approved_root_identity()
+    except ValueError as exc:
+        raise TerraformPlanError(str(exc)) from exc
     with tempfile.TemporaryDirectory(prefix="intent-engine-terraform-vpc-contract-") as tmp:
         workspace = Path(tmp)
         _copy_approved_root(workspace)
@@ -180,7 +257,7 @@ def validate_approved_root(*, terraform_command: str = "terraform") -> None:
                 sort_keys=True,
             )
         )
-        environment = {**os.environ, "TF_IN_AUTOMATION": "1"}
+        environment = _terraform_environment(workspace)
         version = _command([terraform_command, "version", "-json"], workspace, environment)
         if version.returncode or _terraform_version(version.stdout) != TERRAFORM_VERSION:
             raise TerraformPlanError(f"Terraform {TERRAFORM_VERSION} is required.")
@@ -191,6 +268,10 @@ def validate_approved_root(*, terraform_command: str = "terraform") -> None:
         )
         if init.returncode:
             raise TerraformPlanError("Approved Terraform root init failed.")
+        try:
+            installed_module_tree_digest(workspace)
+        except ValueError as exc:
+            raise TerraformPlanError(str(exc)) from exc
         validation = _command([terraform_command, "validate", "-json"], workspace, environment)
         data = _json_mapping(validation.stdout)
         if validation.returncode or not data or data.get("valid") is not True:
@@ -253,6 +334,7 @@ def _approved_manifest_blockers(bundle: Path) -> list[_Blocker]:
     target = manifest.get("target")
     toolchain = manifest.get("toolchain")
     approved_root = manifest.get("approvedRoot")
+    approved_module = manifest.get("approvedModule")
     immutable_inputs = manifest.get("immutableInputs")
     source = manifest.get("sourceDocument")
     maturity = manifest.get("maturity")
@@ -286,9 +368,17 @@ def _approved_manifest_blockers(bundle: Path) -> list[_Blocker]:
         (
             isinstance(approved_root, dict)
             and approved_root.get("sha256") == approved_root_digest()
+            and approved_root.get("sha256") == APPROVED_ROOT_SHA256
             and approved_root.get("files") == approved_root_identities(),
             "TERRAFORM_APPROVED_ROOT_CHANGED",
             "The code-owned Terraform root or provider lockfile changed.",
+        ),
+        (
+            isinstance(approved_module, dict)
+            and approved_module.get("releaseCommit") == MODULE_RELEASE_COMMIT
+            and approved_module.get("treeSha256") == MODULE_TREE_SHA256,
+            "TERRAFORM_APPROVED_MODULE_CHANGED",
+            "The approved module release or content identity changed.",
         ),
         (
             immutable_inputs == expected_inputs,
@@ -325,7 +415,9 @@ def _bundle_file_digest(bundle: Path, name: str) -> str:
     return sha256_file(path)
 
 
-def _plan_inputs(bundle: Path, blockers: list[_Blocker]) -> tuple[str, dict[str, Any]]:
+def _plan_inputs(
+    bundle: Path, blockers: list[_Blocker]
+) -> tuple[TerraformVpcIntent | None, dict[str, Any]]:
     try:
         report = load_bundle_yaml_mapping(bundle, "decision-report.yaml")
         module_inputs = load_bundle_yaml_mapping(bundle, "module-inputs.yaml")
@@ -333,7 +425,7 @@ def _plan_inputs(bundle: Path, blockers: list[_Blocker]) -> tuple[str, dict[str,
         blockers.append(
             _blocker("TERRAFORM_INPUT_INVALID", str(exc), "Recompile the bundle and retry.")
         )
-        return "", {}
+        return None, {}
     vpc = report.get("vpc")
     delivery = report.get("delivery")
     entries = module_inputs.get("moduleInputs")
@@ -345,7 +437,7 @@ def _plan_inputs(bundle: Path, blockers: list[_Blocker]) -> tuple[str, dict[str,
                 "Recompile the bundle and retry.",
             )
         )
-        return "", {}
+        return None, {}
     if not isinstance(entries, list) or len(entries) != 1 or not isinstance(entries[0], dict):
         blockers.append(
             _blocker(
@@ -354,7 +446,7 @@ def _plan_inputs(bundle: Path, blockers: list[_Blocker]) -> tuple[str, dict[str,
                 "Recompile the bundle and retry.",
             )
         )
-        return "", {}
+        return None, {}
     entry = entries[0]
     variables = entry.get("variables")
     if entry.get("moduleName") != "terraform-aws-vpc" or not isinstance(variables, dict):
@@ -365,7 +457,7 @@ def _plan_inputs(bundle: Path, blockers: list[_Blocker]) -> tuple[str, dict[str,
                 "Recompile the bundle and retry.",
             )
         )
-        return "", {}
+        return None, {}
     if set(variables) != MODULE_VARIABLES:
         blockers.append(
             _blocker(
@@ -374,19 +466,33 @@ def _plan_inputs(bundle: Path, blockers: list[_Blocker]) -> tuple[str, dict[str,
                 "Correct the pattern adapter and recompile the bundle.",
             )
         )
-        return "", {}
-    region = vpc.get("region")
-    account = delivery.get("targetAccountId")
-    if not isinstance(region, str) or not isinstance(account, str):
+        return None, {}
+    try:
+        intent = TerraformVpcIntent.model_validate(
+            {
+                "vpc_name": vpc.get("name"),
+                "primary_region": vpc.get("region"),
+                "cidr": vpc.get("cidr"),
+                "az_count": vpc.get("azCount"),
+                "public_subnet_cidrs": vpc.get("publicSubnetCidrs"),
+                "private_subnet_cidrs": vpc.get("privateSubnetCidrs"),
+                "enable_nat_gateway": vpc.get("enableNatGateway"),
+                "single_nat_gateway": vpc.get("singleNatGateway"),
+                "enable_dns_hostnames": vpc.get("enableDnsHostnames"),
+                "target_account_id": delivery.get("targetAccountId"),
+                "deployment_pipeline_ref": delivery.get("deploymentPipelineRef"),
+            }
+        )
+    except ValidationError:
         blockers.append(
             _blocker(
                 "TERRAFORM_DELIVERY_IDENTITY_INVALID",
-                "Region and target AWS account ID must be strings.",
+                "Decision report values cannot be reconstructed as typed Terraform VPC intent.",
                 "Fix the delivery requirements and recompile the bundle.",
             )
         )
-        return "", {}
-    return account, {"region": region, **variables}
+        return None, {}
+    return intent, {"region": intent.primary_region, **variables}
 
 
 def _copy_approved_root(workspace: Path) -> None:
@@ -422,7 +528,7 @@ def _require_terraform_version(
         _Stage(
             name="terraform-version",
             status="pass" if passed else "fail",
-            exit_code=result.returncode,
+            exitCode=result.returncode,
         )
     )
     if not passed:
@@ -450,7 +556,7 @@ def _run_init(
     passed = result.returncode == 0
     stages.append(
         _Stage(
-            name="terraform-init", status="pass" if passed else "fail", exit_code=result.returncode
+            name="terraform-init", status="pass" if passed else "fail", exitCode=result.returncode
         )
     )
     if not passed:
@@ -461,6 +567,23 @@ def _run_init(
                 "Restore the approved adapter or module registry access and retry.",
             )
         )
+
+
+def _verify_module(workspace: Path, stages: list[_Stage], blockers: list[_Blocker]) -> str:
+    try:
+        digest = installed_module_tree_digest(workspace)
+    except (OSError, ValueError) as exc:
+        stages.append(_Stage(name="terraform-module", status="fail"))
+        blockers.append(
+            _blocker(
+                "TERRAFORM_MODULE_CONTENT_MISMATCH",
+                str(exc),
+                "Restore registry access to the exact approved module release and retry.",
+            )
+        )
+        return ""
+    stages.append(_Stage(name="terraform-module", status="pass", exitCode=0))
+    return digest
 
 
 def _run_validate(
@@ -477,7 +600,7 @@ def _run_validate(
         _Stage(
             name="terraform-validate",
             status="pass" if passed else "fail",
-            exit_code=result.returncode,
+            exitCode=result.returncode,
         )
     )
     if not passed:
@@ -513,7 +636,7 @@ def _run_speculative_plan(
     passed = result.returncode in {0, 2}
     stages.append(
         _Stage(
-            name="terraform-plan", status="pass" if passed else "fail", exit_code=result.returncode
+            name="terraform-plan", status="pass" if passed else "fail", exitCode=result.returncode
         )
     )
     if not passed:
@@ -534,13 +657,13 @@ def _show_plan(
     environment: dict[str, str],
     stages: list[_Stage],
     blockers: list[_Blocker],
-) -> dict[str, Any] | None:
+) -> tuple[dict[str, Any] | None, bytes]:
     result = _command([command, "show", "-json", str(plan_path)], workspace, environment)
     data = _json_mapping(result.stdout)
     passed = result.returncode == 0 and data is not None
     stages.append(
         _Stage(
-            name="terraform-show", status="pass" if passed else "fail", exit_code=result.returncode
+            name="terraform-show", status="pass" if passed else "fail", exitCode=result.returncode
         )
     )
     if not passed:
@@ -551,7 +674,21 @@ def _show_plan(
                 "Correct the approved adapter or Terraform installation and retry.",
             )
         )
-    return data
+    return data, result.stdout.encode()
+
+
+def _terraform_environment(workspace: Path) -> dict[str, str]:
+    cli_config = workspace / "terraform-cli.tfrc"
+    cli_config.write_text("disable_checkpoint = true\n")
+    environment = {key: value for key, value in os.environ.items() if not key.startswith("TF_")}
+    environment.update(
+        {
+            "TF_IN_AUTOMATION": "1",
+            "TF_CLI_CONFIG_FILE": str(cli_config),
+            "CHECKPOINT_DISABLE": "1",
+        }
+    )
+    return environment
 
 
 def _command(
@@ -586,15 +723,46 @@ def _replay_identity(bundle: Path) -> dict[str, str]:
     except BundleFileError:
         replay = None
     if replay is None:
-        return {"replayManifestSha256": "", "bundleDigest": ""}
+        return {
+            "replayManifestSha256": "unavailable",
+            "bundleDigest": "unavailable",
+            "sourceSha256": "unavailable",
+        }
     try:
         manifest = load_bundle_yaml_mapping(bundle, "replay-manifest.yaml")
     except (BundleFileError, ValueError):
-        return {"replayManifestSha256": sha256_file(replay), "bundleDigest": ""}
+        return {
+            "replayManifestSha256": sha256_file(replay),
+            "bundleDigest": "unavailable",
+            "sourceSha256": "unavailable",
+        }
     artifacts = manifest.get("artifacts")
     files = artifacts.get("files") if isinstance(artifacts, dict) else []
     encoded = json.dumps(files, sort_keys=True, separators=(",", ":"))
     return {
         "replayManifestSha256": sha256_file(replay),
         "bundleDigest": hashlib.sha256(encoded.encode()).hexdigest(),
+        "sourceSha256": (
+            str(manifest.get("source", {}).get("sha256", ""))
+            if isinstance(manifest.get("source"), dict)
+            else ""
+        ),
     }
+
+
+def _conformance_artifact_identities(bundle: Path) -> dict[str, str]:
+    names = {
+        "requirementGraphSha256": "requirement-graph.json",
+        "decisionAuditSha256": "decision-audit.yaml",
+        "policyGraphSha256": "policy-graph.yaml",
+        "planManifestSha256": "plan-manifest.yaml",
+        "decisionReportSha256": "decision-report.yaml",
+        "moduleInputsSha256": "module-inputs.yaml",
+    }
+    identities: dict[str, str] = {}
+    for key, name in names.items():
+        try:
+            identities[key] = _bundle_file_digest(bundle, name)
+        except BundleFileError:
+            identities[key] = "unavailable"
+    return identities

@@ -39,12 +39,27 @@ an existing deployment mechanism. The detailed API contract lives in
   contract-backed evidence, temporary state, and a hard no-apply boundary; do
   not extract a generic executor before a second real target proves the same
   protocol.
+- A plan-capable target must keep observation rules, strict outcome models,
+  resource provenance, applicability, and aggregation inside the owning pattern.
+  Every applicable requirement/control must have exactly one terminal outcome;
+  unknown, sensitive, contradictory, missing, or unsupported evidence fails
+  closed. `not-observable` must be declared in code with a later evidence phase.
+- Keep policy-pack mappings distinct from evaluation. Do not add OPA, CUE, KCL,
+  or another policy runtime for one target-specific Python/Pydantic consumer.
 - Do not make LLM output authoritative. Raw model output must pass through the
   requirement graph and target contracts.
 - Do not leave target boundaries only in prose prompts. Pattern context must be
   short, reviewable, and backed by graph and contract checks.
 - Do not add dashboards, servers, workflow builders, or graph databases to make a
   pattern work. Emit portable artifacts first.
+- Treat Git plus contract-backed artifacts as the default integration protocol.
+  A pattern-local bridge may emit target-shaped configuration when it reuses an
+  existing approved root and keeps backend, credentials, state, workspace,
+  approval, and apply downstream. Do not add a core integration registry for one
+  consumer.
+- A second orchestration bridge, portal integration, MCP facade, or new semantic
+  plan evaluator requires repeated owner demand. If each target needs another
+  thousand-line evaluator, keep it configuration-only or stop.
 
 ## Acceptance Signals
 
@@ -79,6 +94,7 @@ src/intent_engine/patterns/my_pattern/
   generators.py     # artifact emitters, if large enough to split
   validators.py     # pattern-specific validators, only when graph rules are not enough
   samples.py        # reusable sample configs
+  conformance.py    # target-local plan observations/outcomes, only when earned
 ```
 
 Keep small patterns in one module until splitting reduces noise.

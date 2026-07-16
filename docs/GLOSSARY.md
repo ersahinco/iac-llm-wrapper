@@ -2,6 +2,20 @@
 
 Shared language for `iac-llm-wrapper`.
 
+## Requirements-to-target handoff compiler
+
+The product identity for this repository: a stateless compiler that resolves
+architecture requirements into contract-checked artifacts for an approved
+downstream target. The package name `iac-llm-wrapper` is historical; an LLM is
+optional and has no transition authority.
+
+## Atmos abstract component
+
+A non-deployable Atmos catalog component with `metadata.type: abstract`. The
+`terraform-vpc/intent-defaults` component carries replay-bound variables and
+points to the approved root. An owner must inherit it from a real component and
+provide runtime configuration in the owner repository.
+
 ## Intent
 
 Architect or engineer input, usually Markdown prose. Intent is source material,
@@ -127,3 +141,30 @@ explains how the bundle was produced. Evidence is for audit and improvement; it
 is not a separate source of authority. Raw prompt/response evidence is a local
 development/debug artifact and can be disabled for service-style runs while
 keeping trace and benchmark summaries.
+
+## Plan Produced
+
+The exact target adapter completed a non-errored Terraform plan and parsed its
+JSON. This is an execution fact, not proof that requirements match or that apply
+is authorized.
+
+## Plan Conformant
+
+Every applicable `terraform-vpc` requirement observable at plan time has a
+passing terminal outcome, every managed resource has approved provenance, and
+all other controls are predeclared as later gates. The normal v1 status is
+`conformant-with-deferred-gates`; it is not global policy compliance, owner
+approval, or runtime compliance.
+
+## Deferred Gate
+
+A code-declared control that cannot be observed in the local speculative plan
+and names the later evidence phase. Pipeline control, organizational IPAM
+approval, and downstream attachment correctness are deferred in v1. Missing
+plan data cannot be relabeled as a deferred gate.
+
+## Policy Pack
+
+Pattern-owned metadata mapping controls to requirements, artifacts, module
+variables, scanners, and owner references. A policy pack is not itself a policy
+runtime, conformance evaluator, attestation, or deployment approval.
