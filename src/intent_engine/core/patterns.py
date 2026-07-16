@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from .contracts import CORE_CONTRACTS, ContractValidator, TargetContract
+from .contracts import CORE_CONTRACTS, TargetContract
 from .module_mapping import IaCIntentPayload, ModuleInputs
 from .policy import PolicyPack
 from .requirements import RequirementGraph
@@ -68,7 +68,6 @@ class Pattern:
     # Optional pattern-owned structured entity recovery.
     markdown_entity_extractor: MarkdownEntityExtractor | None = None
     markdown_entity_applier: EntityApplier | None = None
-    llm_entity_applier: EntityApplier | None = None
     review_evidence_loader: ReviewEvidenceLoader | None = None
     violation_requirement_map: dict[str, str] = field(default_factory=dict)
     artifact_review_owners: dict[str, str] = field(default_factory=dict)
@@ -113,10 +112,8 @@ class PatternRegistry:
         if globals().get("GLOBAL_REGISTRY") is not self:
             return
         self._builtins_load_attempted = True
-        try:
-            from intent_engine.patterns import load_builtin_patterns
-        except ImportError:
-            return
+        from intent_engine.patterns import load_builtin_patterns
+
         load_builtin_patterns()
 
     def register(self, pattern: Pattern) -> None:
@@ -125,55 +122,11 @@ class PatternRegistry:
         self._patterns[pattern.name] = pattern
 
     def _validate_pattern(self, pattern: Pattern) -> None:
-        """Validate that all requirements map to valid intent model fields.
+        """Validate that requirements, contracts, and metadata agree."""
+        from .pattern_check import validate_pattern_references
 
-        Skips validation if the graph factory depends on symbols not yet loaded
-        during module import.
-        """
-        from .model_introspection import validate_requirement_against_model
-
-        model = pattern.intent_factory
         graph = pattern.create_graph()
-
-        errors: list[str] = []
-        for req in graph._requirements.values():
-            errors.extend(validate_requirement_against_model(req, model))
-        for contract in pattern.contracts:
-            validator = ContractValidator(contract)
-            for violation in validator.validate_contract() + validator.validate_graph(graph):
-                errors.append(f"Contract '{contract.name}': {violation.message}")
-        known_requirements = set(graph._requirements)
-        known_contracts = {contract.name for contract in pattern.contracts}
-        for pack in pattern.policy_packs:
-            for control in pack.controls:
-                for req_key in control.mapping.requirement_keys:
-                    if req_key not in known_requirements:
-                        errors.append(
-                            f"Policy pack '{pack.name}' control '{control.id}': "
-                            f"unknown requirement '{req_key}'"
-                        )
-                for contract_name in control.mapping.target_contracts:
-                    if contract_name not in known_contracts:
-                        errors.append(
-                            f"Policy pack '{pack.name}' control '{control.id}': "
-                            f"unknown target contract '{contract_name}'"
-                        )
-        for code, requirement_key in pattern.violation_requirement_map.items():
-            if requirement_key not in known_requirements:
-                errors.append(
-                    f"Violation mapping '{code}': unknown requirement '{requirement_key}'"
-                )
-        for requirement_key in pattern.reconfirmation_keys:
-            if requirement_key not in known_requirements:
-                errors.append(f"Reconfirmation key '{requirement_key}' is not a requirement")
-        known_artifacts = {
-            artifact.name for contract in pattern.contracts for artifact in contract.artifacts
-        }
-        for artifact_name in pattern.artifact_review_owners:
-            if artifact_name not in known_artifacts:
-                errors.append(
-                    f"Artifact owner mapping references unknown artifact '{artifact_name}'"
-                )
+        errors = [item.registration_message for item in validate_pattern_references(pattern, graph)]
         if errors:
             msg = "Pattern '{}' schema validation failed:\n  - {}".format(
                 pattern.name, "\n  - ".join(errors)

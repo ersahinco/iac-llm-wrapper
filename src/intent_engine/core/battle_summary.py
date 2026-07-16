@@ -7,9 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import ruamel.yaml
-
-from .yaml_utils import write_yaml_artifact
+from .yaml_utils import load_yaml_mapping, write_yaml_artifact
 
 _BATTLE_SUMMARY_HEADER = (
     "# yaml-language-server: $schema=none\n"
@@ -41,11 +39,7 @@ class BattleCompileResult:
 def load_optional_yaml(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
-    yaml = ruamel.yaml.YAML(typ="safe")
-    data = yaml.load(path.read_text())
-    if not isinstance(data, dict):
-        raise ValueError(f"{path}: expected mapping")
-    return data
+    return load_yaml_mapping(path)
 
 
 def summarize_battle_artifacts(output_dir: Path) -> dict[str, Any]:
@@ -78,30 +72,14 @@ def write_battle_summary(path: Path, data: dict[str, Any]) -> None:
     write_yaml_artifact(path, data, _BATTLE_SUMMARY_HEADER)
 
 
-def build_battle_summary(
-    *,
+def _compile_findings(
     case: BattleCaseInput,
-    output_dir: Path,
-    command: list[str],
-    use_llm: bool,
     compile_result: BattleCompileResult,
-    repo_root: Path,
-    git_commit: str,
-) -> dict[str, Any]:
-    from .patterns import GLOBAL_REGISTRY
-
-    pattern = GLOBAL_REGISTRY.get(case.pattern)
-    trace = load_optional_yaml(output_dir / "llm-trace-summary.yaml")
-    validation = load_optional_yaml(output_dir / "contract-validation.yaml")
-    handoff = load_optional_yaml(output_dir / "handoff-plan.yaml")
-    decision_report = load_optional_yaml(output_dir / "decision-report.yaml")
-
-    summary = summarize_battle_artifacts(output_dir)
+    decision_report: dict[str, Any],
+) -> list[dict[str, str]]:
     findings: list[dict[str, str]] = []
     compile_succeeded = compile_result.returncode == 0
     expected_pass = case.expected_compile == "pass"
-    combined_output = f"{compile_result.stdout}\n{compile_result.stderr}"
-
     if compile_succeeded != expected_pass:
         findings.append(
             _finding(
@@ -111,6 +89,8 @@ def build_battle_summary(
                 f"{'pass' if compile_succeeded else 'fail'}.",
             )
         )
+
+    combined_output = f"{compile_result.stdout}\n{compile_result.stderr}"
     for expected_violation in case.expected_violations:
         if expected_violation not in combined_output and expected_violation not in str(
             decision_report
@@ -122,13 +102,24 @@ def build_battle_summary(
                     f"Expected violation not surfaced: {expected_violation}.",
                 )
             )
+    return findings
 
+
+def _extraction_findings(
+    pattern: Any,
+    trace: dict[str, Any],
+    *,
+    use_llm: bool,
+    expected_pass: bool,
+) -> list[dict[str, str]]:
+    findings: list[dict[str, str]] = []
     accepted = trace.get("acceptedDecisions", {})
     raw_llm = trace.get("rawLlmDecisions", {})
     raw_llm_signals = trace.get("rawLlmSignalDecisions", {})
     applied = trace.get("appliedDecisions", {})
     gaps = trace.get("gaps", {})
     contradictions = trace.get("contradictions", {})
+
     if not isinstance(accepted, dict) or not accepted:
         findings.append(_finding("fail", "extraction", "No accepted decisions captured."))
     if isinstance(accepted, dict):
@@ -197,8 +188,18 @@ def build_battle_summary(
                     "Blocking contradictions surfaced in an expected-pass battle.",
                 )
             )
+    return findings
 
-    artifact_status = _artifact_status(output_dir, case.expected_artifacts)
+
+def _handoff_findings(
+    output_dir: Path,
+    artifact_status: list[dict[str, str]],
+    validation: dict[str, Any],
+    handoff: dict[str, Any],
+    *,
+    expected_pass: bool,
+) -> list[dict[str, str]]:
+    findings: list[dict[str, str]] = []
     missing_artifacts = [item["name"] for item in artifact_status if item["status"] != "present"]
     if missing_artifacts and expected_pass:
         findings.append(
@@ -213,9 +214,9 @@ def build_battle_summary(
         not isinstance(validation_summary, dict) or validation_summary.get("status") != "pass"
     ):
         findings.append(_finding("fail", "handoff", "Contract validation did not pass."))
-    allowed_next_action = handoff.get("allowedNextAction")
-    if expected_pass and not allowed_next_action:
+    if expected_pass and not handoff.get("allowedNextAction"):
         findings.append(_finding("fail", "handoff", "handoff-plan.yaml has no allowedNextAction."))
+
     review_path = output_dir / "handoff-review.html"
     if expected_pass and not review_path.exists():
         findings.append(_finding("fail", "handoff", "Review page was not generated."))
@@ -226,19 +227,32 @@ def build_battle_summary(
                 findings.append(
                     _finding("fail", "handoff", f"Review page missing section: {marker}.")
                 )
+    return findings
 
-    for forbidden in pattern.forbidden_artifacts:
-        if (output_dir / forbidden).exists():
-            findings.append(
-                _finding(
-                    "fail",
-                    "safety",
-                    f"Unexpected forbidden artifact emitted: {forbidden}.",
-                )
-            )
+
+def _artifact_safety_findings(
+    pattern: Any,
+    output_dir: Path,
+    *,
+    use_llm: bool,
+) -> list[dict[str, str]]:
+    findings = [
+        _finding("fail", "safety", f"Unexpected forbidden artifact emitted: {name}.")
+        for name in pattern.forbidden_artifacts
+        if (output_dir / name).exists()
+    ]
     if use_llm and not (output_dir / "raw-evidence.yaml").exists():
         findings.append(_finding("fail", "safety", "Raw LLM evidence was not preserved."))
+    return findings
 
+
+def _model_findings(
+    summary: dict[str, Any],
+    output_dir: Path,
+    *,
+    use_llm: bool,
+) -> list[dict[str, str]]:
+    findings: list[dict[str, str]] = []
     if use_llm:
         if summary["latencyMs"] in (0, "0", None):
             findings.append(_finding("fail", "model", "Latency was not captured."))
@@ -254,6 +268,46 @@ def build_battle_summary(
             )
     if not (output_dir / "model-benchmark.yaml").exists():
         findings.append(_finding("fail", "model", "model-benchmark.yaml missing."))
+    return findings
+
+
+def build_battle_summary(
+    *,
+    case: BattleCaseInput,
+    output_dir: Path,
+    command: list[str],
+    use_llm: bool,
+    compile_result: BattleCompileResult,
+    repo_root: Path,
+    git_commit: str,
+) -> dict[str, Any]:
+    from .patterns import GLOBAL_REGISTRY
+
+    pattern = GLOBAL_REGISTRY.get(case.pattern)
+    trace = load_optional_yaml(output_dir / "llm-trace-summary.yaml")
+    validation = load_optional_yaml(output_dir / "contract-validation.yaml")
+    handoff = load_optional_yaml(output_dir / "handoff-plan.yaml")
+    decision_report = load_optional_yaml(output_dir / "decision-report.yaml")
+
+    summary = summarize_battle_artifacts(output_dir)
+    compile_succeeded = compile_result.returncode == 0
+    expected_pass = case.expected_compile == "pass"
+    artifact_status = _artifact_status(output_dir, case.expected_artifacts)
+    findings = _compile_findings(case, compile_result, decision_report)
+    findings.extend(
+        _extraction_findings(pattern, trace, use_llm=use_llm, expected_pass=expected_pass)
+    )
+    findings.extend(
+        _handoff_findings(
+            output_dir,
+            artifact_status,
+            validation,
+            handoff,
+            expected_pass=expected_pass,
+        )
+    )
+    findings.extend(_artifact_safety_findings(pattern, output_dir, use_llm=use_llm))
+    findings.extend(_model_findings(summary, output_dir, use_llm=use_llm))
 
     confidence = {
         "extraction": _confidence_status(findings, "extraction"),

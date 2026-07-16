@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import ruamel.yaml
+from intent_engine.core.yaml_utils import load_yaml_mapping
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 FIXTURES_DIR = REPO_ROOT / "fixtures" / "usability"
@@ -112,11 +112,7 @@ def _evidence_failures(config: TrialConfig, evidence_path: Path | None) -> list[
 
 
 def _yaml_load(path: Path) -> dict[str, Any]:
-    yaml = ruamel.yaml.YAML(typ="safe")
-    data = yaml.load(path.read_text())
-    if not isinstance(data, dict):
-        raise ValueError(f"{path}: expected YAML mapping")
-    return data
+    return load_yaml_mapping(path)
 
 
 def _module_inputs(output_dir: Path) -> list[dict[str, Any]]:
@@ -314,6 +310,35 @@ def _trial_byom_terraform_vpc(config: TrialConfig) -> TrialResult:
     )
 
 
+def _regulated_vpc_checkov_failures(evidence_path: Path) -> list[str]:
+    if not evidence_path.exists():
+        return ["missing Checkov shift-left evidence"]
+
+    failures: list[str] = []
+    evidence = _yaml_load(evidence_path)
+    if evidence.get("result", {}).get("status") == "invalid-input":
+        failures.append("Checkov evidence scanned an invalid input")
+    if "does not deploy" not in str(evidence.get("boundary", "")):
+        failures.append("Checkov evidence missing no-deploy boundary")
+
+    evidence_input = evidence.get("input", {})
+    if evidence_input.get("iacKind") != "terraform":
+        failures.append("Checkov evidence missing Terraform IaC kind")
+    packs = evidence_input.get("policyPacks", [])
+    if not packs or packs[0].get("name") != "regulated-vpc-baseline-v1":
+        failures.append("Checkov evidence missing regulated VPC policy pack")
+    if not evidence_input.get("ownerPolicyPaths"):
+        failures.append("Checkov evidence missing owner custom-policy path")
+
+    evidence_text = evidence_path.read_text().lower()
+    failures.extend(
+        f"Checkov evidence includes forbidden command: {command}"
+        for command in ("terraform apply", "terragrunt apply", "kubectl apply")
+        if command in evidence_text
+    )
+    return failures
+
+
 def _trial_existing_account_terraform_vpc(config: TrialConfig) -> TrialResult:
     failures: list[str] = []
     evidence_files: list[Path] = []
@@ -394,27 +419,7 @@ def _trial_existing_account_terraform_vpc(config: TrialConfig) -> TrialResult:
         )
         if checkov_proc.returncode != 0:
             failures.append("checkov evidence command failed")
-        if not checkov_evidence.exists():
-            failures.append("missing Checkov shift-left evidence")
-        else:
-            evidence = _yaml_load(checkov_evidence)
-            status = evidence.get("result", {}).get("status")
-            if status == "invalid-input":
-                failures.append("Checkov evidence scanned an invalid input")
-            if "does not deploy" not in str(evidence.get("boundary", "")):
-                failures.append("Checkov evidence missing no-deploy boundary")
-            evidence_input = evidence.get("input", {})
-            if evidence_input.get("iacKind") != "terraform":
-                failures.append("Checkov evidence missing Terraform IaC kind")
-            packs = evidence_input.get("policyPacks", [])
-            if not packs or packs[0].get("name") != "regulated-vpc-baseline-v1":
-                failures.append("Checkov evidence missing regulated VPC policy pack")
-            if not evidence_input.get("ownerPolicyPaths"):
-                failures.append("Checkov evidence missing owner custom-policy path")
-            evidence_text = checkov_evidence.read_text().lower()
-            for forbidden in ("terraform apply", "terragrunt apply", "kubectl apply"):
-                if forbidden in evidence_text:
-                    failures.append(f"Checkov evidence includes forbidden command: {forbidden}")
+        failures.extend(_regulated_vpc_checkov_failures(checkov_evidence))
 
         report = _yaml_load(output_dir / "decision-report.yaml")
         delivery = report.get("delivery", {})
@@ -823,7 +828,7 @@ def main() -> int:
         action="store_true",
         help="Use configured LLM extraction instead of deterministic mode.",
     )
-    parser.add_argument("--provider", default="ollama", help="LLM provider when --llm is set.")
+    parser.add_argument("--provider", default="", help="LLM provider when --llm is set.")
     parser.add_argument("--model", default="", help="LLM model when --llm is set.")
     parser.add_argument(
         "--evidence-dir",
@@ -831,6 +836,8 @@ def main() -> int:
         help="Directory to keep LLM evidence YAML files from --llm trials.",
     )
     args = parser.parse_args()
+    if args.llm and (not args.provider or not args.model):
+        parser.error("--llm requires both --provider and --model")
 
     config = TrialConfig(
         use_llm=args.llm,

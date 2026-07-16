@@ -56,7 +56,7 @@ class TestCompileCommand:
         output = tmp_path / "output"
         response = json.dumps({"decisions": {}, "signal_decisions": {}, "gaps": []})
         monkeypatch.setattr(
-            "intent_engine.cli.auto_detect_llm",
+            "intent_engine.cli.create_llm_caller",
             lambda **kwargs: LLMCaller(_MockBackend(response)),
         )
 
@@ -68,6 +68,10 @@ class TestCompileCommand:
                 str(FIXTURES / "usability" / "engineer-handoff-lza.md"),
                 "--output",
                 str(output),
+                "--provider",
+                "ollama",
+                "--model",
+                "test-model",
             ],
         )
 
@@ -84,7 +88,7 @@ class TestCompileCommand:
         output = tmp_path / "output"
         response = json.dumps({"decisions": {}, "signal_decisions": {}, "gaps": []})
         monkeypatch.setattr(
-            "intent_engine.cli.auto_detect_llm",
+            "intent_engine.cli.create_llm_caller",
             lambda **kwargs: LLMCaller(_MockBackend(response)),
         )
 
@@ -96,6 +100,10 @@ class TestCompileCommand:
                 str(FIXTURES / "usability" / "engineer-handoff-lza.md"),
                 "--output",
                 str(output),
+                "--provider",
+                "ollama",
+                "--model",
+                "test-model",
                 "--no-raw-evidence",
             ],
         )
@@ -112,7 +120,7 @@ class TestCompileCommand:
     ):
         output = tmp_path / "output"
         monkeypatch.setattr(
-            "intent_engine.cli.auto_detect_llm",
+            "intent_engine.cli.create_llm_caller",
             lambda **kwargs: LLMCaller(_FailingBackend()),
         )
 
@@ -124,6 +132,10 @@ class TestCompileCommand:
                 str(FIXTURES / "usability" / "engineer-handoff-lza.md"),
                 "--output",
                 str(output),
+                "--provider",
+                "ollama",
+                "--model",
+                "test-model",
             ],
         )
 
@@ -140,17 +152,34 @@ class TestCompileCommand:
         assert result.exit_code == 1
         assert "does not exist" in result.output
 
+    def test_compile_rejects_unpinned_llm_provider(self, tmp_path: Path):
+        result = runner.invoke(
+            app,
+            [
+                "compile",
+                "--input",
+                str(FIXTURES / "usability" / "engineer-handoff-lza.md"),
+                "--output",
+                str(tmp_path / "output"),
+                "--provider",
+                "ollama",
+            ],
+        )
+
+        assert result.exit_code == 1
+        assert "LLM use requires an explicit model name" in result.output
+
 
 class TestDiscoverCommand:
-    def test_discover_auto_detects_llm_without_extra_flags(self, monkeypatch):
+    def test_discover_uses_explicit_llm_configuration(self, monkeypatch):
         calls: list[dict[str, Any]] = []
         response = json.dumps({"decisions": {}, "signal_decisions": {}, "gaps": []})
 
-        def fake_auto_detect_llm(**kwargs: Any) -> LLMCaller:
+        def fake_create_llm_caller(**kwargs: Any) -> LLMCaller:
             calls.append(kwargs)
             return LLMCaller(_MockBackend(response))
 
-        monkeypatch.setattr("intent_engine.cli.auto_detect_llm", fake_auto_detect_llm)
+        monkeypatch.setattr("intent_engine.cli.create_llm_caller", fake_create_llm_caller)
 
         result = runner.invoke(
             app,
@@ -158,12 +187,17 @@ class TestDiscoverCommand:
                 "discover",
                 "--input",
                 str(FIXTURES / "usability" / "engineer-handoff-lza.md"),
+                "--provider",
+                "ollama",
+                "--model",
+                "test-model",
             ],
         )
 
         assert result.exit_code == 0, result.output
         assert calls
-        assert calls[0]["task"] == "reason"
+        assert calls[0]["provider"] == "ollama"
+        assert calls[0]["model"] == "test-model"
 
 
 class TestValidateCommand:

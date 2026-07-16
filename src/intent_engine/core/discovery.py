@@ -7,9 +7,40 @@ hardcoding domain-specific checks. Works with any pattern.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any
 
 from .requirements import RequirementGraph, RequirementStatus
+
+
+def _read_nested(obj: Any, dotted_path: str) -> Any:
+    for part in dotted_path.split("."):
+        obj = getattr(obj, part)
+    return obj
+
+
+def _decision_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, StrEnum):
+        return value.value
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, list):
+        return ",".join(str(item) for item in value) if value else None
+    return str(value)
+
+
+def _intent_field_values(graph: RequirementGraph, intent: Any) -> dict[str, str | None]:
+    values: dict[str, str | None] = {}
+    for key, requirement in graph._requirements.items():
+        if requirement.target_field is None:
+            continue
+        try:
+            values[key] = _decision_text(_read_nested(intent, requirement.target_field))
+        except AttributeError:
+            values[key] = None
+    return values
 
 
 @dataclass
@@ -67,67 +98,22 @@ class DiscoveryEngine:
         Derives field mappings from the graph's requirement nodes (target_field),
         making this data-driven rather than hardcoded.
         """
-        synced = []
-        import warnings as _warnings
-
+        synced: list[str] = []
         default_intent = self._create_default_intent(intent)
+        field_values = _intent_field_values(self.graph, intent)
+        default_values = _intent_field_values(self.graph, default_intent)
 
-        def _read_nested(obj: Any, dotted_path: str) -> Any:
-            parts = dotted_path.split(".")
-            for part in parts:
-                obj = getattr(obj, part)
-            return obj
-
-        def _val_to_str(val: Any) -> str | None:
-            if val is None:
-                return None
-            from enum import StrEnum as _StrEnum
-
-            if isinstance(val, _StrEnum):
-                return val.value
-            if isinstance(val, bool):
-                return "true" if val else "false"
-            if isinstance(val, list):
-                return ",".join(str(x) for x in val) if val else None
-            return str(val)
-
-        field_map: dict[str, str | None] = {}
-        default_map: dict[str, str | None] = {}
-
-        for key, req in self.graph._requirements.items():
-            intent_path = req.target_field
-            if intent_path is None:
+        for key, value in field_values.items():
+            if value is None:
                 continue
-            try:
-                val = _read_nested(intent, intent_path)
-                field_map[key] = _val_to_str(val)
-            except AttributeError:
-                field_map[key] = None
-            try:
-                val = _read_nested(default_intent, intent_path)
-                default_map[key] = _val_to_str(val)
-            except AttributeError:
-                default_map[key] = None
-
-        for key, val in field_map.items():
-            if val is not None:
-                if key in self.graph._requirements:
-                    if val != default_map.get(key):
-                        self.graph.decide(key, val)
-                    else:
-                        req = self.graph._requirements[key]
-                        if req.default is None or str(req.default).strip() == "":
-                            # Graph has no default; model default is not evidence
-                            # that the design doc supplied this requirement.
-                            continue
-                        self.graph.apply_default(key)
-                    synced.append(key)
-                elif val != default_map.get(key):
-                    _warnings.warn(
-                        f"Field '{key}' is set to '{val}' but this pattern's graph "
-                        f"has no corresponding requirement. Add a Requirement node "
-                        f"or use a different pattern."
-                    )
+            if value != default_values.get(key):
+                self.graph.decide(key, value)
+            else:
+                requirement = self.graph._requirements[key]
+                if requirement.default is None or not str(requirement.default).strip():
+                    continue
+                self.graph.apply_default(key)
+            synced.append(key)
         return synced
 
     def _create_default_intent(self, intent: Any) -> Any:
@@ -137,7 +123,7 @@ class DiscoveryEngine:
         model = type(intent)
         try:
             return model()
-        except Exception:
+        except (TypeError, ValueError):
             return intent
 
     def discover(self, intent: Any, text: str = "") -> DiscoveryResult:

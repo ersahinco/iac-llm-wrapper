@@ -12,10 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import ruamel.yaml
-
 from intent_engine.core.contract_validation import build_contract_validation
-from intent_engine.core.yaml_utils import write_yaml_artifact
+from intent_engine.core.yaml_utils import load_yaml_mapping, write_yaml_artifact
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 READY_FIXTURE = REPO_ROOT / "fixtures" / "eval" / "aws-lza-customer-board-notes.md"
@@ -147,11 +145,7 @@ class JourneyResult:
 
 
 def _yaml_load(path: Path) -> dict[str, Any]:
-    yaml = ruamel.yaml.YAML(typ="safe")
-    data = yaml.load(path.read_text())
-    if not isinstance(data, dict):
-        raise ValueError(f"{path}: expected YAML mapping")
-    return data
+    return load_yaml_mapping(path)
 
 
 def _run_cli(
@@ -582,7 +576,7 @@ def main() -> int:
         action="store_true",
         help="Use configured LLM extraction instead of deterministic mode.",
     )
-    parser.add_argument("--provider", default="ollama", help="LLM provider when --llm is set.")
+    parser.add_argument("--provider", default="", help="LLM provider when --llm is set.")
     parser.add_argument("--model", default="", help="LLM model when --llm is set.")
     parser.add_argument(
         "--require-conformant",
@@ -605,6 +599,8 @@ def main() -> int:
         help="Directory to keep the generated golden journey bundle.",
     )
     args = parser.parse_args()
+    if args.llm and (not args.provider or not args.model):
+        parser.error("--llm requires both --provider and --model")
 
     if args.scenario == "all" and args.fixture is not None:
         print(

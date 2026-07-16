@@ -8,10 +8,8 @@ import pytest
 from pydantic import BaseModel
 
 from intent_engine.core.model_introspection import (
+    coerce_requirement_value,
     coerce_value,
-    derive_target_type,
-    field_exists,
-    list_annotation_item_model,
     resolve_field_info,
 )
 
@@ -26,19 +24,14 @@ class NestedModel(BaseModel):
     count: int = 0
 
 
-class ItemModel(BaseModel):
-    name: str = "item"
-    value: str = ""
-
-
 class SampleModel(BaseModel):
     __test__ = False
     name: str = "test"
     color: Color = Color.RED
     nested: NestedModel = NestedModel()
-    items: list[ItemModel] = []
     tags: list[str] = []
     optional_field: str | None = None
+    enabled: bool = True
 
 
 class TestResolveFieldInfo:
@@ -59,12 +52,6 @@ class TestResolveFieldInfo:
             annotation = next((a for a in args if a is not type(None)), annotation)
         assert annotation is Color
 
-    def test_resolve_list_field(self):
-        field_info, annotation = resolve_field_info(SampleModel, "items")
-        from typing import get_origin
-
-        assert get_origin(annotation) is list
-
     def test_missing_field_raises(self):
         with pytest.raises(AttributeError):
             resolve_field_info(SampleModel, "nonexistent")
@@ -74,32 +61,16 @@ class TestResolveFieldInfo:
         assert annotation is str | None or annotation == str | None
 
 
-class TestDeriveTargetType:
-    def test_string(self):
-        assert derive_target_type(str) == "string"
-
-    def test_int(self):
-        assert derive_target_type(int) == "int"
-
-    def test_bool(self):
-        assert derive_target_type(bool) == "bool"
-
-    def test_optional_str(self):
-        assert derive_target_type(str | None) == "string"
-
-    def test_list_str(self):
-        assert derive_target_type(list[str]) == "cidr_list"
-
-    def test_strenum(self):
-        assert derive_target_type(Color) == "Color"
-
-
 class TestCoerceValue:
     def test_coerce_str(self):
         assert coerce_value("hello", str) == "hello"
 
     def test_coerce_int(self):
         assert coerce_value("42", int) == 42
+        assert coerce_value("42.0", int) == 42
+        assert coerce_value("1.5", int) is None
+        assert coerce_value(True, int) is None
+        assert coerce_value("not-an-int", int) is None
 
     def test_coerce_bool(self):
         assert coerce_value("true", bool) is True
@@ -108,38 +79,51 @@ class TestCoerceValue:
 
     def test_coerce_optional_str(self):
         assert coerce_value("hello", str | None) == "hello"
+        assert coerce_value("not-an-int", int | None) is None
 
     def test_coerce_cidr_list(self):
         assert coerce_value("10.0.0.0/16,192.168.0.0/24", list[str]) == [
             "10.0.0.0/16",
             "192.168.0.0/24",
         ]
+        assert coerce_value(["eu-central-1", "eu-west-1"], list[str]) == [
+            "eu-central-1",
+            "eu-west-1",
+        ]
+        assert coerce_value({"region": "eu-central-1"}, list[str]) is None
 
     def test_coerce_strenum(self):
         assert coerce_value("red", Color) == Color.RED
+        assert coerce_value("green", Color) is None
 
     def test_coerce_none(self):
         assert coerce_value(None, str) is None
 
-
-class TestFieldExists:
-    def test_existing_field(self):
-        assert field_exists(SampleModel, "name")
-
-    def test_nested_field(self):
-        assert field_exists(SampleModel, "nested.name")
-
-    def test_missing_field(self):
-        assert not field_exists(SampleModel, "nonexistent")
-
-
-class TestListAnnotationItemModel:
-    def test_list_of_models(self):
-        model = list_annotation_item_model(list[ItemModel])
-        assert model is ItemModel
-
-    def test_non_list_returns_none(self):
-        assert list_annotation_item_model(str) is None
-
-    def test_list_of_primitives_returns_none(self):
-        assert list_annotation_item_model(list[str]) is None
+    def test_requirement_coercion_uses_model_then_fail_closed_fallback(self):
+        assert (
+            coerce_requirement_value(
+                "false",
+                model=SampleModel,
+                target_field="enabled",
+                target_type="bool",
+            )
+            is False
+        )
+        assert (
+            coerce_requirement_value(
+                "sometimes",
+                model=SampleModel,
+                target_field="enabled",
+                target_type="bool",
+            )
+            is None
+        )
+        assert (
+            coerce_requirement_value(
+                "red",
+                model=SampleModel,
+                target_field="missing",
+                target_type="Color",
+            )
+            == Color.RED
+        )

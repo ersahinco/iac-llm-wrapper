@@ -271,7 +271,7 @@ class LLMCaller:
                     "completion_tokens": data["usage"].get("completion_tokens", 0),
                     "total_tokens": data["usage"].get("total_tokens", 0),
                 }
-        except Exception:
+        except (AttributeError, json.JSONDecodeError, TypeError):
             pass
 
         evidence = LLMEvidence(
@@ -285,70 +285,29 @@ class LLMCaller:
         return response, evidence
 
 
-def auto_detect_llm(
-    provider: str = "openai",
+def create_llm_caller(
+    provider: str = "",
     api_key: str = "",
     base_url: str = "",
     model: str = "",
-    task: str = "extract",
 ) -> LLMCaller | None:
-    """Auto-detect an LLM backend.
-
-    Priority:
-    1. OpenAI-compatible provider when an API key is available
-    2. Local Ollama at http://localhost:11434
-    3. None (caller falls back to graph defaults)
-
-    Args:
-        task: Type of work — "extract" (JSON, prefers non-reasoning models)
-              or "reason" (interview/discovery, prefers reasoning models).
-    """
-    if os.environ.get("INTENT_ENGINE_DISABLE_LLM"):
+    """Build an explicitly configured, model-pinned LLM caller."""
+    if os.environ.get("INTENT_ENGINE_DISABLE_LLM") or not provider:
         return None
+    if not model:
+        raise ValueError("LLM use requires an explicit model name")
 
-    backend_kwargs: dict[str, Any] = {}
-    if provider == "bedrock":
-        if model:
-            backend_kwargs["model"] = model
-        backend = create_backend(provider, **backend_kwargs)
-        return LLMCaller(backend)
-
-    if api_key or os.environ.get("OPENAI_API_KEY"):
-        backend_kwargs = {}
+    backend_kwargs: dict[str, Any] = {"model": model}
+    if provider == "openai":
+        if not api_key and not os.environ.get("OPENAI_API_KEY") and not base_url:
+            raise ValueError("OpenAI-compatible LLM use requires an API key or custom base URL")
         if api_key:
             backend_kwargs["api_key"] = api_key
         if base_url:
             backend_kwargs["base_url"] = base_url
-        if model:
-            backend_kwargs["model"] = model
-        backend = create_backend(provider, **backend_kwargs)
-        return LLMCaller(backend)
-
-    # No API key — try local Ollama
-    try:
-        resp = requests.get("http://localhost:11434/api/tags", timeout=2.0)
-        if resp.status_code == 200:
-            ollama_base = base_url or "http://localhost:11434/v1"
-            if not model:
-                models = resp.json().get("models", [])
-                names = [m["name"] for m in models]
-                if task == "reason":
-                    preferred = ["qwen2.5:3b", "qwen3.5:3b", "deepseek-r1:7b", "phi4:14b"]
-                else:
-                    preferred = ["llama3.2:3b", "llama3.2", "phi3:mini", "llama3.1:8b"]
-                model = next(
-                    (n for p in preferred for n in names if n.startswith(p)),
-                    names[0] if names else "llama3.2:3b",
-                )
-            backend = create_backend("ollama", base_url=ollama_base, model=model)
-            import warnings
-
-            warnings.warn(f"No API key set — using local Ollama model {model}")
-            return LLMCaller(backend)
-    except requests.RequestException:
-        pass
-
-    return None
+    elif provider == "ollama":
+        backend_kwargs["base_url"] = base_url or "http://localhost:11434/v1"
+    return LLMCaller(create_backend(provider, **backend_kwargs))
 
 
 def create_backend(

@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from pydantic import BaseModel
 
 from intent_engine.core.contracts import ArtifactContract, TargetContract
-from intent_engine.core.pattern_check import check_pattern
-from intent_engine.core.patterns import Pattern
+from intent_engine.core.pattern_check import check_pattern, validate_pattern_references
+from intent_engine.core.patterns import Pattern, PatternRegistry
 from intent_engine.core.policy import PolicyControl, PolicyPack, PolicyRequirementMapping
 from intent_engine.core.requirements import Requirement, RequirementGraph
 from intent_engine.core.sample_config import SampleConfig
@@ -319,3 +320,32 @@ def test_check_pattern_reports_policy_mapping_failures(tmp_path: Path):
     assert (
         "regulated-test-v1:CTRL-001: unknown target contract missing-contract" in result.violations
     )
+
+
+def test_registry_and_pattern_check_share_reference_validation(tmp_path: Path):
+    pattern = Pattern(
+        name="invalid-reference",
+        description="Invalid reference pattern",
+        graph_factory=lambda: _graph(_requirement()),
+        intent_factory=_TestIntent,
+        prompt_context=(
+            "This pattern captures approved region handoff context only. "
+            "Extract the region decision for an existing target contract."
+        ),
+        contracts=[
+            TargetContract(
+                name="invalid-contract",
+                kind="yaml",
+                source_url="https://example.com",
+                artifacts=[ArtifactContract(name="config.yaml")],
+                required_decisions=["missing"],
+            )
+        ],
+    )
+    graph = pattern.create_graph()
+    references = validate_pattern_references(pattern, graph)
+
+    assert len(references) == 1
+    assert references[0].check_message in check_pattern(pattern, fixtures_root=tmp_path).violations
+    with pytest.raises(ValueError, match="requires decision 'missing'"):
+        PatternRegistry().register(pattern)

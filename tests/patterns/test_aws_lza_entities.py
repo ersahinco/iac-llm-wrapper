@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from intent_engine.patterns.aws_lza.entities import (
-    apply_llm_entities,
     extract_markdown_entities,
     merge_markdown_entities,
 )
@@ -51,6 +50,24 @@ def test_entity_recovery_ignores_unstructured_and_unrelated_sections():
     }
 
 
+def test_entity_recovery_uses_inventory_heading_and_ignores_decision_bullets():
+    text = """## Accounts
+- workload_accounts: AppProd, SandboxDev
+- audit_account: Audit
+
+## Accounts Inventory
+- AppProd: ou=Workloads, description=Production
+- SandboxDev: ou=Sandbox, description=Development
+"""
+
+    result = extract_markdown_entities(text)
+
+    assert result["accounts"] == [
+        {"name": "AppProd", "ou": "Workloads", "description": "Production"},
+        {"name": "SandboxDev", "ou": "Sandbox", "description": "Development"},
+    ]
+
+
 def test_entity_recovery_supports_h3_headings_and_empty_sections():
     text = """### Organizational Units
 - Security: Security baseline OU
@@ -64,23 +81,10 @@ def test_entity_recovery_supports_h3_headings_and_empty_sections():
     assert result["accounts"] == []
 
 
-def test_applies_structured_llm_entities_to_aws_intent():
-    intent = AwsLzaIntent()
-
-    apply_llm_entities(
-        {
-            "ous": [{"name": "Sandbox", "description": "Development accounts"}],
-            "accounts": [{"name": "SandboxDev", "ou": "Sandbox"}],
-        },
-        intent,
+def test_markdown_entities_override_untrusted_existing_metadata():
+    intent = AwsLzaIntent(
+        accounts=[LzaAccount(name="SandboxDev", ou="Workloads", description="inferred")]
     )
-
-    assert intent.ous[0].name == "Sandbox"
-    assert intent.accounts[0].ou == "Sandbox"
-
-
-def test_markdown_entities_backfill_without_overriding_llm_values():
-    intent = AwsLzaIntent(accounts=[LzaAccount(name="SandboxDev", description="LLM description")])
 
     merge_markdown_entities(
         {
@@ -97,4 +101,4 @@ def test_markdown_entities_backfill_without_overriding_llm_values():
 
     assert len(intent.accounts) == 1
     assert intent.accounts[0].ou == "Sandbox"
-    assert intent.accounts[0].description == "LLM description"
+    assert intent.accounts[0].description == "Markdown description"

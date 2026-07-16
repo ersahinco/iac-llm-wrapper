@@ -14,37 +14,11 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from .model_introspection import coerce_value, resolve_field_info
 from .requirements import RequirementGraph, describe_expression
 
 
-def _str(v: Any) -> str | None:
-    if v is None:
-        return None
-    return str(v)
-
-
-def _bool(v: Any) -> bool | None:
-    if v is None:
-        return None
-    if isinstance(v, bool):
-        return v
-    normalized = str(v).strip().lower()
-    if normalized in ("true", "yes", "1"):
-        return True
-    if normalized in ("false", "no", "0"):
-        return False
-    return None
-
-
-def _safe_json_parse(raw: str) -> dict[str, Any] | None:
-    """Parse JSON with recovery for common LLM malformations.
-
-    Handles markdown fences, trailing commas, and extra closing braces
-    that small LLMs occasionally produce.
-    """
+def _normalized_json_text(raw: str) -> str:
     text = raw.strip()
-    # Strip markdown fences
     if text.startswith("```"):
         lines = text.splitlines()
         if len(lines) >= 2:
@@ -53,51 +27,37 @@ def _safe_json_parse(raw: str) -> dict[str, Any] | None:
         text = text[4:].strip()
     if text.startswith("```"):
         text = text.strip("`").strip()
-    # Try full parse
-    try:
-        parsed = json.loads(text)
-        if isinstance(parsed, dict):
-            return parsed
-    except json.JSONDecodeError:
-        pass
-    # Brace-matching recovery: find outermost {…} pair
-    brace_matches = list(re.finditer(r"\{.*\}", text, re.DOTALL))
-    if brace_matches:
-        last_brace = brace_matches[-1].group()
+    return text
+
+
+def _json_candidates(text: str) -> list[str]:
+    """Return ordered recovery candidates without parsing policy duplication."""
+    candidates = [text]
+    brace_match = re.search(r"\{.*\}", text, re.DOTALL)
+    if brace_match:
+        candidates.append(brace_match.group())
+    candidates.extend(
+        [
+            re.sub(r'([}\]])[\t\n ]+(?=")', r"\1, ", text),
+            re.sub(r",\s*([}\]])", r"\1", text),
+        ]
+    )
+    candidates.extend(
+        text[: index + 1] for index in range(len(text) - 1, 0, -1) if text[index] == "}"
+    )
+    return list(dict.fromkeys(candidates))
+
+
+def _safe_json_parse(raw: str) -> dict[str, Any] | None:
+    """Parse a JSON mapping through ordered, reviewable recovery candidates."""
+    for candidate in _json_candidates(_normalized_json_text(raw)):
         try:
-            parsed = json.loads(last_brace)
+            parsed = json.loads(candidate)
             if isinstance(parsed, dict):
                 return parsed
         except json.JSONDecodeError:
-            pass
-    # Comma-insertion recovery: LLMs often miss commas between top-level keys.
-    # Insert commas after } or ] when followed by whitespace + " (a new key).
-    fixed = re.sub(r'([}\]])[\t\n ]+(?=")', r"\1, ", text)
-    try:
-        parsed = json.loads(fixed)
-        if isinstance(parsed, dict):
-            return parsed
-    except json.JSONDecodeError:
-        pass
-    # Progressive truncation: try stripping trailing content after each }
-    for i in range(len(text) - 1, 0, -1):
-        if text[i] == "}":
-            try:
-                parsed = json.loads(text[: i + 1])
-                if isinstance(parsed, dict):
-                    return parsed
-            except json.JSONDecodeError:
-                continue
+            continue
     return None
-
-
-def _int(v: Any) -> int | None:
-    if v is None:
-        return None
-    try:
-        return int(float(v))
-    except (ValueError, TypeError):
-        return None
 
 
 @dataclass
@@ -112,11 +72,7 @@ class LLMGraphResult:
 
     def to_intent(self, extractor: Extractor) -> Any:
         """Convert the decision map to a type-safe intent model."""
-        intent = extractor._decisions_to_intent(self.decisions)
-        parsed = _safe_json_parse(self.raw_response)
-        if isinstance(parsed, dict):
-            extractor._apply_pattern_entities(parsed, intent)
-        return intent
+        return extractor._decisions_to_intent(self.decisions)
 
 
 class Extractor:
@@ -272,7 +228,6 @@ class Extractor:
             '    {"key": "requirement_key", "reason": "why it contradicts", "details": "..."}\n'
             "  ]\n"
             "}\n\n"
-            "Include pattern-owned top-level entities only when DOMAIN CONTEXT defines them.\n"
             "If the document does not mention a field, omit it from 'decisions'.\n"
             "Do NOT hallucinate values. If unsure about a SCHEMA key, omit the decision "
             "and list that SCHEMA key in 'gaps'.\n\n"
@@ -292,52 +247,26 @@ class Extractor:
 
         # Graph-aware format
         if "decisions" in data or "signal_decisions" in data:
-            result.decisions = self._coerce_decisions(data.get("decisions", {}))
-            result.signal_decisions = self._coerce_decisions(data.get("signal_decisions", {}))
+            result.decisions = self._stringify_decisions(data.get("decisions", {}))
+            result.signal_decisions = self._stringify_decisions(data.get("signal_decisions", {}))
             result.gaps = data.get("gaps", [])
             result.contradictions = data.get("contradictions", [])
             return result
 
         # Flat format: treat entire response as decisions.
-        result.decisions = self._coerce_decisions(data)
+        result.decisions = self._stringify_decisions(data)
         return result
 
-    def _coerce_decisions(self, data: dict[str, Any]) -> dict[str, str]:
-        """Coerce decision values to strings using graph target_type metadata."""
-        coerced: dict[str, str] = {}
+    def _stringify_decisions(self, data: dict[str, Any]) -> dict[str, str]:
+        """Serialize decisions without duplicating graph-owned type coercion."""
+        serialized: dict[str, str] = {}
         for key, raw_val in data.items():
             if raw_val is None:
                 continue
             req = self.graph._requirements.get(key)
-            if req is None:
-                # Unknown key — keep as string
-                coerced[key] = str(raw_val)
-                continue
-            target_type = req.target_type
-            if target_type == "bool":
-                if isinstance(raw_val, bool):
-                    coerced[key] = "true" if raw_val else "false"
-                else:
-                    normalized = str(raw_val).strip().lower()
-                    if normalized in ("true", "yes", "1"):
-                        coerced[key] = "true"
-                    elif normalized in ("false", "no", "0"):
-                        coerced[key] = "false"
-                    else:
-                        coerced[key] = str(raw_val)
-            elif target_type == "int":
-                try:
-                    coerced[key] = str(int(float(raw_val)))
-                except (ValueError, TypeError):
-                    coerced[key] = str(raw_val)
-            elif target_type in ("cidr_list", "string_list"):
-                if isinstance(raw_val, list):
-                    coerced[key] = ",".join(str(c) for c in raw_val)
-                else:
-                    coerced[key] = str(raw_val)
-            else:
-                coerced[key] = str(raw_val)
-        return coerced
+            target_type = req.target_type if req is not None else "string"
+            serialized[key] = self.graph.stringify_decision_value(raw_val, target_type)
+        return serialized
 
     def _decisions_to_intent(self, decisions: dict[str, str]) -> Any:
         """Apply a flat decision map to an intent model with type coercion.
@@ -356,53 +285,16 @@ class Extractor:
             if raw_val is None:
                 continue
 
-            parsed_val: Any = None
-            try:
-                _, annotation = resolve_field_info(model, req.target_field)
-                parsed_val = coerce_value(raw_val, annotation)
-            except (AttributeError, TypeError, ValueError):
-                # Fall back to target_type metadata.
-                pass
-
-            if parsed_val is None:
-                # Fallback for string-based target_type metadata.
-                target_type = req.target_type
-                if target_type == "string":
-                    parsed_val = _str(raw_val)
-                elif target_type == "int":
-                    parsed_val = _int(raw_val)
-                elif target_type == "bool":
-                    parsed_val = _bool(raw_val)
-                elif target_type in ("cidr_list", "string_list"):
-                    if isinstance(raw_val, str):
-                        parsed_val = [c.strip() for c in raw_val.split(",") if c.strip()]
-                else:
-                    # Try to find the type by name in the intent model's module
-                    try:
-                        enum_cls = getattr(model, target_type, None)
-                        if enum_cls is None:
-                            import importlib
-
-                            mod = importlib.import_module(model.__module__)
-                            enum_cls = getattr(mod, target_type, None)
-                        if enum_cls is not None and isinstance(enum_cls, type):
-                            s = _str(raw_val)
-                            if s:
-                                parsed_val = enum_cls(s)
-                    except Exception:
-                        pass
+            parsed_val = self.graph._convert_value(
+                raw_val,
+                req.target_type,
+                req.target_field,
+            )
 
             if parsed_val is not None:
                 RequirementGraph._set_nested(intent, req.target_field, parsed_val)
 
         return intent
-
-    def _apply_pattern_entities(self, data: dict[str, Any], intent: Any) -> None:
-        from .patterns import GLOBAL_REGISTRY
-
-        applier = GLOBAL_REGISTRY.get(self.pattern).llm_entity_applier
-        if applier is not None:
-            applier(data, intent)
 
     def extract(self, llm_response: str | None = None) -> Any:
         if llm_response is not None:

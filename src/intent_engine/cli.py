@@ -39,7 +39,7 @@ from .core.compiler import (
     validate_generated,
 )
 from .core.contracts import TargetContract
-from .core.discovery import DiscoveryEngine, generate_clarifying_questions
+from .core.discovery import DiscoveryEngine, DiscoveryResult, generate_clarifying_questions
 from .core.extractor import Extractor
 from .core.git_incremental import (
     bundle_path_for_doc,
@@ -48,7 +48,7 @@ from .core.git_incremental import (
 )
 from .core.graph_export import graph_to_json, graph_to_mermaid
 from .core.interview import InterviewEngine
-from .core.llm_caller import LLMEvidenceStore, auto_detect_llm
+from .core.llm_caller import LLMCaller, LLMEvidenceStore, create_llm_caller
 from .core.markdown_extractor import extract_from_markdown
 from .core.pattern_check import check_pattern
 from .core.patterns import GLOBAL_REGISTRY, Pattern
@@ -93,6 +93,21 @@ def _write_evidence_output(evidence_output: Path | None, evidence_store: LLMEvid
 
     write_yaml_artifact(evidence_output, evidence_store.to_dict(), "", indent=False)
     typer.echo(f"LLM evidence written to: {evidence_output}")
+
+
+def _configured_llm_or_exit(
+    *, provider: str, api_key: str, base_url: str, model: str
+) -> LLMCaller | None:
+    try:
+        return create_llm_caller(
+            provider=provider,
+            api_key=api_key,
+            base_url=base_url,
+            model=model,
+        )
+    except ValueError as exc:
+        typer.echo(f"Invalid LLM configuration: {exc}", err=True)
+        raise typer.Exit(1) from exc
 
 
 def _emit_llm_fallback_warning(evidence_store: LLMEvidenceStore) -> None:
@@ -249,6 +264,101 @@ def _selected_samples_or_exit(
     raise typer.Exit(1)
 
 
+def _echo_contract_artifact(artifact: Any) -> None:
+    schema_hint = (
+        f" | paths: {', '.join(artifact.required_paths)}" if artifact.required_paths else ""
+    )
+    assertion_hint = ""
+    if artifact.value_assertions:
+        assertion_hint = " | assertions: " + ", ".join(
+            item.path for item in artifact.value_assertions
+        )
+    typer.echo(f"  - {artifact.name}{schema_hint}{assertion_hint}")
+
+
+def _echo_contract_list(contracts: list[TargetContract]) -> None:
+    typer.echo("=== Target Contracts ===")
+    typer.echo("")
+    for contract_obj in contracts:
+        typer.echo(f"  {contract_obj.name}")
+        typer.echo(f"    Kind: {contract_obj.kind}")
+        typer.echo(f"    Required artifacts: {len(contract_obj.required_artifacts)}")
+        typer.echo(f"    Optional artifacts: {len(contract_obj.optional_artifacts)}")
+        typer.echo(f"    Required decisions: {len(contract_obj.required_decisions)}")
+        typer.echo(f"    Source: {contract_obj.source_url}")
+        typer.echo("")
+
+
+def _echo_contract_details(contract_obj: TargetContract) -> None:
+    typer.echo(f"=== {contract_obj.name} ===")
+    typer.echo(f"Kind: {contract_obj.kind}")
+    typer.echo(f"Source: {contract_obj.source_url}")
+    typer.echo("")
+    typer.echo("Required artifacts:")
+    for artifact in contract_obj.artifacts:
+        if artifact.required:
+            _echo_contract_artifact(artifact)
+    if contract_obj.optional_artifacts:
+        typer.echo("")
+        typer.echo("Optional artifacts:")
+        for artifact in contract_obj.artifacts:
+            if not artifact.required:
+                _echo_contract_artifact(artifact)
+    typer.echo("")
+    typer.echo("Required decisions:")
+    for decision in contract_obj.required_decisions:
+        typer.echo(f"  - {decision}")
+    if contract_obj.lineage:
+        typer.echo("")
+        typer.echo("Lineage:")
+        for item in contract_obj.lineage:
+            typer.echo(f"  - {item.decision} -> {item.artifact}:{item.path}")
+
+
+def _echo_sample_list(samples: list[SampleConfig]) -> None:
+    typer.echo("=== Sample Configs ===")
+    typer.echo("")
+    for sample_obj in samples:
+        typer.echo(f"  {sample_obj.name}")
+        typer.echo(f"    Pattern: {sample_obj.pattern}")
+        typer.echo(f"    Version: {sample_obj.version}")
+        typer.echo(f"    Release: {sample_obj.release_date}")
+        if sample_obj.upstream_variant:
+            typer.echo(f"    Variant: {sample_obj.upstream_variant}")
+        if sample_obj.source_contract:
+            typer.echo(f"    Contract: {sample_obj.source_contract}")
+        typer.echo(f"    Source: {sample_obj.source_url}")
+        typer.echo("")
+
+
+def _echo_sample_details(sample_obj: SampleConfig) -> None:
+    typer.echo(f"=== {sample_obj.name} ===")
+    typer.echo(f"Pattern: {sample_obj.pattern}")
+    typer.echo(f"Version: {sample_obj.version}")
+    typer.echo(f"Release: {sample_obj.release_date}")
+    if sample_obj.description:
+        typer.echo(f"Description: {sample_obj.description}")
+    if sample_obj.upstream_variant:
+        typer.echo(f"Upstream variant: {sample_obj.upstream_variant}")
+    if sample_obj.source_contract:
+        typer.echo(f"Source contract: {sample_obj.source_contract}")
+    if sample_obj.tags:
+        typer.echo(f"Tags: {', '.join(sample_obj.tags)}")
+    typer.echo(f"Source: {sample_obj.source_url}")
+    typer.echo("")
+    typer.echo("Decisions:")
+    for key, value in sample_obj.decisions.items():
+        typer.echo(f"  - {key} = {value}")
+    if sample_obj.module_refs:
+        typer.echo("")
+        typer.echo("Module refs:")
+        for ref in sample_obj.module_refs:
+            summary = f"{ref.module_name} | {ref.source} | {ref.version}"
+            if ref.description:
+                summary += f" | {ref.description}"
+            typer.echo(f"  - {summary}")
+
+
 def _emit_sample_matches(pattern: str, decisions: dict[str, Any]) -> None:
     for line in sample_match_lines(APP_NAME, pattern, decisions):
         typer.echo(line)
@@ -313,6 +423,92 @@ def _emit_discovery_next_steps(*, input: Path, pattern: str, complete: bool) -> 
         complete=complete,
     ):
         typer.echo(line)
+
+
+def _read_design_text(input_path: Path) -> str:
+    if input_path.is_dir():
+        return "\n---\n".join(path.read_text() for path in sorted(input_path.glob("*.md")))
+    return input_path.read_text()
+
+
+def _apply_discovery_llm(
+    *,
+    text: str,
+    graph: Any,
+    pattern: str,
+    llm_caller: LLMCaller | None,
+    evidence_store: LLMEvidenceStore,
+) -> None:
+    if llm_caller is None:
+        return
+    from .core.compiler import LLMContextProvider
+
+    llm_result = LLMContextProvider(
+        prose=text,
+        graph=graph,
+        pattern=pattern,
+        llm_caller=llm_caller,
+        evidence_store=evidence_store,
+    ).run()
+    if llm_result.decisions:
+        graph.apply_decisions(llm_result.decisions)
+    if llm_result.signal_decisions:
+        graph.apply_decisions(llm_result.signal_decisions)
+
+
+def _echo_discovery_sync(
+    result: DiscoveryResult,
+    graph: Any,
+    simulated_decisions: list[str],
+) -> None:
+    if result.synced:
+        source_label = "design doc and simulated decisions" if simulated_decisions else "design doc"
+        typer.echo(f"[+] Synced {len(result.synced)} values from {source_label}:")
+        for key in result.synced:
+            typer.echo(f"    {key} = {graph.get(key)}")
+        typer.echo("")
+    if simulated_decisions:
+        typer.echo(f"[+] Applied {len(simulated_decisions)} simulated decision(s):")
+        for key in simulated_decisions:
+            typer.echo(f"    {key} = {graph.get(key)}")
+        typer.echo("")
+
+
+def _echo_discovery_signals(result: DiscoveryResult) -> None:
+    if not result.signals:
+        return
+    typer.echo("[!] Detected signals from design doc:")
+    for signal in result.signals:
+        typer.echo(f"  Signal: {signal.signal}")
+        typer.echo(f"    Context: {signal.context}")
+        typer.echo(f"    Affects: {', '.join(signal.triggered_requirements)}")
+    typer.echo("")
+
+
+def _echo_discovery_gaps(result: DiscoveryResult, graph: Any) -> None:
+    if result.is_complete():
+        typer.echo("[+] No gaps found. Design is complete.")
+        return
+
+    typer.echo(f"[!] {result.total_gaps()} gap(s) found:")
+    typer.echo("")
+    for index, gap in enumerate(result.missing, 1):
+        typer.echo(f"  [{index}] {gap.label}")
+        typer.echo(f"      Reason: {gap.reason}")
+        typer.echo(f"      Suggestion: {gap.suggestion}")
+        typer.echo("")
+
+    questions = generate_clarifying_questions(result, graph=graph)
+    if questions:
+        typer.echo("Clarifying questions to ask:")
+    for index, question in enumerate(questions, 1):
+        options = f" | options: {', '.join(question['options'])}" if question.get("options") else ""
+        default = (
+            f" | default: {question.get('default', 'none')}" if question.get("default") else ""
+        )
+        typer.echo(f"  {index}. [{question['key']}] {question['question']}{options}{default}")
+        if question.get("context"):
+            typer.echo(f"     context: {question['context']}")
 
 
 def _version_callback(value: bool) -> None:
@@ -560,6 +756,95 @@ def shift_left_checkov(
         raise typer.Exit(1)
 
 
+def _compile_git_document(
+    doc: dict[str, Any],
+    *,
+    repo_root: Path,
+    base_ref: str,
+    bundle_root: Path,
+    output_root: Path,
+    pattern: str,
+    dry_run: bool,
+    llm_caller: LLMCaller | None,
+) -> tuple[dict[str, Any], bool]:
+    doc_path = Path(str(doc["path"]))
+    relative_path = str(doc["relativePath"])
+    baseline_bundle = bundle_path_for_doc(bundle_root, relative_path)
+    output_bundle = bundle_path_for_doc(output_root, relative_path)
+    repo_relative_path = str(doc["repoRelativePath"])
+    baseline_text = git_show_text(repo_root, base_ref, repo_relative_path)
+    entry: dict[str, Any] = {
+        "path": str(doc_path),
+        "relativePath": relative_path,
+        "repoRelativePath": repo_relative_path,
+        "baselineDocumentAvailable": baseline_text is not None,
+        "baselineBundle": str(baseline_bundle),
+        "baselineBundleAvailable": baseline_bundle.is_dir(),
+        "outputBundle": str(output_bundle),
+        "status": "planned",
+        "mode": "incremental" if baseline_text is not None else "full",
+    }
+    if not doc_path.exists():
+        entry.update(
+            status="skipped",
+            reason="changed document is not present in the working tree",
+        )
+        return entry, True
+    if dry_run:
+        entry["status"] = (
+            "planned-incremental"
+            if baseline_text is not None and baseline_bundle.is_dir()
+            else "planned-full"
+            if baseline_text is None
+            else "planned-skip"
+        )
+        return entry, False
+    if baseline_text is None:
+        try:
+            compile_design(
+                doc_path,
+                output_bundle,
+                pattern=pattern,
+                llm_caller=llm_caller,
+                evidence_store=LLMEvidenceStore(),
+            )
+        except CompileError as exc:
+            entry["status"] = "blocked"
+            entry["violations"] = [
+                {"code": violation.code, "message": violation.message}
+                for violation in exc.violations
+            ]
+            return entry, True
+        entry["status"] = "compiled-full"
+        return entry, False
+    if not baseline_bundle.is_dir():
+        entry.update(status="skipped", reason="baseline bundle is missing")
+        return entry, True
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        baseline_doc = Path(temp_dir) / doc_path.name
+        baseline_doc.write_text(baseline_text)
+        try:
+            compile_incremental_design(
+                baseline_bundle=baseline_bundle,
+                changed_doc=doc_path,
+                output_dir=output_bundle,
+                baseline_doc=baseline_doc,
+                pattern=pattern,
+                llm_caller=llm_caller,
+                evidence_store=LLMEvidenceStore(),
+            )
+        except CompileError as exc:
+            entry["status"] = "blocked"
+            entry["violations"] = [
+                {"code": violation.code, "message": violation.message}
+                for violation in exc.violations
+            ]
+            return entry, True
+    entry["status"] = "compiled-incremental"
+    return entry, False
+
+
 @app.command("compile-git")
 def compile_git(
     base_ref: str = typer.Option(..., "--base-ref", help="Git ref for the previous design state."),
@@ -601,8 +886,8 @@ def compile_git(
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1) from exc
 
-    llm_caller = auto_detect_llm(
-        provider=os.environ.get("INTENT_ENGINE_PROVIDER", "openai"),
+    llm_caller = _configured_llm_or_exit(
+        provider=os.environ.get("INTENT_ENGINE_PROVIDER", ""),
         api_key=os.environ.get("OPENAI_API_KEY", ""),
         base_url=os.environ.get("INTENT_ENGINE_BASE_URL", ""),
         model=os.environ.get("INTENT_ENGINE_MODEL", ""),
@@ -622,77 +907,17 @@ def compile_git(
     }
     failure_count = 0
     for doc in discovered["changedDocuments"]:
-        doc_path = Path(str(doc["path"]))
-        relative_path = str(doc["relativePath"])
-        baseline_bundle = bundle_path_for_doc(bundle_root, relative_path)
-        output_bundle = bundle_path_for_doc(output_root, relative_path)
-        baseline_text = git_show_text(repo_root, base_ref, str(doc["repoRelativePath"]))
-        entry: dict[str, Any] = {
-            "path": str(doc_path),
-            "relativePath": relative_path,
-            "repoRelativePath": str(doc["repoRelativePath"]),
-            "baselineDocumentAvailable": baseline_text is not None,
-            "baselineBundle": str(baseline_bundle),
-            "baselineBundleAvailable": baseline_bundle.is_dir(),
-            "outputBundle": str(output_bundle),
-            "status": "planned",
-            "mode": "incremental" if baseline_text is not None else "full",
-        }
-        if not doc_path.exists():
-            entry["status"] = "skipped"
-            entry["reason"] = "changed document is not present in the working tree"
-            failure_count += 1
-        elif dry_run:
-            entry["status"] = (
-                "planned-incremental"
-                if baseline_text is not None and baseline_bundle.is_dir()
-                else "planned-full"
-                if baseline_text is None
-                else "planned-skip"
-            )
-        elif baseline_text is None:
-            try:
-                compile_design(
-                    doc_path,
-                    output_bundle,
-                    pattern=pattern,
-                    llm_caller=llm_caller,
-                    evidence_store=LLMEvidenceStore(),
-                )
-                entry["status"] = "compiled-full"
-            except CompileError as exc:
-                entry["status"] = "blocked"
-                entry["violations"] = [
-                    {"code": violation.code, "message": violation.message}
-                    for violation in exc.violations
-                ]
-                failure_count += 1
-        elif not baseline_bundle.is_dir():
-            entry["status"] = "skipped"
-            entry["reason"] = "baseline bundle is missing"
-            failure_count += 1
-        else:
-            with tempfile.TemporaryDirectory() as temp_dir:
-                baseline_doc = Path(temp_dir) / doc_path.name
-                baseline_doc.write_text(baseline_text)
-                try:
-                    compile_incremental_design(
-                        baseline_bundle=baseline_bundle,
-                        changed_doc=doc_path,
-                        output_dir=output_bundle,
-                        baseline_doc=baseline_doc,
-                        pattern=pattern,
-                        llm_caller=llm_caller,
-                        evidence_store=LLMEvidenceStore(),
-                    )
-                    entry["status"] = "compiled-incremental"
-                except CompileError as exc:
-                    entry["status"] = "blocked"
-                    entry["violations"] = [
-                        {"code": violation.code, "message": violation.message}
-                        for violation in exc.violations
-                    ]
-                    failure_count += 1
+        entry, failed = _compile_git_document(
+            doc,
+            repo_root=repo_root,
+            base_ref=base_ref,
+            bundle_root=bundle_root,
+            output_root=output_root,
+            pattern=pattern,
+            dry_run=dry_run,
+            llm_caller=llm_caller,
+        )
+        failure_count += int(failed)
         plan["changedDocuments"].append(entry)
 
     plan["summary"] = {
@@ -741,14 +966,14 @@ def compile(
         help="Output directory for generated configs",
     ),
     provider: str = typer.Option(
-        os.environ.get("INTENT_ENGINE_PROVIDER", "openai"),
+        os.environ.get("INTENT_ENGINE_PROVIDER", ""),
         "--provider",
-        help="LLM provider: openai, ollama, bedrock",
+        help="LLM provider: openai, ollama, bedrock. Unset means deterministic extraction.",
     ),
     model: str = typer.Option(
         os.environ.get("INTENT_ENGINE_MODEL", ""),
         "--model",
-        help="Model name (defaults to provider's default)",
+        help="Pinned model name; required when an LLM provider is configured",
     ),
     base_url: str = typer.Option(
         os.environ.get("INTENT_ENGINE_BASE_URL", ""),
@@ -791,9 +1016,8 @@ def compile(
 ) -> None:
     """Compile Markdown design docs into validated intent artifacts.
 
-    The LLM extracts structured intent from plain Markdown guided by the
-    requirement graph (data model). No regex, no rigid format — just
-    describe your infrastructure requirements in whatever structure you prefer.
+    Structured Markdown and graph defaults form the deterministic baseline.
+    An explicitly configured, pinned LLM can additionally extract prose intent.
     """
     incremental = baseline_bundle is not None or changed_doc is not None
     if incremental:
@@ -825,13 +1049,12 @@ def compile(
     graph = _get_pattern_or_exit(pattern).create_graph()
 
     evidence_store = LLMEvidenceStore()
-    llm_caller = auto_detect_llm(provider=provider, api_key=api_key, base_url=base_url, model=model)
-    if llm_caller is None:
-        typer.echo(
-            "WARNING: No LLM available — extracting from Markdown only. "
-            "Set OPENAI_API_KEY or run Ollama locally for LLM-powered extraction.",
-            err=True,
-        )
+    llm_caller = _configured_llm_or_exit(
+        provider=provider,
+        api_key=api_key,
+        base_url=base_url,
+        model=model,
+    )
     evidence_path = _default_evidence_output(
         llm_caller=llm_caller,
         evidence_output=evidence_output,
@@ -932,14 +1155,14 @@ def discover(
         help=f"Pattern to use. Available: {_available_patterns()}",
     ),
     provider: str = typer.Option(
-        os.environ.get("INTENT_ENGINE_PROVIDER", "openai"),
+        os.environ.get("INTENT_ENGINE_PROVIDER", ""),
         "--provider",
-        help="LLM provider: openai, ollama, bedrock",
+        help="LLM provider: openai, ollama, bedrock. Unset means deterministic extraction.",
     ),
     model: str = typer.Option(
         os.environ.get("INTENT_ENGINE_MODEL", ""),
         "--model",
-        help="Model name (defaults to provider's default)",
+        help="Pinned model name; required when an LLM provider is configured",
     ),
     base_url: str = typer.Option(
         os.environ.get("INTENT_ENGINE_BASE_URL", ""),
@@ -971,8 +1194,8 @@ def discover(
 
     Shows requirement gaps, clarifying questions, and next steps.
     Use --decisions to simulate decisions before discovering.
-    When an LLM is available, the design doc prose is extracted first
-    to auto-fill decisions before gap analysis. Use --no-llm to skip.
+    When an LLM provider and model are configured, prose is extracted first
+    to fill decisions before gap analysis. Use --no-llm to override environment config.
     """
     if not input.exists():
         typer.echo(f"Error: input path does not exist: {input}", err=True)
@@ -985,13 +1208,7 @@ def discover(
     else:
         graph = _get_pattern_or_exit(pattern).create_graph()
 
-    if input.is_dir():
-        texts = []
-        for f in sorted(input.glob("*.md")):
-            texts.append(f.read_text())
-        text = "\n---\n".join(texts)
-    else:
-        text = input.read_text()
+    text = _read_design_text(input)
 
     markdown_decisions = extract_from_markdown(text, graph)
     if markdown_decisions:
@@ -1000,29 +1217,20 @@ def discover(
     evidence_store = LLMEvidenceStore()
     llm_caller = None
     if not no_llm:
-        llm_caller = auto_detect_llm(
+        llm_caller = _configured_llm_or_exit(
             provider=provider,
             api_key=api_key,
             base_url=base_url,
             model=model,
-            task="reason",
         )
 
-    if llm_caller is not None:
-        from .core.compiler import LLMContextProvider
-
-        llm_provider = LLMContextProvider(
-            prose=text,
-            graph=graph,
-            pattern=pattern,
-            llm_caller=llm_caller,
-            evidence_store=evidence_store,
-        )
-        llm_result = llm_provider.run()
-        if llm_result.decisions:
-            graph.apply_decisions(llm_result.decisions)
-        if llm_result.signal_decisions:
-            graph.apply_decisions(llm_result.signal_decisions)
+    _apply_discovery_llm(
+        text=text,
+        graph=graph,
+        pattern=pattern,
+        llm_caller=llm_caller,
+        evidence_store=evidence_store,
+    )
 
     decision_dict = _parse_decisions_or_exit(decisions)
     simulated_decisions: list[str] = []
@@ -1038,53 +1246,9 @@ def discover(
     typer.echo("=== Discovery Report ===")
     typer.echo("")
 
-    synced = result.synced
-    if synced:
-        source_label = "design doc and simulated decisions" if simulated_decisions else "design doc"
-        typer.echo(f"[+] Synced {len(synced)} values from {source_label}:")
-        for k in synced:
-            val = graph.get(k)
-            typer.echo(f"    {k} = {val}")
-        typer.echo("")
-
-    if simulated_decisions:
-        typer.echo(f"[+] Applied {len(simulated_decisions)} simulated decision(s):")
-        for key in simulated_decisions:
-            typer.echo(f"    {key} = {graph.get(key)}")
-        typer.echo("")
-
-    if result.signals:
-        typer.echo("[!] Detected signals from design doc:")
-        for sig in result.signals:
-            typer.echo(f"  Signal: {sig.signal}")
-            typer.echo(f"    Context: {sig.context}")
-            typer.echo(f"    Affects: {', '.join(sig.triggered_requirements)}")
-        typer.echo("")
-
-    if result.is_complete():
-        typer.echo("[+] No gaps found. Design is complete.")
-    else:
-        typer.echo(f"[!] {result.total_gaps()} gap(s) found:")
-        typer.echo("")
-
-        if result.missing:
-            for index, gap in enumerate(result.missing, 1):
-                typer.echo(f"  [{index}] {gap.label}")
-                typer.echo(f"      Reason: {gap.reason}")
-                typer.echo(f"      Suggestion: {gap.suggestion}")
-                typer.echo("")
-
-        questions = generate_clarifying_questions(result, graph=graph)
-        if questions:
-            typer.echo("Clarifying questions to ask:")
-            for i, q in enumerate(questions, 1):
-                opt_str = ""
-                if q.get("options"):
-                    opt_str = f" | options: {', '.join(q['options'])}"
-                def_str = f" | default: {q.get('default', 'none')}" if q.get("default") else ""
-                typer.echo(f"  {i}. [{q['key']}] {q['question']}{opt_str}{def_str}")
-                if q.get("context"):
-                    typer.echo(f"     context: {q['context']}")
+    _echo_discovery_sync(result, graph, simulated_decisions)
+    _echo_discovery_signals(result)
+    _echo_discovery_gaps(result, graph)
 
     _write_evidence_output(evidence_output, evidence_store)
     _emit_discovery_next_steps(input=input, pattern=pattern, complete=result.is_complete())
@@ -1183,7 +1347,7 @@ def interview(
         typer.echo("Compilation failed with violations:", err=True)
         for v in e.violations:
             typer.echo(f"  [{v.code}] {v.message}", err=True)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command()
@@ -1238,58 +1402,11 @@ def contract(
     contracts = _selected_contracts_or_exit(action, name, pattern)
 
     if action == "list":
-        typer.echo("=== Target Contracts ===")
-        typer.echo("")
-        for contract_obj in contracts:
-            typer.echo(f"  {contract_obj.name}")
-            typer.echo(f"    Kind: {contract_obj.kind}")
-            typer.echo(f"    Required artifacts: {len(contract_obj.required_artifacts)}")
-            typer.echo(f"    Optional artifacts: {len(contract_obj.optional_artifacts)}")
-            typer.echo(f"    Required decisions: {len(contract_obj.required_decisions)}")
-            typer.echo(f"    Source: {contract_obj.source_url}")
-            typer.echo("")
+        _echo_contract_list(contracts)
         return
 
     for contract_obj in contracts:
-        typer.echo(f"=== {contract_obj.name} ===")
-        typer.echo(f"Kind: {contract_obj.kind}")
-        typer.echo(f"Source: {contract_obj.source_url}")
-        typer.echo("")
-        typer.echo("Required artifacts:")
-        for artifact in contract_obj.artifacts:
-            if not artifact.required:
-                continue
-            schema_hint = ""
-            if artifact.required_paths:
-                schema_hint = f" | paths: {', '.join(artifact.required_paths)}"
-            assertion_hint = ""
-            if artifact.value_assertions:
-                paths = ", ".join(item.path for item in artifact.value_assertions)
-                assertion_hint = f" | assertions: {paths}"
-            typer.echo(f"  - {artifact.name}{schema_hint}{assertion_hint}")
-        if contract_obj.optional_artifacts:
-            typer.echo("")
-            typer.echo("Optional artifacts:")
-            for artifact in contract_obj.artifacts:
-                if artifact.required:
-                    continue
-                schema_hint = ""
-                if artifact.required_paths:
-                    schema_hint = f" | paths: {', '.join(artifact.required_paths)}"
-                assertion_hint = ""
-                if artifact.value_assertions:
-                    paths = ", ".join(item.path for item in artifact.value_assertions)
-                    assertion_hint = f" | assertions: {paths}"
-                typer.echo(f"  - {artifact.name}{schema_hint}{assertion_hint}")
-        typer.echo("")
-        typer.echo("Required decisions:")
-        for decision in contract_obj.required_decisions:
-            typer.echo(f"  - {decision}")
-        if contract_obj.lineage:
-            typer.echo("")
-            typer.echo("Lineage:")
-            for item in contract_obj.lineage:
-                typer.echo(f"  - {item.decision} -> {item.artifact}:{item.path}")
+        _echo_contract_details(contract_obj)
 
 
 @app.command()
@@ -1332,47 +1449,11 @@ def sample(
         raise typer.Exit(1)
 
     if action == "list":
-        typer.echo("=== Sample Configs ===")
-        typer.echo("")
-        for sample_obj in samples:
-            typer.echo(f"  {sample_obj.name}")
-            typer.echo(f"    Pattern: {sample_obj.pattern}")
-            typer.echo(f"    Version: {sample_obj.version}")
-            typer.echo(f"    Release: {sample_obj.release_date}")
-            if sample_obj.upstream_variant:
-                typer.echo(f"    Variant: {sample_obj.upstream_variant}")
-            if sample_obj.source_contract:
-                typer.echo(f"    Contract: {sample_obj.source_contract}")
-            typer.echo(f"    Source: {sample_obj.source_url}")
-            typer.echo("")
+        _echo_sample_list(samples)
         return
 
     for sample_obj in samples:
-        typer.echo(f"=== {sample_obj.name} ===")
-        typer.echo(f"Pattern: {sample_obj.pattern}")
-        typer.echo(f"Version: {sample_obj.version}")
-        typer.echo(f"Release: {sample_obj.release_date}")
-        if sample_obj.description:
-            typer.echo(f"Description: {sample_obj.description}")
-        if sample_obj.upstream_variant:
-            typer.echo(f"Upstream variant: {sample_obj.upstream_variant}")
-        if sample_obj.source_contract:
-            typer.echo(f"Source contract: {sample_obj.source_contract}")
-        if sample_obj.tags:
-            typer.echo(f"Tags: {', '.join(sample_obj.tags)}")
-        typer.echo(f"Source: {sample_obj.source_url}")
-        typer.echo("")
-        typer.echo("Decisions:")
-        for key, value in sample_obj.decisions.items():
-            typer.echo(f"  - {key} = {value}")
-        if sample_obj.module_refs:
-            typer.echo("")
-            typer.echo("Module refs:")
-            for ref in sample_obj.module_refs:
-                summary = f"{ref.module_name} | {ref.source} | {ref.version}"
-                if ref.description:
-                    summary += f" | {ref.description}"
-                typer.echo(f"  - {summary}")
+        _echo_sample_details(sample_obj)
 
 
 @app.command()

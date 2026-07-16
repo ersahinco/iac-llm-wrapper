@@ -11,8 +11,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import ruamel.yaml
-
 from intent_engine.core.battle_summary import (
     BattleCaseInput,
     BattleCompileResult,
@@ -21,6 +19,7 @@ from intent_engine.core.battle_summary import (
     write_battle_summary,
 )
 from intent_engine.core.contract_validation import write_contract_validation
+from intent_engine.core.yaml_utils import load_yaml_mapping
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EVAL_DIR = REPO_ROOT / "fixtures" / "eval"
@@ -28,11 +27,7 @@ RESULTS_DIR = REPO_ROOT / "tests" / "results"
 
 
 def _yaml_load(path: Path) -> dict[str, Any]:
-    yaml = ruamel.yaml.YAML(typ="safe")
-    data = yaml.load(path.read_text())
-    if not isinstance(data, dict):
-        raise ValueError(f"{path}: expected mapping")
-    return data
+    return load_yaml_mapping(path)
 
 
 def _load_case(name: str) -> BattleCaseInput:
@@ -117,6 +112,8 @@ def main() -> int:
         help="Keep existing output directory contents instead of replacing them",
     )
     args = parser.parse_args()
+    if args.llm and (not args.provider or not args.model):
+        parser.error("--llm requires both --provider and --model")
 
     case = _load_case(args.fixture)
     output_dir = _result_dir(case, args.llm, args.model, args.output).resolve()

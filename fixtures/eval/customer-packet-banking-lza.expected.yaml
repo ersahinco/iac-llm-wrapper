@@ -3,92 +3,36 @@ name: customer-packet-banking-lza
 input: customer-packet-banking-lza.md
 pattern: aws-lza
 expect:
-  compile: pass
+  compile: fail
+  violations:
+    - AWS_LZA_WORKLOAD_ACCOUNT_OU_AMBIGUOUS
   values:
     pattern: aws-lza
-    baseline: standard
-    orgMode: control-tower
-    organizationName: BlueRiverBank
-    homeRegion: eu-central-1
-    enabledRegions:
-      - eu-central-1
-      - eu-west-1
-    organizationalUnits:
-      - Security
-      - Infrastructure
-      - Workloads
-      - Sandbox
-    accounts.audit: Audit
-    accounts.logArchive: LogArchive
-    accounts.securityTooling: SecurityTooling
-    accounts.network: NetworkShared
-    accounts.workloads:
-      - DigitalBankingProd
-      - CardsProd
-      - DataShared
-      - SandboxDev
-    identity.identityCenterDelegatedAdmin: SecurityTooling
-    identity.identityCenterPermissionSets:
-      - ReadOnlyAccess
-      - SecurityAudit
-      - PowerUserAccess
-      - BreakGlassAdmin
-      - NetworkAdmin
-    identity.identityCenterAssignments:
-      - PlatformAdmins:PowerUserAccess:Management
-      - SecurityAuditors:SecurityAudit:Audit
-      - NetworkEngineers:NetworkAdmin:NetworkShared
-      - DigitalBankingEngineers:PowerUserAccess:DigitalBankingProd
-      - CardsEngineers:PowerUserAccess:CardsProd
-      - DataEngineers:ReadOnlyAccess:DataShared
-      - IncidentCommanders:BreakGlassAdmin:SecurityTooling
-      - SandboxDevelopers:ReadOnlyAccess:SandboxDev
-    network.topology: hub-spoke
-    network.cidr: 10.64.0.0/16
-    security.centralizedLogging: true
-    security.securityHubEnabled: true
-    security.guardDutyEnabled: true
-    security.complianceOverlay: financial-services
-    semanticModel.summary.failedConstraintCount: 0
-    handoffReadiness.status: ready
-    handoffReadiness.handoffAllowed: true
-    handoffReadiness.targetCapabilities.selectedTargetPath:
-      - accelerator
-    handoffReadiness.targetCapabilities.unsupportedGapCount: 0
-  counts:
-    enabledRegions: 2
-    organizationalUnits: 4
-  names:
-    enabledRegions:
-      - eu-central-1
-      - eu-west-1
-    organizationalUnits:
-      - Security
-      - Infrastructure
-      - Workloads
-      - Sandbox
+    handoffReadiness.status: blocked
+    handoffReadiness.handoffAllowed: false
   artifacts:
+    - decision-report.yaml
+    - llm-trace-summary.yaml
+    - model-benchmark.yaml
+  forbiddenArtifacts:
     - accounts-config.yaml
     - global-config.yaml
     - iam-config.yaml
     - network-config.yaml
     - organization-config.yaml
     - security-config.yaml
-    - decision-report.yaml
     - handoff-plan.yaml
-    - llm-trace-summary.yaml
-    - model-benchmark.yaml
     - lineage-manifest.yaml
     - deployment-runbook.md
     - sample-recommendations.yaml
     - context-manifest.yaml
-    - target-capability-graph.yaml
-  forbiddenArtifacts:
     - main.tf
     - terraform.tfvars
     - terragrunt.hcl
     - template.yaml
     - stack.yaml
+  contracts:
+    - blocked-assessment-artifacts
   trace:
     required:
       - rawLlmDecisions
@@ -102,7 +46,7 @@ expect:
       - rawEvidencePath
     values:
       pattern: aws-lza
-      handoffReadiness.status: ready
+      handoffReadiness.status: blocked
     deterministicValues:
       callCount: 0
       rawEvidence.status: not-requested

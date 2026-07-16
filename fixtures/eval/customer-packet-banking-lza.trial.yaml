@@ -3,6 +3,11 @@ name: customer-packet-banking-lza
 purpose: T33 real customer packet trial
 provider: bedrock
 model: eu.amazon.nova-2-lite-v1:0
+historicalEvidence: true
+currentExpectation:
+  readiness: blocked
+  violation: AWS_LZA_WORKLOAD_ACCOUNT_OU_AMBIGUOUS
+  reason: The packet defines Workloads and Sandbox OUs but does not map each workload account.
 serviceStyleRun:
   outputDir: tests/results/customer-packet-banking-lza-bedrock
   rawEvidence: omitted
@@ -24,16 +29,18 @@ evalRun:
   latencyMs: 3401.9
 reviewCategories:
   promptModelMisses: []
-  graphModelMissingFields: []
+  graphModelMissingFields:
+    - The historical graph accepted an inferred SandboxDev-to-Sandbox relationship and
+      defaulted every deterministic workload placement to Workloads.
   reviewUsabilityFriction:
     - The review page reports an expected weakness that structured Markdown
       carried the accepted handoff. That is accurate for this packet because
       the architect clarification pass intentionally records explicit decisions.
       No code or prompt change is needed.
 decision:
-  outcome: no-change-needed
+  outcome: invalidated-by-contract-gap
   reason: >
-    The realistic packet compiled ready, Bedrock independently returned all
-    accepted decisions, service-style raw evidence was omitted, secret-store
-    references did not leak into generated artifacts, and review HTML showed
-    the expected readiness/model/contract signals.
+    The recorded run remains useful model evidence, but its ready verdict is no
+    longer valid. Model-inferred entity placement bypassed graph provenance and
+    deterministic compilation chose a different OU. Current compilation must
+    block until the packet explicitly maps every workload account to an OU.

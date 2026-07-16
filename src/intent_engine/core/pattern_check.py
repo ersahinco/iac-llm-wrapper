@@ -6,8 +6,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .contracts import ContractValidator
+from .model_introspection import validate_requirement_against_model
 from .patterns import Pattern
-from .requirements import expression_dependencies, validate_expression
+from .requirements import RequirementGraph, expression_dependencies, validate_expression
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,196 @@ class PatternCheckResult:
     @property
     def passed(self) -> bool:
         return not self.violations
+
+
+@dataclass(frozen=True)
+class PatternReferenceViolation:
+    """One invalid pattern reference with caller-specific existing wording."""
+
+    check_message: str
+    registration_message: str
+
+
+def _model_and_contract_reference_violations(
+    pattern: Pattern,
+    graph: RequirementGraph,
+) -> list[PatternReferenceViolation]:
+    violations: list[PatternReferenceViolation] = []
+    for req in graph._requirements.values():
+        for message in validate_requirement_against_model(req, pattern.intent_factory):
+            violations.append(PatternReferenceViolation(message, message))
+
+    for contract in pattern.contracts:
+        validator = ContractValidator(contract)
+        for violation in validator.validate_contract() + validator.validate_graph(graph):
+            violations.append(
+                PatternReferenceViolation(
+                    f"{contract.name}: {violation.message}",
+                    f"Contract '{contract.name}': {violation.message}",
+                )
+            )
+
+    return violations
+
+
+def _policy_reference_violations(
+    pattern: Pattern,
+    graph: RequirementGraph,
+) -> list[PatternReferenceViolation]:
+    violations: list[PatternReferenceViolation] = []
+    known_requirements = set(graph._requirements)
+    known_contracts = {contract.name for contract in pattern.contracts}
+    for pack in pattern.policy_packs:
+        for control in pack.controls:
+            for requirement_key in control.mapping.requirement_keys:
+                if requirement_key not in known_requirements:
+                    violations.append(
+                        PatternReferenceViolation(
+                            f"{pack.name}:{control.id}: unknown requirement {requirement_key}",
+                            f"Policy pack '{pack.name}' control '{control.id}': "
+                            f"unknown requirement '{requirement_key}'",
+                        )
+                    )
+            for contract_name in control.mapping.target_contracts:
+                if contract_name not in known_contracts:
+                    violations.append(
+                        PatternReferenceViolation(
+                            f"{pack.name}:{control.id}: unknown target contract {contract_name}",
+                            f"Policy pack '{pack.name}' control '{control.id}': "
+                            f"unknown target contract '{contract_name}'",
+                        )
+                    )
+
+    return violations
+
+
+def _metadata_reference_violations(
+    pattern: Pattern,
+    graph: RequirementGraph,
+) -> list[PatternReferenceViolation]:
+    violations: list[PatternReferenceViolation] = []
+    known_requirements = set(graph._requirements)
+    for code, requirement_key in pattern.violation_requirement_map.items():
+        if requirement_key not in known_requirements:
+            violations.append(
+                PatternReferenceViolation(
+                    f"{code}: unknown mapped requirement {requirement_key}",
+                    f"Violation mapping '{code}': unknown requirement '{requirement_key}'",
+                )
+            )
+    for requirement_key in pattern.reconfirmation_keys:
+        if requirement_key not in known_requirements:
+            violations.append(
+                PatternReferenceViolation(
+                    f"unknown reconfirmation requirement {requirement_key}",
+                    f"Reconfirmation key '{requirement_key}' is not a requirement",
+                )
+            )
+
+    known_artifacts = {
+        artifact.name for contract in pattern.contracts for artifact in contract.artifacts
+    }
+    for artifact_name in pattern.artifact_review_owners:
+        if artifact_name not in known_artifacts:
+            violations.append(
+                PatternReferenceViolation(
+                    f"unknown artifact owner mapping {artifact_name}",
+                    f"Artifact owner mapping references unknown artifact '{artifact_name}'",
+                )
+            )
+    return violations
+
+
+def validate_pattern_references(
+    pattern: Pattern,
+    graph: RequirementGraph,
+) -> list[PatternReferenceViolation]:
+    """Validate model, contract, policy, and pattern metadata references once."""
+    return [
+        *_model_and_contract_reference_violations(pattern, graph),
+        *_policy_reference_violations(pattern, graph),
+        *_metadata_reference_violations(pattern, graph),
+    ]
+
+
+def _check_requirement_graph(graph: RequirementGraph, violations: list[str]) -> None:
+    if not graph._requirements:
+        violations.append("graph has no requirements")
+    cycle = graph.cycle_edges()
+    if cycle:
+        violations.append(f"requirement graph has a cycle: {cycle}")
+
+    for key, req in graph._requirements.items():
+        if not req.label:
+            violations.append(f"{key}: missing label")
+        if not req.question:
+            violations.append(f"{key}: missing question")
+        if not req.category:
+            violations.append(f"{key}: missing category")
+        if not req.target_field:
+            violations.append(f"{key}: missing target field")
+        if (
+            req.required_when_applicable
+            and req.default is None
+            and not req.options
+            and (not req.violation_code or not req.violation_message)
+        ):
+            violations.append(
+                f"{key}: required open requirement must define violation code and message"
+            )
+        for dependency in req.depends_on:
+            if dependency not in graph._requirements:
+                violations.append(f"{key}: unknown dependency {dependency}")
+        condition_dependencies = (
+            set(req.applies_if)
+            | set(req.blocked_if)
+            | set(expression_dependencies(req.applies_when))
+            | set(expression_dependencies(req.blocked_when))
+        )
+        violations.extend(
+            f"{key}: {error}"
+            for error in validate_expression(req.applies_when, path=f"{key}.applies_when")
+        )
+        violations.extend(
+            f"{key}: {error}"
+            for error in validate_expression(req.blocked_when, path=f"{key}.blocked_when")
+        )
+        violations.extend(
+            f"{key}: unknown condition dependency {dependency}"
+            for dependency in condition_dependencies
+            if dependency not in graph._requirements
+        )
+
+
+def _check_policy_metadata(pattern: Pattern, violations: list[str]) -> None:
+    for pack in pattern.policy_packs:
+        if not pack.controls:
+            violations.append(f"{pack.name}: policy pack has no controls")
+        if not pack.frameworks:
+            violations.append(f"{pack.name}: policy pack has no frameworks")
+        for control in pack.controls:
+            if not control.title:
+                violations.append(f"{pack.name}:{control.id}: policy control has no title")
+            mapping = control.mapping
+            if not (
+                mapping.requirement_keys
+                or mapping.target_contracts
+                or mapping.artifact_paths
+                or mapping.module_variables
+                or mapping.checkov_check_ids
+                or mapping.owner_policy_refs
+            ):
+                violations.append(f"{pack.name}:{control.id}: policy control has no mapping")
+
+
+def _check_samples(pattern: Pattern, fixtures_root: Path, violations: list[str]) -> None:
+    for sample in pattern.samples:
+        if not sample.decisions:
+            violations.append(f"{sample.name}: sample has no decisions")
+        if sample.fixture_dir or (fixtures_root / sample.fixture_name).exists():
+            fixture_dir = fixtures_root / sample.fixture_name
+            if not fixture_dir.exists():
+                violations.append(f"{sample.name}: missing fixture dir {fixture_dir}")
 
 
 def check_pattern(
@@ -51,97 +242,12 @@ def check_pattern(
 
     requirements = len(graph._requirements)
     context_rules = 0
+    violations.extend(item.check_message for item in validate_pattern_references(pattern, graph))
     if not pattern.description.strip():
         violations.append("pattern description is missing")
     context_rules += _check_prompt_context(pattern, violations)
-    if not graph._requirements:
-        violations.append("graph has no requirements")
-    cycle = graph.cycle_edges()
-    if cycle:
-        violations.append(f"requirement graph has a cycle: {cycle}")
-
-    for key, req in graph._requirements.items():
-        if not req.label:
-            violations.append(f"{key}: missing label")
-        if not req.question:
-            violations.append(f"{key}: missing question")
-        if not req.category:
-            violations.append(f"{key}: missing category")
-        if not req.target_field:
-            violations.append(f"{key}: missing target field")
-        if (
-            req.required_when_applicable
-            and req.default is None
-            and not req.options
-            and (not req.violation_code or not req.violation_message)
-        ):
-            violations.append(
-                f"{key}: required open requirement must define violation code and message"
-            )
-        for dep in req.depends_on:
-            if dep not in graph._requirements:
-                violations.append(f"{key}: unknown dependency {dep}")
-        condition_dependencies = (
-            set(req.applies_if)
-            | set(req.blocked_if)
-            | set(expression_dependencies(req.applies_when))
-            | set(expression_dependencies(req.blocked_when))
-        )
-        for error in validate_expression(req.applies_when, path=f"{key}.applies_when"):
-            violations.append(f"{key}: {error}")
-        for error in validate_expression(req.blocked_when, path=f"{key}.blocked_when"):
-            violations.append(f"{key}: {error}")
-        for dep in condition_dependencies:
-            if dep not in graph._requirements:
-                violations.append(f"{key}: unknown condition dependency {dep}")
-
-    for contract_obj in pattern.contracts:
-        validator = ContractValidator(contract_obj)
-        violations.extend(
-            f"{contract_obj.name}: {violation.message}"
-            for violation in validator.validate_contract() + validator.validate_graph(graph)
-        )
-
-    known_contracts = {contract.name for contract in pattern.contracts}
-    known_artifacts = {
-        artifact.name for contract in pattern.contracts for artifact in contract.artifacts
-    }
-    for pack in pattern.policy_packs:
-        if not pack.controls:
-            violations.append(f"{pack.name}: policy pack has no controls")
-        if not pack.frameworks:
-            violations.append(f"{pack.name}: policy pack has no frameworks")
-        for control in pack.controls:
-            if not control.title:
-                violations.append(f"{pack.name}:{control.id}: policy control has no title")
-            mapping = control.mapping
-            for req_key in mapping.requirement_keys:
-                if req_key not in graph._requirements:
-                    violations.append(f"{pack.name}:{control.id}: unknown requirement {req_key}")
-            for contract_name in mapping.target_contracts:
-                if contract_name not in known_contracts:
-                    violations.append(
-                        f"{pack.name}:{control.id}: unknown target contract {contract_name}"
-                    )
-            if not (
-                mapping.requirement_keys
-                or mapping.target_contracts
-                or mapping.artifact_paths
-                or mapping.module_variables
-                or mapping.checkov_check_ids
-                or mapping.owner_policy_refs
-            ):
-                violations.append(f"{pack.name}:{control.id}: policy control has no mapping")
-
-    for code, requirement_key in pattern.violation_requirement_map.items():
-        if requirement_key not in graph._requirements:
-            violations.append(f"{code}: unknown mapped requirement {requirement_key}")
-    for requirement_key in pattern.reconfirmation_keys:
-        if requirement_key not in graph._requirements:
-            violations.append(f"unknown reconfirmation requirement {requirement_key}")
-    for artifact_name in pattern.artifact_review_owners:
-        if artifact_name not in known_artifacts:
-            violations.append(f"unknown artifact owner mapping {artifact_name}")
+    _check_requirement_graph(graph, violations)
+    _check_policy_metadata(pattern, violations)
 
     expected_artifacts = pattern.expected_artifacts()
     for artifact in expected_artifacts:
@@ -149,13 +255,7 @@ def check_pattern(
             violations.append("expected artifact list contains an empty name")
 
     samples = pattern.samples
-    for sample in samples:
-        if not sample.decisions:
-            violations.append(f"{sample.name}: sample has no decisions")
-        if sample.fixture_dir or (fixtures_root / sample.fixture_name).exists():
-            fixture_dir = fixtures_root / sample.fixture_name
-            if not fixture_dir.exists():
-                violations.append(f"{sample.name}: missing fixture dir {fixture_dir}")
+    _check_samples(pattern, fixtures_root, violations)
 
     return PatternCheckResult(
         pattern=pattern.name,

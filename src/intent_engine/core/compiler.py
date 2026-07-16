@@ -608,7 +608,7 @@ class LLMContextProvider:
     def run(self) -> LLMGraphResult:
         """Run LLM graph traversal and return structured result.
 
-        When no LLM is available, returns an empty result — the harness
+        When no LLM is configured, returns an empty result — the harness
         will apply defaults and fill gaps deterministically.
         """
         if self.llm_caller is None:
@@ -1075,6 +1075,51 @@ def _build_section_map(pattern: str, graph) -> dict[str, tuple[str, str | None]]
     return section_map
 
 
+def _template_requirement_lines(req: Any, field_name: str | None) -> list[str]:
+    from .requirements import describe_expression
+
+    lines: list[str] = []
+    for condition_key, condition_values in req.applies_if.items():
+        lines.append(f"# Only when {condition_key} is one of: {', '.join(condition_values)}")
+    if req.applies_when:
+        lines.append(f"# Only when {describe_expression(req.applies_when)}")
+
+    lines.append(f"# {req.question}")
+    if req.options:
+        lines.append(f"# Options: {', '.join(req.options)}")
+    if req.default:
+        lines.append(f"# Default: {req.default}")
+
+    if field_name is None:
+        if req.options:
+            lines.extend(
+                f"- {option}" if option == req.default else f"# - {option}"
+                for option in req.options
+            )
+        elif req.default:
+            lines.append(f"- {req.default}")
+    else:
+        lines.append(f"- {field_name}: {req.default or ''}")
+    lines.append("")
+    return lines
+
+
+def _template_section_lines(
+    section_name: str,
+    fields: list[tuple[str, Any, str | None]],
+    examples: list[str],
+) -> list[str]:
+    if not fields and not examples:
+        return []
+    lines = [f"## {section_name}", ""]
+    if examples:
+        lines.extend(f"# - {example}" for example in examples)
+        lines.append("")
+    for _, req, field_name in fields:
+        lines.extend(_template_requirement_lines(req, field_name))
+    return lines
+
+
 def generate_template(pattern: str = "aws-lza") -> str:
     """Generate a Markdown design doc scaffold from a pattern."""
     from .patterns import GLOBAL_REGISTRY
@@ -1103,54 +1148,13 @@ def generate_template(pattern: str = "aws-lza") -> str:
     free_form_examples = pattern_obj.free_form_examples or {}
 
     for section_name in section_order:
-        has_fields = section_name in sections_content
-        has_examples = section_name in free_form_examples
-        if not has_fields and not has_examples:
-            continue
-
-        lines.append(f"## {section_name}")
-        lines.append("")
-
-        if section_name in free_form_examples:
-            for example in free_form_examples[section_name]:
-                lines.append(f"# - {example}")
-            lines.append("")
-            # Only skip field-based content if there are no requirements for this section
-            if section_name not in sections_content:
-                continue
-
-        for key, req, field_name in sections_content.get(section_name, []):
-            if req.applies_if:
-                for cond_key, cond_vals in req.applies_if.items():
-                    lines.append(f"# Only when {cond_key} is one of: {', '.join(cond_vals)}")
-            if req.applies_when:
-                from .requirements import describe_expression
-
-                lines.append(f"# Only when {describe_expression(req.applies_when)}")
-
-            lines.append(f"# {req.question}")
-            if req.options:
-                lines.append(f"# Options: {', '.join(req.options)}")
-            if req.default:
-                lines.append(f"# Default: {req.default}")
-
-            if field_name is None:
-                # Topology field: show default uncommented, alternatives commented
-                if req.options:
-                    for opt in req.options:
-                        if opt == req.default:
-                            lines.append(f"- {opt}")
-                        else:
-                            lines.append(f"# - {opt}")
-                elif req.default:
-                    lines.append(f"- {req.default}")
-            else:
-                line = f"- {field_name}: "
-                if req.default:
-                    line += req.default
-                lines.append(line)
-
-            lines.append("")
+        lines.extend(
+            _template_section_lines(
+                section_name,
+                sections_content.get(section_name, []),
+                free_form_examples.get(section_name, []),
+            )
+        )
 
     return "\n".join(lines)
 

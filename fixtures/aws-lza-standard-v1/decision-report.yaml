@@ -38,7 +38,7 @@ semanticModel:
   summary:
     entityCount: 23
     relationshipCount: 12
-    constraintCount: 13
+    constraintCount: 14
     failedConstraintCount: 0
   entities:
     - kind: OU
@@ -253,6 +253,24 @@ semanticModel:
       violationCode: AWS_LZA_INFRASTRUCTURE_OU_REQUIRED
       violationMessage: Hub-spoke topology requires an Infrastructure OU for the
         network account.
+    - key: workload-account-ou-placement-explicit
+      label: Workload account OU placement is explicit when multiple OUs are
+        eligible
+      expression:
+        applies_when:
+          multiple_workload_ous:
+            - Workloads
+        explicit_relationship:
+          source: workload_accounts
+          relationship: belongs_to
+          target: organizational_units
+      status: pass
+      evidence: workload_capable_ous=['Workloads']; explicit_placements={};
+        unmapped_accounts=[]
+      violationCode: AWS_LZA_WORKLOAD_ACCOUNT_OU_AMBIGUOUS
+      violationMessage: "Multiple workload-capable OUs exist, so every workload account
+        must be mapped explicitly with '- AccountName: ou=OUName' under an Accounts
+        or Account Inventory heading."
     - key: workload-account-ous-exist
       label: Workload account OUs exist
       expression:

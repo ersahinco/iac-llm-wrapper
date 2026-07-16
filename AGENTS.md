@@ -165,6 +165,29 @@ continuing minimum-cost validation across local and AWS LZA owner boundaries.
   malformed booleans no longer become `false`, Terraform AZ counts are bounded,
   Kubernetes node-pool bounds are checked, and malformed CloudFormation
   parameter entries block the handoff.
+- **AWS LZA placement trust boundary**: removed the model-only top-level entity
+  side channel. Structured Markdown account inventories are now the placement
+  authority, `Accounts Inventory` headings are recovered deterministically,
+  decision bullets are not misread as entities, and workload accounts must have
+  explicit OU mappings when multiple workload-capable OUs exist.
+- **Deterministic model boundary**: compile and discovery no longer silently
+  select an installed Ollama model. LLM extraction is opt-in and requires an
+  explicit provider plus pinned model; deterministic compile remains the local
+  product baseline.
+- **Lean cleanup**: deleted unused, test-only model-introspection helpers,
+  consolidated duplicate script YAML loaders, removed stale NetworkX claims,
+  and made broken built-in pattern imports fail visibly.
+- **Code craftsmanship repair**: registry and contributor checks now share one
+  pattern-reference validator, graph/extraction/comparison paths share one
+  fail-closed requirement coercion path, and JSON recovery uses one ordered
+  candidate pipeline. CLI, battle scoring, template, discovery, interview, and
+  usability flows now separate validation, orchestration, and rendering without
+  changing their public contracts.
+- **Complexity contract**: Ruff now enforces cyclomatic complexity at 15,
+  branches at 15, and statements at 60. The only localized exception is the
+  linear AWS LZA end-to-end artifact contract test; argument and return counts
+  remain deliberately ungated. Broad exception catches remain only at parser,
+  plugin, evaluation, or external-backend boundaries.
 - **Pattern ownership**: AWS named-entity recovery, validator-to-requirement
   review mapping, LZA validation evidence, artifact review owners, incremental
   reconfirmation policy, and forbidden artifact checks now live on the AWS LZA
@@ -172,13 +195,14 @@ continuing minimum-cost validation across local and AWS LZA owner boundaries.
 - **Validation**: `uv run pytest` passed with 382 tests and one skipped. Ruff,
   Ruff format, mypy, Pyright, fixture drift, golden journey, extraction (8/8),
   usability (8/8), and `prek run --all-files` all passed. Registered AWS LZA and
-  Kubernetes fixtures were regenerated from the audited behavior.
-- **Model comparison**: the implicit local Ollama fallback used
+  Kubernetes fixtures remain synchronized with the audited behavior.
+- **Model comparison**: the historical implicit local Ollama fallback used
   `llama3.2:3b`, took about 79 seconds, and produced a graph delta from the
   deterministic bundle. It inferred `SandboxDev` belongs to the `Sandbox` OU,
   while deterministic recovery assigned it to `Workloads`; the packet does not
-  explicitly map workload accounts to OUs. Both bundles passed validation, so
-  deterministic-versus-model graph diff is a required review signal.
+  explicitly map workload accounts to OUs. That ready verdict is now invalidated:
+  current compilation blocks with `AWS_LZA_WORKLOAD_ACCOUNT_OU_AMBIGUOUS` until
+  the packet supplies explicit mappings.
 - **AWS cost boundary**: validation-only remains the recommended LZA cloud
   ceiling. Current AWS guidance estimates the sample LZA environment at roughly
   $430.22/month even with no activity or workloads, so full personal-account LZA
@@ -193,6 +217,11 @@ continuing minimum-cost validation across local and AWS LZA owner boundaries.
   contract checks, review evidence, and owner-controlled downstream execution.
 - Prefer packet-driven fixes over imagined platform features.
 - Prefer deletion and shared local helpers over new abstractions.
+- Share domain knowledge only when its meaning and change boundary are the same;
+  leave coincidental repetition local when a shared abstraction would add flags
+  or coupling.
+- Treat complexity metrics as enforceable investigation thresholds, not a reason
+  to fragment linear contract assertions or introduce indirection.
 - Require a real packet, contract, review failure, or measured gap before adding
   a feature; do not preserve test-only feature families without product callers.
 - Do not register quality checks that pass when their required tool is absent.
@@ -202,14 +231,17 @@ continuing minimum-cost validation across local and AWS LZA owner boundaries.
   intentional fixture or contract artifact.
 - Treat deterministic compile as the local product baseline and explicit,
   pinned-model compile as a separate extraction-quality experiment.
+- Never accept model-inferred account-to-OU placement as handoff evidence;
+  require explicit structured packet data when more than one OU is eligible.
 - Compare deterministic and model bundles before handoff; an exit-zero result
   alone does not prove interpretation equivalence.
 - Do not use a full personal LZA deployment as a cost-minimal validation path.
 
 ### Next
 
-1. Clarify the intended OU for each workload account in the customer packet, or
-   make the ambiguity fail closed before downstream handoff.
+1. Clarify the intended OU for each workload account in the banking customer
+   packet and record the mappings under an account inventory; compilation now
+   fails closed until that evidence exists.
 2. Re-run official `iac-llm-wrapper lza validate` with owner-approved account
    emails and an AWS/LZA lookup-capable validation context.
 3. If validation still fails, fix only packet-backed repo issues or record

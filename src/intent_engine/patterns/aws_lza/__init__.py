@@ -7,7 +7,7 @@ from typing import Any
 from intent_engine.core.patterns import GLOBAL_REGISTRY, Pattern, PatternGenerator
 
 from .contracts import AWS_LZA_SAMPLE_CONFIG_CONTRACT
-from .entities import apply_llm_entities, extract_markdown_entities, merge_markdown_entities
+from .entities import extract_markdown_entities, merge_markdown_entities
 from .generators import (
     enrich_lza_handoff_readiness,
     gen_lza_accounts_config,
@@ -228,21 +228,20 @@ def _register_pattern() -> None:
                 "Use AWS LZA sample configurations as the downstream deployment contract. "
                 "Extract only decisions needed for LZA configuration and handoff; flag "
                 "explicit custom Terraform requests as unsupported for this pattern. "
-                "When the packet explicitly lists named entities, the JSON may also include "
-                "top-level accounts as [{name, ou, description}] and ous as "
-                "[{name, description}]. These are metadata, not requirement gaps."
+                "Do not infer workload-account OU placement. Account placement is accepted "
+                "only from an explicit structured Markdown account inventory."
             ),
             contracts=[AWS_LZA_SAMPLE_CONFIG_CONTRACT],
             samples=aws_lza_samples(),
             readiness_enricher=enrich_lza_handoff_readiness,
             markdown_entity_extractor=extract_markdown_entities,
             markdown_entity_applier=merge_markdown_entities,
-            llm_entity_applier=apply_llm_entities,
             review_evidence_loader=load_lza_review_evidence,
             violation_requirement_map={
                 "AWS_LZA_SECURITY_OU_REQUIRED": "organizational_units",
                 "AWS_LZA_INFRASTRUCTURE_OU_REQUIRED": "organizational_units",
                 "AWS_LZA_WORKLOADS_OU_REQUIRED": "organizational_units",
+                "AWS_LZA_WORKLOAD_ACCOUNT_OU_AMBIGUOUS": "workload_accounts",
                 "AWS_LZA_LOG_ARCHIVE_ACCOUNT_REQUIRED": "log_archive_account",
                 "AWS_LZA_AUDIT_ACCOUNT_REQUIRED": "audit_account",
                 "AWS_LZA_SECURITY_TOOLING_ACCOUNT_REQUIRED": "security_tooling_account",

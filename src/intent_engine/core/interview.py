@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +31,12 @@ class Question:
     compliance_controls: list[str]
     tradeoffs: list[str]
     signals: list[str]
+
+
+class _InterviewAction(StrEnum):
+    ANSWERED = "answered"
+    BACK = "back"
+    SAVED = "saved"
 
 
 class InterviewEngine:
@@ -126,6 +134,91 @@ class InterviewEngine:
                     self.graph._decisions.pop(target_key, None)
         self.graph._update_blocked()
 
+    def _render_question(
+        self,
+        question: Question,
+        *,
+        asked: int,
+        total: int,
+        output_fn: Callable[[str], None],
+    ) -> None:
+        output_fn(f"─── [{question.category}] {question.label} ({asked}/{total}) ───")
+        if question.blocked_reason:
+            output_fn(f"  BLOCKED: {question.blocked_reason}")
+            return
+        if question.applies_reason:
+            output_fn(f"  Context: {question.applies_reason}")
+        if question.hint:
+            output_fn(f"  Hint: {question.hint}")
+        if question.compliance_controls:
+            output_fn(f"  Compliance: {', '.join(question.compliance_controls)}")
+        if question.signals:
+            output_fn(f"  Signals: {', '.join(question.signals)}")
+        if question.tradeoffs:
+            output_fn("  Tradeoffs:")
+            for tradeoff in question.tradeoffs:
+                output_fn(f"    - {tradeoff}")
+        output_fn(f"  {question.question}")
+
+        if question.options:
+            for option in question.options:
+                marker = "  (default)" if option == question.default else ""
+                output_fn(f"    - {option}{marker}")
+            return
+
+        requirement = self.graph._requirements.get(question.key)
+        type_hints = {"int": " (integer)", "bool": " (yes/no)"}
+        type_hint = type_hints.get(requirement.target_type, "") if requirement else ""
+        default = f" (default: {question.default})" if question.default else ""
+        output_fn(f"  Enter value{type_hint}{default}")
+
+    def _collect_answer(
+        self,
+        question: Question,
+        *,
+        can_go_back: bool,
+        input_fn: Callable[[str], str],
+        output_fn: Callable[[str], None],
+    ) -> _InterviewAction:
+        for attempt in range(3):
+            prompt = (
+                "  Answer (or Enter for default): "
+                if question.default is not None
+                else "  Answer: "
+            )
+            raw = input_fn(prompt).strip()
+            if raw.startswith("\\save"):
+                save_path = raw[5:].strip()
+                if not save_path:
+                    output_fn("  ! Usage: \\save <path>")
+                    continue
+                self.save_state(save_path)
+                output_fn(f"  ✓ Interview state saved to: {save_path}")
+                output_fn("  Exiting interview. Resume with --resume.")
+                return _InterviewAction.SAVED
+            if raw == "\\back":
+                if can_go_back:
+                    return _InterviewAction.BACK
+                output_fn("  ! Cannot go back — this is the first question.")
+                continue
+            if not raw and question.default is not None:
+                self.accept_default(question.key)
+                return _InterviewAction.ANSWERED
+            if not raw:
+                self.skip(question.key)
+                return _InterviewAction.ANSWERED
+
+            error = self._validate_answer(question, raw)
+            if error is None:
+                self.answer(question.key, raw)
+                return _InterviewAction.ANSWERED
+            if attempt < 2:
+                output_fn(f"  ! {error}  Try again.")
+            else:
+                output_fn(f"  ! {error}  Skipping.")
+                self.skip(question.key)
+        return _InterviewAction.ANSWERED
+
     def run_interactive(self, input_fn=None, output_fn=None) -> None:
         input_fn = input_fn or input
         output_fn = output_fn or print
@@ -146,86 +239,25 @@ class InterviewEngine:
             total = asked + len(self.graph.pending())
             asked_sequence.append(q.key)
 
-            output_fn(f"─── [{q.category}] {q.label} ({asked}/{total}) ───")
+            self._render_question(q, asked=asked, total=total, output_fn=output_fn)
             if q.blocked_reason:
-                output_fn(f"  BLOCKED: {q.blocked_reason}")
                 self.skip(q.key, q.blocked_reason)
                 continue
-            if q.applies_reason:
-                output_fn(f"  Context: {q.applies_reason}")
-            if q.hint:
-                output_fn(f"  Hint: {q.hint}")
-            if q.compliance_controls:
-                output_fn(f"  Compliance: {', '.join(q.compliance_controls)}")
-            if q.signals:
-                output_fn(f"  Signals: {', '.join(q.signals)}")
-            if q.tradeoffs:
-                output_fn("  Tradeoffs:")
-                for t in q.tradeoffs:
-                    output_fn(f"    - {t}")
-            output_fn(f"  {q.question}")
-
-            if q.options:
-                for opt in q.options:
-                    marker = "  (default)" if opt == q.default else ""
-                    output_fn(f"    - {opt}{marker}")
-            else:
-                type_hint = ""
-                req = self.graph._requirements.get(q.key)
-                if req:
-                    type_hints = {"int": " (integer)", "bool": " (yes/no)"}
-                    type_hint = type_hints.get(req.target_type, "")
-                def_str = f" (default: {q.default})" if q.default else ""
-                output_fn(f"  Enter value{type_hint}{def_str}")
-
-            max_attempts = 3
-            for attempt in range(max_attempts):
-                prompt = (
-                    "  Answer (or Enter for default): " if q.default is not None else "  Answer: "
-                )
-                raw = input_fn(prompt).strip()
-
-                # Commands must be checked before stripping whitespace
-                if raw.startswith("\\save"):
-                    save_path = raw[5:].strip()
-                    if save_path:
-                        self.save_state(save_path)
-                        output_fn(f"  ✓ Interview state saved to: {save_path}")
-                        output_fn("  Exiting interview. Resume with --resume.")
-                        return
-                    else:
-                        output_fn("  ! Usage: \\save <path>")
-                        continue
-
-                if raw == "\\back":
-                    if len(asked_sequence) > 1:
-                        prev_key = asked_sequence[-2]
-                        asked_sequence = asked_sequence[:-2]
-                        asked -= 2
-                        self._undo_last_decision(prev_key)
-                        output_fn("  ↺ Back to previous question.")
-                        output_fn("")
-                        break
-                    else:
-                        output_fn("  ! Cannot go back — this is the first question.")
-                        continue
-
-                if not raw and q.default is not None:
-                    self.accept_default(q.key)
-                    break
-                if not raw:
-                    self.skip(q.key)
-                    break
-
-                err = self._validate_answer(q, raw)
-                if err is None:
-                    self.answer(q.key, raw)
-                    break
-                if attempt < max_attempts - 1:
-                    output_fn(f"  ! {err}  Try again.")
-                else:
-                    output_fn(f"  ! {err}  Skipping.")
-                    self.skip(q.key)
+            action = self._collect_answer(
+                q,
+                can_go_back=len(asked_sequence) > 1,
+                input_fn=input_fn,
+                output_fn=output_fn,
+            )
+            if action == _InterviewAction.SAVED:
+                return
+            if action == _InterviewAction.BACK:
+                previous_key = asked_sequence[-2]
+                asked_sequence = asked_sequence[:-2]
+                asked -= 2
+                self._undo_last_decision(previous_key)
+                output_fn("  ↺ Back to previous question.")
+                output_fn("")
 
             output_fn("")
 

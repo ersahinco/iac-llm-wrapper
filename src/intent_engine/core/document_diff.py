@@ -158,7 +158,7 @@ def _report_value(graph, key: str, value: Any) -> Any:
         return SampleConfig.to_builtin(
             graph._convert_value(value, req.target_type, req.target_field)
         )
-    except Exception:
+    except (AttributeError, ImportError, TypeError, ValueError):
         return SampleConfig.to_builtin(value)
 
 

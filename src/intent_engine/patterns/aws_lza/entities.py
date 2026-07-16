@@ -10,6 +10,8 @@ from .models import AwsLzaIntent, LzaAccount, LzaOrganizationalUnit
 _SECTION_HEADINGS = {
     "organizational units": "ous",
     "accounts": "accounts",
+    "account inventory": "accounts",
+    "accounts inventory": "accounts",
 }
 
 
@@ -55,8 +57,11 @@ def _parse_accounts(section: str) -> list[dict[str, str]]:
         match = re.match(r"[-*]\s+(.+?)\s*:\s*(.+)", line.strip())
         if not match:
             continue
-        item = {"name": match.group(1).strip()}
-        item.update(_parse_key_values(match.group(2)))
+        values = _parse_key_values(match.group(2))
+        if not values or not set(values).issubset({"ou", "description", "account_type"}):
+            continue
+        item = {"name": match.group(1).strip().strip("`")}
+        item.update(values)
         items.append(item)
     return items
 
@@ -68,25 +73,9 @@ def extract_markdown_entities(text: str) -> dict[str, list[dict[str, Any]]]:
         section = _find_section(text, heading)
         if not section:
             continue
-        if entity_type == "ous":
-            result[entity_type] = _parse_ous(section)
-        else:
-            result[entity_type] = _parse_accounts(section)
+        items = _parse_ous(section) if entity_type == "ous" else _parse_accounts(section)
+        result[entity_type].extend(items)
     return result
-
-
-def apply_llm_entities(data: dict[str, Any], intent: AwsLzaIntent) -> None:
-    """Apply AWS LZA entities from a structured model response."""
-    intent.accounts.extend(
-        LzaAccount.model_validate(item)
-        for item in data.get("accounts", [])
-        if isinstance(item, dict)
-    )
-    intent.ous.extend(
-        LzaOrganizationalUnit.model_validate(item)
-        for item in data.get("ous", [])
-        if isinstance(item, dict)
-    )
 
 
 def _merge_named_entities(items: list[Any], values: list[Any], model: type[Any]) -> None:
@@ -107,16 +96,12 @@ def _merge_named_entities(items: list[Any], values: list[Any], model: type[Any])
             field_name: getattr(candidate, field_name)
             for field_name in candidate.model_fields_set
             if field_name != "name"
-            and (
-                field_name not in existing.model_fields_set
-                or getattr(existing, field_name) in (None, "", [], {})
-            )
         }
         if updates:
             items[existing_index] = existing.model_copy(update=updates)
 
 
 def merge_markdown_entities(data: dict[str, Any], intent: AwsLzaIntent) -> None:
-    """Backfill deterministic AWS entities without overriding explicit LLM fields."""
+    """Apply structured Markdown entities as the placement authority."""
     _merge_named_entities(intent.ous, data.get("ous", []), LzaOrganizationalUnit)
     _merge_named_entities(intent.accounts, data.get("accounts", []), LzaAccount)

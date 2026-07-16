@@ -9,6 +9,9 @@ running locally is sufficient for many structured design docs; use a 7B model
 when customer-style notes are the quality bar and your workstation can handle
 the latency.
 
+Compilation is deterministic by default. LLM use is opt-in and requires both an
+explicit provider and model so results stay attributable and repeatable.
+
 **Important**: LLM testing is a local developer responsibility. CI does not run LLM tests (no API keys in GitHub Actions, no Ollama in CI). Every developer validates extraction quality with their own local models before submitting PRs.
 
 ## Quick Start with Ollama
@@ -240,7 +243,7 @@ full architect intent.
 - Check the LLM evidence output: `--evidence-output evidence.yaml`
 - Check `model-benchmark.yaml` for latency, parse errors, and decision/gap counts
 
-### Ollama Not Detected
+### Ollama Is Unavailable
 - Verify Ollama is running: `curl http://localhost:11434/api/tags`
 - Check the model is pulled: `ollama list`
 - Try specifying base URL: `--base-url http://localhost:11434/v1`

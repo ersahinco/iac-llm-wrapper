@@ -1,12 +1,8 @@
-"""Model introspection utilities.
-
-The Pydantic data model is the single source of truth. This module provides
-tools to inspect models, resolve dotted field paths, derive target_type from
-annotations, and coerce values generically.
-"""
+"""Resolve Pydantic fields and coerce graph decisions to model values."""
 
 from __future__ import annotations
 
+import importlib
 from enum import StrEnum
 from typing import Any, get_args, get_origin
 
@@ -60,123 +56,126 @@ def resolve_field_info(
     return field_info, annotation
 
 
-def derive_target_type(annotation: Any) -> str:
-    """Derive a target_type string from a Python type annotation.
-
-    Returns one of: 'string', 'int', 'bool', 'float', 'cidr_list',
-    or the class name for enums / StrEnum.
-    """
+def _unwrap_optional(annotation: Any) -> tuple[Any, Any]:
     origin = get_origin(annotation)
     if origin is not None:
         args = get_args(annotation)
         if type(None) in args:
             annotation = next(a for a in args if a is not type(None))
             origin = get_origin(annotation)
+    return annotation, origin
 
-    if origin is list:
-        args = get_args(annotation)
-        if args and args[0] is str:
-            return "cidr_list"
-        return "list"
 
-    if annotation is str:
-        return "string"
-    if annotation is int:
-        return "int"
-    if annotation is bool:
-        return "bool"
-    if annotation is float:
-        return "float"
+def _coerce_int(raw: Any) -> int | None:
+    if isinstance(raw, bool):
+        return None
+    if isinstance(raw, int):
+        return raw
+    if isinstance(raw, float):
+        return int(raw) if raw.is_integer() else None
+    try:
+        return int(raw)
+    except (ValueError, TypeError, OverflowError):
+        try:
+            number = float(raw)
+        except (ValueError, TypeError, OverflowError):
+            return None
+        return int(number) if number.is_integer() else None
 
-    if isinstance(annotation, type) and issubclass(annotation, StrEnum):
-        return annotation.__name__
-    if isinstance(annotation, type) and issubclass(annotation, str):
-        return "string"
-    if isinstance(annotation, type) and issubclass(annotation, int):
-        return "int"
-    if isinstance(annotation, type) and issubclass(annotation, bool):
-        return "bool"
 
-    return "string"
+def _coerce_float(raw: Any) -> float | None:
+    try:
+        return float(raw)
+    except (ValueError, TypeError):
+        return None
+
+
+def _coerce_bool(raw: Any) -> bool | None:
+    if isinstance(raw, bool):
+        return raw
+    normalized = str(raw).strip().lower()
+    if normalized in ("true", "yes", "1"):
+        return True
+    if normalized in ("false", "no", "0"):
+        return False
+    return None
+
+
+def _coerce_string_list(raw: Any) -> list[str] | None:
+    if isinstance(raw, list):
+        return [str(item) for item in raw]
+    if isinstance(raw, str):
+        return [part.strip() for part in raw.split(",") if part.strip()]
+    return None
 
 
 def coerce_value(raw: Any, annotation: Any) -> Any:
-    """Coerce a raw value to match a Python type annotation.
-
-    Handles str, int, bool, float, list[str], and StrEnum subclasses.
-    Returns None if coercion fails.
-    """
+    """Coerce a raw value to an annotation, returning None on invalid input."""
     if raw is None:
         return None
 
-    origin = get_origin(annotation)
-    if origin is not None:
-        args = get_args(annotation)
-        if type(None) in args:
-            annotation = next(a for a in args if a is not type(None))
-            origin = get_origin(annotation)
+    annotation, origin = _unwrap_optional(annotation)
 
     if annotation is str:
         return str(raw)
     if annotation is int:
-        try:
-            return int(float(raw))
-        except (ValueError, TypeError):
-            return None
+        return _coerce_int(raw)
     if annotation is bool:
-        if isinstance(raw, bool):
-            return raw
-        normalized = str(raw).strip().lower()
-        if normalized in ("true", "yes", "1"):
-            return True
-        if normalized in ("false", "no", "0"):
-            return False
-        return None
+        return _coerce_bool(raw)
     if annotation is float:
-        try:
-            return float(raw)
-        except (ValueError, TypeError):
-            return None
+        return _coerce_float(raw)
 
-    # list[str] / cidr_list
     if origin is list:
         args = get_args(annotation)
         if args and args[0] is str:
-            if isinstance(raw, list):
-                return [str(x) for x in raw]
-            if isinstance(raw, str):
-                return [c.strip() for c in raw.split(",") if c.strip()]
-            return None
+            return _coerce_string_list(raw)
         return None
 
-    # StrEnum
     if isinstance(annotation, type) and issubclass(annotation, StrEnum):
         try:
             return annotation(raw)
-        except ValueError:
+        except (TypeError, ValueError):
             return None
 
-    # Fallback
     return str(raw)
 
 
-def field_exists(model: type[BaseModel], dotted_path: str) -> bool:
-    """Check whether a dotted path exists on a model."""
-    try:
-        resolve_field_info(model, dotted_path)
-        return True
-    except (AttributeError, TypeError):
-        return False
+def coerce_requirement_value(
+    raw: Any,
+    *,
+    model: type[BaseModel] | None,
+    target_field: str | None,
+    target_type: str,
+) -> Any:
+    """Coerce one graph requirement through its model annotation or metadata."""
+    if model is not None and target_field is not None:
+        try:
+            _, annotation = resolve_field_info(model, target_field)
+        except (AttributeError, TypeError):
+            pass
+        else:
+            return coerce_value(raw, annotation)
 
+    fallback_annotations = {
+        "string": str,
+        "int": int,
+        "bool": bool,
+        "float": float,
+        "cidr_list": list[str],
+        "string_list": list[str],
+    }
+    annotation = fallback_annotations.get(target_type)
+    if annotation is not None:
+        return coerce_value(raw, annotation)
 
-def list_annotation_item_model(annotation: Any) -> type[BaseModel] | None:
-    """If annotation is list[SomeModel], return SomeModel."""
-    origin = get_origin(annotation)
-    if origin is list:
-        args = get_args(annotation)
-        if args and isinstance(args[0], type) and issubclass(args[0], BaseModel):
-            return args[0]
-    return None
+    if model is not None:
+        enum_type = getattr(model, target_type, None)
+        if enum_type is None:
+            module = importlib.import_module(model.__module__)
+            enum_type = getattr(module, target_type, None)
+        if isinstance(enum_type, type):
+            return coerce_value(raw, enum_type)
+    return str(raw)
 
 
 def validate_requirement_against_model(
@@ -191,11 +190,7 @@ def validate_requirement_against_model(
     if not req.target_field:
         return errors
     try:
-        _, annotation = resolve_field_info(model, req.target_field)
-        derived = derive_target_type(annotation)
-        if req.target_type and req.target_type != derived:
-            # Allow explicit overrides, but warn
-            pass
+        resolve_field_info(model, req.target_field)
     except (AttributeError, TypeError) as e:
         errors.append(f"Requirement '{req.key}': target_field '{req.target_field}' invalid: {e}")
     return errors

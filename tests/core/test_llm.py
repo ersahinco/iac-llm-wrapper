@@ -18,8 +18,8 @@ from intent_engine.core.llm_caller import (
     LLMEvidence,
     LLMEvidenceStore,
     OpenAICompatibleBackend,
-    auto_detect_llm,
     create_backend,
+    create_llm_caller,
 )
 from intent_engine.core.observability import build_model_benchmark
 from intent_engine.core.patterns import GLOBAL_REGISTRY
@@ -286,12 +286,20 @@ class TestCreateBackend:
             with pytest.raises(RuntimeError, match="model access denied"):
                 backend.complete("extract this")
 
-    def test_auto_detect_bedrock_does_not_require_openai_key(self):
+    def test_bedrock_caller_does_not_require_openai_key(self):
         with patch.dict("os.environ", {}, clear=True):
-            caller = auto_detect_llm(provider="bedrock", model="eu.amazon.nova-2-lite-v1:0")
+            caller = create_llm_caller(provider="bedrock", model="eu.amazon.nova-2-lite-v1:0")
 
         assert isinstance(caller, LLMCaller)
         assert isinstance(caller.backend, BedrockCliBackend)
+
+    def test_llm_caller_is_disabled_without_explicit_provider(self):
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "set-but-not-opted-in"}, clear=True):
+            assert create_llm_caller(model="gpt-4o-mini") is None
+
+    def test_llm_caller_requires_pinned_model(self):
+        with pytest.raises(ValueError, match="explicit model"):
+            create_llm_caller(provider="ollama")
 
     def test_unknown_provider_raises(self):
         with pytest.raises(ValueError, match="Unknown provider"):
@@ -573,6 +581,30 @@ class TestMalformedLLMResponse:
         intent = result.to_intent(extractor)
         assert intent.home_region == "ap-southeast-1"
 
+    def test_missing_comma_recovery(self):
+        extractor = Extractor(pattern="aws-lza")
+        response = '{"decisions": {"home_region": "eu-west-1"} "gaps": [], "contradictions": []}'
+
+        result = extractor.parse_response(response)
+
+        assert result.decisions["home_region"] == "eu-west-1"
+
+    def test_trailing_comma_recovery(self):
+        extractor = Extractor(pattern="aws-lza")
+        response = '{"decisions": {"home_region": "eu-west-1"},}'
+
+        result = extractor.parse_response(response)
+
+        assert result.decisions["home_region"] == "eu-west-1"
+
+    def test_extra_closing_brace_recovery(self):
+        extractor = Extractor(pattern="aws-lza")
+        response = '{"decisions": {"home_region": "eu-west-1"}}}'
+
+        result = extractor.parse_response(response)
+
+        assert result.decisions["home_region"] == "eu-west-1"
+
     def test_invalid_json_returns_model_defaults(self):
         extractor = Extractor(pattern="aws-lza")
         result = extractor.parse_response("not json").to_intent(extractor)
@@ -584,6 +616,14 @@ class TestMalformedLLMResponse:
         result = extractor.parse_response(response)
         intent = result.to_intent(extractor)
         assert intent.topology.value == "hub-spoke"
+
+    def test_fractional_integer_is_skipped(self):
+        extractor = Extractor(pattern="terraform-vpc")
+        response = '{"decisions": {"az_count": "1.5"}}'
+
+        intent = extractor.parse_response(response).to_intent(extractor)
+
+        assert intent.az_count == 2
 
     def test_bool_and_list_coercion(self):
         extractor = Extractor(pattern="aws-lza")

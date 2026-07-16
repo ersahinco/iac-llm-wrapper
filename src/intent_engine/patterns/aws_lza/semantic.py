@@ -168,6 +168,17 @@ def _constraints(
     workload_ous = {
         account_ous.get(account_name, _WORKLOADS_OU) for account_name in intent.workload_accounts
     }
+    workload_capable_ous = ou_names - {_ROOT_OU, _SECURITY_OU, _INFRASTRUCTURE_OU}
+    explicit_workload_ous = {
+        account.name: account.ou
+        for account in intent.accounts
+        if account.name in intent.workload_accounts and account.ou.strip()
+    }
+    ambiguous_workload_accounts = sorted(
+        set(intent.workload_accounts) - set(explicit_workload_ous)
+        if len(workload_capable_ous) > 1
+        else set()
+    )
     constraints = [
         _constraint(
             key="security-ou-present",
@@ -189,6 +200,32 @@ def _constraints(
             evidence=f"topology={intent.topology}; organizational_units={sorted(ou_names)}",
             code="AWS_LZA_INFRASTRUCTURE_OU_REQUIRED",
             message="Hub-spoke topology requires an Infrastructure OU for the network account.",
+        ),
+        _constraint(
+            key="workload-account-ou-placement-explicit",
+            label="Workload account OU placement is explicit when multiple OUs are eligible",
+            expression={
+                "applies_when": {
+                    "multiple_workload_ous": sorted(workload_capable_ous),
+                },
+                "explicit_relationship": {
+                    "source": "workload_accounts",
+                    "relationship": "belongs_to",
+                    "target": "organizational_units",
+                },
+            },
+            passed=not ambiguous_workload_accounts,
+            evidence=(
+                f"workload_capable_ous={sorted(workload_capable_ous)}; "
+                f"explicit_placements={explicit_workload_ous}; "
+                f"unmapped_accounts={ambiguous_workload_accounts}"
+            ),
+            code="AWS_LZA_WORKLOAD_ACCOUNT_OU_AMBIGUOUS",
+            message=(
+                "Multiple workload-capable OUs exist, so every workload account must be "
+                "mapped explicitly with '- AccountName: ou=OUName' under an Accounts or "
+                "Account Inventory heading."
+            ),
         ),
         _constraint(
             key="workload-account-ous-exist",

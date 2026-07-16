@@ -11,15 +11,14 @@ contextInventory:
     intentModel: intent_engine.patterns.aws_lza.models.AwsLzaIntent
   promptContext:
     present: true
-    sha256: 4612639c2536efb345f4afe8ed88617772f2a34b4e83a0a4f67ee68dece8bb67
-    wordCount: 67
+    sha256: 92cbc446f19830d2d6f0c3f55657569b2b03178dc5a58f1b992141a7ca77e25d
+    wordCount: 56
     text: This pattern gathers decisions for AWS Landing Zone Accelerator. Use
       AWS LZA sample configurations as the downstream deployment contract.
       Extract only decisions needed for LZA configuration and handoff; flag
-      explicit custom Terraform requests as unsupported for this pattern. When
-      the packet explicitly lists named entities, the JSON may also include
-      top-level accounts as [{name, ou, description}] and ous as [{name,
-      description}]. These are metadata, not requirement gaps.
+      explicit custom Terraform requests as unsupported for this pattern. Do not
+      infer workload-account OU placement. Account placement is accepted only
+      from an explicit structured Markdown account inventory.
   requirementGraph:
     nodeCount: 27
     edgeCount: 5

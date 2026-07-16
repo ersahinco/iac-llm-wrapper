@@ -8,15 +8,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import ruamel.yaml
+from intent_engine.core.yaml_utils import load_yaml_mapping
 
 
 def _yaml_load(path: Path) -> dict[str, Any]:
-    yaml = ruamel.yaml.YAML(typ="safe")
-    data = yaml.load(path.read_text())
-    if not isinstance(data, dict):
-        raise ValueError(f"{path}: expected mapping")
-    return data
+    return load_yaml_mapping(path)
 
 
 def _nested(data: dict[str, Any], section: str, key: str, default: Any = "") -> Any:

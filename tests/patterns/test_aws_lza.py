@@ -126,7 +126,26 @@ class TestAwsLzaPattern:
 
         assert "AWS_LZA_WORKLOADS_OU_REQUIRED" not in failed_codes
 
-    def test_compile_from_interview_creates_handoff_artifacts(self, tmp_path: Path):
+    def test_multiple_workload_ous_require_explicit_account_placement(self):
+        intent = AwsLzaIntent(
+            organizational_units=["Security", "Infrastructure", "Workloads", "Sandbox"],
+            workload_accounts=["AppProd", "SandboxDev"],
+            network_account="Network",
+            identity_center_permission_sets=["ReadOnlyAccess"],
+            identity_center_assignments=["Admins:ReadOnlyAccess:Management"],
+        )
+
+        failed_codes = {
+            item.violation_code
+            for item in build_aws_lza_semantic_model(intent).failed_constraints()
+        }
+
+        assert "AWS_LZA_WORKLOAD_ACCOUNT_OU_AMBIGUOUS" in failed_codes
+
+    def test_compile_from_interview_creates_handoff_artifacts(  # noqa: PLR0915
+        self, tmp_path: Path
+    ):
+        # One linear contract matrix is easier to audit than fragmented assertion helpers.
         decisions = {
             "baseline": "standard",
             "org_mode": "control-tower",

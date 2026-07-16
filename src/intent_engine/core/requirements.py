@@ -35,6 +35,30 @@ def expression_dependencies(expression: RequirementExpression | None) -> list[st
     return list(dict.fromkeys(deps))
 
 
+def _validate_expression_group(value: Any, *, operator: str, path: str) -> list[str]:
+    if not isinstance(value, list) or not value:
+        return [f"{path}.{operator}: must be a non-empty list"]
+    errors: list[str] = []
+    for index, item in enumerate(value):
+        item_path = f"{path}.{operator}[{index}]"
+        if not isinstance(item, dict):
+            errors.append(f"{item_path}: item must be an expression mapping")
+            continue
+        errors.extend(validate_expression(item, path=item_path))
+    return errors
+
+
+def _validate_expression_predicate(value: Any, *, operator: str, path: str) -> list[str]:
+    if not isinstance(value, dict):
+        return [f"{path}.{operator}: must be a predicate mapping"]
+    errors: list[str] = []
+    if not isinstance(value.get("decision"), str) or not value.get("decision"):
+        errors.append(f"{path}.{operator}: decision is required")
+    if operator != "present" and "value" not in value:
+        errors.append(f"{path}.{operator}: value is required")
+    return errors
+
+
 def validate_expression(
     expression: RequirementExpression | None,
     *,
@@ -57,32 +81,13 @@ def validate_expression(
     operator = operators[0]
     value = expression[operator]
     if operator in {"all", "any"}:
-        if not isinstance(value, list) or not value:
-            return errors + [f"{path}.{operator}: must be a non-empty list"]
-        for index, item in enumerate(value):
-            if not isinstance(item, dict):
-                errors.append(f"{path}.{operator}[{index}]: item must be an expression mapping")
-                continue
-            errors.extend(validate_expression(item, path=f"{path}.{operator}[{index}]"))
-        return errors
+        return errors + _validate_expression_group(value, operator=operator, path=path)
     if operator == "not":
         if not isinstance(value, dict):
             return errors + [f"{path}.not: must be an expression mapping"]
         return errors + validate_expression(value, path=f"{path}.not")
-    if operator in {"equals", "contains"}:
-        if not isinstance(value, dict):
-            return errors + [f"{path}.{operator}: must be a predicate mapping"]
-        if not isinstance(value.get("decision"), str) or not value.get("decision"):
-            errors.append(f"{path}.{operator}: decision is required")
-        if "value" not in value:
-            errors.append(f"{path}.{operator}: value is required")
-        return errors
-    if operator == "present":
-        if not isinstance(value, dict):
-            return errors + [f"{path}.present: must be a predicate mapping"]
-        if not isinstance(value.get("decision"), str) or not value.get("decision"):
-            errors.append(f"{path}.present: decision is required")
-        return errors
+    if operator in {"equals", "contains", "present"}:
+        return errors + _validate_expression_predicate(value, operator=operator, path=path)
     return errors
 
 
@@ -535,38 +540,15 @@ class RequirementGraph:
         }
 
     def _convert_value(self, value: str, target_type: str, target_field: str | None = None) -> Any:
-        """Convert a string decision value to the target type.
+        """Convert a graph decision through the shared fail-closed coercion path."""
+        from .model_introspection import coerce_requirement_value
 
-        Uses the intent model's annotation when available for generic coercion.
-        """
-        # Try model-driven coercion first
-        if self._intent_model is not None and target_field is not None:
-            try:
-                from .model_introspection import coerce_value, resolve_field_info
-
-                _, annotation = resolve_field_info(self._intent_model, target_field)
-                return coerce_value(value, annotation)
-            except Exception:
-                pass
-
-        # Fallback for string-based target_type metadata.
-        if target_type == "string":
-            return value
-        if target_type == "int":
-            return int(value)
-        if target_type == "bool":
-            return value.lower() in ("true", "yes", "1")
-        if target_type in ("cidr_list", "string_list"):
-            return [c.strip() for c in value.split(",") if c.strip()]
-        # Enum types — resolve from intent model module if available
-        if self._intent_model is not None:
-            import importlib
-
-            mod = importlib.import_module(self._intent_model.__module__)
-            enum_cls = getattr(mod, target_type, None)
-            if enum_cls is not None:
-                return enum_cls(value)
-        return value
+        return coerce_requirement_value(
+            value,
+            model=self._intent_model,
+            target_field=target_field,
+            target_type=target_type,
+        )
 
     @staticmethod
     def _set_nested(obj: Any, dotted_path: str, value: Any) -> None:

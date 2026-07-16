@@ -9,11 +9,11 @@ import re
 from pathlib import Path
 from typing import Any, get_args, get_origin
 
-import ruamel.yaml
 from pydantic import BaseModel
 
 from intent_engine.core.graph_export import graph_to_json, graph_to_mermaid
 from intent_engine.core.patterns import GLOBAL_REGISTRY
+from intent_engine.core.yaml_utils import read_yaml_mapping
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = REPO_ROOT / "src" / "intent_engine"
@@ -371,9 +371,7 @@ def _write_index(
 
 
 def _yaml_load(path: Path) -> dict[str, Any]:
-    yaml = ruamel.yaml.YAML(typ="safe")
-    data = yaml.load(path.read_text())
-    return data if isinstance(data, dict) else {}
+    return read_yaml_mapping(path)
 
 
 def _markdown_table(title: str, headers: list[str], rows: list[list[str]]) -> str:

@@ -289,6 +289,24 @@ def test_llm_missing_raw_evidence_fails(tmp_path: Path):
     } in summary["findings"]
 
 
+def test_missing_model_benchmark_is_reported_once(tmp_path: Path):
+    repo_root = tmp_path / "repo"
+    output_dir = repo_root / "out"
+    _write_ready_bundle(output_dir, artifacts=("accounts-config.yaml",))
+    (output_dir / "model-benchmark.yaml").unlink()
+
+    summary = _summary(tmp_path, case=_case(repo_root), output_dir=output_dir)
+
+    matching = [
+        finding
+        for finding in summary["findings"]
+        if finding["message"] == "model-benchmark.yaml missing."
+    ]
+    assert matching == [
+        {"type": "fail", "area": "model", "message": "model-benchmark.yaml missing."}
+    ]
+
+
 def test_aws_lza_deployable_scaffold_fails(tmp_path: Path):
     repo_root = tmp_path / "repo"
     output_dir = repo_root / "out"

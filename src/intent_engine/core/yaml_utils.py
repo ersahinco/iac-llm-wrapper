@@ -24,9 +24,20 @@ def write_yaml_artifact(path: Path, data: Any, header: str, *, indent: bool = Tr
     path.write_text(header + dump_yaml(data, indent=indent))
 
 
-def read_yaml_mapping(path: Path) -> dict[str, Any]:
-    if not path.exists():
-        return {}
+def load_yaml_mapping(path: Path) -> dict[str, Any]:
+    """Load a required YAML mapping and reject other document shapes."""
     yaml = ruamel.yaml.YAML(typ="safe")
     data = yaml.load(path.read_text())
-    return data if isinstance(data, dict) else {}
+    if not isinstance(data, dict):
+        raise ValueError(f"{path}: expected YAML mapping")
+    return data
+
+
+def read_yaml_mapping(path: Path) -> dict[str, Any]:
+    """Load an optional YAML mapping, returning empty for missing/non-mapping files."""
+    if not path.exists():
+        return {}
+    try:
+        return load_yaml_mapping(path)
+    except ValueError:
+        return {}

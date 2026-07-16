@@ -2,7 +2,7 @@
 """Evaluate generated artifacts against expected extraction outcomes.
 
 Default mode disables LLM use so the deterministic path is fast and repeatable.
-Pass --llm to let normal provider/model auto-detection run.
+Pass --llm with an explicit provider and model for a pinned extraction experiment.
 """
 
 from __future__ import annotations
@@ -17,11 +17,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import ruamel.yaml
-
 from intent_engine.core.contracts import ContractValidator
 from intent_engine.core.patterns import GLOBAL_REGISTRY
-from intent_engine.core.yaml_utils import write_yaml_artifact
+from intent_engine.core.yaml_utils import load_yaml_mapping, write_yaml_artifact
 from intent_engine.patterns import load_builtin_patterns
 
 load_builtin_patterns()
@@ -49,11 +47,7 @@ class EvalResult:
 
 
 def _yaml_load(path: Path) -> dict[str, Any]:
-    yaml = ruamel.yaml.YAML(typ="safe")
-    data = yaml.load(path.read_text())
-    if not isinstance(data, dict):
-        raise ValueError(f"{path}: expected mapping")
-    return data
+    return load_yaml_mapping(path)
 
 
 def _load_cases(fixtures_dir: Path, only: str | None) -> list[EvalCase]:
@@ -497,6 +491,8 @@ def main() -> int:
         help="Write machine-readable eval-results.yaml artifact.",
     )
     args = parser.parse_args()
+    if args.llm and (not args.provider or not args.model):
+        parser.error("--llm requires both --provider and --model")
 
     cases = _load_cases(args.fixtures_dir, args.fixture)
     keep_output = args.keep_output.resolve() if args.keep_output else None

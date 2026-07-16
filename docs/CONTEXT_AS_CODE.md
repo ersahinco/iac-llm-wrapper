@@ -69,5 +69,16 @@ That model represents entities such as `Account`, `OU`, `PermissionSet`,
 `Assignment`, `Control`, and `Artifact`, then evaluates predicate constraints
 such as `references_known`, `contains`, and `cidr_valid`. This is the current
 middle path: richer than flat strings and simple keyword routing, but still just
-Pydantic, dataclasses, NetworkX, and YAML artifacts rather than RDF/OWL or a
-Datalog engine.
+Pydantic, dataclasses, and YAML artifacts rather than RDF/OWL, a graph database,
+or a Datalog engine.
+
+Workload account placement is a deterministic trust boundary. When more than
+one workload-capable OU exists, an AWS LZA packet must include explicit entries
+under `## Accounts` or `## Account Inventory`:
+
+```markdown
+- AppProd: ou=Workloads, description=Production application account
+- SandboxDev: ou=Sandbox, description=Developer sandbox account
+```
+
+Model-inferred OU relationships do not satisfy that constraint.
