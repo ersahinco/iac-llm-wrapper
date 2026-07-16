@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .generator import generate_all
+from .paths import BundleFileError, resolve_bundle_file
 from .patterns import GLOBAL_REGISTRY
 from .validator import Violation
 from .yaml_utils import write_yaml_artifact
@@ -33,11 +34,19 @@ def validate_generated_violations(input_dir: Path, pattern: str = "aws-lza") -> 
 
     pattern_obj = GLOBAL_REGISTRY.get(pattern)
     for fname in pattern_obj.expected_artifacts():
-        if not (input_dir / fname).exists():
+        try:
+            resolve_bundle_file(input_dir, fname)
+        except BundleFileError as exc:
+            code = (
+                "REQUIRED_ARTIFACT_MISSING"
+                if exc.reason == "missing"
+                else "REQUIRED_ARTIFACT_INVALID"
+            )
+            message = f"Missing required file: {fname}" if exc.reason == "missing" else str(exc)
             violations.append(
                 Violation(
-                    code="REQUIRED_ARTIFACT_MISSING",
-                    message=f"Missing required file: {fname}",
+                    code=code,
+                    message=message,
                 )
             )
 

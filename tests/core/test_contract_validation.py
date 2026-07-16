@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import pytest
 import ruamel.yaml
 from pydantic import BaseModel
 
@@ -331,6 +332,14 @@ def test_missing_readiness_metadata_fails_closed(tmp_path: Path):
             "message": "Bundle is missing handoff readiness metadata.",
         }
     ]
+
+
+def test_malformed_optional_handoff_metadata_is_not_treated_as_absent(tmp_path: Path):
+    _write_yaml(tmp_path / "decision-report.yaml", {"pattern": "contract-validation-example"})
+    (tmp_path / "handoff-plan.yaml").write_text("readiness: [unterminated\n")
+
+    with pytest.raises(ValueError, match="handoff-plan.yaml: invalid YAML"):
+        build_contract_validation(tmp_path)
 
 
 def test_incomplete_readiness_metadata_fails_closed(tmp_path: Path):

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import subprocess
 import time
@@ -10,6 +11,91 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 import requests
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+_RETRYABLE_HTTP_STATUSES = {429, 500, 502, 503, 504}
+_TOKEN_KEYS = {
+    "prompt_tokens": "prompt_tokens",
+    "completion_tokens": "completion_tokens",
+    "total_tokens": "total_tokens",
+}
+_BEDROCK_TOKEN_KEYS = {
+    "inputTokens": "prompt_tokens",
+    "outputTokens": "completion_tokens",
+    "totalTokens": "total_tokens",
+}
+
+
+class _ProviderModel(BaseModel):
+    model_config = ConfigDict(extra="ignore", strict=True)
+
+
+class _OpenAIMessage(_ProviderModel):
+    content: str
+
+    @field_validator("content")
+    @classmethod
+    def _usable_content(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("content must contain text")
+        return value
+
+
+class _OpenAIChoice(_ProviderModel):
+    message: _OpenAIMessage
+
+
+class _OpenAIResponse(_ProviderModel):
+    choices: list[_OpenAIChoice] = Field(min_length=1)
+    usage: Any = None
+
+
+class _BedrockContentBlock(_ProviderModel):
+    text: str | None = None
+
+
+class _BedrockMessage(_ProviderModel):
+    content: list[_BedrockContentBlock] = Field(min_length=1)
+
+
+class _BedrockOutput(_ProviderModel):
+    message: _BedrockMessage
+
+
+class _BedrockResponse(_ProviderModel):
+    output: _BedrockOutput
+    usage: Any = None
+
+
+def _token_usage(value: Any, keys: dict[str, str]) -> dict[str, int]:
+    if not isinstance(value, dict):
+        return {}
+    usage: dict[str, int] = {}
+    for source, target in keys.items():
+        token_count = value.get(source)
+        if type(token_count) is int and token_count >= 0:
+            usage[target] = token_count
+    return usage
+
+
+def _retry_attempts(value: Any) -> int:
+    if type(value) is not int or not 1 <= value <= 5:
+        raise ValueError("max_retries must be an integer from 1 to 5")
+    return value
+
+
+def _retry_delay(response: requests.Response | None, attempt: int) -> float:
+    fallback: float = min(30.0, 0.5 * float(2**attempt))
+    if response is None:
+        return fallback
+    raw = response.headers.get("Retry-After")
+    if raw is None:
+        return fallback
+    try:
+        delay = float(raw)
+    except ValueError:
+        return fallback
+    return min(delay, 30.0) if math.isfinite(delay) and delay >= 0 else fallback
 
 
 class LLMBackend(ABC):
@@ -40,6 +126,7 @@ class OpenAICompatibleBackend(LLMBackend):
         self.last_token_usage: dict[str, int] = {}
 
     def complete(self, prompt: str, **kwargs: Any) -> str:
+        self.last_token_usage = {}
         headers: dict[str, str] = {
             "Content-Type": "application/json",
         }
@@ -58,7 +145,7 @@ class OpenAICompatibleBackend(LLMBackend):
         endpoint = f"{self.base_url}/chat/completions"
 
         timeout = kwargs.get("timeout", self.timeout)
-        max_retries = kwargs.get("max_retries", 3)
+        max_retries = _retry_attempts(kwargs.get("max_retries", 3))
 
         last_exc: Exception | None = None
         for attempt in range(max_retries):
@@ -69,43 +156,28 @@ class OpenAICompatibleBackend(LLMBackend):
                     json=payload,
                     timeout=timeout,
                 )
-                if response.status_code in (500, 502, 503, 504):
-                    last_exc = Exception(f"HTTP {response.status_code}: {response.text[:100]}")
-                    time.sleep(2**attempt * 0.5)
+                try:
+                    response.raise_for_status()
+                except requests.exceptions.HTTPError as exc:
+                    if response.status_code not in _RETRYABLE_HTTP_STATUSES:
+                        raise
+                    last_exc = exc
+                    if attempt < max_retries - 1:
+                        time.sleep(_retry_delay(response, attempt))
                     continue
-                response.raise_for_status()
-                data = response.json()
-                usage = data.get("usage")
-                self.last_token_usage = (
-                    {
-                        "prompt_tokens": int(usage.get("prompt_tokens", 0) or 0),
-                        "completion_tokens": int(usage.get("completion_tokens", 0) or 0),
-                        "total_tokens": int(usage.get("total_tokens", 0) or 0),
-                    }
-                    if isinstance(usage, dict)
-                    else {}
-                )
-                return str(data["choices"][0]["message"]["content"])
+                data = _OpenAIResponse.model_validate(response.json())
+                self.last_token_usage = _token_usage(data.usage, _TOKEN_KEYS)
+                return data.choices[0].message.content
             except requests.exceptions.Timeout as exc:
                 last_exc = exc
                 if attempt < max_retries - 1:
-                    time.sleep(2**attempt * 0.5)
-                    timeout = int(timeout * 1.5)
+                    time.sleep(_retry_delay(None, attempt))
                     continue
             except requests.exceptions.ConnectionError as exc:
                 last_exc = exc
                 if attempt < max_retries - 1:
-                    time.sleep(2**attempt * 0.5)
+                    time.sleep(_retry_delay(None, attempt))
                     continue
-            except requests.exceptions.HTTPError as exc:
-                last_exc = exc
-                error_response = exc.response
-                if error_response is not None and error_response.status_code in (429,):
-                    retry_after = error_response.headers.get("Retry-After")
-                    wait = int(retry_after) if retry_after else 2**attempt * 2
-                    time.sleep(wait)
-                    continue
-                raise
 
         if last_exc:
             raise last_exc
@@ -133,6 +205,7 @@ class BedrockCliBackend(LLMBackend):
         self.last_token_usage: dict[str, int] = {}
 
     def complete(self, prompt: str, **kwargs: Any) -> str:
+        self.last_token_usage = {}
         inference_config = {
             "maxTokens": int(kwargs.get("max_tokens") or 4096),
             "temperature": float(kwargs.get("temperature", 0.1)),
@@ -163,23 +236,13 @@ class BedrockCliBackend(LLMBackend):
             detail = (result.stderr or result.stdout).strip()
             raise RuntimeError(detail or f"Bedrock CLI exited with {result.returncode}")
 
-        data = json.loads(result.stdout)
-        usage = data.get("usage")
-        self.last_token_usage = (
-            {
-                "prompt_tokens": int(usage.get("inputTokens", 0) or 0),
-                "completion_tokens": int(usage.get("outputTokens", 0) or 0),
-                "total_tokens": int(usage.get("totalTokens", 0) or 0),
-            }
-            if isinstance(usage, dict)
-            else {}
-        )
-        content = data.get("output", {}).get("message", {}).get("content", [])
+        data = _BedrockResponse.model_validate(json.loads(result.stdout))
+        self.last_token_usage = _token_usage(data.usage, _BEDROCK_TOKEN_KEYS)
         text_parts = [
-            str(part["text"])
-            for part in content
-            if isinstance(part, dict) and isinstance(part.get("text"), str)
+            part.text for part in data.output.message.content if part.text and part.text.strip()
         ]
+        if not text_parts:
+            raise ValueError("Bedrock response did not contain usable text content")
         return "\n".join(text_parts)
 
 
@@ -255,24 +318,9 @@ class LLMCaller:
 
         latency_ms = (time.perf_counter() - start) * 1000
 
-        token_usage = {}
+        token_usage: dict[str, int] = {}
         backend_usage = getattr(self.backend, "last_token_usage", {})
-        if isinstance(backend_usage, dict):
-            token_usage = {
-                str(key): int(value or 0)
-                for key, value in backend_usage.items()
-                if key in {"prompt_tokens", "completion_tokens", "total_tokens"}
-            }
-        try:
-            data = json.loads(response)
-            if "usage" in data and not token_usage:
-                token_usage = {
-                    "prompt_tokens": data["usage"].get("prompt_tokens", 0),
-                    "completion_tokens": data["usage"].get("completion_tokens", 0),
-                    "total_tokens": data["usage"].get("total_tokens", 0),
-                }
-        except (AttributeError, json.JSONDecodeError, TypeError):
-            pass
+        token_usage = _token_usage(backend_usage, _TOKEN_KEYS)
 
         evidence = LLMEvidence(
             prompt=prompt,

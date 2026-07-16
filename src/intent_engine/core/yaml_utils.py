@@ -9,6 +9,8 @@ from typing import Any
 import ruamel.yaml
 from ruamel.yaml.error import YAMLError
 
+from .paths import resolve_bundle_file
+
 
 def dump_yaml(data: Any, *, indent: bool = True) -> str:
     yaml = ruamel.yaml.YAML()
@@ -38,10 +40,18 @@ def load_yaml_mapping(path: Path) -> dict[str, Any]:
 
 
 def read_yaml_mapping(path: Path) -> dict[str, Any]:
-    """Load an optional YAML mapping, returning empty for missing/non-mapping files."""
-    if not path.exists():
+    """Load an optional YAML mapping, returning empty only when it is absent."""
+    if not path.exists() and not path.is_symlink():
         return {}
-    try:
-        return load_yaml_mapping(path)
-    except ValueError:
-        return {}
+    return load_yaml_mapping(path)
+
+
+def load_bundle_yaml_mapping(
+    bundle: Path,
+    relative_name: str,
+    *,
+    required: bool = True,
+) -> dict[str, Any]:
+    """Load a bundle YAML mapping through the safe member resolver."""
+    path = resolve_bundle_file(bundle, relative_name, required=required)
+    return load_yaml_mapping(path) if path is not None else {}

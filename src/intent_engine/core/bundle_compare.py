@@ -8,8 +8,9 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
+from .paths import BundleFileError, resolve_bundle_file
 from .sample_config import SampleConfig
-from .yaml_utils import read_yaml_mapping, write_yaml_artifact
+from .yaml_utils import load_bundle_yaml_mapping, write_yaml_artifact
 
 
 @dataclass(frozen=True)
@@ -313,14 +314,14 @@ def _text_decision_list(title: str, values: list[Any]) -> list[str]:
 
 
 def _load_bundle(path: Path) -> _BundleSnapshot:
-    report = _read_yaml(path / "decision-report.yaml")
-    trace = _read_yaml(path / "llm-trace-summary.yaml")
-    benchmark = _read_yaml(path / "model-benchmark.yaml")
-    handoff = _read_yaml(path / "handoff-plan.yaml")
-    contract = _read_yaml(path / "contract-validation.yaml")
-    input_diff = _read_yaml(path / "input-diff-report.yaml")
-    lineage = _coerce_list(_read_yaml(path / "lineage-manifest.yaml").get("lineage"))
-    samples = _coerce_list(_read_yaml(path / "sample-recommendations.yaml").get("recommendations"))
+    report = _read_yaml(path, "decision-report.yaml")
+    trace = _read_yaml(path, "llm-trace-summary.yaml")
+    benchmark = _read_yaml(path, "model-benchmark.yaml")
+    handoff = _read_yaml(path, "handoff-plan.yaml")
+    contract = _read_yaml(path, "contract-validation.yaml")
+    input_diff = _read_yaml(path, "input-diff-report.yaml")
+    lineage = _coerce_list(_read_yaml(path, "lineage-manifest.yaml").get("lineage"))
+    samples = _coerce_list(_read_yaml(path, "sample-recommendations.yaml").get("recommendations"))
     readiness = _readiness(report, handoff, contract)
     decisions = _decisions(report, trace, path)
     metrics = _requirement_metrics(decisions, readiness, trace, benchmark)
@@ -340,8 +341,8 @@ def _load_bundle(path: Path) -> _BundleSnapshot:
     )
 
 
-def _read_yaml(path: Path) -> dict[str, Any]:
-    return read_yaml_mapping(path)
+def _read_yaml(bundle: Path, name: str) -> dict[str, Any]:
+    return load_bundle_yaml_mapping(bundle, name, required=False)
 
 
 def _readiness(
@@ -384,7 +385,7 @@ def _decisions(
     accepted = _dict(trace.get("acceptedDecisions"))
     if accepted:
         return {key: _to_builtin(value) for key, value in accepted.items()}
-    current = _dict(_read_yaml(path / "sample-recommendations.yaml").get("currentDecisions"))
+    current = _dict(_read_yaml(path, "sample-recommendations.yaml").get("currentDecisions"))
     if current:
         return {key: _to_builtin(value) for key, value in current.items()}
     return _flatten_report_decisions(report)
@@ -457,9 +458,14 @@ def _artifact_hashes(path: Path) -> dict[str, str]:
     if not path.exists():
         return hashes
     for item in sorted(path.iterdir()):
-        if not item.is_file() or item.name.startswith("."):
+        if item.name.startswith(".") or (item.is_dir() and not item.is_symlink()):
             continue
-        hashes[item.name] = hashlib.sha256(item.read_bytes()).hexdigest()
+        try:
+            resolved = resolve_bundle_file(path, item.name)
+        except BundleFileError as exc:
+            raise ValueError(str(exc)) from exc
+        assert resolved is not None
+        hashes[item.name] = hashlib.sha256(resolved.read_bytes()).hexdigest()
     return hashes
 
 

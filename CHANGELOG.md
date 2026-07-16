@@ -27,3 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Root docs and OpenCode/Copilot instructions now point to `AGENTS.md` as the shared project workflow source of truth.
 - Runtime and development dependency floors now match the locked compatibility matrix and exclude future breaking releases.
 - CI and releases use the uv version declared in `pyproject.toml`, hashed build constraints, deterministic wheel smoke tests, and separate SBOM evidence.
+
+### Fixed
+- Bundle reads now reject unsafe paths, directories, broken files, and leaf or parent symlinks before validation, comparison, review, or AWS LZA staging.
+- Git incremental compilation resolves the requested base ref once, parses NUL-delimited paths, rejects non-portable paths, and records the resolved commit.
+- OpenAI-compatible and Bedrock responses now require usable typed success envelopes; token evidence and retries are bounded and fail closed independently of valid content.

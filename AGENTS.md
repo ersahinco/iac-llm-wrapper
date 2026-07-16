@@ -203,21 +203,34 @@ continuing minimum-cost validation across local and AWS LZA owner boundaries.
   comes from package metadata; CI and `prek` use the locked uv/Ruff toolchain,
   actions are pinned to verified commit SHAs, Python 3.14 and clean-wheel smoke
   tests are covered, and the SBOM comes directly from the lockfile.
+- **Compatible toolchain refresh**: runtime and development dependency floors
+  now match the fully tested lock, future breaking releases are capped, and uv
+  0.11.29 is declared once in `pyproject.toml`. Builds use a hashed setuptools
+  constraint, release tags must match the package version before build or
+  publish, and weekly uv/Actions maintenance is grouped for review.
+- **Bundle trust boundary**: trust-sensitive bundle reads now share one
+  resolver that rejects unsafe portable paths, directories, containment
+  escapes, and leaf, parent, or root symlinks. Optional YAML is empty only when
+  absent; malformed or non-mapping content fails visibly across validation,
+  comparison, review, and AWS LZA staging.
+- **Git and provider boundaries**: `compile-git` resolves an accepted ref once
+  to an immutable commit, parses NUL-delimited paths, rejects unsafe paths, and
+  records the resolved commit. OpenAI-compatible and Bedrock success envelopes
+  require usable typed content while malformed usage evidence is ignored;
+  retries are limited to transient failures, one to five attempts, and a
+  30-second maximum server-directed delay.
 - **Pattern ownership**: AWS named-entity recovery, validator-to-requirement
   review mapping, LZA validation evidence, artifact review owners, incremental
   reconfirmation policy, and forbidden artifact checks now live on the AWS LZA
   pattern instead of generic core branches.
-- **Validation**: 413 tests passed with five optional real-Ollama tests skipped
-  when the local service was unavailable; coverage is 89.95%. Ruff, Ruff
+- **Validation**: 484 tests passed with five optional real-Ollama tests skipped
+  when the local service was unavailable; coverage is 90.75%. Ruff, Ruff
   format, mypy, Pyright, fixture drift, golden journey, extraction (8/8),
   usability (8/8), all-files `prek`, lock check, Bandit, runtime `pip-audit`,
-  CycloneDX export, package build, and both installed CLI entry points passed.
-  No fixture drift was introduced.
-- **Deferred dependency maintenance**: routine dependency upgrades remain a
-  separate compatibility change. The shipped runtime lock export has no known
-  vulnerabilities; an environment-wide audit also sees advisories in
-  `pip-audit`'s own transitive `msgpack` and `pip` packages, so CI intentionally
-  audits the product runtime export rather than its auditor environment.
+  full-development `pip-audit`, CycloneDX export, constrained package build,
+  and both installed CLI entry points in a clean Python 3.11 environment
+  passed. The first dependency checkpoint passed the complete GitHub Python
+  3.11-3.14 matrix; no fixture drift or known dependency vulnerabilities remain.
 - **Model comparison**: the historical implicit local Ollama fallback used
   `llama3.2:3b`, took about 79 seconds, and produced a graph delta from the
   deterministic bundle. It inferred `SandboxDev` belongs to the `Sandbox` OU,
@@ -252,7 +265,17 @@ continuing minimum-cost validation across local and AWS LZA owner boundaries.
 - Validate incremental bundles and portable artifact paths before reading them
   as trusted handoff state.
 - Keep CI dependency audits scoped to the locked dependencies shipped by the
-  product; update development tooling in explicit dependency-only changes.
+  product, and verify the full development environment during compatibility
+  upgrades.
+- Keep the uv version single-sourced in `pyproject.toml` and require hashed
+  build constraints plus hash-locked runtime installation for release evidence.
+- Treat generated bundles as untrusted filesystem input: validate containment,
+  type, and every path component before reading, and never follow bundle
+  symlinks.
+- Resolve Git refs to immutable commits before diff or historical reads; keep
+  the original ref only as user-facing provenance.
+- Validate provider content independently from optional token evidence, and
+  retry only explicitly transient failures within bounded attempts and delays.
 - Keep pattern-specific review, extraction, and validation behavior on the
   owning pattern rather than branching in generic core.
 - Keep generated/ignored evidence out of committed source unless it is an

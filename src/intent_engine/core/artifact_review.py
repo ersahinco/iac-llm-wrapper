@@ -7,9 +7,10 @@ from pathlib import Path
 from typing import Any
 
 from .contract_validation import build_contract_validation
+from .paths import BundleFileError, resolve_bundle_file
 from .patterns import GLOBAL_REGISTRY
 from .review_renderer import render_review_html as render_review_html_context
-from .yaml_utils import read_yaml_mapping
+from .yaml_utils import load_bundle_yaml_mapping
 
 
 def write_review_html(input_dir: Path, output: Path) -> None:
@@ -52,14 +53,14 @@ def build_review_context(
     contract_validation_path: Path | None,
 ) -> dict[str, Any]:
     """Read generated artifacts and return renderer-ready review context."""
-    report = _read_yaml(input_dir / "decision-report.yaml")
-    trace = _read_yaml(input_dir / "llm-trace-summary.yaml")
-    benchmark = _read_yaml(input_dir / "model-benchmark.yaml")
-    handoff = _read_yaml(input_dir / "handoff-plan.yaml")
-    lineage = _read_yaml(input_dir / "lineage-manifest.yaml")
-    policy_graph = _read_yaml(input_dir / "policy-graph.yaml")
-    shift_left_evidence = _read_yaml(input_dir / "shift-left-evidence.yaml")
-    target_capabilities = _read_yaml(input_dir / "target-capability-graph.yaml")
+    report = _read_yaml(input_dir, "decision-report.yaml")
+    trace = _read_yaml(input_dir, "llm-trace-summary.yaml")
+    benchmark = _read_yaml(input_dir, "model-benchmark.yaml")
+    handoff = _read_yaml(input_dir, "handoff-plan.yaml")
+    lineage = _read_yaml(input_dir, "lineage-manifest.yaml")
+    policy_graph = _read_yaml(input_dir, "policy-graph.yaml")
+    shift_left_evidence = _read_yaml(input_dir, "shift-left-evidence.yaml")
+    target_capabilities = _read_yaml(input_dir, "target-capability-graph.yaml")
     if not target_capabilities:
         target_capabilities = _dict(
             report.get("targetCapabilities")
@@ -68,7 +69,7 @@ def build_review_context(
         )
     readiness = _readiness(report, handoff)
     contract_validation = (
-        _read_yaml(contract_validation_path)
+        _read_yaml(input_dir, contract_validation_path.name)
         if contract_validation_path is not None
         else build_contract_validation(input_dir)
     )
@@ -208,11 +209,11 @@ def _relative_graph_exports(
 
 def _existing_contract_validation(input_dir: Path) -> Path | None:
     path = input_dir / "contract-validation.yaml"
-    return path if path.exists() else None
+    return path if path.exists() or path.is_symlink() else None
 
 
-def _read_yaml(path: Path | None) -> dict[str, Any]:
-    return read_yaml_mapping(path) if path is not None else {}
+def _read_yaml(bundle: Path, name: str) -> dict[str, Any]:
+    return load_bundle_yaml_mapping(bundle, name, required=False)
 
 
 def _dict(value: Any) -> dict[str, Any]:
@@ -419,13 +420,14 @@ def _artifact_names(input_dir: Path, handoff: dict[str, Any], lineage: dict[str,
 
 
 def _artifact_rows(input_dir: Path, artifacts: list[str]) -> list[dict[str, str]]:
-    return [
-        {
-            "name": artifact,
-            "status": "present" if (input_dir / artifact).exists() else "missing",
-        }
-        for artifact in artifacts
-    ]
+    rows = []
+    for artifact in artifacts:
+        try:
+            path = resolve_bundle_file(input_dir, artifact, required=False)
+        except BundleFileError as exc:
+            raise ValueError(str(exc)) from exc
+        rows.append({"name": artifact, "status": "present" if path is not None else "missing"})
+    return rows
 
 
 def _raw_evidence(trace: dict[str, Any]) -> str:

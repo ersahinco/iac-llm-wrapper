@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from intent_engine.core.yaml_utils import read_yaml_mapping
+from intent_engine.core.yaml_utils import load_bundle_yaml_mapping
 
 from .validation import LZA_VALIDATION_EVIDENCE, summarize_lza_validation_output
 
@@ -14,8 +14,7 @@ _ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def load_lza_review_evidence(input_dir: Path) -> dict[str, Any]:
-    evidence_path = input_dir / LZA_VALIDATION_EVIDENCE
-    evidence = read_yaml_mapping(evidence_path) if evidence_path.exists() else {}
+    evidence = load_bundle_yaml_mapping(input_dir, LZA_VALIDATION_EVIDENCE, required=False)
     return {
         "label": "LZA validation",
         "sectionTitle": "LZA Validation Evidence",

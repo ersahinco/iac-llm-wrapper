@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from intent_engine.core.bundle_compare import (
     compare_handoff_bundles,
     render_bundle_comparison_html,
@@ -88,6 +90,31 @@ def test_compare_handoff_bundles_reports_blocker_and_sample_deltas(tmp_path: Pat
     assert "incremental-compile-report.yaml" in html
     assert "target.yaml" in html
     assert "Changed artifacts" in html
+
+
+def test_compare_handoff_bundles_rejects_symlinked_artifact(tmp_path: Path):
+    before = tmp_path / "before"
+    after = tmp_path / "after"
+    before.mkdir()
+    after.mkdir()
+    for bundle in (before, after):
+        _write_bundle(
+            bundle,
+            status="ready",
+            handoff_allowed=True,
+            blockers=[],
+            missing=[],
+            decisions={},
+            samples=[],
+            artifact_body="safe",
+        )
+    outside = tmp_path / "outside.yaml"
+    outside.write_text("secret: outside\n")
+    (after / "target.yaml").unlink()
+    (after / "target.yaml").symlink_to(outside)
+
+    with pytest.raises(ValueError, match="must not be a symlink"):
+        compare_handoff_bundles(before, after)
 
 
 def _write_bundle(

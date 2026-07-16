@@ -100,6 +100,17 @@ def test_summarize_lza_validation_output_prioritizes_default_email():
     assert diagnostic["summary"] == "Default email (audit@example.com) found."
 
 
+def test_validate_lza_config_bundle_rejects_symlinked_config(tmp_path: Path):
+    bundle = _bundle(tmp_path / "bundle")
+    config = bundle / AWS_LZA_CONFIG_ARTIFACTS[0]
+    outside = tmp_path / "outside.yaml"
+    config.replace(outside)
+    config.symlink_to(outside)
+
+    with pytest.raises(LzaValidationError, match="must not be a symlink"):
+        validate_lza_config_bundle(bundle_dir=bundle, lza_source=tmp_path / "lza")
+
+
 def test_validate_lza_config_bundle_writes_validation_only_evidence(
     tmp_path: Path,
     monkeypatch,

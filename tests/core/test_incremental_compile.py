@@ -65,6 +65,25 @@ def test_incremental_compile_rejects_malformed_baseline_report(tmp_path: Path):
     assert exc_info.value.violations[0].code == "INCREMENTAL_BASELINE_INVALID"
 
 
+def test_incremental_compile_rejects_symlinked_baseline_report(tmp_path: Path):
+    baseline, source = _aws_baseline(tmp_path)
+    report = baseline / "decision-report.yaml"
+    outside = tmp_path / "outside-report.yaml"
+    report.replace(outside)
+    report.symlink_to(outside)
+
+    with pytest.raises(CompileError) as exc_info:
+        compile_incremental_design(
+            baseline_bundle=baseline,
+            baseline_doc=source,
+            changed_doc=source,
+            output_dir=tmp_path / "output",
+        )
+
+    assert exc_info.value.violations[0].code == "INCREMENTAL_BASELINE_INVALID"
+    assert "symlink" in exc_info.value.violations[0].message
+
+
 def test_incremental_compile_rejects_incomplete_generated_baseline(tmp_path: Path):
     baseline, source = _aws_baseline(tmp_path)
     (baseline / "accounts-config.yaml").unlink()

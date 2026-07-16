@@ -199,6 +199,20 @@ class TestContractValidator:
             "CONTRACT_REQUIRED_ARTIFACT_MISSING"
         }
 
+    @pytest.mark.parametrize("kind", ["directory", "symlink"])
+    def test_required_artifact_must_be_a_regular_bundle_file(self, tmp_path: Path, kind: str):
+        artifact = tmp_path / "main.tf"
+        if kind == "directory":
+            artifact.mkdir()
+        else:
+            outside = tmp_path / "outside.tf"
+            outside.write_text("secret")
+            artifact.symlink_to(outside)
+
+        violations = ContractValidator(_contract()).validate_artifacts(tmp_path)
+
+        assert [violation.code for violation in violations] == ["CONTRACT_ARTIFACT_FILE_INVALID"]
+
     def test_optional_artifact_is_not_required(self, tmp_path: Path):
         (tmp_path / "main.tf").write_text("")
 

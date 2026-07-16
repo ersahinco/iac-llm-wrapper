@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .yaml_utils import load_yaml_mapping
+from .yaml_utils import load_bundle_yaml_mapping
 
 
 @dataclass(frozen=True)
@@ -27,9 +27,9 @@ def without_locked_decisions(
 
 def load_baseline_bundle(bundle: Path) -> BaselineBundle:
     """Load the required baseline reports without silent shape fallback."""
-    report = load_yaml_mapping(bundle / "decision-report.yaml")
-    trace = load_yaml_mapping(bundle / "llm-trace-summary.yaml")
-    benchmark = load_yaml_mapping(bundle / "model-benchmark.yaml")
+    report = load_bundle_yaml_mapping(bundle, "decision-report.yaml")
+    trace = load_bundle_yaml_mapping(bundle, "llm-trace-summary.yaml")
+    benchmark = load_bundle_yaml_mapping(bundle, "model-benchmark.yaml")
 
     accepted = trace.get("acceptedDecisions")
     if isinstance(accepted, dict) and accepted:

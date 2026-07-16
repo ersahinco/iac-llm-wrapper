@@ -12,7 +12,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from .paths import relative_path_error
+from .paths import BundleFileError, relative_path_error, resolve_bundle_file
 from .validator import Violation
 from .yaml_utils import load_yaml_mapping
 
@@ -176,15 +176,22 @@ class ContractValidator:
                 continue
             if not artifact.required:
                 continue
-            artifact_path = input_dir / artifact.name
-            if not artifact_path.exists():
-                violations.append(
-                    Violation(
-                        code="CONTRACT_REQUIRED_ARTIFACT_MISSING",
-                        message=f"Missing required file: {artifact.name}",
-                    )
+            try:
+                artifact_path = resolve_bundle_file(input_dir, artifact.name)
+            except BundleFileError as exc:
+                code = (
+                    "CONTRACT_REQUIRED_ARTIFACT_MISSING"
+                    if exc.reason == "missing"
+                    else "CONTRACT_ARTIFACT_FILE_INVALID"
                 )
+                message = (
+                    f"Missing required file: {artifact.name}"
+                    if exc.reason == "missing"
+                    else str(exc)
+                )
+                violations.append(Violation(code=code, message=message))
                 continue
+            assert artifact_path is not None
             if not artifact.required_paths and not artifact.value_assertions:
                 data_by_artifact[artifact.name] = {}
                 continue

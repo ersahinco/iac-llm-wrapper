@@ -13,7 +13,7 @@ from .contracts import (
     ContractValidator,
 )
 from .patterns import GLOBAL_REGISTRY
-from .yaml_utils import read_yaml_mapping, write_yaml_artifact
+from .yaml_utils import load_bundle_yaml_mapping, write_yaml_artifact
 
 _CONTRACT_VALIDATION_HEADER = (
     "# yaml-language-server: $schema=none\n"
@@ -23,8 +23,8 @@ _CONTRACT_VALIDATION_HEADER = (
 
 def build_contract_validation(input_dir: Path) -> dict[str, Any]:
     """Validate generated artifacts against the contracts implied by the bundle."""
-    report = read_yaml_mapping(input_dir / "decision-report.yaml")
-    handoff = read_yaml_mapping(input_dir / "handoff-plan.yaml")
+    report = load_bundle_yaml_mapping(input_dir, "decision-report.yaml", required=False)
+    handoff = load_bundle_yaml_mapping(input_dir, "handoff-plan.yaml", required=False)
     readiness = _readiness(report, handoff)
     contracts = []
 

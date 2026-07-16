@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from .yaml_utils import load_yaml_mapping, write_yaml_artifact
+from .yaml_utils import load_bundle_yaml_mapping, write_yaml_artifact
 
 _BATTLE_SUMMARY_HEADER = (
     "# yaml-language-server: $schema=none\n"
@@ -36,15 +36,13 @@ class BattleCompileResult:
     stderr: str
 
 
-def load_optional_yaml(path: Path) -> dict[str, Any]:
-    if not path.exists():
-        return {}
-    return load_yaml_mapping(path)
+def load_optional_yaml(bundle: Path, name: str) -> dict[str, Any]:
+    return load_bundle_yaml_mapping(bundle, name, required=False)
 
 
 def summarize_battle_artifacts(output_dir: Path) -> dict[str, Any]:
-    benchmark = load_optional_yaml(output_dir / "model-benchmark.yaml")
-    validation = load_optional_yaml(output_dir / "contract-validation.yaml")
+    benchmark = load_optional_yaml(output_dir, "model-benchmark.yaml")
+    validation = load_optional_yaml(output_dir, "contract-validation.yaml")
     run = benchmark.get("run", {}) if isinstance(benchmark.get("run"), dict) else {}
     latency = benchmark.get("latency", {}) if isinstance(benchmark.get("latency"), dict) else {}
     tokens = benchmark.get("tokens", {}) if isinstance(benchmark.get("tokens"), dict) else {}
@@ -284,10 +282,10 @@ def build_battle_summary(
     from .patterns import GLOBAL_REGISTRY
 
     pattern = GLOBAL_REGISTRY.get(case.pattern)
-    trace = load_optional_yaml(output_dir / "llm-trace-summary.yaml")
-    validation = load_optional_yaml(output_dir / "contract-validation.yaml")
-    handoff = load_optional_yaml(output_dir / "handoff-plan.yaml")
-    decision_report = load_optional_yaml(output_dir / "decision-report.yaml")
+    trace = load_optional_yaml(output_dir, "llm-trace-summary.yaml")
+    validation = load_optional_yaml(output_dir, "contract-validation.yaml")
+    handoff = load_optional_yaml(output_dir, "handoff-plan.yaml")
+    decision_report = load_optional_yaml(output_dir, "decision-report.yaml")
 
     summary = summarize_battle_artifacts(output_dir)
     compile_succeeded = compile_result.returncode == 0

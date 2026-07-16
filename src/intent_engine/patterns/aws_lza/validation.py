@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from intent_engine.core.paths import BundleFileError, resolve_bundle_file
 from intent_engine.core.yaml_utils import write_yaml_artifact
 
 from .contracts import AWS_LZA_CONFIG_ARTIFACTS
@@ -41,7 +42,18 @@ def validate_lza_config_bundle(
     """Run the official AWS LZA config validator against generated config files only."""
     if not bundle_dir.is_dir():
         raise LzaValidationError(f"Bundle path is not a directory: {bundle_dir}")
-    missing = [name for name in AWS_LZA_CONFIG_ARTIFACTS if not (bundle_dir / name).is_file()]
+    config_files: dict[str, Path] = {}
+    missing = []
+    for name in AWS_LZA_CONFIG_ARTIFACTS:
+        try:
+            path = resolve_bundle_file(bundle_dir, name)
+        except BundleFileError as exc:
+            if exc.reason == "missing":
+                missing.append(name)
+                continue
+            raise LzaValidationError(str(exc)) from exc
+        assert path is not None
+        config_files[name] = path
     if missing:
         raise LzaValidationError(
             "Bundle is missing required AWS LZA config files: " + ", ".join(missing)
@@ -53,8 +65,8 @@ def validate_lza_config_bundle(
     with tempfile.TemporaryDirectory(prefix="intent-engine-lza-config-") as temp:
         staged_config = Path(temp) / "aws-accelerator-config"
         staged_config.mkdir()
-        for name in AWS_LZA_CONFIG_ARTIFACTS:
-            shutil.copy2(bundle_dir / name, staged_config / name)
+        for name, source in config_files.items():
+            shutil.copy2(source, staged_config / name)
 
         command = _validator_command(staged_config)
         started = datetime.now(UTC)
@@ -81,6 +93,7 @@ def validate_lza_config_bundle(
         duration_ms = round((time.monotonic() - start_time) * 1000, 1)
         evidence = _build_evidence(
             bundle_dir=bundle_dir,
+            config_files=config_files,
             lza_source=lza_source,
             source_dir=source_dir,
             staged_config=staged_config,
@@ -120,12 +133,15 @@ def _validator_command(staged_config: Path) -> list[str]:
     return ["yarn", "validate-config", str(staged_config)]
 
 
-def _config_file_records(bundle_dir: Path) -> list[dict[str, str]]:
+def _config_file_records(
+    bundle_dir: Path,
+    config_files: dict[str, Path],
+) -> list[dict[str, str]]:
     return [
         {
             "name": name,
             "bundlePath": str(bundle_dir / name),
-            "sha256": hashlib.sha256((bundle_dir / name).read_bytes()).hexdigest(),
+            "sha256": hashlib.sha256(config_files[name].read_bytes()).hexdigest(),
         }
         for name in AWS_LZA_CONFIG_ARTIFACTS
     ]
@@ -134,6 +150,7 @@ def _config_file_records(bundle_dir: Path) -> list[dict[str, str]]:
 def _build_evidence(
     *,
     bundle_dir: Path,
+    config_files: dict[str, Path],
     lza_source: Path,
     source_dir: Path,
     staged_config: Path,
@@ -171,7 +188,7 @@ def _build_evidence(
                 "official validator; the temporary copy is removed after validation."
             ),
             "configFiles": list(AWS_LZA_CONFIG_ARTIFACTS),
-            "configFileDigests": _config_file_records(bundle_dir),
+            "configFileDigests": _config_file_records(bundle_dir, config_files),
         },
         "lzaSource": {
             "requestedPath": str(lza_source),

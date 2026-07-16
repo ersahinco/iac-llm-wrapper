@@ -89,6 +89,30 @@ def test_shift_left_checkov_records_failed_findings_soft_fail(tmp_path: Path):
     assert evidence["findings"][0]["checkId"] == "CKV_AWS_1"
 
 
+def test_shift_left_checkov_rejects_malformed_bundle_metadata(tmp_path: Path):
+    bundle = tmp_path / "bundle"
+    scan_path = tmp_path / "owner-module"
+    bundle.mkdir()
+    scan_path.mkdir()
+    (bundle / "decision-report.yaml").write_text("pattern: [unterminated\n")
+
+    result = runner.invoke(
+        app,
+        [
+            "shift-left",
+            "checkov",
+            "--bundle",
+            str(bundle),
+            "--scan-path",
+            str(scan_path),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Error: invalid bundle metadata:" in result.output
+    assert "decision-report.yaml: invalid YAML" in result.output
+
+
 def test_shift_left_checkov_require_pass_fails_on_findings(tmp_path: Path):
     bundle = tmp_path / "bundle"
     scan_path = tmp_path / "owner-module"

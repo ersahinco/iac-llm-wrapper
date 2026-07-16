@@ -56,7 +56,7 @@ from .core.pattern_check import check_pattern
 from .core.patterns import GLOBAL_REGISTRY, Pattern
 from .core.policy import PolicyPack
 from .core.sample_config import SampleConfig
-from .core.yaml_utils import read_yaml_mapping, write_yaml_artifact
+from .core.yaml_utils import load_bundle_yaml_mapping, read_yaml_mapping, write_yaml_artifact
 from .patterns import load_builtin_patterns
 from .patterns.aws_lza.validation import (
     LZA_VALIDATION_EVIDENCE,
@@ -161,8 +161,12 @@ def _get_pattern_or_exit(pattern: str) -> Pattern:
 
 
 def _bundle_pattern(bundle: Path) -> Pattern | None:
-    report = read_yaml_mapping(bundle / "decision-report.yaml")
-    manifest = read_yaml_mapping(bundle / "context-manifest.yaml")
+    try:
+        report = load_bundle_yaml_mapping(bundle, "decision-report.yaml", required=False)
+        manifest = load_bundle_yaml_mapping(bundle, "context-manifest.yaml", required=False)
+    except ValueError as exc:
+        typer.echo(f"Error: invalid bundle metadata: {exc}", err=True)
+        raise typer.Exit(1) from exc
     pattern_name = str(report.get("pattern") or manifest.get("pattern") or "")
     if not pattern_name:
         return None
@@ -771,7 +775,7 @@ def _compile_git_document(
     doc: dict[str, Any],
     *,
     repo_root: Path,
-    base_ref: str,
+    base_commit: str,
     bundle_root: Path,
     output_root: Path,
     pattern: str,
@@ -783,7 +787,7 @@ def _compile_git_document(
     baseline_bundle = bundle_path_for_doc(bundle_root, relative_path)
     output_bundle = bundle_path_for_doc(output_root, relative_path)
     repo_relative_path = str(doc["repoRelativePath"])
-    baseline_text = git_show_text(repo_root, base_ref, repo_relative_path)
+    baseline_text = git_show_text(repo_root, base_commit, repo_relative_path)
     entry: dict[str, Any] = {
         "path": str(doc_path),
         "relativePath": relative_path,
@@ -905,9 +909,11 @@ def compile_git(
     )
     output_root.mkdir(parents=True, exist_ok=True)
     repo_root = Path(str(discovered["repoRoot"]))
+    resolved_base = str(discovered["resolvedBaseCommit"])
     plan: dict[str, Any] = {
         "schemaVersion": "intent-engine/git-incremental-plan/v1",
         "baseRef": base_ref,
+        "resolvedBaseCommit": resolved_base,
         "pattern": pattern,
         "repoRoot": str(repo_root),
         "docRoot": str(Path(str(discovered["docRoot"]))),
@@ -921,7 +927,7 @@ def compile_git(
         entry, failed = _compile_git_document(
             doc,
             repo_root=repo_root,
-            base_ref=base_ref,
+            base_commit=resolved_base,
             bundle_root=bundle_root,
             output_root=output_root,
             pattern=pattern,

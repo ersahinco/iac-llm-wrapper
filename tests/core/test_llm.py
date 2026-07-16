@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
-from unittest.mock import patch
+from typing import cast
+from unittest.mock import Mock, patch
 
 import pytest
+import requests
 
 from intent_engine.core.compiler import LLMContextProvider, compile_design
 from intent_engine.core.extractor import Extractor
@@ -33,6 +35,33 @@ class MockLLMBackend(LLMBackend):
     def complete(self, prompt: str, **kwargs):
         self.calls.append({"prompt": prompt, "kwargs": kwargs})
         return self.response
+
+
+def _openai_response(
+    payload: object,
+    *,
+    status: int = 200,
+    headers: dict[str, str] | None = None,
+) -> Mock:
+    response = Mock()
+    response.status_code = status
+    response.headers = headers or {}
+    response.text = json.dumps(payload)
+    response.json.return_value = payload
+    if status >= 400:
+        response.raise_for_status.side_effect = requests.exceptions.HTTPError(
+            f"HTTP {status}", response=response
+        )
+    return response
+
+
+def _openai_payload(content: object = "answer", *, usage: object = None) -> dict[str, object]:
+    return {
+        "id": "response-id",
+        "choices": [{"index": 0, "message": {"role": "assistant", "content": content}}],
+        "usage": usage,
+        "provider_extension": {"ignored": True},
+    }
 
 
 def _complete_aws_lza_design() -> str:
@@ -100,6 +129,17 @@ class TestLLMCaller:
             "completion_tokens": 4,
             "total_tokens": 15,
         }
+
+    def test_call_ignores_malformed_backend_token_usage(self):
+        backend = MockLLMBackend("hello world")
+        backend.last_token_usage = cast(
+            dict[str, int],
+            {"prompt_tokens": 11, "completion_tokens": -1, "total_tokens": "10"},
+        )
+
+        _, evidence = LLMCaller(backend).call("say hello")
+
+        assert evidence.token_usage == {"prompt_tokens": 11}
 
     def test_context_provider_uses_the_active_pattern_prompt(self):
         backend = MockLLMBackend('{"decisions": {}}')
@@ -310,6 +350,233 @@ class TestCreateBackend:
             backend = create_backend("openai")
             assert isinstance(backend, OpenAICompatibleBackend)
             assert backend.api_key == "env-key"
+
+
+class TestProviderResponseBoundaries:
+    def test_openai_accepts_unknown_fields_and_valid_optional_usage(self):
+        backend = OpenAICompatibleBackend(api_key="test")
+        payload = _openai_payload(
+            usage={"prompt_tokens": 8, "completion_tokens": 3, "total_tokens": 11}
+        )
+
+        with patch("intent_engine.core.llm_caller.requests.post") as post:
+            post.return_value = _openai_response(payload)
+            response = backend.complete("extract")
+
+        assert response == "answer"
+        assert backend.last_token_usage == {
+            "prompt_tokens": 8,
+            "completion_tokens": 3,
+            "total_tokens": 11,
+        }
+
+    def test_openai_keeps_valid_content_when_usage_is_malformed(self):
+        backend = OpenAICompatibleBackend()
+        payload = _openai_payload(
+            usage={"prompt_tokens": 8, "completion_tokens": -1, "total_tokens": "bad"}
+        )
+
+        with patch("intent_engine.core.llm_caller.requests.post") as post:
+            post.return_value = _openai_response(payload)
+            response = backend.complete("extract")
+
+        assert response == "answer"
+        assert backend.last_token_usage == {"prompt_tokens": 8}
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            {},
+            {"choices": []},
+            {"choices": [{}]},
+            _openai_payload(""),
+            _openai_payload(None),
+        ],
+    )
+    def test_openai_rejects_malformed_or_empty_success_envelope(self, payload: object):
+        backend = OpenAICompatibleBackend()
+
+        with patch("intent_engine.core.llm_caller.requests.post") as post:
+            post.return_value = _openai_response(payload)
+            with pytest.raises(ValueError):
+                backend.complete("extract")
+
+        assert post.call_count == 1
+
+    def test_openai_rejects_malformed_json_without_retry(self):
+        backend = OpenAICompatibleBackend()
+        response = _openai_response({})
+        response.json.side_effect = json.JSONDecodeError("bad JSON", "", 0)
+
+        with patch("intent_engine.core.llm_caller.requests.post") as post:
+            post.return_value = response
+            with pytest.raises(json.JSONDecodeError):
+                backend.complete("extract")
+
+        assert post.call_count == 1
+
+    @pytest.mark.parametrize("status", [429, 500, 502, 503, 504])
+    def test_openai_retries_only_transient_http_statuses(self, status: int):
+        backend = OpenAICompatibleBackend()
+        failed = _openai_response({"error": "temporary"}, status=status)
+        succeeded = _openai_response(_openai_payload())
+
+        with (
+            patch(
+                "intent_engine.core.llm_caller.requests.post", side_effect=[failed, succeeded]
+            ) as post,
+            patch("intent_engine.core.llm_caller.time.sleep") as sleep,
+        ):
+            assert backend.complete("extract", max_retries=2) == "answer"
+
+        assert post.call_count == 2
+        sleep.assert_called_once()
+
+    def test_openai_caps_numeric_retry_after(self):
+        backend = OpenAICompatibleBackend()
+        failed = _openai_response(
+            {"error": "rate limited"}, status=429, headers={"Retry-After": "120"}
+        )
+        succeeded = _openai_response(_openai_payload())
+
+        with (
+            patch("intent_engine.core.llm_caller.requests.post", side_effect=[failed, succeeded]),
+            patch("intent_engine.core.llm_caller.time.sleep") as sleep,
+        ):
+            backend.complete("extract", max_retries=2)
+
+        sleep.assert_called_once_with(30.0)
+
+    def test_openai_does_not_retry_permanent_http_failure(self):
+        backend = OpenAICompatibleBackend()
+        failed = _openai_response({"error": "bad request"}, status=400)
+
+        with (
+            patch("intent_engine.core.llm_caller.requests.post", return_value=failed) as post,
+            patch("intent_engine.core.llm_caller.time.sleep") as sleep,
+            pytest.raises(requests.exceptions.HTTPError),
+        ):
+            backend.complete("extract", max_retries=5)
+
+        assert post.call_count == 1
+        sleep.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "failure",
+        [requests.exceptions.Timeout("slow"), requests.exceptions.ConnectionError("offline")],
+    )
+    def test_openai_retries_timeout_and_connection_failure(self, failure: Exception):
+        backend = OpenAICompatibleBackend()
+        succeeded = _openai_response(_openai_payload())
+
+        with (
+            patch(
+                "intent_engine.core.llm_caller.requests.post", side_effect=[failure, succeeded]
+            ) as post,
+            patch("intent_engine.core.llm_caller.time.sleep") as sleep,
+        ):
+            assert backend.complete("extract", max_retries=2) == "answer"
+
+        assert post.call_count == 2
+        sleep.assert_called_once_with(0.5)
+
+    def test_openai_stops_after_retry_exhaustion(self):
+        backend = OpenAICompatibleBackend()
+
+        with (
+            patch(
+                "intent_engine.core.llm_caller.requests.post",
+                side_effect=requests.exceptions.Timeout("slow"),
+            ) as post,
+            patch("intent_engine.core.llm_caller.time.sleep") as sleep,
+            pytest.raises(requests.exceptions.Timeout),
+        ):
+            backend.complete("extract", max_retries=3)
+
+        assert post.call_count == 3
+        assert sleep.call_count == 2
+
+    @pytest.mark.parametrize("attempts", [0, 6, True, "3"])
+    def test_openai_retry_count_is_bounded(self, attempts: object):
+        with pytest.raises(ValueError, match="max_retries"):
+            OpenAICompatibleBackend().complete("extract", max_retries=attempts)
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            {},
+            {"output": {"message": {"content": []}}},
+            {"output": {"message": {"content": [{"image": "ignored"}]}}},
+        ],
+    )
+    def test_bedrock_rejects_success_without_usable_text(self, payload: object):
+        backend = BedrockCliBackend()
+        completed = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout=json.dumps(payload), stderr=""
+        )
+
+        with patch("intent_engine.core.llm_caller.subprocess.run", return_value=completed):
+            with pytest.raises(ValueError):
+                backend.complete("extract")
+
+    def test_bedrock_keeps_valid_text_when_usage_is_malformed(self):
+        backend = BedrockCliBackend()
+        payload = {
+            "output": {"message": {"content": [{"text": "answer", "extra": True}]}},
+            "usage": {"inputTokens": 5, "outputTokens": -1, "totalTokens": "bad"},
+            "extra": True,
+        }
+        completed = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout=json.dumps(payload), stderr=""
+        )
+
+        with patch("intent_engine.core.llm_caller.subprocess.run", return_value=completed):
+            assert backend.complete("extract") == "answer"
+
+        assert backend.last_token_usage == {"prompt_tokens": 5}
+
+    def test_bedrock_rejects_malformed_json(self):
+        backend = BedrockCliBackend()
+        completed = subprocess.CompletedProcess(args=[], returncode=0, stdout="not JSON", stderr="")
+
+        with patch("intent_engine.core.llm_caller.subprocess.run", return_value=completed):
+            with pytest.raises(json.JSONDecodeError):
+                backend.complete("extract")
+
+    def test_provider_parse_failure_propagates_to_evidence(self):
+        backend = OpenAICompatibleBackend()
+
+        with patch("intent_engine.core.llm_caller.requests.post") as post:
+            post.return_value = _openai_response({"choices": []})
+            response, evidence = LLMCaller(backend).call("extract")
+
+        assert response == ""
+        assert evidence.parse_error
+        assert evidence.backend == "OpenAICompatibleBackend"
+
+    def test_bedrock_timeout_propagates_to_evidence(self):
+        backend = BedrockCliBackend()
+
+        with patch(
+            "intent_engine.core.llm_caller.subprocess.run",
+            side_effect=subprocess.TimeoutExpired("aws", 1),
+        ):
+            response, evidence = LLMCaller(backend).call("extract")
+
+        assert response == ""
+        assert "timed out" in str(evidence.parse_error)
+
+    def test_bedrock_cli_failure_propagates_to_evidence(self):
+        backend = BedrockCliBackend()
+        completed = subprocess.CompletedProcess(
+            args=[], returncode=254, stdout="", stderr="model access denied"
+        )
+
+        with patch("intent_engine.core.llm_caller.subprocess.run", return_value=completed):
+            response, evidence = LLMCaller(backend).call("extract")
+
+        assert response == ""
+        assert evidence.parse_error == "model access denied"
 
 
 class TestEndToEndLLM:

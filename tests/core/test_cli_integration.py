@@ -259,6 +259,8 @@ class TestCLICompile:
         assert not (output_root / "unchanged").exists()
         yaml = ruamel.yaml.YAML(typ="safe")
         plan = yaml.load((output_root / "git-incremental-plan.yaml").read_text())
+        assert plan["baseRef"] == base_ref
+        assert plan["resolvedBaseCommit"] == base_ref
         assert plan["summary"]["changedDocumentCount"] == 1
         assert plan["changedDocuments"][0]["status"] == "compiled-incremental"
         assert plan["changedDocuments"][0]["baselineBundleAvailable"] is True
