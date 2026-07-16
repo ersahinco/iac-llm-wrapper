@@ -5,22 +5,65 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     outputs:
       hashes: ${{ steps.hash.outputs.hashes }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Set up uv
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
-          version: "0.11.8"
           python-version: "3.11"
 
+      - name: Verify release tag
+        run: test "v$(uv version --short)" = "$GITHUB_REF_NAME"
+
+      - name: Install locked development dependencies
+        run: uv sync --locked --extra dev
+
+      - name: Run repository gates
+        run: |
+          uv run --locked --extra dev pytest --cov=src/intent_engine --cov-report=term-missing --cov-fail-under=80
+          uv run --locked --extra dev ruff check .
+          uv run --locked --extra dev ruff format --check .
+          uv run --locked --extra dev mypy
+          uv run --locked --extra dev pyright .
+          uv run --locked --extra dev python scripts/sync-sample-fixtures.py --check
+          uv run --locked --extra dev python scripts/evaluate-golden-journey.py
+          uv run --locked --extra dev python scripts/evaluate-extraction.py
+          uv run --locked --extra dev python scripts/evaluate-usability.py
+          uv run --locked --extra dev prek run --all-files
+
+      - name: Audit development and runtime dependencies
+        run: |
+          uv run --locked --extra dev pip-audit
+          uv export --locked --no-dev --no-emit-project --format requirements-txt --output-file runtime-requirements.txt
+          uv run --locked --extra dev pip-audit --requirement runtime-requirements.txt
+
       - name: Build package
-        run: uv build
+        run: uv build --build-constraint build-constraints.txt --require-hashes
+
+      - name: Smoke test installed entry points
+        run: |
+          uv venv .package-smoke
+          uv pip install --require-hashes --python .package-smoke/bin/python --requirement runtime-requirements.txt
+          uv pip install --no-deps --python .package-smoke/bin/python dist/*.whl
+          .package-smoke/bin/iac-llm-wrapper --version
+          .package-smoke/bin/intent-engine --version
+
+      - name: Generate release SBOM
+        run: |
+          mkdir release-evidence
+          uv export --preview-features sbom-export --locked --no-dev --format cyclonedx1.5 --output-file release-evidence/sbom.cdx.json
 
       - name: Generate hashes
         id: hash
@@ -33,6 +76,12 @@ jobs:
         with:
           name: dist
           path: dist/
+
+      - name: Upload release SBOM
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-sbom
+          path: release-evidence/sbom.cdx.json
 
   provenance:
     needs: [build]
@@ -48,23 +97,32 @@ jobs:
   publish:
     needs: [build, provenance]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       id-token: write
       contents: write
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
       - name: Download build artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: dist
           path: dist/
 
+      - name: Download release SBOM
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-sbom
+          path: release-evidence/
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
+        with:
+          packages-dir: dist/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           generate_release_notes: true
-          files: dist/*
+          files: |
+            dist/*
+            release-evidence/*

@@ -6,7 +6,8 @@ Prerequisites: maintainers with PyPI trusted publishing access.
 
 1. Update `version` in `pyproject.toml` following SemVer.
 2. Update `CHANGELOG.md`: move Unreleased items to a new dated section.
-3. Regenerate the lock file: `uv lock`
+3. Regenerate the lock file with the uv version required by `pyproject.toml`:
+   `uv lock`
 4. Open a pull request titled `release: vX.Y.Z`.
 5. After CI passes, merge to `main`.
 
@@ -21,16 +22,23 @@ git push origin vX.Y.Z
 
 The `Release` workflow will:
 
-- build the package
+- reject a tag that does not exactly match the package version
+- rerun the full repository gates and dependency audits
+- build the package with the hashed build constraint
+- install the locked runtime and wheel in a clean environment
 - generate SLSA provenance attestation
 - publish to PyPI via trusted publishing
-- create a GitHub Release with auto-generated notes and build artifacts
+- create a GitHub Release with auto-generated notes, build artifacts, and a
+  release-specific CycloneDX SBOM
 
 ### Supply chain artifacts
 
 - `uv.lock` is committed to the repo for reproducible dependency resolution.
+- `pyproject.toml` is the sole source of the required uv version.
+- `build-constraints.txt` pins and hashes the isolated build backend.
 - CI generates a CycloneDX SBOM on every run (available as an artifact).
-- Releases include SLSA provenance attestations for build integrity.
+- Releases include a separate CycloneDX SBOM and SLSA provenance attestations
+  for build integrity. Only files under `dist/` are sent to PyPI.
 
 ### Hotfix release
 
@@ -39,5 +47,5 @@ For urgent fixes on the latest release:
 1. Choose the next patch version (for example, `v1.2.3` becomes `v1.2.4`) and
    branch from the current release tag: `git checkout -b hotfix/v1.2.4 v1.2.3`
 2. Apply fix, update version and changelog.
-3. Regenerate lock file: `uv lock`
+3. Regenerate the lock file: `uv lock`
 4. Tag the chosen patch version and push.

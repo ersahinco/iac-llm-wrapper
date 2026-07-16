@@ -49,6 +49,8 @@ downstream owner, command, pipeline, or schema result produced it.
 
 ## Local Setup
 
+Install the uv version required by `pyproject.toml`; CI reads the same setting.
+
 ```bash
 uv sync --locked --extra dev
 uv run --locked --extra dev pytest
@@ -67,6 +69,7 @@ uv run --locked --extra dev python scripts/evaluate-golden-journey.py
 uv run --locked --extra dev python scripts/evaluate-extraction.py
 uv run --locked --extra dev python scripts/evaluate-usability.py
 uv run --locked --extra dev prek run --all-files
+uv build --build-constraint build-constraints.txt --require-hashes
 ```
 
 For small changes, run the smallest relevant subset from the change matrix.

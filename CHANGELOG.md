@@ -25,3 +25,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Structured Markdown decisions take precedence over direct LLM decisions, direct LLM decisions take precedence over signal decisions, and defaults fill only remaining gaps.
 - LLM-reported gaps and contradictions only block when they target known applicable requirement graph nodes.
 - Root docs and OpenCode/Copilot instructions now point to `AGENTS.md` as the shared project workflow source of truth.
+- Runtime and development dependency floors now match the locked compatibility matrix and exclude future breaking releases.
+- CI and releases use the uv version declared in `pyproject.toml`, hashed build constraints, deterministic wheel smoke tests, and separate SBOM evidence.

@@ -84,6 +84,9 @@ iac-llm-wrapper review html --input out/engineer-handoff-lza \
   --output out/engineer-handoff-lza/handoff-review.html
 ```
 
+The supported uv version is declared once in `pyproject.toml`. Install that
+version before running the locked commands.
+
 The output is a reviewed handoff bundle: decision report, trace summary,
 contract-backed LZA config files, lineage, runbook, sample recommendations, and a
 portable HTML review page.

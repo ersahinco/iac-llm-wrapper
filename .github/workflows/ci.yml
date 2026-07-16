@@ -6,16 +6,21 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Set up uv
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
-          version: "0.11.8"
           python-version: "3.11"
 
       - name: Install dependencies
@@ -47,17 +52,19 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       matrix:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Set up uv
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
-          version: "0.11.8"
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
@@ -68,14 +75,16 @@ jobs:
 
   security:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Set up uv
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
-          version: "0.11.8"
           python-version: "3.11"
 
       - name: Install dependencies
@@ -83,6 +92,7 @@ jobs:
 
       - name: Dependency audit
         run: |
+          uv run --locked --extra dev pip-audit
           uv export --locked --no-dev --no-emit-project --format requirements-txt --output-file runtime-requirements.txt
           uv run --locked --extra dev pip-audit --requirement runtime-requirements.txt
 
@@ -100,21 +110,25 @@ jobs:
 
   package:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Set up uv
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
-          version: "0.11.8"
           python-version: "3.11"
 
       - name: Build wheel and source distribution
-        run: uv build
+        run: uv build --build-constraint build-constraints.txt --require-hashes
 
       - name: Smoke test installed entry points
         run: |
+          uv export --locked --no-dev --no-emit-project --format requirements-txt --output-file runtime-requirements.txt
           uv venv .package-smoke
-          uv pip install --python .package-smoke/bin/python dist/*.whl
+          uv pip install --require-hashes --python .package-smoke/bin/python --requirement runtime-requirements.txt
+          uv pip install --no-deps --python .package-smoke/bin/python dist/*.whl
           .package-smoke/bin/iac-llm-wrapper --version
           .package-smoke/bin/intent-engine --version
