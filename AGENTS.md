@@ -323,6 +323,53 @@ drift, and audit decision. Treat OSS as leverage, not territory to absorb.
   ceiling. Current AWS guidance estimates the sample LZA environment at roughly
   $430.22/month even with no activity or workloads, so full personal-account LZA
   deployment is not a minimum-cost test.
+- **Principal architecture audit (2026-07-17; decision pending review)**: the
+  proposed next slice is to make the existing `terraform-vpc` review path
+  fail-closed before its first owner PR, then prove one owner-authorized
+  non-production journey and one repeat use. The audit found that separately
+  produced Terraform and AWS LZA evidence can survive recompilation and be
+  rendered without current-bundle validation, CLI bundle validation does not
+  verify replay digests, and nine of eleven Terraform VPC decisions may be
+  defaulted while still becoming plan-allowed. The Terraform conformance
+  evaluator also proves managed `resource_changes`, not a reconciled inventory
+  of every plan representation. No implementation, new dependency, target,
+  policy engine, execution protocol, or apply path was added. The existing
+  environment's full test run passed with 551 tests and five optional
+  integrations skipped; the locked `uv` command was not rerun because the local
+  uv version is older than the repository's required version.
+- **AI/IaC platform addendum (2026-07-17; decision pending review)**: current
+  Spacelift Intent and Pulumi Neo evidence confirms that managed platforms are
+  strongest at provider operations, repositories, credentials, state, policy
+  attachment, approvals, execution, drift, and audit. `gofireflyio/aiac` is an
+  unrestricted prompt-to-code utility, while `aliyun/iac-code` is a young,
+  stateful generation-and-deployment agent; neither supplies authoritative
+  requirement acceptance or end-to-end evidence lineage. Architecture-as-Code,
+  agent guardrails, and intent compilers validate different representations and
+  do not by composition prove that prose was understood, policy is complete, or
+  apply/runtime will satisfy intent. The proposed value remains a portable,
+  pre-execution requirements-to-evidence compiler for immutable registered
+  targets. No CALM, agent framework, policy engine, managed API, generator, or
+  other dependency was added. If real landing-zone and repeated approved-module
+  trials do not produce material review value over native forms and owner
+  pipelines, shrink to externally demanded trust primitives or stop; do not
+  build a meta-toolkit as a consolation product.
+- **Architect-to-engineer handoff landscape (2026-07-17; decision pending
+  review)**: no mature project found spans landscape discovery, deterministic
+  infrastructure-decision traversal, explicit human acceptance, immutable
+  registered-target lowering, and requirement-to-evidence lineage. FINOS CALM,
+  SAP LeanIX, and Ardoq are strongest on architecture discovery and decision
+  context; Cartography, Fix Inventory, CloudQuery, and Steampipe observe the
+  estate; Score, Humanitec, Crossplane, Kratix, Backstage, and Massdriver begin
+  after a platform offering is already defined. The proposed product boundary is
+  the missing handoff seam, not another EA repository or IDP: keep separately
+  authoritative landscape-evidence, requirement/decision, target-mapping, and
+  evidence-obligation graphs, let the LLM navigate and explain only the
+  deterministic applicable frontier, and require human acceptance before target
+  compilation. Current repository primitives are close, but defaults still need
+  explicit confirmation semantics and the owner-review value remains unproven.
+  No implementation, CALM/DMN/graph dependency, discovery adapter, portal, or
+  execution integration was added; the supporting diagram is a research
+  artifact outside the repository.
 - **Remaining blockers**: the requested Terraform owner acceptance plan needs an
   owner-approved non-production packet/account and matching restricted AWS
   credentials; the core can observe account identity but cannot prove permission
@@ -424,21 +471,29 @@ drift, and audit decision. Treat OSS as leverage, not territory to absorb.
 
 ### Next
 
-1. Run one owner-authorized PR using the Atmos bundle. Require at least one
-   material benefit—missing decision discovery, contradiction blocking,
+1. Review the 2026-07-17 principal architecture decision before implementation.
+   If accepted, first invalidate derived evidence on recompile, make validate and
+   review verify replay/current-bundle identities, require explicit confirmation
+   of applicable `terraform-vpc` decisions before plan invocation, and reconcile
+   all relevant plan inventories. Keep evidence semantics target-specific and add
+   no dependency, generic executor, or generic policy protocol.
+2. After those trust-boundary repairs, run one owner-authorized PR using the
+   Atmos bundle with an approved non-production packet/account and matching
+   restricted AWS credentials. Require v2
+   `conformant-with-deferred-gates` evidence, validate credential scope out of
+   band, verify no state, raw JSON, or plan binary remains, and require at least
+   one material benefit—missing decision discovery, contradiction blocking,
    misleading-plan rejection, or evidence used in review—and one repeat use
-   before expanding the integration surface.
-2. Do not register AFT until an owner supplies the AFT request-repository
+   before expanding the integration surface. Compare the result with the direct
+   approved-module form/owner-PR baseline; if reviewers ignore the evidence or
+   the wrapper catches nothing beyond ordinary schema validation, remove or
+   demote the extra bridge rather than broadening it.
+3. Do not register AFT until an owner supplies the AFT request-repository
    contract, one approved real account request, approved handling for account and
    SSO emails, and repeat demand. If those gates are met, review a fixed-template
    configuration-only proposal; do not implement Git push or CodePipeline calls.
-3. Add cfn-lint/cfn-guard validation only when an owner provides an approved
+4. Add cfn-lint/cfn-guard validation only when an owner provides an approved
    CloudFormation template and rules with a concrete review failure to address.
-4. Run the explicit Terraform owner acceptance trial only after receiving an
-   owner-approved non-production packet/account and matching restricted AWS
-   credentials; require v2 `conformant-with-deferred-gates` evidence, validate
-   cloud-audit read scope out of band, and verify no state, raw JSON, or plan
-   binary remains.
 5. Clarify the intended OU for each workload account in the banking customer
    packet and record the mappings under an account inventory; compilation now
    fails closed until that evidence exists.
