@@ -1,0 +1,75 @@
+[project]
+name = "iac-llm-wrapper"
+version = "0.2.0"
+description = "Knowledge-graph decision capture, deterministic gap and conflict review, and optional AI discussion agendas, emitting AWS Landing Zone Accelerator configuration."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [
+    {name = "Cemreoguz Ersahin", email = "ersahin@users.noreply.github.com"},
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Systems Administration",
+]
+dependencies = [
+    "pydantic>=2.13.4,<3",
+    "typer>=0.27.0,<1",
+    "ruamel.yaml>=0.19.1,<0.20",
+    "requests>=2.34.2,<3",
+    "neo4j>=5.28.3,<6",
+]
+
+[project.urls]
+homepage = "https://github.com/ersahinco/iac-llm-wrapper"
+repository = "https://github.com/ersahinco/iac-llm-wrapper"
+
+[project.scripts]
+iac-llm-wrapper = "intent_engine.cli:app"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.1.1,<10",
+    "ruff>=0.15.21,<0.16",
+    "mypy>=2.3.0,<3",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["C901", "E", "F", "I", "PLR0912", "PLR0915", "UP"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src/intent_engine"]
+pretty = true
+show_error_codes = true
+warn_unused_ignores = true
+warn_return_any = true
+ignore_missing_imports = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+namespaces = false
+
+[tool.setuptools.package-data]
+"intent_engine" = ["decisions.yaml", "policy/*.rego"]

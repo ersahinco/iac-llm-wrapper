@@ -1,0 +1,158 @@
+# Architecture decision catalog for the AWS Landing Zone Accelerator target.
+#
+# This file holds decisions a human must make. It holds no derived values and no
+# bookkeeping about itself. Each entry becomes a (:Decision) node in the graph.
+#
+# type:      enum | string | string_list | bool
+# gate:      decision only applies when another decision has a given value
+# requires:  decision cannot be reviewed before these are answered
+
+- key: baseline
+  label: LZA Baseline
+  category: accelerator
+  type: enum
+  question: Which AWS LZA sample configuration baseline should be used?
+  options: [standard, universal, healthcare, education, govcloud]
+  default: standard
+  hint: Start from an AWS-maintained sample configuration, then override only what differs.
+
+- key: org_mode
+  label: Organization Mode
+  category: organization
+  type: enum
+  question: Should this landing zone use Control Tower or raw AWS Organizations?
+  options: [control-tower, raw-orgs]
+  default: control-tower
+
+- key: organization_name
+  label: Organization Name
+  category: organization
+  type: string
+  question: What organization name identifies this landing zone?
+
+- key: home_region
+  label: Home Region
+  category: organization
+  type: string
+  question: Which AWS region is the home region?
+
+- key: enabled_regions
+  label: Enabled Regions
+  category: organization
+  type: string_list
+  question: Which AWS regions should LZA enable? Comma-separated.
+
+- key: organizational_units
+  label: Organizational Units
+  category: organization
+  type: string_list
+  question: Which organizational units are required? Comma-separated.
+  default: Security, Infrastructure, Workloads
+
+- key: audit_account
+  label: Audit Account
+  category: accounts
+  type: string
+  question: Which account owns audit and security audit functions?
+  default: Audit
+
+- key: log_archive_account
+  label: Log Archive Account
+  category: accounts
+  type: string
+  question: Which account stores immutable centralized logs?
+  default: LogArchive
+
+- key: security_tooling_account
+  label: Security Tooling Account
+  category: accounts
+  type: string
+  question: Which account owns delegated security tooling administration?
+  default: SecurityTooling
+
+- key: workload_accounts
+  label: Workload Accounts
+  category: accounts
+  type: string_list
+  question: Which workload accounts should be vended? Comma-separated.
+
+- key: account_emails
+  label: Account Emails
+  category: accounts
+  type: string_list
+  question: >-
+    Which account root emails are approved? Account=email entries, comma-separated.
+    Owner input only; never inferred.
+
+- key: network_account
+  label: Network Account
+  category: network
+  type: string
+  question: Which account owns shared networking?
+  gate: {decision: topology, equals: hub-spoke}
+
+- key: topology
+  label: Network Topology
+  category: network
+  type: enum
+  question: Which network topology should LZA configure?
+  options: [single-vpc, hub-spoke]
+  default: hub-spoke
+
+- key: network_cidr
+  label: Network CIDR
+  category: network
+  type: string
+  question: Which private CIDR does the landing zone reserve for shared networking?
+
+- key: identity_center_delegated_admin_account
+  label: Identity Center Delegated Admin
+  category: identity
+  type: string
+  question: Which account is delegated administrator for IAM Identity Center?
+  default: SecurityTooling
+
+- key: identity_center_permission_sets
+  label: Identity Center Permission Sets
+  category: identity
+  type: string_list
+  question: Which IAM Identity Center permission sets are approved? Comma-separated.
+
+- key: identity_center_assignments
+  label: Identity Center Assignments
+  category: identity
+  type: string_list
+  question: >-
+    Which IAM Identity Center assignments are approved?
+    Principal:PermissionSet:Account entries, comma-separated.
+  requires: [identity_center_permission_sets]
+
+- key: centralized_logging
+  label: Centralized Logging
+  category: security
+  type: bool
+  question: Should centralized organization logging be enabled?
+  default: "true"
+
+- key: security_hub_enabled
+  label: Security Hub
+  category: security
+  type: bool
+  question: Should AWS Security Hub be enabled by the baseline?
+  default: "true"
+
+- key: guardduty_enabled
+  label: GuardDuty
+  category: security
+  type: bool
+  question: Should GuardDuty be enabled by the baseline?
+  default: "true"
+
+- key: compliance_overlay
+  label: Compliance Overlay
+  category: security
+  type: enum
+  question: Which compliance overlay applies?
+  options: [none, regulated, financial-services, healthcare, education]
+  default: none
+  hint: An overlay selects stricter decisions. It does not replace attestation.

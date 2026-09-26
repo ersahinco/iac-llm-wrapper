@@ -1,0 +1,26 @@
+# Local Neo4j for the knowledge graph. Development only: it binds to loopback,
+# uses a throwaway password, and holds no production data.
+#
+# Use `docker compose up -d --wait`. Without --wait the port proxy accepts the
+# connection before Bolt is ready and the driver reports an incomplete handshake.
+services:
+  neo4j:
+    image: neo4j:5.26.4-community
+    container_name: iac-graph
+    ports:
+      - "127.0.0.1:7474:7474"
+      - "127.0.0.1:7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/localdevpassword
+      NEO4J_server_memory_heap_max__size: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p localdevpassword 'RETURN 1'"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 15s
+    volumes:
+      - graph-data:/data
+
+volumes:
+  graph-data:
