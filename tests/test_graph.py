@@ -63,8 +63,7 @@ def test_sample_packet_leaves_nothing_open(graph, catalog, sample_path):
 def test_gaps_report_gating_and_blocking(graph, catalog, tmp_path):
     path = tmp_path / "partial.md"
     path.write_text(
-        "- topology: hub-spoke\n"
-        "- identity_center_assignments: Admins:PowerUserAccess:Management\n",
+        "- topology: hub-spoke\n- identity_center_assignments: Admins:PowerUserAccess:Management\n",
         encoding="utf-8",
     )
     _ingest(graph, catalog, path)
@@ -72,7 +71,10 @@ def test_gaps_report_gating_and_blocking(graph, catalog, tmp_path):
 
     assert "topology" not in gaps
     assert "network_account" in gaps
-    assert gaps["identity_center_permission_sets"].blocks == ["identity_center_assignments"]
+    assert gaps["identity_center_permission_sets"].blocks == [
+        "identity_center_assignments",
+        "identity_center_policy_mappings",
+    ]
 
 
 def test_gated_decision_disappears_under_single_vpc(graph, catalog, tmp_path):
@@ -95,3 +97,26 @@ def test_two_statements_for_one_decision_contradict(graph, catalog, tmp_path):
     assert [conflict.code for conflict in conflicts] == ["CONTRADICTORY_STATEMENTS"]
     assert len(conflicts[0].evidence) == 2
     assert any("Later Review" in line for line in conflicts[0].evidence)
+
+
+@pytest.mark.parametrize("stage", ["_load_catalog", "_load_document", "_load_facts"])
+def test_failed_replacement_preserves_previous_graph(
+    graph, catalog, sample_path, tmp_path, monkeypatch, stage
+):
+    from intent_engine.graph import GraphUnavailable
+
+    _ingest(graph, catalog, sample_path)
+    original = (graph.document(), graph.facts(), graph.counts(), review(graph, catalog))
+    load = getattr(graph, stage)
+
+    def fail_after_load(tx, data):
+        load(tx, data)
+        # A real database failure after destructive work must roll the transaction back.
+        tx.run("CREATE (:Decision {key: 'home_region'})").consume()
+
+    monkeypatch.setattr(graph, stage, fail_after_load)
+    changed = tmp_path / "replacement.md"
+    changed.write_text("- home_region: eu-west-1\n", encoding="utf-8")
+    with pytest.raises(GraphUnavailable, match="graph replacement failed"):
+        _ingest(graph, catalog, changed)
+    assert (graph.document(), graph.facts(), graph.counts(), review(graph, catalog)) == original

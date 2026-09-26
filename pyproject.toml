@@ -25,6 +25,7 @@ dependencies = [
     "ruamel.yaml>=0.19.1,<0.20",
     "requests>=2.34.2,<3",
     "neo4j>=5.28.3,<6",
+    "jsonschema>=4.23,<5",
 ]
 
 [project.urls]
@@ -72,4 +73,4 @@ where = ["src"]
 namespaces = false
 
 [tool.setuptools.package-data]
-"intent_engine" = ["decisions.yaml", "policy/*.rego"]
+"intent_engine" = ["decisions.yaml", "policy/*.rego", "schemas/*.json", "schemas/*.txt"]

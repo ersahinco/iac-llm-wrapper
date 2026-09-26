@@ -7,15 +7,6 @@
 # gate:      decision only applies when another decision has a given value
 # requires:  decision cannot be reviewed before these are answered
 
-- key: baseline
-  label: LZA Baseline
-  category: accelerator
-  type: enum
-  question: Which AWS LZA sample configuration baseline should be used?
-  options: [standard, universal, healthcare, education, govcloud]
-  default: standard
-  hint: Start from an AWS-maintained sample configuration, then override only what differs.
-
 - key: org_mode
   label: Organization Mode
   category: organization
@@ -127,6 +118,42 @@
     Principal:PermissionSet:Account entries, comma-separated.
   requires: [identity_center_permission_sets]
 
+- key: identity_center_policy_mappings
+  label: Identity Center Policy Mappings
+  category: identity
+  type: string_list
+  question: >-
+    Which AWS-managed policy is explicitly approved for each permission set?
+    PermissionSet=PolicyName entries, comma-separated. Repeat a permission set
+    to attach multiple policies. Custom policies require an owner integration.
+  requires: [identity_center_permission_sets]
+
+- key: data_classification
+  label: Data Classification
+  category: data
+  type: enum
+  question: What is the data classification for this workload handoff?
+  options: [public, internal, confidential, restricted]
+
+- key: data_regions
+  label: Approved Data Regions
+  category: data
+  type: string_list
+  question: Which enabled regions may hold this workload's data and backups?
+  requires: [enabled_regions]
+
+- key: recovery_objectives
+  label: Recovery Objectives
+  category: data
+  type: string
+  question: What RPO and RTO must the workload owner meet and test?
+
+- key: application_owner
+  label: Application Owner
+  category: application
+  type: string
+  question: Which team owns workload integration, delivery, and recovery testing?
+
 - key: centralized_logging
   label: Centralized Logging
   category: security
@@ -138,14 +165,14 @@
   label: Security Hub
   category: security
   type: bool
-  question: Should AWS Security Hub be enabled by the baseline?
+  question: Should AWS Security Hub be enabled?
   default: "true"
 
 - key: guardduty_enabled
   label: GuardDuty
   category: security
   type: bool
-  question: Should GuardDuty be enabled by the baseline?
+  question: Should GuardDuty be enabled?
   default: "true"
 
 - key: compliance_overlay

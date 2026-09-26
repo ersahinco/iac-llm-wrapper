@@ -104,10 +104,7 @@ def _rule_home_region(values: dict[str, Any]) -> list[Conflict]:
     return [
         Conflict(
             code="HOME_REGION_NOT_ENABLED",
-            message=(
-                f"home region '{home}' is not in the enabled regions "
-                f"({', '.join(enabled)})"
-            ),
+            message=(f"home region '{home}' is not in the enabled regions ({', '.join(enabled)})"),
             decision_keys=["home_region", "enabled_regions"],
         )
     ]
@@ -174,9 +171,7 @@ def _rule_overlay_detection(values: dict[str, Any]) -> list[Conflict]:
     if overlay not in _STRICT_OVERLAYS:
         return []
     disabled = [
-        key
-        for key in ("security_hub_enabled", "guardduty_enabled")
-        if values.get(key) is False
+        key for key in ("security_hub_enabled", "guardduty_enabled") if values.get(key) is False
     ]
     if not disabled:
         return []
@@ -203,9 +198,7 @@ def _rule_assignments(values: dict[str, Any]) -> list[Conflict]:
             conflicts.append(
                 Conflict(
                     code="ASSIGNMENT_MALFORMED",
-                    message=(
-                        f"assignment '{entry}' is not Principal:PermissionSet:Account"
-                    ),
+                    message=(f"assignment '{entry}' is not Principal:PermissionSet:Account"),
                     decision_keys=["identity_center_assignments"],
                 )
             )
@@ -279,9 +272,7 @@ def _rule_missing_account_emails(values: dict[str, Any]) -> list[Conflict]:
     return [
         Conflict(
             code="ACCOUNT_EMAIL_MISSING",
-            message=(
-                "declared accounts have no approved root email: " f"{', '.join(uncovered)}"
-            ),
+            message=(f"declared accounts have no approved root email: {', '.join(uncovered)}"),
             decision_keys=["account_emails"],
         )
     ]
@@ -314,9 +305,7 @@ def _rule_duplicate_accounts(values: dict[str, Any]) -> list[Conflict]:
         conflicts.append(
             Conflict(
                 code="ACCOUNT_NAME_RESERVED",
-                message=(
-                    f"workload accounts reuse platform account names: {', '.join(clashes)}"
-                ),
+                message=(f"workload accounts reuse platform account names: {', '.join(clashes)}"),
                 decision_keys=["workload_accounts"],
             )
         )
@@ -331,6 +320,58 @@ def _rule_duplicate_accounts(values: dict[str, Any]) -> list[Conflict]:
     return conflicts
 
 
+def _rule_policy_mappings(values: dict[str, Any]) -> list[Conflict]:
+    entries = values.get("identity_center_policy_mappings") or []
+    if not entries:
+        return []  # Missing input is a catalog gap.
+    approved = set(values.get("identity_center_permission_sets") or [])
+    covered: set[str] = set()
+    conflicts: list[Conflict] = []
+    for entry in entries:
+        name, separator, policy = (part.strip() for part in entry.partition("="))
+        if not separator or not policy or name not in approved:
+            conflicts.append(
+                Conflict(
+                    code="POLICY_MAPPING_INVALID",
+                    message=f"policy mapping '{entry}' needs an approved PermissionSet=PolicyName",
+                    decision_keys=[
+                        "identity_center_policy_mappings",
+                        "identity_center_permission_sets",
+                    ],
+                )
+            )
+        else:
+            covered.add(name)
+    if missing := sorted(approved - covered):
+        conflicts.append(
+            Conflict(
+                code="POLICY_MAPPING_MISSING",
+                message=f"permission sets have no approved policies: {', '.join(missing)}",
+                decision_keys=[
+                    "identity_center_policy_mappings",
+                    "identity_center_permission_sets",
+                ],
+            )
+        )
+    return conflicts
+
+
+def _rule_data_regions(values: dict[str, Any]) -> list[Conflict]:
+    enabled = values.get("enabled_regions")
+    if not enabled:
+        return []
+    outside = sorted(set(values.get("data_regions") or []) - set(enabled))
+    if not outside:
+        return []
+    return [
+        Conflict(
+            code="DATA_REGION_NOT_ENABLED",
+            message=f"approved data/backup regions are not enabled: {', '.join(outside)}",
+            decision_keys=["data_regions", "enabled_regions"],
+        )
+    ]
+
+
 _RULES: tuple[Callable[[dict[str, Any]], list[Conflict]], ...] = (
     _rule_home_region,
     _rule_network_account_scope,
@@ -342,6 +383,8 @@ _RULES: tuple[Callable[[dict[str, Any]], list[Conflict]], ...] = (
     _rule_missing_account_emails,
     _rule_workload_ou,
     _rule_duplicate_accounts,
+    _rule_policy_mappings,
+    _rule_data_regions,
 )
 
 

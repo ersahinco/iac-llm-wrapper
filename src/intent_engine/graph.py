@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from neo4j import Driver, GraphDatabase
+from neo4j import Driver, GraphDatabase, ManagedTransaction
 from neo4j.exceptions import (
     AuthError,
     ConfigurationError,
@@ -34,8 +34,7 @@ from neo4j.exceptions import (
 from .models import Conflict, Decision, Document, Fact, Gap
 
 _CONSTRAINT = (
-    "CREATE CONSTRAINT decision_key IF NOT EXISTS "
-    "FOR (d:Decision) REQUIRE d.key IS UNIQUE"
+    "CREATE CONSTRAINT decision_key IF NOT EXISTS FOR (d:Decision) REQUIRE d.key IS UNIQUE"
 )
 
 
@@ -108,24 +107,36 @@ class KnowledgeGraph:
             records, _, _ = self._driver.execute_query(
                 query, parameters_=params, database_=self._config.database
             )
-        except Neo4jError as exc:
+        except (Neo4jError, ServiceUnavailable) as exc:
             raise GraphUnavailable(f"query failed: {exc}") from exc
         return [record.data() for record in records]
 
     # ------------------------------------------------------------------ write
 
-    def replace(
-        self, catalog: dict[str, Decision], document: Document, facts: list[Fact]
-    ) -> None:
-        """Wipe the database and load the catalog plus one complete document."""
-        self._run("MATCH (n) DETACH DELETE n")
+    def replace(self, catalog: dict[str, Decision], document: Document, facts: list[Fact]) -> None:
+        """Replace the whole document atomically; failed loads preserve the old graph."""
+        # Schema changes cannot share a transaction with data changes.
         self._run(_CONSTRAINT)
-        self._load_catalog(catalog)
-        self._load_document(document)
-        self._load_facts(facts)
+        try:
+            with self._driver.session(database=self._config.database) as session:
+                session.execute_write(self._replace, catalog, document, facts)
+        except (Neo4jError, ServiceUnavailable) as exc:
+            raise GraphUnavailable(f"graph replacement failed: {exc}") from exc
 
-    def _load_catalog(self, catalog: dict[str, Decision]) -> None:
-        self._run(
+    def _replace(
+        self,
+        tx: ManagedTransaction,
+        catalog: dict[str, Decision],
+        document: Document,
+        facts: list[Fact],
+    ) -> None:
+        tx.run("MATCH (n) DETACH DELETE n").consume()
+        self._load_catalog(tx, catalog)
+        self._load_document(tx, document)
+        self._load_facts(tx, facts)
+
+    def _load_catalog(self, tx: ManagedTransaction, catalog: dict[str, Decision]) -> None:
+        tx.run(
             """
             UNWIND $decisions AS d
             MERGE (n:Decision {key: d.key})
@@ -146,8 +157,8 @@ class KnowledgeGraph:
                 }
                 for d in catalog.values()
             ],
-        )
-        self._run(
+        ).consume()
+        tx.run(
             """
             UNWIND $edges AS e
             MATCH (d:Decision {key: e.source})
@@ -159,8 +170,8 @@ class KnowledgeGraph:
                 for d in catalog.values()
                 for required in d.requires
             ],
-        )
-        self._run(
+        ).consume()
+        tx.run(
             """
             UNWIND $edges AS e
             MATCH (d:Decision {key: e.source})
@@ -172,10 +183,10 @@ class KnowledgeGraph:
                 for d in catalog.values()
                 if d.gate is not None
             ],
-        )
+        ).consume()
 
-    def _load_document(self, document: Document) -> None:
-        self._run(
+    def _load_document(self, tx: ManagedTransaction, document: Document) -> None:
+        tx.run(
             """
             CREATE (doc:Document {path: $path, sha256: $sha256, ingested_at: $ingested_at})
             WITH doc
@@ -187,12 +198,12 @@ class KnowledgeGraph:
             sha256=document.sha256,
             ingested_at=datetime.now(UTC).isoformat(timespec="seconds"),
             statements=[s.model_dump() for s in document.statements],
-        )
+        ).consume()
 
-    def _load_facts(self, facts: list[Fact]) -> None:
+    def _load_facts(self, tx: ManagedTransaction, facts: list[Fact]) -> None:
         if not facts:
             return
-        self._run(
+        tx.run(
             """
             UNWIND $facts AS f
             MATCH (d:Decision {key: f.decision_key})
@@ -205,7 +216,7 @@ class KnowledgeGraph:
                 CREATE (fa)-[:EVIDENCE]->(evidence))
             """,
             facts=[f.model_dump() for f in facts],
-        )
+        ).consume()
 
     # ------------------------------------------------------------------- read
 

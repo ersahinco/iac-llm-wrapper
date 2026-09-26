@@ -1,0 +1,8 @@
+Upstream: https://github.com/awslabs/landing-zone-accelerator-on-aws
+Release: v1.16.3
+Commit: e6cab2077ed57d638f8d7b18e5bce8519aa7d26d
+Path: source/packages/@aws-accelerator/config/lib/schemas/
+
+The six JSON schemas are copied unchanged. LICENSE.txt and NOTICE.txt are
+the upstream project's notices. Update the schemas and contract.py together,
+then run the emission/contract tests. Normal validation is entirely offline.

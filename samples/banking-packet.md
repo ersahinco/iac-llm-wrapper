@@ -1,5 +1,8 @@
 # Customer Packet — Blue River Bank Landing Zone Intake
 
+Illustrative example, not a record of bank approvals. The policy mappings and
+workload handoff answers below are example inputs; replace them with owner decisions.
+
 Client meeting notes, architect clarifications, and security review comments in
 one document. The whole file is ingested on every run; there is no incremental
 mode and no baseline to reconcile.
@@ -22,7 +25,6 @@ Frankfurt and Ireland, with Frankfurt as home.
 
 ## Architect Clarification Pass
 
-- baseline: standard
 - org_mode: control-tower
 - organization_name: BlueRiverBank
 - home_region: eu-central-1
@@ -46,6 +48,7 @@ input and are never generated:
 
 - identity_center_delegated_admin_account: SecurityTooling
 - identity_center_permission_sets: ReadOnlyAccess, SecurityAudit, PowerUserAccess, BreakGlassAdmin, NetworkAdmin
+- identity_center_policy_mappings: ReadOnlyAccess=ReadOnlyAccess, SecurityAudit=SecurityAudit, PowerUserAccess=PowerUserAccess, BreakGlassAdmin=AdministratorAccess, NetworkAdmin=AmazonVPCFullAccess
 - identity_center_assignments: PlatformAdmins:PowerUserAccess:Management, SecurityAuditors:SecurityAudit:Audit, NetworkEngineers:NetworkAdmin:NetworkShared, DigitalBankingEngineers:PowerUserAccess:DigitalBankingProd, CardsEngineers:PowerUserAccess:CardsProd, DataEngineers:ReadOnlyAccess:DataShared, IncidentCommanders:BreakGlassAdmin:SecurityTooling
 
 ## Network
@@ -68,6 +71,15 @@ in this document, in prompts, or in emitted artifacts. Pipeline credentials are
 referenced by parameter name only, held in the bank's approved secret store.
 
 ## Engineer Handoff
+
+This packet covers the shared foundation for the digital-banking workload and its
+supporting accounts. All data and backup locations in this example use the same
+approved region set; differing workload constraints need a separate design review.
+
+- data_classification: restricted
+- data_regions: eu-central-1, eu-west-1
+- recovery_objectives: RPO 15 minutes; RTO 4 hours; workload owner must prove both in a restore exercise
+- application_owner: Digital Banking Platform team
 
 Manual gates before any LZA execution:
 

@@ -1,0 +1,489 @@
+{
+  "$ref": "#/definitions/IOrganizationConfig",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "IBackupPolicyConfig": {
+      "additionalProperties": false,
+      "description": "Configuration structure for backup policies that enforce consistent data protection across your organization.\nBackup policies help deploy organization-wide backup plans to ensure compliance and data recovery capabilities.",
+      "properties": {
+        "deploymentTargets": {
+          "$ref": "#/definitions/IDeploymentTargets",
+          "description": "Specifies which organizational units this backup policy will be applied to. Determines the scope of backup requirement enforcement."
+        },
+        "description": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Human-readable description explaining what backup requirements this policy enforces. Helps administrators understand the policy's data protection and compliance purpose."
+        },
+        "name": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Unique identifier for the backup policy. The regex pattern that is used to validate this parameter is a string of any of the characters in the ASCII character range."
+        },
+        "policy": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Path to the JSON file containing the backup policy definition. File must exist in the configuration repository and define backup plans and schedules."
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "policy",
+        "deploymentTargets"
+      ],
+      "type": "object"
+    },
+    "IChatbotPolicyConfig": {
+      "additionalProperties": false,
+      "description": "Configuration structure for chatbot policies that control AWS account access from chat applications.\nChatbot policies help manage permissions and security for integrations with Slack, Microsoft Teams, and other chat platforms.",
+      "properties": {
+        "deploymentTargets": {
+          "$ref": "#/definitions/IDeploymentTargets",
+          "description": "Specifies which organizational units this chatbot policy will be applied to. Determines the scope of chat application access control."
+        },
+        "description": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Human-readable description explaining what chatbot access controls this policy enforces. Helps administrators understand the policy's security and integration purpose."
+        },
+        "name": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Unique identifier for the chatbot policy. The regex pattern that is used to validate this parameter is a string of any of the characters in the ASCII character range."
+        },
+        "policy": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Path to the JSON file containing the chatbot policy definition. File must exist in the configuration repository and define chat application access permissions."
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "policy",
+        "deploymentTargets"
+      ],
+      "type": "object"
+    },
+    "IDeclarativePolicyConfig": {
+      "additionalProperties": false,
+      "description": "Configuration structure for declarative policies that manage AWS service settings.",
+      "properties": {
+        "deploymentTargets": {
+          "$ref": "#/definitions/IDeploymentTargets",
+          "description": "Specifies which organizational units or accounts this declarative policy will be applied to."
+        },
+        "description": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Human-readable description explaining what AWS service settings this policy manages. Helps administrators understand the policy's purpose and scope."
+        },
+        "name": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Unique identifier for the declarative policy. The regex pattern that is used to validate this parameter is a string of any of the characters in the ASCII character range."
+        },
+        "policy": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Path to the JSON file containing the declarative policy definition. File must exist in the configuration repository and define the desired AWS service states."
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "policy",
+        "deploymentTargets"
+      ],
+      "type": "object"
+    },
+    "IDeploymentTargets": {
+      "additionalProperties": false,
+      "description": "## Deployment Targets Interface\n\nDefines where AWS resources should be deployed within your AWS organization. This interface provides flexible targeting options for resource deployment across accounts, organizational units, and regions.\n\n### Key Features\n\n- **Account-level targeting**: Deploy to specific AWS accounts\n- **OU-level targeting**: Deploy to all accounts within organizational units\n- **Regional exclusions**: Skip specific AWS regions for compliance or cost optimization\n- **Account exclusions**: Exclude specific accounts from broader deployments\n\n### Example\n\n```yaml deploymentTargets:   organizationalUnits:     - Production     - Development   excludedAccounts:     - Management   excludedRegions:     - us-west-1 ```",
+      "properties": {
+        "accounts": {
+          "description": "**Target Accounts** *(Optional)*\n\nList of specific account names where resources should be deployed. Use for precise account-level targeting.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "excludedAccounts": {
+          "description": "**Excluded Accounts** *(Optional)*\n\nList of account names to exclude from deployment. Takes precedence over organizational unit and account inclusions.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "excludedRegions": {
+          "description": "**Excluded Regions** *(Optional)*\n\nList of AWS regions to exclude from deployment. Useful for compliance requirements or cost optimization.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "organizationalUnits": {
+          "description": "**Organizational Units** *(Optional)*\n\nList of organizational unit names where resources should be deployed. When specified, resources will be created in all accounts within these OUs.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "IOrganizationConfig": {
+      "additionalProperties": false,
+      "description": "Organization configuration\n\nDefines organizational structure and governance policies to be deployed across your multi-account environment. Controls whether organizational management is enabled and specifies the account hierarchy, security policies, and automated controls that will be applied.",
+      "properties": {
+        "backupPolicies": {
+          "description": "Backup policy configurations that enforce organization-wide backup requirements across organizational units. These policies ensure consistent backup strategies and compliance across accounts. The policy content is loaded from a JSON file from the path specified and deployed to the specified organizational units. File must exist in the configuration repository.",
+          "items": {
+            "$ref": "#/definitions/IBackupPolicyConfig"
+          },
+          "type": "array"
+        },
+        "chatbotPolicies": {
+          "description": "Chat applications policy configurations that control access to organization accounts from chat applications. These policies enforce which chat applications can be used and restrict access to specific workspaces and channels. The policy content is loaded from a JSON file from the path specified and deployed to the specified organizational units. File must exist in the configuration repository.",
+          "items": {
+            "$ref": "#/definitions/IChatbotPolicyConfig"
+          },
+          "type": "array"
+        },
+        "declarativePolicies": {
+          "description": "Declarative policy configurations that manage AWS service settings across organizational units. The policy content is loaded from a JSON file from the path specified. File must exist in the configuration repository.",
+          "items": {
+            "$ref": "#/definitions/IDeclarativePolicyConfig"
+          },
+          "type": "array"
+        },
+        "enable": {
+          "description": "Controls whether AWS Organizations features are enabled for the management account. When set to true, enables the organizational structure and policies defined in this configuration.",
+          "type": "boolean"
+        },
+        "organizationalUnitIds": {
+          "description": "Optionally provide a list of Organizational Unit IDs to bypass the usage of the AWS Organizations Client lookup. This is not a readonly member since we will initialize it with values if it is not provided.",
+          "items": {
+            "$ref": "#/definitions/IOrganizationalUnitIdConfig"
+          },
+          "type": "array"
+        },
+        "organizationalUnits": {
+          "description": "List of Organizational Units to be created or managed. Supports nested organizational unit structures using forward slash notation.",
+          "items": {
+            "$ref": "#/definitions/IOrganizationalUnitConfig"
+          },
+          "type": "array"
+        },
+        "quarantineNewAccounts": {
+          "$ref": "#/definitions/IQuarantineNewAccountsConfig",
+          "description": "Configuration for automatically applying quarantine policies to newly created accounts. When enabled, applies a specified Service Control Policy to all new accounts for security isolation."
+        },
+        "resourceControlPolicies": {
+          "description": "Resource Control Policy configurations for controlling access to AWS resources. RCPs help establish data perimeters and restrict resource access patterns. The policy content is loaded from a JSON file from the path specified and deployed to the specified organizational units. File must exist in the configuration repository.",
+          "items": {
+            "$ref": "#/definitions/IResourceControlPolicyConfig"
+          },
+          "type": "array"
+        },
+        "serviceControlPolicies": {
+          "description": "Service Control Policy configurations that define maximum permissions for users and roles. SCPs act as guardrails to prevent certain actions. The policy content is loaded from a JSON file from the path specified and deployed to the specified organizational units. File must exist in the configuration repository.",
+          "items": {
+            "$ref": "#/definitions/IServiceControlPolicyConfig"
+          },
+          "type": "array"
+        },
+        "taggingPolicies": {
+          "description": "Tagging policy configurations that standardize tags across resources in organizational units. The policy content is loaded from a JSON file from the path specified and deployed to the specified organizational units. File must exist in the configuration repository.",
+          "items": {
+            "$ref": "#/definitions/ITaggingPolicyConfig"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "enable",
+        "organizationalUnits",
+        "serviceControlPolicies",
+        "taggingPolicies",
+        "backupPolicies"
+      ],
+      "type": "object",
+      "patternProperties": {
+        "^\\.": {
+          "description": "YAML anchor"
+        }
+      }
+    },
+    "IOrganizationalUnitConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for defining organizational units within your AWS organization structure.\nOrganizational units provide hierarchical grouping of accounts and enable targeted application of governance policies.",
+      "properties": {
+        "ignore": {
+          "description": "When set to true, excludes this organizational unit and its associated accounts from processing. Defaults to false if not specified.",
+          "type": "boolean"
+        },
+        "name": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Name and hierarchical path for the organizational unit. Supports nested structures using forward slash notation (e.g., \"Sandbox/Development/Application1\"). This name is used as a reference in other configuration sections. Always configure all of the OUs in the path.\n\nA nested OU configuration would be like this\n- name: Sandbox\n- name: Sandbox/Pipeline\n- name: Sandbox/Development\n- name: Sandbox/Development/Application1"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "IOrganizationalUnitIdConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for mapping organizational unit names to their AWS identifiers.\nProvides a way to bypass AWS Organizations API lookups by explicitly defining OU IDs and ARNs.\n\nOrganizational unit id configuration",
+      "properties": {
+        "arn": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Amazon Resource Name (ARN) of the organizational unit."
+        },
+        "id": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "AWS Organizations unique identifier for the organizational unit."
+        },
+        "name": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The logical name that identifies the organizational unit. Used as a reference key for mapping to the corresponding OU ID and ARN."
+        },
+        "orgsApiResponse": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/OrganizationalUnit"
+            },
+            {
+              "$ref": "#/definitions/Root"
+            }
+          ],
+          "description": "Optional AWS Organizations API response data. Contains the raw response from the Organizations service."
+        }
+      },
+      "required": [
+        "name",
+        "id",
+        "arn"
+      ],
+      "type": "object"
+    },
+    "IQuarantineNewAccountsConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for automatically applying quarantine policies to newly created accounts.\nWhen enabled, applies a specified Service Control Policy to all new accounts for security isolation until proper setup is completed.",
+      "properties": {
+        "enable": {
+          "description": "Controls whether quarantine policies are automatically applied to newly created accounts. When enabled, all accounts created by any means will have the specified SCP applied for security isolation.",
+          "type": "boolean"
+        },
+        "scpPolicyName": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Name of the Service Control Policy to apply to new accounts for quarantine purposes. This value is required when quarantine is enabled and must match a policy defined in the serviceControlPolicies section."
+        }
+      },
+      "required": [
+        "enable"
+      ],
+      "type": "object"
+    },
+    "IResourceControlPolicyConfig": {
+      "additionalProperties": false,
+      "description": "Configuration structure for resource control policies that establish data perimeters and control resource access.",
+      "properties": {
+        "deploymentTargets": {
+          "$ref": "#/definitions/IDeploymentTargets",
+          "description": "Specifies which organizational units this resource control policy will be applied to. Determines the scope of data perimeter enforcement."
+        },
+        "description": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Human-readable description explaining what data perimeter controls this policy enforces. Helps administrators understand the policy's security purpose and scope."
+        },
+        "name": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Unique identifier for the resource control policy. The regex pattern that is used to validate this parameter is a string of any of the characters in the ASCII character range."
+        },
+        "policy": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Path to the JSON file containing the resource control policy definition. File must exist in the configuration repository and define resource access restrictions."
+        },
+        "strategy": {
+          "description": "Defines how the resource control policy is evaluated - either deny-list (default) or allow-list. Deny-list blocks specified resources, allow-list only permits specified resources. https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_rcps_evaluation.html",
+          "enum": [
+            "deny-list",
+            "allow-list"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "policy",
+        "deploymentTargets"
+      ],
+      "type": "object"
+    },
+    "IServiceControlPolicyConfig": {
+      "additionalProperties": false,
+      "description": "Configuration structure for service control policies that define permission guardrails for AWS accounts.\nSCPs help establish security boundaries by controlling what actions users and roles can perform.",
+      "properties": {
+        "deploymentTargets": {
+          "$ref": "#/definitions/IDeploymentTargets",
+          "description": "Specifies which organizational units this service control policy will be applied to. Determines the scope of permission enforcement."
+        },
+        "description": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Human-readable description explaining what permissions this policy controls. Helps administrators understand the policy's security purpose and scope."
+        },
+        "name": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Unique identifier for the service control policy. The regex pattern that is used to validate this parameter is a string of any of the characters in the ASCII character range."
+        },
+        "policy": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Path to the JSON file containing the service control policy definition. File must exist in the configuration repository and define permission restrictions."
+        },
+        "strategy": {
+          "description": "Defines how the service control policy is evaluated - either deny-list (default) or allow-list. Deny-list blocks specified actions, allow-list only permits specified actions.",
+          "enum": [
+            "deny-list",
+            "allow-list"
+          ],
+          "type": "string"
+        },
+        "type": {
+          "description": "Specifies whether this is an AWS-managed or customer-managed policy. AWS-managed policies are predefined by AWS, customer-managed policies are custom.",
+          "enum": [
+            "awsManaged",
+            "customerManaged"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "policy",
+        "type",
+        "deploymentTargets"
+      ],
+      "type": "object"
+    },
+    "ITaggingPolicyConfig": {
+      "additionalProperties": false,
+      "description": "Configuration structure for tagging policies that enforce consistent tag standards across your organization.\nTagging policies help standardize tag keys, values, and capitalization on all tagged resources and define what values are allowed.",
+      "properties": {
+        "deploymentTargets": {
+          "$ref": "#/definitions/IDeploymentTargets",
+          "description": "Specifies which organizational units this tagging policy will be applied to. Determines the scope of tag standardization enforcement."
+        },
+        "description": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Human-readable description explaining what tagging standards this policy enforces. Helps administrators understand the policy's compliance and governance purpose."
+        },
+        "name": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Unique identifier for the tagging policy. The regex pattern that is used to validate this parameter is a string of any of the characters in the ASCII character range."
+        },
+        "policy": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Path to the JSON file containing the tagging policy definition. File must exist in the configuration repository and define required tags and allowed values."
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "policy",
+        "deploymentTargets"
+      ],
+      "type": "object"
+    },
+    "NonEmptyString": {
+      "description": "## Non-Empty String Type\n\nRepresents a string that must contain at least one character. Used for required text fields throughout the Landing Zone Accelerator configuration where empty values are not permitted.\n\n```",
+      "minLength": 1,
+      "type": "string"
+    },
+    "OrganizationalUnit": {
+      "additionalProperties": false,
+      "description": "<p>Contains details about an organizational unit (OU). An OU is a container of Amazon Web Services             accounts within a root of an organization. Policies that are attached to an OU apply to             all accounts contained in that OU and in any child OUs.</p>",
+      "properties": {
+        "Arn": {
+          "description": "<p>The Amazon Resource Name (ARN) of this OU.</p>          <p>For more information about ARNs in Organizations, see <a href=\"https://docs.aws.amazon.com/service-authorization/latest/reference/list_awsorganizations.html#awsorganizations-resources-for-iam-policies\">ARN     Formats Supported by Organizations</a> in the <i>Amazon Web Services Service Authorization Reference</i>.</p>",
+          "type": "string"
+        },
+        "Id": {
+          "description": "<p>The unique identifier (ID) associated with this OU. The ID is unique to the             organization only.</p>          <p>The <a href=\"http://wikipedia.org/wiki/regex\">regex pattern</a> for an organizational unit ID string requires     \"ou-\" followed by from 4 to 32 lowercase letters or digits (the ID of the root that contains the     OU). This string is followed by a second \"-\" dash and from 8 to 32 additional lowercase letters     or digits.</p>",
+          "type": "string"
+        },
+        "Name": {
+          "description": "<p>The friendly name of this OU.</p>          <p>The <a href=\"http://wikipedia.org/wiki/regex\">regex pattern</a>     that is used to validate this parameter is a string of any of the characters in the ASCII     character range.</p>",
+          "type": "string"
+        },
+        "Path": {
+          "description": "<p>The path in the organization where this OU exists.</p>",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "PolicyType": {
+      "enum": [
+        "AISERVICES_OPT_OUT_POLICY",
+        "BACKUP_POLICY",
+        "BEDROCK_POLICY",
+        "CHATBOT_POLICY",
+        "DECLARATIVE_POLICY_EC2",
+        "INSPECTOR_POLICY",
+        "NETWORK_SECURITY_DIRECTOR_POLICY",
+        "RESOURCE_CONTROL_POLICY",
+        "S3_POLICY",
+        "SECURITYHUB_POLICY",
+        "SERVICE_CONTROL_POLICY",
+        "TAG_POLICY",
+        "UPGRADE_ROLLOUT_POLICY"
+      ],
+      "type": "string"
+    },
+    "PolicyTypeStatus": {
+      "enum": [
+        "ENABLED",
+        "PENDING_DISABLE",
+        "PENDING_ENABLE"
+      ],
+      "type": "string"
+    },
+    "PolicyTypeSummary": {
+      "additionalProperties": false,
+      "description": "<p>Contains information about a policy type and its status in the associated root.</p>",
+      "properties": {
+        "Status": {
+          "$ref": "#/definitions/PolicyTypeStatus",
+          "description": "<p>The status of the policy type as it relates to the associated root. To attach a policy             of the specified type to a root or to an OU or account in that root, it must be             available in the organization and enabled for that root.</p>"
+        },
+        "Type": {
+          "$ref": "#/definitions/PolicyType",
+          "description": "<p>The name of the policy type.</p>"
+        }
+      },
+      "type": "object"
+    },
+    "Root": {
+      "additionalProperties": false,
+      "description": "<p>Contains details about a root. A root is a top-level parent node in the hierarchy of             an organization that can contain organizational units (OUs) and accounts.             The root contains every Amazon Web Services account in the             organization.</p>",
+      "properties": {
+        "Arn": {
+          "description": "<p>The Amazon Resource Name (ARN) of the root.</p>          <p>For more information about ARNs in Organizations, see <a href=\"https://docs.aws.amazon.com/service-authorization/latest/reference/list_awsorganizations.html#awsorganizations-resources-for-iam-policies\">ARN     Formats Supported by Organizations</a> in the <i>Amazon Web Services Service Authorization Reference</i>.</p>",
+          "type": "string"
+        },
+        "Id": {
+          "description": "<p>The unique identifier (ID) for the root. The ID is unique to the organization             only.</p>          <p>The <a href=\"http://wikipedia.org/wiki/regex\">regex pattern</a> for a root ID string requires \"r-\" followed by     from 4 to 32 lowercase letters or digits.</p>",
+          "type": "string"
+        },
+        "Name": {
+          "description": "<p>The friendly name of the root.</p>          <p>The <a href=\"http://wikipedia.org/wiki/regex\">regex pattern</a>     that is used to validate this parameter is a string of any of the characters in the ASCII     character range.</p>",
+          "type": "string"
+        },
+        "PolicyTypes": {
+          "description": "<p>The types of policies that are currently enabled for the root and therefore can be             attached to the root or to its OUs or accounts.</p>          <note>             <p>Even if a policy type is shown as available in the organization, you can                 separately enable and disable them at the root level by using <a>EnablePolicyType</a> and <a>DisablePolicyType</a>. Use <a>DescribeOrganization</a> to see the availability of the policy types in                 that organization.</p>          </note>",
+          "items": {
+            "$ref": "#/definitions/PolicyTypeSummary"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    }
+  }
+}

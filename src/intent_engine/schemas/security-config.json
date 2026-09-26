@@ -1,0 +1,2267 @@
+{
+  "$ref": "#/definitions/ISecurityConfig",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "IAccessAnalyzerConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for AWS Identity and Access Management (IAM) Access Analyzer that identifies resources with external access\nand helps implement least privilege by analyzing resource policies for security risks.",
+      "properties": {
+        "enable": {
+          "description": "Controls whether AWS IAM Access Analyzer is enabled across your organization.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enable"
+      ],
+      "type": "object"
+    },
+    "IAlarmConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for CloudWatch alarms that monitor metrics and trigger notifications when thresholds are breached.",
+      "properties": {
+        "alarmDescription": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Human-readable description explaining what this alarm monitors and when it triggers."
+        },
+        "alarmName": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Unique name for the CloudWatch alarm"
+        },
+        "comparisonOperator": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The comparison operator used to evaluate the metric against the threshold. This determines the condition that must be met for the alarm to trigger."
+        },
+        "evaluationPeriods": {
+          "description": "The number of consecutive periods over which the threshold must be breached for the alarm to trigger.",
+          "type": "number"
+        },
+        "metricName": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The name of the CloudWatch metric to monitor for threshold breaches."
+        },
+        "namespace": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The CloudWatch namespace where the metric is located."
+        },
+        "period": {
+          "description": "The length of each evaluation period in seconds.",
+          "type": "number"
+        },
+        "snsAlertLevel": {
+          "$ref": "#/definitions/NonEmptyString",
+          "deprecated": "This parameter is deprecated.",
+          "description": "SNS notification level for alarm alerts."
+        },
+        "snsTopicName": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The name of the SNS topic to send alarm notifications to when the alarm state changes. This topic name must be defined in the global configuration."
+        },
+        "statistic": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The statistical function to apply to the metric data points within each period. This determines how multiple data points within a period are aggregated for threshold comparison."
+        },
+        "threshold": {
+          "description": "The threshold value that the metric statistic is compared against to determine alarm state. When the metric breaches this threshold according to the comparison operator, the alarm will transition to the ALARM state and trigger notifications.",
+          "type": "number"
+        },
+        "treatMissingData": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Defines how the alarm should behave when metric data is missing or is insufficient."
+        }
+      },
+      "required": [
+        "alarmName",
+        "alarmDescription",
+        "metricName",
+        "namespace",
+        "comparisonOperator",
+        "evaluationPeriods",
+        "period",
+        "statistic",
+        "threshold",
+        "treatMissingData"
+      ],
+      "type": "object"
+    },
+    "IAlarmSetConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for a set of CloudWatch alarms that will be deployed together to specific regions and organizational units.",
+      "properties": {
+        "alarms": {
+          "description": "Array of CloudWatch alarm configurations to deploy as part of this alarm set.",
+          "items": {
+            "$ref": "#/definitions/IAlarmConfig"
+          },
+          "type": "array"
+        },
+        "deploymentTargets": {
+          "$ref": "#/definitions/IDeploymentTargets",
+          "description": "Specifies the organizational units and accounts where this set of alarms will be deployed."
+        },
+        "regions": {
+          "description": "AWS regions where the CloudWatch alarms will be deployed.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "deploymentTargets",
+        "alarms"
+      ],
+      "type": "object"
+    },
+    "IAuditManagerConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for AWS Audit Manager, a service that helps you continually audit your AWS usage to simplify how you manage risk and\ncompliance with regulations and industry standards.\nUse this configuration to enable AWS Audit Manager for an AWS Organization. Audit Manager automates evidence collection\nso you can more easily assess whether your policies, procedures, and activities are operating effectively.",
+      "properties": {
+        "defaultReportsConfiguration": {
+          "$ref": "#/definitions/IAuditManagerDefaultReportsDestinationConfig",
+          "description": "Configuration for where Audit Manager stores compliance assessment reports and audit-ready evidence."
+        },
+        "enable": {
+          "description": "Controls whether AWS Audit Manager is enabled across your organization.",
+          "type": "boolean"
+        },
+        "excludeRegions": {
+          "description": "List of AWS regions where Audit Manager should not be enabled.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "lifecycleRules": {
+          "description": "S3 lifecycle rules that automatically manage the retention and deletion of Audit Manager reports and evidence stored in S3.",
+          "items": {
+            "$ref": "#/definitions/ILifecycleRule"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "enable",
+        "defaultReportsConfiguration"
+      ],
+      "type": "object"
+    },
+    "IAuditManagerDefaultReportsDestinationConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for specifying where AWS Audit Manager stores compliance assessment reports\nUse this configuration to enable a destination for reports generated by AWS Audit Manager.",
+      "properties": {
+        "destinationType": {
+          "const": "S3",
+          "description": "The type of resource for storing audit reports. Currently only Amazon S3 buckets are supported.",
+          "type": "string"
+        },
+        "enable": {
+          "description": "Controls whether AWS Audit Manager Default Reports destination is enabled. When enabled, compliance reports are automatically saved to the specified destination for audit trail purposes.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enable",
+        "destinationType"
+      ],
+      "type": "object"
+    },
+    "IAwsConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for AWS Config service that enables continuous monitoring and assessment of AWS resource configurations\nfor compliance, security, and governance. This service records configuration changes, evaluates resources against\ncompliance rules, and provides centralized visibility into your AWS environment's configuration state.",
+      "properties": {
+        "aggregation": {
+          "$ref": "#/definitions/IAwsConfigAggregation",
+          "description": "Configuration for AWS Config aggregation that centralizes compliance data from multiple accounts and regions. This enables organization-wide compliance reporting and centralized governance oversight."
+        },
+        "deploymentTargets": {
+          "$ref": "#/definitions/IDeploymentTargets",
+          "description": "Specifies the organizational units and accounts where AWS Config will be deployed."
+        },
+        "enableConfigurationRecorder": {
+          "description": "Controls whether the AWS Config configuration recorder is enabled to track resource changes.",
+          "type": "boolean"
+        },
+        "enableDeliveryChannel": {
+          "deprecated": "This parameter is deprecated.",
+          "description": "Controls whether the delivery channel is enabled for sending configuration changes to S3.",
+          "type": "boolean"
+        },
+        "overrideExisting": {
+          "description": "Controls whether to override existing Config recorder settings in accounts that already have Config enabled.",
+          "type": "boolean"
+        },
+        "ruleSets": {
+          "description": "Array of Config rule sets that define compliance checks to be deployed across your organization.",
+          "items": {
+            "$ref": "#/definitions/IAwsConfigRuleSet"
+          },
+          "type": "array"
+        },
+        "useServiceLinkedRole": {
+          "description": "Controls whether to use AWS service-linked roles for Config instead of custom IAM roles created by LZA.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enableConfigurationRecorder"
+      ],
+      "type": "object"
+    },
+    "IAwsConfigAggregation": {
+      "additionalProperties": false,
+      "description": "Configuration for AWS Config aggregation that centralizes compliance data from multiple accounts and regions\ninto a single location for organization-wide visibility and reporting. This enables centralized compliance\nmonitoring and simplifies governance oversight across your entire AWS Organization.",
+      "properties": {
+        "delegatedAdminAccount": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The name of the account designated to collect and store aggregated Config data."
+        },
+        "enable": {
+          "description": "Controls whether AWS Config aggregation is enabled across your organization. When enabled, compliance data from all accounts and regions will be centralized for unified reporting and governance oversight.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enable"
+      ],
+      "type": "object"
+    },
+    "IAwsConfigRuleSet": {
+      "additionalProperties": false,
+      "description": "Configuration for a set of AWS Config rules that will be deployed together to specific organizational units or accounts.",
+      "properties": {
+        "deploymentTargets": {
+          "$ref": "#/definitions/IDeploymentTargets",
+          "description": "Specifies the organizational units and accounts where this set of Config rules will be deployed."
+        },
+        "rules": {
+          "description": "Array of AWS Config rules to deploy as part of this rule set.",
+          "items": {
+            "$ref": "#/definitions/IConfigRule"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "deploymentTargets",
+        "rules"
+      ],
+      "type": "object"
+    },
+    "IBlockPublicDocumentSharingConfig": {
+      "additionalProperties": false,
+      "description": "This interface defines the SSM Block Public Document Sharing configuration for organization accounts.\nSSM Block Public Document Sharing prevents AWS Systems Manager documents from being shared publicly,\nproviding an additional layer of security for organizations. The feature operates on a per-region basis\nand is applied across all enabled regions for comprehensive protection.",
+      "properties": {
+        "enable": {
+          "description": "Indicates whether SSM Block Public Document Sharing is enabled across the organization. When true, blocks public document sharing on all accounts except those in excludeAccounts. When false, allows public document sharing on all accounts. This setting is applied in all enabled regions for comprehensive security coverage.",
+          "type": "boolean"
+        },
+        "excludeAccounts": {
+          "description": "List of AWS Account names to be excluded from SSM Block Public Document Sharing configuration. Accounts in this list will have public document sharing allowed regardless of the enable setting. Account names must match those defined in the accounts configuration. Exclusions are applied across all enabled regions.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "enable"
+      ],
+      "type": "object"
+    },
+    "ICentralSecurityServicesConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for centralized security services that provides organization-wide security controls and monitoring capabilities.\nThis configuration enables and manages core AWS security services including GuardDuty, Security Hub, Macie, Detective, and Audit Manager\nacross your entire AWS Organization. It establishes a centralized security posture with consistent policies, automated threat detection,\ncompliance monitoring, and unified security findings management to help organizations maintain strong security governance at scale.",
+      "properties": {
+        "auditManager": {
+          "$ref": "#/definitions/IAuditManagerConfig",
+          "description": "Configuration for AWS Audit Manager compliance automation service across your organization. Audit Manager helps automate evidence collection and assessment preparation for audits by continuously collecting and organizing evidence from your AWS services."
+        },
+        "delegatedAdminAccount": {
+          "$ref": "#/definitions/NonEmptyString",
+          "default": "Audit",
+          "description": "Designated administrator account name for accelerator security services. AWS organizations designate a member account as a delegated administrator for the organization users and roles from that account can perform administrative actions for security services like Macie, GuardDuty, Detective and Security Hub. Without designated administrator account administrative tasks for security services are performed only by users or roles in the organization's management account. This helps you to separate management of the organization from management of these security services. Accelerator currently supports using the Audit account **only** as the delegated administrator account."
+        },
+        "detective": {
+          "$ref": "#/definitions/IDetectiveConfig",
+          "description": "Configuration for Amazon Detective security investigation service across your organization. Detective helps analyze and investigate potential security issues by providing visualizations and context around security findings from GuardDuty, Security Hub, and VPC Flow Logs."
+        },
+        "ebsDefaultVolumeEncryption": {
+          "$ref": "#/definitions/IEbsDefaultVolumeEncryptionConfig",
+          "description": "Configuration for automatically encrypting all new EBS volumes across your organization. This ensures data-at-rest protection and helps meet compliance requirements by enforcing encryption on all EBS volumes without requiring manual configuration.\n\nAWS Elastic Block Store default encryption configuration"
+        },
+        "guardduty": {
+          "$ref": "#/definitions/IGuardDutyConfig",
+          "description": "Configuration for Amazon GuardDuty threat detection service across your organization. GuardDuty provides intelligent threat detection using machine learning to identify malicious activity and unauthorized behavior across your AWS environment."
+        },
+        "macie": {
+          "$ref": "#/definitions/IMacieConfig",
+          "description": "Amazon Macie is a data security service that discovers, classifies, and protects sensitive data\nstored in Amazon S3. When configured, Macie automatically scans S3 buckets to identify personally\nidentifiable information (PII), financial data, and other sensitive content types."
+        },
+        "s3PublicAccessBlock": {
+          "$ref": "#/definitions/IS3PublicAccessBlockConfig",
+          "description": "Configuration for blocking public access to S3 buckets across your organization. This security control prevents accidental data exposure by blocking public access at the account level, providing an additional layer of protection for sensitive data."
+        },
+        "scpRevertChangesConfig": {
+          "$ref": "#/definitions/IScpRevertChangesConfig",
+          "description": "Configuration for monitoring and reverting unauthorized changes to Service Control Policies. This helps maintain security governance by detecting and alerting on manual modifications to SCPs that could weaken your organization's security posture."
+        },
+        "securityHub": {
+          "$ref": "#/definitions/ISecurityHubConfig",
+          "description": "Configuration for AWS Security Hub centralized security findings management across your organization. Security Hub aggregates security alerts and findings from multiple AWS security services."
+        },
+        "snsSubscriptions": {
+          "deprecated": "This parameter is deprecated and will be removed in a future release.\nSNS topic configuration has been moved to the Global Config.",
+          "description": "Configuration for SNS notification subscriptions for security alerts (DEPRECATED).",
+          "items": {
+            "$ref": "#/definitions/ISnsSubscriptionConfig"
+          },
+          "type": "array"
+        },
+        "ssmAutomation": {
+          "$ref": "#/definitions/ISsmAutomationConfig",
+          "description": "Configuration for AWS Systems Manager automation documents across your organization. This enables centralized management and distribution of SSM documents for standardizing operational procedures and automating administrative tasks across all accounts."
+        },
+        "ssmSettings": {
+          "$ref": "#/definitions/ISsmSettingsConfig",
+          "description": "Configuration for AWS Systems Manager security settinga across your organization."
+        }
+      },
+      "required": [
+        "delegatedAdminAccount",
+        "ebsDefaultVolumeEncryption",
+        "s3PublicAccessBlock",
+        "guardduty",
+        "securityHub",
+        "ssmAutomation"
+      ],
+      "type": "object"
+    },
+    "IClassificationScopeExcludedBucketConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for S3 buckets in a specific region to exclude from Macie automated sensitive data discovery.\nGroups multiple bucket names under a single region to avoid repeating the region for each bucket.\n\nThe Macie UpdateClassificationScope API is regional — it only accepts buckets that exist\nin the current AWS Region. The `region` field is required so the solution can filter the\nexclusion list per-region and send only region-local buckets to each regional API call.",
+      "properties": {
+        "names": {
+          "description": "List of S3 bucket names to exclude from automated sensitive data discovery in this region. Each must be the exact, resolved bucket name — no placeholders.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "region": {
+          "description": "AWS region where the buckets reside (e.g., `us-east-1`, `eu-west-1`). Required because the Macie API validates that each bucket exists in the target region.\n\nWhen enabling Macie in a new region for the first time, the bucket inventory may take up to 24 hours to populate. Verify the buckets appear in the Macie S3 bucket inventory in the AWS Console before adding them here to avoid `ValidationException` errors.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "names",
+        "region"
+      ],
+      "type": "object"
+    },
+    "ICloudWatchConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for AWS CloudWatch monitoring and logging services across your organization.",
+      "properties": {
+        "alarmSets": {
+          "description": "Array of alarm sets that monitor metrics and trigger notifications when thresholds are breached.",
+          "items": {
+            "$ref": "#/definitions/IAlarmSetConfig"
+          },
+          "type": "array"
+        },
+        "logGroups": {
+          "description": "Array of CloudWatch log group configurations for centralized log management.",
+          "items": {
+            "$ref": "#/definitions/ILogGroupsConfig"
+          },
+          "type": "array"
+        },
+        "metricSets": {
+          "description": "Array of metric filter sets that extract metrics from log data for monitoring and alerting.",
+          "items": {
+            "$ref": "#/definitions/IMetricSetConfig"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "metricSets",
+        "alarmSets"
+      ],
+      "type": "object"
+    },
+    "IConfigRule": {
+      "additionalProperties": false,
+      "description": "Configuration for AWS Config rules that evaluate AWS resource compliance against organizational policies and best practices.\nConfig rules can be either AWS-managed rules (pre-built compliance checks) or custom rules (organization-specific logic)\nand can include automated remediation to restore compliance when violations are detected.",
+      "properties": {
+        "complianceResourceTypes": {
+          "description": "Array of AWS resource types that this rule will evaluate for compliance.",
+          "items": {
+            "$ref": "#/definitions/NonEmptyString"
+          },
+          "type": "array"
+        },
+        "customRule": {
+          "$ref": "#/definitions/ICustomRuleConfigType",
+          "description": "Configuration for custom config rules backed by AWS Lambda functions. Required when type is set to \"Custom\" for organization-specific compliance logic."
+        },
+        "description": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Human-readable description explaining what this Config rule evaluates."
+        },
+        "identifier": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The identifier of the AWS-managed rule to use for compliance evaluation."
+        },
+        "inputParameters": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/definitions/NonEmptyString"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Key-value pairs that provide configuration parameters to the Config rule."
+        },
+        "name": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Unique name for the AWS Config rule within your organization."
+        },
+        "remediation": {
+          "$ref": "#/definitions/IConfigRuleRemediationType",
+          "description": "Configuration for automated remediation actions when resources are found non-compliant. When configured, AWS Config can automatically fix compliance violations without manual intervention, ensuring continuous compliance across your AWS environment."
+        },
+        "tags": {
+          "description": "Key-value pairs to assign as tags to the Config rule.",
+          "items": {
+            "$ref": "#/definitions/ITag"
+          },
+          "type": "array"
+        },
+        "type": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The type of Config rule being created."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "IConfigRuleRemediationType": {
+      "additionalProperties": false,
+      "description": "Configuration for automated remediation actions that AWS Config executes when resources are found non-compliant.\nThis enables automatic correction of compliance violations using AWS Systems Manager automation documents,\nreducing manual intervention and ensuring continuous compliance across your AWS environment.",
+      "properties": {
+        "automatic": {
+          "description": "Controls whether remediation actions are triggered automatically when non-compliance is detected. When enabled, AWS Config will immediately attempt to remediate non-compliant resources without manual intervention.",
+          "type": "boolean"
+        },
+        "excludeRegions": {
+          "description": "List of AWS regions where this remediation should not be applied.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "maximumAutomaticAttempts": {
+          "default": "5 attempts",
+          "description": "The maximum number of remediation attempts for a single non-compliant resource. This prevents infinite retry loops while allowing for temporary failures to be resolved. After reaching this limit, manual intervention may be required.",
+          "type": "number"
+        },
+        "parameters": {
+          "description": "Array of input parameters to pass to the remediation automation document. These parameters provide the necessary context and data for the automation document to perform the appropriate corrective actions on non-compliant resources.",
+          "items": {
+            "$ref": "#/definitions/IRemediationParametersConfigType"
+          },
+          "type": "array"
+        },
+        "retryAttemptSeconds": {
+          "default": "60 seconds",
+          "description": "Maximum time in seconds that AWS Config waits for each remediation attempt to complete. This prevents remediation actions from running indefinitely and ensures timely failure detection.",
+          "type": "number"
+        },
+        "rolePolicyFile": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Path to the JSON file defining IAM policies for the remediation execution role. This file must be available in the configuration repository."
+        },
+        "targetAccountName": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The name of the AWS account that owns the remediation automation document."
+        },
+        "targetDocumentLambda": {
+          "$ref": "#/definitions/ICustomRuleLambdaType",
+          "description": "Configuration for a Lambda function that supports the remediation automation document. This is used when the remediation requires custom logic that cannot be achieved through standard SSM automation document actions alone."
+        },
+        "targetId": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The name of the AWS Systems Manager automation document that performs the remediation actions."
+        },
+        "targetVersion": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The version of the target automation document to use for remediation."
+        }
+      },
+      "required": [
+        "rolePolicyFile",
+        "automatic",
+        "targetId"
+      ],
+      "type": "object"
+    },
+    "ICustomRuleConfigType": {
+      "additionalProperties": false,
+      "description": "Configuration for custom AWS Config rules that use Lambda functions to evaluate resource compliance.",
+      "properties": {
+        "configurationChanges": {
+          "default": false,
+          "description": "Controls whether the rule runs when AWS resource configurations change. When enabled, the rule will immediately evaluate affected resources whenever their configuration is modified.",
+          "type": "boolean"
+        },
+        "lambda": {
+          "$ref": "#/definitions/ICustomRuleLambdaType",
+          "description": "Configuration for the Lambda function that implements the custom compliance evaluation logic."
+        },
+        "maximumExecutionFrequency": {
+          "default": "MaximumExecutionFrequency.TWENTY_FOUR_HOURS",
+          "description": "The frequency at which periodic evaluations are performed.",
+          "type": "string"
+        },
+        "periodic": {
+          "default": true,
+          "description": "Controls whether the rule runs on a scheduled basis at regular intervals. When enabled, the rule will evaluate resources according to the specified frequency.",
+          "type": "boolean"
+        },
+        "triggeringResources": {
+          "$ref": "#/definitions/ITriggeringResourceType",
+          "description": "Specifies which AWS resources will trigger evaluations for this Config rule."
+        }
+      },
+      "required": [
+        "lambda",
+        "maximumExecutionFrequency",
+        "triggeringResources"
+      ],
+      "type": "object"
+    },
+    "ICustomRuleLambdaType": {
+      "additionalProperties": false,
+      "description": "Configuration for AWS Lambda functions that implement custom AWS Config rules for compliance monitoring.",
+      "properties": {
+        "handler": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The entry point for your Lambda function that AWS Config will invoke. Specifies the method within your code that Lambda calls to execute the compliance evaluation. Format varies by runtime (e.g., \"index.handler\" for Node.js, \"lambda_function.lambda_handler\" for Python)."
+        },
+        "rolePolicyFile": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Path to the JSON file defining IAM policies for the Lambda execution role. This file must be available in the accelerator configuration repository."
+        },
+        "runtime": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The runtime environment for executing your Lambda function. Must be compatible with your function's source code language and version requirements."
+        },
+        "sourceFilePath": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Path to the ZIP file containing your Lambda function source code. This file must be available in the accelerator configuration repository."
+        },
+        "timeout": {
+          "description": "Maximum execution time for the Lambda function in seconds.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "sourceFilePath",
+        "handler",
+        "runtime",
+        "rolePolicyFile"
+      ],
+      "type": "object"
+    },
+    "IDeploymentTargets": {
+      "additionalProperties": false,
+      "description": "## Deployment Targets Interface\n\nDefines where AWS resources should be deployed within your AWS organization. This interface provides flexible targeting options for resource deployment across accounts, organizational units, and regions.\n\n### Key Features\n\n- **Account-level targeting**: Deploy to specific AWS accounts\n- **OU-level targeting**: Deploy to all accounts within organizational units\n- **Regional exclusions**: Skip specific AWS regions for compliance or cost optimization\n- **Account exclusions**: Exclude specific accounts from broader deployments\n\n### Example\n\n```yaml deploymentTargets:   organizationalUnits:     - Production     - Development   excludedAccounts:     - Management   excludedRegions:     - us-west-1 ```",
+      "properties": {
+        "accounts": {
+          "description": "**Target Accounts** *(Optional)*\n\nList of specific account names where resources should be deployed. Use for precise account-level targeting.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "excludedAccounts": {
+          "description": "**Excluded Accounts** *(Optional)*\n\nList of account names to exclude from deployment. Takes precedence over organizational unit and account inclusions.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "excludedRegions": {
+          "description": "**Excluded Regions** *(Optional)*\n\nList of AWS regions to exclude from deployment. Useful for compliance requirements or cost optimization.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "organizationalUnits": {
+          "description": "**Organizational Units** *(Optional)*\n\nList of organizational unit names where resources should be deployed. When specified, resources will be created in all accounts within these OUs.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "IDetectiveConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for Amazon Detective, a security service that helps you analyze, investigate, and quickly identify the\nroot cause of security findings. Use this configuration to enable Amazon Detective for an AWS Organization.\n\n**Prerequisite:** Amazon Detective requires Amazon GuardDuty to be enabled in every account and region where\nDetective is enabled, and GuardDuty must have been continuously enabled for at least 48 hours before Detective\ncan be turned on. Enabling Detective sooner will cause the accelerator pipeline to fail. Ensure that the\n`guardduty` configuration has been deployed and has been running for at least 48 hours in the target accounts\nand regions before enabling Detective in this configuration.",
+      "properties": {
+        "enable": {
+          "description": "Controls whether Amazon Detective is enabled across your organization.\n\n**Prerequisite:** GuardDuty must be enabled and running for at least 48 hours in every targeted account and region before setting `enable: true` here. Enabling Detective before that window will cause the pipeline to fail.",
+          "type": "boolean"
+        },
+        "excludeRegions": {
+          "description": "List of AWS regions where Detective should not be enabled.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "enable"
+      ],
+      "type": "object"
+    },
+    "IDocumentConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for defining AWS Systems Manager documents (SSM documents) that can be used to automate tasks on managed instances.\nSSM documents contain the steps and parameters needed to perform specific administrative tasks or configurations.",
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The unique identifier for the SSM document to be created."
+        },
+        "targetType": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The target resource type that defines which AWS resources this document can operate on."
+        },
+        "template": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The file path to the document template containing the SSM document definition. This file must be available in the accelerator configuration repository."
+        }
+      },
+      "required": [
+        "name",
+        "template"
+      ],
+      "type": "object"
+    },
+    "IDocumentSetConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for sharing AWS Systems Manager documents across organizational units within your AWS Organization.",
+      "properties": {
+        "documents": {
+          "description": "Array of SSM documents to be shared with the specified organizational units.",
+          "items": {
+            "$ref": "#/definitions/IDocumentConfig"
+          },
+          "type": "array"
+        },
+        "shareTargets": {
+          "$ref": "#/definitions/IShareTargets",
+          "description": "Specifies the organizational units (OUs) where the SSM documents will be shared."
+        }
+      },
+      "required": [
+        "shareTargets",
+        "documents"
+      ],
+      "type": "object"
+    },
+    "IEbsDefaultVolumeEncryptionConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for enabling automatic encryption of all new EBS volumes and snapshots in your AWS environment..",
+      "properties": {
+        "deploymentTargets": {
+          "$ref": "#/definitions/IDeploymentTargets",
+          "description": "Specifies which organizational units (OUs) and accounts will have EBS default volume encryption enabled."
+        },
+        "enable": {
+          "description": "Controls whether EBS default volume encryption is enabled. When enabled, all new EBS volumes created in the specified accounts and regions will be encrypted by default.",
+          "type": "boolean"
+        },
+        "excludeRegions": {
+          "description": "List of AWS regions where EBS default volume encryption should not be enabled.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "kmsKey": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Name of the AWS Key Management Service (KMS) key to use for encrypting EBS volumes"
+        }
+      },
+      "required": [
+        "enable"
+      ],
+      "type": "object"
+    },
+    "IEncryptionConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for encrypting CloudWatch log groups using AWS Key Management Service (KMS).",
+      "properties": {
+        "kmsKeyArn": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "References a KMS key, not managed by LZA, for log group encryption."
+        },
+        "kmsKeyName": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "References a KMS key created and managed by Landing Zone Accelerator for log group encryption."
+        },
+        "useLzaManagedKey": {
+          "description": "Uses the default CloudWatch Logs KMS key that is automatically deployed by Landing Zone Accelerator.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "IGuardDutyConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for Amazon GuardDuty, a threat detection service that monitors your AWS environment for malicious activity.\nUse this configuration to enable Amazon GuardDuty for an AWS Organization and configure which AWS services should be\nmonitored for security threats.",
+      "properties": {
+        "autoEnableOrgMembers": {
+          "default": true,
+          "description": "Controls whether GuardDuty is automatically enabled for new accounts joining the organization.",
+          "type": "boolean"
+        },
+        "deploymentTargets": {
+          "$ref": "#/definitions/IDeploymentTargets",
+          "description": "Specifies which organizational units and accounts should have GuardDuty enabled."
+        },
+        "ec2Protection": {
+          "$ref": "#/definitions/IGuardDutyEc2ProtectionConfig",
+          "description": "Configuration for GuardDuty EC2 Malware Protection that scans your EC2 instances for malicious software."
+        },
+        "eksProtection": {
+          "$ref": "#/definitions/IGuardDutyEksProtectionConfig",
+          "description": "(OPTIONAL) AWS GuardDuty EKS Protection configuration."
+        },
+        "enable": {
+          "description": "Controls whether GuardDuty is enabled across your organization to monitor for security threats.",
+          "type": "boolean"
+        },
+        "excludeRegions": {
+          "description": "List of AWS regions where GuardDuty should not be enabled.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "exportConfiguration": {
+          "$ref": "#/definitions/IGuardDutyExportFindingsConfig",
+          "description": "Configuration for exporting GuardDuty findings to S3 for long-term storage and analysis."
+        },
+        "lambdaProtection": {
+          "$ref": "#/definitions/IGuardDutyLambdaProtectionConfig",
+          "description": "Configuration for GuardDuty Lambda Protection that monitors your serverless functions for security threats."
+        },
+        "lifecycleRules": {
+          "description": "S3 lifecycle rules that automatically manage the retention and deletion of GuardDuty findings stored in S3.",
+          "items": {
+            "$ref": "#/definitions/ILifecycleRule"
+          },
+          "type": "array"
+        },
+        "rdsProtection": {
+          "$ref": "#/definitions/IGuardDutyRdsProtectionConfig",
+          "description": "Configuration for GuardDuty RDS Protection that monitors your databases for security threats."
+        },
+        "s3MalwareProtection": {
+          "$ref": "#/definitions/IGuardDutyS3MalwareProtectionConfig",
+          "description": "(OPTIONAL) AWS GuardDuty S3 Malware Protection configuration."
+        },
+        "s3Protection": {
+          "$ref": "#/definitions/IGuardDutyS3ProtectionConfig",
+          "description": "Configuration for GuardDuty S3 Protection that monitors your S3 buckets for suspicious activity."
+        }
+      },
+      "required": [
+        "enable",
+        "s3Protection",
+        "exportConfiguration"
+      ],
+      "type": "object"
+    },
+    "IGuardDutyEc2ProtectionConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for GuardDuty for EC2 malware protection that scans EC2 instances and EBS volumes for malicious software.\nEC2 Malware Protection helps you detect malware and other security threats on your EC2 instances.",
+      "properties": {
+        "enable": {
+          "description": "Controls whether GuardDuty EC2 Malware Protection is enabled to scan your EC2 instances for malware.",
+          "type": "boolean"
+        },
+        "excludeRegions": {
+          "description": "List of AWS regions where GuardDuty EC2 Malware Protection should not be enabled.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "keepSnapshots": {
+          "description": "Controls whether EBS snapshots created during malware scanning are retained. When enables, snapshots are preserved.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enable",
+        "keepSnapshots"
+      ],
+      "type": "object"
+    },
+    "IGuardDutyEksProtectionConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for GuardDuty EKS (Elastic Kubernetes Service) protection that monitors Amazon Elastic Kubernetes Service clusters for security threats.\nEKS Protection helps you detect potential security risks in Amazon EKS clusters.",
+      "properties": {
+        "enable": {
+          "description": "Controls whether GuardDuty EKS Protection is enabled  to monitor your EKS clusters for security threats.",
+          "type": "boolean"
+        },
+        "excludeRegions": {
+          "description": "List of AWS regions where GuardDuty EKS protection should not be enabled.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "manageAgent": {
+          "description": "Controls whether the GuardDuty EKS Agent is managed.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enable"
+      ],
+      "type": "object"
+    },
+    "IGuardDutyExportFindingsConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for exporting GuardDuty security findings to an Amazon S3 bucket for long-term storage and analysis.",
+      "properties": {
+        "destinationType": {
+          "const": "S3",
+          "description": "The type of resource for the publishing destination. Currently only Amazon S3 buckets are supported.",
+          "type": "string"
+        },
+        "enable": {
+          "description": "Controls whether GuardDuty findings are automatically exported to an S3 bucket.",
+          "type": "boolean"
+        },
+        "exportFrequency": {
+          "description": "An enum value that specifies how frequently findings are exported to the S3 bucket. Possible values FIFTEEN_MINUTES, ONE_HOUR, or SIX_HOURS",
+          "enum": [
+            "FIFTEEN_MINUTES",
+            "ONE_HOUR",
+            "SIX_HOURS"
+          ],
+          "type": "string"
+        },
+        "overrideExisting": {
+          "description": "Controls whether existing export configurations can be overwritten with new settings.",
+          "type": "boolean"
+        },
+        "overrideGuardDutyPrefix": {
+          "$ref": "#/definitions/IPrefixConfig",
+          "description": "Custom prefix configuration for organizing GuardDuty findings in your centralized logging S3 bucket."
+        }
+      },
+      "required": [
+        "enable",
+        "destinationType",
+        "exportFrequency"
+      ],
+      "type": "object"
+    },
+    "IGuardDutyLambdaProtectionConfig": {
+      "additionalProperties": false,
+      "description": "AWS GuardDuty Lambda Malware Protection configuration.",
+      "properties": {
+        "enable": {
+          "description": "Controls whether GuardDuty Lambda Protection is enabled to monitor your Lambda functions for security threats.",
+          "type": "boolean"
+        },
+        "excludeRegions": {
+          "description": "List of AWS regions where GuardDuty Lambda Protection should not be enabled.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "enable"
+      ],
+      "type": "object"
+    },
+    "IGuardDutyRdsProtectionConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for GuardDuty RDS (Relational Database Service) protection that monitors Amazon RDS instances for security threats.\nRDS Protection helps you detect potential security risks in your RDS databases.",
+      "properties": {
+        "enable": {
+          "description": "Controls whether GuardDuty RDS Protection is enabled to monitor your RDS databases for security threats..",
+          "type": "boolean"
+        },
+        "excludeRegions": {
+          "description": "List of AWS regions where GuardDuty RDS Protection should not be enabled.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "enable"
+      ],
+      "type": "object"
+    },
+    "IGuardDutyS3MalwareProtectionConfig": {
+      "additionalProperties": false,
+      "description": "Use this configuration to define an Amazon GuardDuty S3 Malware Protection Plan to an Amazon S3 bucket.",
+      "properties": {
+        "enable": {
+          "description": "Indicates whether AWS GuardDuty S3 Malware Protection is enabled.",
+          "type": "boolean"
+        },
+        "s3Configurations": {
+          "description": "(OPTIONAL) The S3 Malware Protection Configuration. Provide this configuration when enabling this feature.",
+          "items": {
+            "$ref": "#/definitions/IMalwareProtectionConfig"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "enable"
+      ],
+      "type": "object"
+    },
+    "IGuardDutyS3ProtectionConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for enabling S3 protection with Amazon GuardDuty to detect suspicious and malicious activity in your S3 buckets.\nUse this configuration to enable S3 Protection with Amazon GuardDuty to monitor object-level API operations for potential\nsecurity risks for data within Amazon S3 buckets.",
+      "properties": {
+        "enable": {
+          "description": "Controls whether GuardDuty S3 protection is enabled to monitor your S3 buckets for suspicious activity.",
+          "type": "boolean"
+        },
+        "excludeRegions": {
+          "description": "List of AWS regions where Amazon GuardDuty S3 protection should not be enabled.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "enable"
+      ],
+      "type": "object"
+    },
+    "IIamPasswordPolicyConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for AWS Identity and Access Management (IAM) password policy that enforces password complexity and security requirements\nfor IAM users across your organization.",
+      "properties": {
+        "allowUsersToChangePassword": {
+          "default": true,
+          "description": "Controls whether IAM users can change their own passwords through the AWS Management Console. When enabled, users can update their passwords without administrator intervention.",
+          "type": "boolean"
+        },
+        "hardExpiry": {
+          "default": true,
+          "description": "Controls whether IAM users can set a new password after their current password expires. When enabled, users with expired passwords cannot access the console until an administrator resets their password.",
+          "type": "boolean"
+        },
+        "maxPasswordAge": {
+          "default": 90,
+          "description": "The maximum number of days a password remains valid before requiring a change.",
+          "type": "number"
+        },
+        "minimumPasswordLength": {
+          "default": 14,
+          "description": "The minimum number of characters required for IAM user passwords.",
+          "type": "number"
+        },
+        "passwordReusePrevention": {
+          "default": 24,
+          "description": "The number of previous passwords that users cannot reuse.",
+          "type": "number"
+        },
+        "requireLowercaseCharacters": {
+          "default": true,
+          "description": "Requires passwords to contain at least one lowercase letter from the ISO basic Latin alphabet (a to z).",
+          "type": "boolean"
+        },
+        "requireNumbers": {
+          "default": true,
+          "description": "Requires passwords to contain at least one numeric character (0-9).",
+          "type": "boolean"
+        },
+        "requireSymbols": {
+          "default": true,
+          "description": "Requires passwords to contain at least one special character. Allowed symbols: ! @ # $ % ^ & * ( ) _ + - = [ ] { } | '",
+          "type": "boolean"
+        },
+        "requireUppercaseCharacters": {
+          "default": true,
+          "description": "Requires passwords to contain at least one uppercase letter from the ISO basic Latin alphabet (A to Z).",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "allowUsersToChangePassword",
+        "hardExpiry",
+        "requireUppercaseCharacters",
+        "requireLowercaseCharacters",
+        "requireSymbols",
+        "requireNumbers",
+        "minimumPasswordLength",
+        "passwordReusePrevention",
+        "maxPasswordAge"
+      ],
+      "type": "object"
+    },
+    "IKeyConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for creating and managing customer-managed keys (CMKs.\nThese keys provide enhanced security control compared to AWS-managed keys, allowing you to define custom access policies,\nenable automatic key rotation, and maintain compliance with data protection regulations. Customer-managed keys are essential\nfor organizations that need granular control over encryption operations and key lifecycle management.",
+      "properties": {
+        "alias": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Human-readable alias that provides an easy way to identify and use the encryption key."
+        },
+        "deploymentTargets": {
+          "$ref": "#/definitions/IDeploymentTargets",
+          "description": "Specifies which organizational units and accounts the customer-managed key is deployed to."
+        },
+        "description": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Human-readable description explaining the purpose and intended use of this encryption key."
+        },
+        "enableKeyRotation": {
+          "default": true,
+          "description": "Controls whether AWS Key Management Service (KMS) automatially rotates the encryption key material.",
+          "type": "boolean"
+        },
+        "enabled": {
+          "default": "true (key is enabled)",
+          "description": "Controls whether the encryption key is available to be used. Disabled keys cannot encrypt or decrypt data.",
+          "type": "boolean"
+        },
+        "name": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Unique identifier for the customer-managed key."
+        },
+        "policy": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Path to the file containing the key policy. The policy file must exist in your configuration repository."
+        },
+        "removalPolicy": {
+          "default": "retain",
+          "description": "Determines what happens to the encryption key when it's removed from the Stack. 'retain' preserves the key for data recovery, 'destroy' permanently deletes it, 'snapshot' creates a backup.",
+          "enum": [
+            "destroy",
+            "retain",
+            "snapshot"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "deploymentTargets"
+      ],
+      "type": "object"
+    },
+    "IKeyManagementServiceConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for AWS Key Management Service (KMS) that enables centralized management of encryption keys\nacross your organization. This allows you to create, manage, and control customer-managed KMS keys\nfor encrypting data at rest and in transit, helping meet compliance requirements and security best practices.",
+      "properties": {
+        "keySets": {
+          "description": "Array of KMS key configurations to be created and managed across your organization.",
+          "items": {
+            "$ref": "#/definitions/IKeyConfig"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "keySets"
+      ],
+      "type": "object"
+    },
+    "ILifecycleRule": {
+      "additionalProperties": false,
+      "description": "## S3 Bucket Lifecycle Rule Configuration\n\nDefines lifecycle management rules for S3 buckets to automatically transition objects between storage classes and manage object expiration. Lifecycle rules help optimize storage costs and manage data retention policies.\n\n### Key Features\n\n- **Cost Optimization**: Automatically transition objects to cheaper storage classes\n- **Data Management**: Set expiration policies for automatic cleanup\n- **Version Control**: Manage current and non-current object versions separately\n- **Prefix Filtering**: Apply rules to specific object prefixes or entire buckets\n\n### Usage Example\n\n```yaml lifecycleRules:   - enabled: true     id: LogsLifecycle     abortIncompleteMultipartUpload: 7     expiration: 2555  # ~7 years     expiredObjectDeleteMarker: false     noncurrentVersionExpiration: 365     transitions:       - storageClass: STANDARD_IA         transitionAfter: 30       - storageClass: GLACIER         transitionAfter: 365     prefix: logs/\n\n  - enabled: true     id: ArchiveLifecycle     expiredObjectDeleteMarker: true     noncurrentVersionExpiration: 90     transitions:       - storageClass: DEEP_ARCHIVE         transitionAfter: 180 ```",
+      "properties": {
+        "abortIncompleteMultipartUpload": {
+          "description": "**Abort Incomplete Multipart Uploads** *(Optional)*\n\nNumber of days after which incomplete multipart uploads are automatically aborted and cleaned up. This helps prevent storage costs from abandoned multipart uploads.\n\n### Benefits\n\n- **Cost Control**: Prevents charges for incomplete upload parts\n- **Storage Cleanup**: Automatically removes orphaned multipart data\n- **Operational Hygiene**: Maintains clean bucket state\n\n### Considerations\n\n- Set based on your typical upload patterns and file sizes\n- Consider network reliability and upload duration requirements\n- Balance between cost control and operational flexibility",
+          "type": "number"
+        },
+        "enabled": {
+          "default": true,
+          "description": "**Rule Enabled** *(Optional)*\n\nControls whether this lifecycle rule is active and enforced. Allows you to temporarily disable rules without removing them from the configuration.",
+          "type": "boolean"
+        },
+        "expiration": {
+          "description": "**Object Expiration** *(Optional)*\n\nNumber of days after object creation when objects are permanently deleted from the bucket. This implements automatic data retention policies and helps manage storage costs for time-sensitive data.\n\n### Use Cases\n\n- **Log Retention**: Automatically delete old log files\n- **Compliance**: Enforce data retention policies\n- **Cost Management**: Remove data that's no longer needed\n- **Regulatory Requirements**: Meet data disposal requirements\n\n### Important Considerations\n\n- **Irreversible**: Expired objects are permanently deleted\n- **Compliance**: Ensure retention periods meet regulatory requirements\n- **Business Needs**: Consider future data access requirements\n- **Backup Strategy**: Ensure critical data is backed up before expiration",
+          "type": "number"
+        },
+        "expiredObjectDeleteMarker": {
+          "default": false,
+          "description": "**Expired Object Delete Marker Cleanup** *(Optional)*\n\nControls whether S3 automatically removes delete markers that have no non-current versions. This helps clean up versioned buckets and reduce storage costs from orphaned delete markers.\n\n### Benefits When Enabled\n\n- **Cost Reduction**: Eliminates charges for orphaned delete markers\n- **Storage Optimization**: Keeps bucket metadata clean\n- **Operational Efficiency**: Reduces clutter in versioned buckets",
+          "type": "boolean"
+        },
+        "id": {
+          "description": "**Rule Identifier** *(Optional)*\n\nUnique, human-readable name for the lifecycle rule within the bucket. Used for rule identification, management, and troubleshooting.",
+          "type": "string"
+        },
+        "noncurrentVersionExpiration": {
+          "description": "**Non-Current Version Expiration** *(Optional)*\n\nNumber of days after an object version becomes non-current when it should be permanently deleted. This manages storage costs for versioned buckets by cleaning up old object versions.\n\n### Considerations\n\n- **Recovery Needs**: Balance cost vs. ability to recover old versions\n- **Compliance**: Some regulations require version retention\n- **Storage Costs**: Non-current versions incur full storage charges\n- **Access Patterns**: Consider how often old versions are accessed",
+          "type": "number"
+        },
+        "noncurrentVersionTransitions": {
+          "description": "**Non-Current Version Transitions** *(Optional)*\n\nArray of transition rules that specify when non-current object versions should move to different storage classes. This optimizes costs for versioned buckets by moving old versions to cheaper storage.\n\n### Storage Class Optimization\n\nNon-current versions are typically accessed less frequently than current versions, making them ideal candidates for cheaper storage classes.",
+          "items": {
+            "$ref": "#/definitions/ITransition"
+          },
+          "type": "array"
+        },
+        "prefix": {
+          "$ref": "#/definitions/NonEmptyString",
+          "default": "undefined (applies to all objects in the bucket)",
+          "description": "**Object Key Prefix Filter** *(Optional)*\n\nObject key prefix that identifies which objects this lifecycle rule applies to. When specified, the rule only affects objects whose keys start with this prefix. When omitted, the rule applies to all objects in the bucket.\n\n\n### Best Practices\n\n- Use consistent prefix naming conventions\n- Design prefixes to support different lifecycle needs\n- Consider future organizational changes\n- Document prefix meanings and purposes"
+        },
+        "transitions": {
+          "description": "**Current Version Transitions** *(Optional)*\n\nArray of transition rules that specify when current objects should move to different storage classes. This implements cost optimization strategies based on data access patterns and age.\n\n### Cost Optimization Strategy\n\nDesign transitions based on your data access patterns:\n- **Frequently Accessed**: Keep in Standard storage\n- **Infrequently Accessed**: Transition to Standard-IA\n- **Archive Data**: Move to Glacier or Deep Archive\n- **Long-term Retention**: Use Deep Archive for lowest cost",
+          "items": {
+            "$ref": "#/definitions/ITransition"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ILogGroupsConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for deploying and managing CloudWatch log groups across your organization.\nYou can deploy new log groups or import existing ones into your accelerator configuration for centralized management.",
+      "properties": {
+        "deploymentTargets": {
+          "$ref": "#/definitions/IDeploymentTargets",
+          "description": "Specifies the organizational units and accounts where this log group will be deployed."
+        },
+        "encryption": {
+          "$ref": "#/definitions/IEncryptionConfig",
+          "description": "Configuration for encrypting log data at rest using AWS KMS."
+        },
+        "logGroupName": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The name of the CLoudWatch log group to create or manage."
+        },
+        "logRetentionInDays": {
+          "default": "undefined",
+          "description": "The number of days to retain log events in the log group.",
+          "type": "number"
+        },
+        "terminationProtected": {
+          "default": true,
+          "description": "Controls whether the log group should be protected from accidental deletion.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "logGroupName",
+        "logRetentionInDays",
+        "deploymentTargets"
+      ],
+      "type": "object"
+    },
+    "IMacieConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for Amazon Macie, a data security service that discovers, classifies, and protects sensitive data.\nUse this configuration to enable Amazon Macie within your AWS Organization along with it's reporting configuration.",
+      "properties": {
+        "automatedDiscoveryEnabled": {
+          "default": true,
+          "description": "When true, automated discovery continuously samples and analyzes S3 objects across\nmember accounts to detect sensitive data without requiring manual job creation.\nWhen false, explicitly disables automated discovery.",
+          "type": "boolean"
+        },
+        "classificationScopeExcludedBuckets": {
+          "description": "Specifies S3 buckets that Macie should not analyze during automated sensitive data discovery.\nThe exclusion list is applied on the delegated admin account and applies to all member accounts.\nInternally uses REPLACE operation to ensure the exclusion list matches the declared state.\n\nEach entry requires the bucket name and the AWS region where the bucket resides.\nThe Macie UpdateClassificationScope API is regional — it only accepts buckets that exist\nin the current AWS Region. The solution filters this list per-region automatically.",
+          "items": {
+            "$ref": "#/definitions/IClassificationScopeExcludedBucketConfig"
+          },
+          "type": "array"
+        },
+        "disabledRegions": {
+          "description": "Specifies AWS regions where the security service will be explicitly disabled when the service\nis enabled (`enable: true`). LZA will enable the service in all `enabledRegions` defined in the\nglobal config, except those listed in `excludeRegions` and `disabledRegions`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "enable": {
+          "description": "Controls whether AWS Macie is enabled across your organization",
+          "type": "boolean"
+        },
+        "excludeRegions": {
+          "description": "Specifies AWS regions where LZA will not configure the security service at all.\nThese regions are completely skipped during service deployment and management,\nregardless of whether the service is enabled or disabled.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "lifecycleRules": {
+          "description": "Declaration of S3 Lifecycle rules that automatically manage the retention and deletion for Macie findings reports stored in S3.",
+          "items": {
+            "$ref": "#/definitions/ILifecycleRule"
+          },
+          "type": "array"
+        },
+        "overrideExisting": {
+          "default": false,
+          "description": "When set to true, forces the LZA security Macie module to execute regardless of previous state checks.\nThis flag bypasses the normal state validation that determines whether the Macie module should run\nbased on its current configuration state.",
+          "type": "boolean"
+        },
+        "policyFindingsPublishingFrequency": {
+          "description": "Specifies how frequently findings are published to Security Hub. Possible values: FIFTEEN_MINUTES, ONE_HOUR, or SIX_HOURS\n\nDefault value is FIFTEEN_MINUTES",
+          "enum": [
+            "FIFTEEN_MINUTES",
+            "ONE_HOUR",
+            "SIX_HOURS"
+          ],
+          "type": "string"
+        },
+        "publishPolicyFindings": {
+          "description": "Specifies whether to publish findings to Security Hub and EventBridge Default value is false.",
+          "type": "boolean"
+        },
+        "publishSensitiveDataFindings": {
+          "description": "Specifies whether to publish sensitive data findings to Security Hub. If you set this value to true, Amazon Macie automatically publishes all sensitive data findings that weren't suppressed by a findings filter. Default value is false.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enable"
+      ],
+      "type": "object"
+    },
+    "IMalwareProtectionConfig": {
+      "additionalProperties": false,
+      "description": "AWS GuardDuty S3 Malware Protection configuration.",
+      "properties": {
+        "account": {
+          "description": "Account that S3 bucket resides in",
+          "type": "string"
+        },
+        "enableMalwareProtectionTags": {
+          "description": "Information about whether the tags will be added to the S3 object after scanning.",
+          "type": "boolean"
+        },
+        "objectPrefixes": {
+          "description": "Information about the specified object prefixes. The S3 object will be scanned only if it belongs to any of the specified object prefixes.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "region": {
+          "description": "Region that S3 bucket resides in",
+          "type": "string"
+        },
+        "s3BucketName": {
+          "description": "Name of the S3 bucket.",
+          "type": "string"
+        },
+        "tags": {
+          "description": "(OPTIONAL) Tags added to the Malware Protection plan resource.",
+          "items": {
+            "$ref": "#/definitions/ITag"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "account",
+        "region",
+        "s3BucketName"
+      ],
+      "type": "object"
+    },
+    "IMetricConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for CloudWatch metric filters that extract metrics from log data for monitoring and alerting.\nMetric filters turn log data into numerical CloudWatch metrics that you can graph or set alarms on.",
+      "properties": {
+        "defaultValue": {
+          "description": "Th value reported to the metric filter during a period when logs are ingested but no matching logs are found.",
+          "type": "number"
+        },
+        "filterName": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Unique name for the metric filter within the log group."
+        },
+        "filterPattern": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "A symbolic description of how CloudWatch Logs should interpret the data in each log event. The pattern specifies what to look for in the log file, such as timestamps, IP addresses, strings, and so on."
+        },
+        "logGroupName": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The name of the CLoudWatch Logs log group to monitor for matching events. The metric filter will scan all log streams within this log group for events that match the specified filter pattern."
+        },
+        "metricName": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The name of the CloudWatch metric to which the monitored log information should be published."
+        },
+        "metricNamespace": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The destination namespace of the new CloudWatch metric."
+        },
+        "metricValue": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The numerical value to publish to the metric each time a matching log is found. Can either be a literal number (typically “1”), or the name of a field in the structure to take the value from the matched event. If you are using a field value, the field value must have been matched using the pattern."
+        },
+        "treatMissingData": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Defines how CloudWatch alarms should handle periods when no matching log events occur."
+        }
+      },
+      "required": [
+        "filterName",
+        "logGroupName",
+        "filterPattern",
+        "metricNamespace",
+        "metricName",
+        "metricValue"
+      ],
+      "type": "object"
+    },
+    "IMetricSetConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for a set of CloudWatch metric filters that will be deployed together to specific regions and organizational units.",
+      "properties": {
+        "deploymentTargets": {
+          "$ref": "#/definitions/IDeploymentTargets",
+          "description": "Specfies the organizational units and accounts where this set of metric filters will be deployed."
+        },
+        "metrics": {
+          "description": "Array of CloudWatch metric filter configurations to deploy as part of this metric set.",
+          "items": {
+            "$ref": "#/definitions/IMetricConfig"
+          },
+          "type": "array"
+        },
+        "regions": {
+          "description": "AWS regions where the CloudWatch metric filters will be deployed.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "metrics"
+      ],
+      "type": "object"
+    },
+    "INetworkPerimeterConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for defining the network perimeter scope when using VPC lookup parameters in resource policies.",
+      "properties": {
+        "managedVpcOnly": {
+          "description": "Controls which VPCs are included when using VPC lookup parameters in resource policy templates.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "IPrefixConfig": {
+      "additionalProperties": false,
+      "description": "## Centralized Logging Prefix Configuration Interface\n\nConfiguration interface for customizing the S3 prefix structure used in centralized logging buckets. Allows organizations to override the default LZA logging path structure to meet specific organizational or compliance requirements.\n\n### Key Features\n\n- **Custom Prefixes**: Override default LZA logging path structure\n- **Organizational Alignment**: Align with existing logging conventions\n- **Compliance**: Meet specific regulatory path requirements\n- **Flexibility**: Maintain consistency across different log types\n\n### Example\n\n```yaml prefixConfig:   useCustomPrefix: true   customOverride: compliance/audit-logs ```",
+      "properties": {
+        "customOverride": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "**Custom Override** *(Optional)*\n\nPrefix to be used for Centralized Logging Path when useCustomPrefix is enabled. This prefix will be prepended to the default LZA logging structure."
+        },
+        "useCustomPrefix": {
+          "default": false,
+          "description": "**Use Custom Prefix** *(Required)*\n\nIndicates whether or not to add a custom prefix to LZA Default Centralized Logging location. If useCustomPrefix is set to true, logs will be stored in the Centralized Logging Bucket prefix.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "useCustomPrefix"
+      ],
+      "type": "object"
+    },
+    "IRemediationParametersConfigType": {
+      "additionalProperties": false,
+      "description": "Configuration for input parameters passed to AWS Config rule remediation actions.\nThese parameters provide the necessary data and context for remediation automation documents\nto execute corrective actions on non-compliant resources, enabling automated compliance restoration.",
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The name of the parameter as expected by the remediation automation document."
+        },
+        "type": {
+          "description": "The data type of the parameter value, determining how the remediation document interprets the input.",
+          "enum": [
+            "String",
+            "StringList"
+          ],
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The value to pass for this parameter during remediation execution."
+        }
+      },
+      "required": [
+        "name",
+        "value",
+        "type"
+      ],
+      "type": "object"
+    },
+    "IResourcePolicyConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for defining resource-based policies that will be automatically applied to specific AWS resource types.\nThis allows you to enforce consistent access controls and security policies across resources of the same type\nthroughout your organization using AWS Config rules for automated compliance monitoring and remediation.",
+      "properties": {
+        "document": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Path to the JSON policy document file that defines the resource-based policy. This file must be available in the accelerator configuration repository."
+        },
+        "resourceType": {
+          "description": "The type of AWS resource that this policy will be applied to. This determines which AWS resources will be targeted for policy enforcement, such as S3 buckets, KMS keys, IAM roles, or other supported resource types.",
+          "enum": [
+            "S3_BUCKET",
+            "KMS_KEY",
+            "IAM_ROLE",
+            "SECRETS_MANAGER_SECRET",
+            "ECR_REPOSITORY",
+            "OPENSEARCH_DOMAIN",
+            "SNS_TOPIC",
+            "SQS_QUEUE",
+            "APIGATEWAY_REST_API",
+            "LEX_BOT",
+            "EFS_FILE_SYSTEM",
+            "EVENTBRIDGE_EVENTBUS",
+            "BACKUP_VAULT",
+            "CODEARTIFACT_REPOSITORY",
+            "CERTIFICATE_AUTHORITY",
+            "LAMBDA_FUNCTION"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "resourceType",
+        "document"
+      ],
+      "type": "object"
+    },
+    "IResourcePolicyEnforcementConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for automated resource policy enforcement across your AWS Organization using AWS Config rules.",
+      "properties": {
+        "enable": {
+          "description": "Controls whether resource policy enforcement is enabled across your organization. When enabled, AWS Config rules will be deployed to monitor and enforce resource-based policies according to the configured policy sets and remediation settings.",
+          "type": "boolean"
+        },
+        "networkPerimeter": {
+          "$ref": "#/definitions/INetworkPerimeterConfig",
+          "description": "Configuration for network perimeter controls when using VPC lookup parameters in resource policies. This optional setting controls which VPCs are included when resolving network references in policy templates."
+        },
+        "policySets": {
+          "description": "Array of policy sets that define which resource policies to enforce and where to deploy them.",
+          "items": {
+            "$ref": "#/definitions/IResourcePolicySetConfig"
+          },
+          "type": "array"
+        },
+        "remediation": {
+          "$ref": "#/definitions/IResourcePolicyRemediation",
+          "description": "Configuration for automated remediation when policy violations are detected. This defines how AWS Config should respond when resources are found to be non-compliant."
+        }
+      },
+      "required": [
+        "enable",
+        "remediation",
+        "policySets"
+      ],
+      "type": "object"
+    },
+    "IResourcePolicyRemediation": {
+      "additionalProperties": false,
+      "description": "Configuration for automated remediation actions when AWS Config detects non-compliant resource policies.\nThis enables automatic correction of policy violations to maintain consistent security controls\nacross your organization without manual intervention, helping ensure continuous compliance.",
+      "properties": {
+        "automatic": {
+          "description": "Controls whether remediation actions are triggered automatically when policy violations are detected. When enabled, AWS Config will automatically attempt to correct non-compliant resource policies.",
+          "type": "boolean"
+        },
+        "maximumAutomaticAttempts": {
+          "default": "5 attempts",
+          "description": "Maximum number of times AWS Config will attempt to remediate a non-compliant resource. This prevents infinite retry loops while allowing for temporary failures to be resolved. After reaching this limit, manual intervention may be required.",
+          "type": "number"
+        },
+        "retryAttemptSeconds": {
+          "default": "60 seconds",
+          "description": "Maximum time in seconds that AWS Config waits before timing out a remediation attempt. This prevents remediation actions from running indefinitely and ensures timely completion.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "automatic"
+      ],
+      "type": "object"
+    },
+    "IResourcePolicySetConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for a set of resource policies that will be deployed together to specific organizational units or accounts.\nThis allows you to group related resource policies and deploy them as a cohesive security control package\nacross your organization, ensuring consistent policy enforcement for different environments or business units.",
+      "properties": {
+        "deploymentTargets": {
+          "$ref": "#/definitions/IDeploymentTargets",
+          "description": "Specifies the organizational units and accounts where the AWS Config rules and remediation actions will be deployed."
+        },
+        "inputParameters": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Custom parameters that will be passed as environment variables to the AWS Config rule and remediation Lambda functions.",
+          "type": "object"
+        },
+        "resourcePolicies": {
+          "description": "Array of resource policy configurations that define the specific policies to be enforced.",
+          "items": {
+            "$ref": "#/definitions/IResourcePolicyConfig"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "deploymentTargets",
+        "resourcePolicies"
+      ],
+      "type": "object"
+    },
+    "IS3PublicAccessBlockConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for preventing accidental public exposure of S3 buckets and objects across your organization.\nWhen enabled, this setting applies organization-wide security guardrails that prevent users from accidentally making S3 buckets or objects publicly accessible.",
+      "properties": {
+        "enable": {
+          "description": "Indicates whether S3 public access blocking is enforced across all accounts in your organization.",
+          "type": "boolean"
+        },
+        "excludeAccounts": {
+          "description": "List of AWS account names that should be exempted from S3 public access blocking requirements.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "enable"
+      ],
+      "type": "object"
+    },
+    "IScpRevertChangesConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for automatically detecting and reverting manual changes to Service Control Policies (SCPs).\nThis securty control helps maintain governance by ensuring that security policies cannot be modified\noutside of your approved change management process. When enabled, any manual changes to SCPs will be\nautomatically reverted and security teams will be notified of the attempted modification.",
+      "properties": {
+        "enable": {
+          "description": "Indicates whether manual changes to Service Control Policies are automatically detected and reverted.",
+          "type": "boolean"
+        },
+        "snsTopicName": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Name of the SNS topic that will receive alerts when unauthorized SCP changes are detected and reverted."
+        }
+      },
+      "required": [
+        "enable"
+      ],
+      "type": "object"
+    },
+    "ISecurityConfig": {
+      "additionalProperties": false,
+      "description": "Root configuration for the Landing Zone Accelerator security services and controls.\nThis configuration enables comprehensive security governance across your AWS Organization through\ncentralized security services, compliance monitoring, access controls, encryption management,\nand automated monitoring and alerting capabilities.",
+      "properties": {
+        "accessAnalyzer": {
+          "$ref": "#/definitions/IAccessAnalyzerConfig",
+          "description": "Configuration for AWS IAM Access Analyzer that identifies resources with external access and helps implement least privilege by analyzing resource policies for security risks."
+        },
+        "awsConfig": {
+          "$ref": "#/definitions/IAwsConfig",
+          "description": "Configuration for AWS Config service that enables continuous monitoring and assessment of AWS resource configurations for compliance, security, and governance across your organization."
+        },
+        "centralSecurityServices": {
+          "$ref": "#/definitions/ICentralSecurityServicesConfig",
+          "description": "Configuration for centralized security services that provide organization-wide security controls."
+        },
+        "cloudWatch": {
+          "$ref": "#/definitions/ICloudWatchConfig",
+          "description": "Configuration for AWS CloudWatch monitoring and logging services that provide comprehensive observability through metric filters, automated alerting, and centralized log management."
+        },
+        "homeRegion": {
+          "description": "The primary AWS region where the Landing Zone Accelerator is deployed and managed.",
+          "type": "string"
+        },
+        "iamPasswordPolicy": {
+          "$ref": "#/definitions/IIamPasswordPolicyConfig",
+          "description": "Configuration for organization-wide IAM password policy that enforces password complexity and security requirements for IAM users across all accounts in your organization."
+        },
+        "keyManagementService": {
+          "$ref": "#/definitions/IKeyManagementServiceConfig",
+          "description": "Configuration for AWS Key Management Service (KMS) that enables centralized management of encryption keys across your organization for data protection and compliance requirements."
+        },
+        "resourcePolicyEnforcement": {
+          "$ref": "#/definitions/IResourcePolicyEnforcementConfig",
+          "description": "Configuration for automated resource policy enforcement that uses AWS Config rules to automatically apply and maintain consistent resource-based policies across your organization, ensuring continuous compliance with security standards."
+        }
+      },
+      "required": [
+        "centralSecurityServices",
+        "accessAnalyzer",
+        "iamPasswordPolicy",
+        "awsConfig",
+        "cloudWatch"
+      ],
+      "type": "object",
+      "patternProperties": {
+        "^\\.": {
+          "description": "YAML anchor"
+        }
+      }
+    },
+    "ISecurityHubAutomationRuleAction": {
+      "additionalProperties": false,
+      "description": "Configuration for defining the specific actions that Security Hub automation rules will perform on findings\nthat match the rule criteria.\nActions determine what modifications will be made to findings, such as updating severity, suppressing findings, or adding notes.",
+      "properties": {
+        "findingFieldsUpdate": {
+          "$ref": "#/definitions/ISecurityHubAutomationRuleFindingFieldsUpdate",
+          "description": "Configuration specifying which finding fields to update and their new values. This defines the specific modifications that will be applied to matching findings, such as changing severity, workflow status, or adding explanatory notes."
+        },
+        "type": {
+          "description": "The type of action to perform when findings match the automation rule criteria.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object"
+    },
+    "ISecurityHubAutomationRuleConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for defining Security Hub automation rules that automatically update findings based on specified criteria.\nAutomation rules help streamline security operations by automatically suppressing, updating, or enriching findings.",
+      "properties": {
+        "actions": {
+          "description": "Array of actions to perform on findings that match the rule criteria.",
+          "items": {
+            "$ref": "#/definitions/ISecurityHubAutomationRuleAction"
+          },
+          "type": "array"
+        },
+        "criteria": {
+          "description": "Array of criteria that findings must match to trigger the rule actions",
+          "items": {
+            "$ref": "#/definitions/ISecurityHubAutomationRuleCriteria"
+          },
+          "type": "array"
+        },
+        "description": {
+          "description": "A detailed description explaining what the automation rule does and when it applies.",
+          "type": "string"
+        },
+        "enabled": {
+          "description": "Controls whether the automation rule is enabled and will proccess findings.",
+          "type": "boolean"
+        },
+        "excludeRegions": {
+          "description": "List of AWS regions where this automation rule should not be applied.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "isTerminal": {
+          "description": "Indiciates whether this rule should be the last rule applied to a matching finding.",
+          "type": "boolean"
+        },
+        "name": {
+          "description": "The unique name identifier for the automation rule.",
+          "type": "string"
+        },
+        "ruleOrder": {
+          "description": "The execution order for this rule when multiple rules apply to the same finding. Rules with lower numbers execute first. Valid range: 1-1000.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "enabled",
+        "actions",
+        "criteria"
+      ],
+      "type": "object"
+    },
+    "ISecurityHubAutomationRuleCriteria": {
+      "additionalProperties": false,
+      "description": "Configuration for defining the filtering criteria that Security Hub findings must match to trigger automation rule actions.\nEach criteria specifies a finding field (key) and the filter conditions that determine whether a finding matches the rule.\nSupports any valid SecurityHub finding field as a key with appropriate filter arrays as values.",
+      "properties": {
+        "filter": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/definitions/ISecurityHubAutomationRulesStringFilter"
+              },
+              "type": "array"
+            },
+            {
+              "items": {
+                "$ref": "#/definitions/ISecurityHubAutomationRulesNumberFilter"
+              },
+              "type": "array"
+            },
+            {
+              "items": {
+                "$ref": "#/definitions/ISecurityHubAutomationRulesDateFilter"
+              },
+              "type": "array"
+            },
+            {
+              "items": {
+                "$ref": "#/definitions/ISecurityHubAutomationRulesKeyValueFilter"
+              },
+              "type": "array"
+            }
+          ],
+          "description": "The filter conditions to apply to the specified finding field. The filter type (string, number, date, or key-value) must match the data type of the field being filtered."
+        },
+        "key": {
+          "description": "The name of the Security Hub finding field to filter on.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "filter"
+      ],
+      "type": "object"
+    },
+    "ISecurityHubAutomationRuleFindingFieldsUpdate": {
+      "additionalProperties": false,
+      "description": "Configuration for updating specific fields within Security Hub findings through automation rules.\nIdentifies the finding fields that the automation rule action updates when a finding matches the defined criteria.",
+      "properties": {
+        "confidence": {
+          "description": "The confidence score (0-100) indicating how certain the automation rule is about the finding's accuracy.",
+          "type": "number"
+        },
+        "criticality": {
+          "description": "The criticality score (0-100) representing the business impact if this finding represents a real security issue.",
+          "type": "number"
+        },
+        "note": {
+          "$ref": "#/definitions/ISecurityHubAutomationRuleNote",
+          "description": "The updated note to add to the finding that documents the reason for the automated action."
+        },
+        "relatedFindings": {
+          "description": "Array of related findings to link to this finding for correlation and context.",
+          "items": {
+            "$ref": "#/definitions/ISecurityHubAutomationRuleRelatedFinding"
+          },
+          "type": "array"
+        },
+        "severityLabel": {
+          "description": "Severity label to assign to the finding",
+          "type": "string"
+        },
+        "types": {
+          "description": "Array of finding types to assign, categorizing the nature of the security issue.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "userDefinedFields": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Custom key-value pairs to add to the finding for organization-specific metadata.",
+          "type": "object"
+        },
+        "verificationState": {
+          "description": "The verification state to assign to the finding, indicating the validation status of the security issue. Valid values: UNKNOWN, TRUE_POSITIVE, FALSE_POSITIVE, BENIGN_POSITIVE.",
+          "type": "string"
+        },
+        "workflowStatus": {
+          "description": "Workflow status to assign to the finding to update information about the investigation. This controls the finding's state in your security workflow (e.g., NEW, NOTIFIED, RESOLVED, SUPPRESSED).",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ISecurityHubAutomationRuleNote": {
+      "additionalProperties": false,
+      "description": "Configuration for adding explanatory notes to Security Hub findings through automation rules.\nThis allows automation rules to automatically document the reason for actions taken on findings,\nproviding context and audit trails for security teams to understand automated decisions.",
+      "properties": {
+        "text": {
+          "description": "The descriptive text content of the note that will be added to the finding. This should explain the reason for the automation action",
+          "type": "string"
+        },
+        "updatedBy": {
+          "description": "The name or identifier of the entity responsible for adding this note.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "updatedBy"
+      ],
+      "type": "object"
+    },
+    "ISecurityHubAutomationRuleRelatedFinding": {
+      "additionalProperties": false,
+      "description": "Configuration for linking related findings in Security Hub automation rules.\nThis allows automation rules to establish relationships between findings.",
+      "properties": {
+        "id": {
+          "description": "The unique identifier of the related finding within the specified security tool.",
+          "type": "string"
+        },
+        "productArn": {
+          "description": "The Amazon Resource Name (ARN) of the security tool that generated the related finding. This identifies the source service or tool that created the finding you want to link to.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "productArn",
+        "id"
+      ],
+      "type": "object"
+    },
+    "ISecurityHubAutomationRulesDateFilter": {
+      "additionalProperties": false,
+      "description": "Configuration for date-based filtering criteria in Security Hub automation rules.\nThis filter allows you to match findings based on date and time values in Security Hub finding fields.",
+      "properties": {
+        "dateRange": {
+          "additionalProperties": false,
+          "description": "Configuration for relative date range filtering based on a rolling time window. This provides a dynamic alternative to fixed start/end dates, automatically adjusting the filter criteria based on the current date and time.",
+          "properties": {
+            "unit": {
+              "const": "DAYS",
+              "description": "The time unit for the date range calculation. Currently only \"DAYS\" is supported for relative date filtering.",
+              "type": "string"
+            },
+            "value": {
+              "description": "The number of time units to look back from the current date. For example, a value of 30 with unit \"DAYS\" would match findings from the last 30 days.",
+              "type": "number"
+            }
+          },
+          "required": [
+            "value",
+            "unit"
+          ],
+          "type": "object"
+        },
+        "end": {
+          "description": "The end date and time for the date range filter in ISO 8601 format. Findings with dates on or before this timestamp will match the filter. Use this to define the end boundary of a specific time period for filtering.",
+          "type": "string"
+        },
+        "start": {
+          "description": "The start date and time for the date range filter in ISO 8601 format. Findings with dates on or after this timestamp will match the filter. Use this to define the beginning of a specific time period for filtering.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ISecurityHubAutomationRulesKeyValueFilter": {
+      "additionalProperties": false,
+      "description": "Configuration for key-value pair filtering criteria in Security Hub automation rules.\nThis filter allows you to match findings based on custom key-value pairs in Security Hub finding fields.",
+      "properties": {
+        "comparison": {
+          "description": "The comparison operator that defines how the filter value should be matched against the key's value. Different operators enable various matching strategies for key-value pair filtering.\n\n- EQUALS: Exact match of the value\n- NOT_EQUALS: Does not match the value exactly\n- CONTAINS: Value contains the specified text\n- NOT_CONTAINS: Value does not contain the specified text",
+          "enum": [
+            "EQUALS",
+            "NOT_EQUALS",
+            "CONTAINS",
+            "NOT_CONTAINS"
+          ],
+          "type": "string"
+        },
+        "key": {
+          "description": "The key name to filter on within key-value pair fields. This specifies which key within a structured field (like tags or user-defined fields) to examine.",
+          "type": "string"
+        },
+        "value": {
+          "description": "The value to match against for the specified key. This is the target value that will be compared against the actual value associated with the key.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "value",
+        "comparison"
+      ],
+      "type": "object"
+    },
+    "ISecurityHubAutomationRulesNumberFilter": {
+      "additionalProperties": false,
+      "description": "Configuration for numeric-based filtering criteria in Security Hub automation rules.\nThis filter allows you to match findings based on numeric values in Security Hub finding fields.",
+      "properties": {
+        "eq": {
+          "description": "Matches findings where the numeric field value exactly equals this number. Use this to filter for findings with specific numeric values.",
+          "type": "number"
+        },
+        "gt": {
+          "description": "Matches findings where the numeric field value is greater than this number. Use this for strict greater-than comparisons (excluding the boundary value).",
+          "type": "number"
+        },
+        "gte": {
+          "description": "Matches findings where the numeric field value is greater than or equal to this number. Use this to filter for findings above a certain threshold (e.g., high severity scores).\n\nGreater than or equal to value",
+          "type": "number"
+        },
+        "lt": {
+          "description": "Matches findings where the numeric field value is less than this number. Use this for strict less-than comparisons (excluding the boundary value).",
+          "type": "number"
+        },
+        "lte": {
+          "description": "Matches findings where the numeric field value is less than or equal to this number. Use this to filter for findings below a certain threshold (e.g., low confidence scores).\n\nLess than or equal to value",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "ISecurityHubAutomationRulesStringFilter": {
+      "additionalProperties": false,
+      "description": "Configuration for string-based filtering criteria in Security Hub automation rules.\nThis filter allows you to match findings based on text values in Security Hub finding fields,\nenabling precise automation rules that target specific types of findings based on their string attributes.",
+      "properties": {
+        "comparison": {
+          "description": "The comparison operator that defines how the filter value should be matched against finding field values. Different operators enable various matching strategies from exact matches to partial text searches.\n\n- EQUALS: Exact match\n- PREFIX: Starts with the specified value\n- NOT_EQUALS: Does not match exactly\n- PREFIX_NOT_EQUALS: Does not start with the specified value\n- CONTAINS: Contains the specified value anywhere\n- NOT_CONTAINS: Does not contain the specified value\n- CONTAINS_WORD: Contains the specified value as a complete word",
+          "enum": [
+            "EQUALS",
+            "PREFIX",
+            "NOT_EQUALS",
+            "PREFIX_NOT_EQUALS",
+            "CONTAINS",
+            "NOT_CONTAINS",
+            "CONTAINS_WORD"
+          ],
+          "type": "string"
+        },
+        "value": {
+          "description": "The string value to match against when filtering Security Hub findings.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "comparison"
+      ],
+      "type": "object"
+    },
+    "ISecurityHubConfig": {
+      "additionalProperties": false,
+      "default": "logLevel HIGH",
+      "description": "Configuration for Amazon Security Hub, a centralized security findings management service that aggregates security alerts\nfrom multiple AWS security services.\nUse this configuration to enable Amazon Security Hub for an AWS Organization along with it's auditing configuration.",
+      "properties": {
+        "autoEnableOrgMembers": {
+          "default": true,
+          "description": "Controls whether Security Hub is automatically enabled for new accounts joining the organization.",
+          "type": "boolean"
+        },
+        "automationRules": {
+          "description": "Configuration for Security Hub automation rules that automatically update findings based on specified criteria.",
+          "items": {
+            "$ref": "#/definitions/ISecurityHubAutomationRuleConfig"
+          },
+          "type": "array"
+        },
+        "deploymentTargets": {
+          "$ref": "#/definitions/IDeploymentTargets",
+          "description": "Specifies which organizational units and accounts should have Security Hub enabled."
+        },
+        "enable": {
+          "description": "Controls whether AWS Security Hub is enabled across your organization",
+          "type": "boolean"
+        },
+        "excludeRegions": {
+          "description": "List of AWS regions where Security Hub should not be enabled.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "logging": {
+          "$ref": "#/definitions/ISecurityHubLoggingConfig",
+          "description": "Configuration for forwarding Security Hub findings to CloudWatch Logs for centralized monitoring. When enabled, findings are automatically sent to CloudWatch for integration with your monitoring and alerting systems."
+        },
+        "notificationLevel": {
+          "description": "Minimum severity level for findings that will trigger SNS notifications.",
+          "type": "string"
+        },
+        "regionAggregation": {
+          "description": "Controls whether Security Hub findings from all regions are aggregated in your organization's home region.",
+          "type": "boolean"
+        },
+        "snsTopicName": {
+          "description": "Name of the SNS topic that will receive Security Hub notifications.",
+          "type": "string"
+        },
+        "standards": {
+          "description": "List of security and compliance standards that Security Hub will monitor across your organization.",
+          "items": {
+            "$ref": "#/definitions/ISecurityHubStandardConfig"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "enable",
+        "standards"
+      ],
+      "type": "object"
+    },
+    "ISecurityHubLoggingCloudwatchConfig": {
+      "additionalProperties": false,
+      "default": "logLevel HIGH",
+      "description": "Configuration for forwarding Security Hub findings to CloudWatch for centralized monitoring and analysis.",
+      "properties": {
+        "enable": {
+          "description": "Controls whether Security Hub findings are automatically forwarded to CloudWatch Logs. When enabled, findings are sent to CloudWatch for integration with monitoring dashboards and alerting systems.",
+          "type": "boolean"
+        },
+        "logGroupName": {
+          "description": "Name of the CloudWatch Log Group where Security Hub findings will be stored.",
+          "type": "string"
+        },
+        "logLevel": {
+          "$ref": "#/definitions/SecurityHubSeverityLevel",
+          "description": "Minimum severity level for findings that will be forwarded to CloudWatch Logs."
+        }
+      },
+      "required": [
+        "enable"
+      ],
+      "type": "object"
+    },
+    "ISecurityHubLoggingConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for Security Hub logging destinations that determines where security findings are stored for analysis.\nThis configuration allows you to centralize Security Hub findings in CloudWatch Logs for integration with your\nmonitoring and alerting infrastructure.",
+      "properties": {
+        "cloudWatch": {
+          "$ref": "#/definitions/ISecurityHubLoggingCloudwatchConfig",
+          "description": "Configuration for forwarding Security Hub findings to CloudWatch Logs."
+        }
+      },
+      "type": "object"
+    },
+    "ISecurityHubStandardConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for enabling specific compliance and security standards within Amazon Security Hub.\nUse this configuration to define the security standard(s) that are enabled through Amazon Security Hub and which accounts and/or\norganization units that the controls are deployed to.",
+      "properties": {
+        "controlsToDisable": {
+          "description": "List of specific control names within the security standard that should be disabled.",
+          "items": {
+            "$ref": "#/definitions/NonEmptyString"
+          },
+          "type": "array"
+        },
+        "deploymentTargets": {
+          "$ref": "#/definitions/IDeploymentTargets",
+          "description": "Specifies which organizational units and accounts this security standard will be applied to."
+        },
+        "enable": {
+          "description": "Controls whether this Security Hub standard is enabled to monitor compliance across your specified deployment targets. When enabled, Security Hub continuously evaluates your resources against the standard's security controls.",
+          "type": "boolean"
+        },
+        "name": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The name of the AWS Security Hub standard to enable or disable. This can be any valid Security Hub standard name supported by AWS.\n\nCommon examples include:\n- 'AWS Foundational Security Best Practices v1.0.0'\n- 'CIS AWS Foundations Benchmark v1.2.0'\n- 'CIS AWS Foundations Benchmark v1.4.0'\n- 'CIS AWS Foundations Benchmark v3.0.0'\n- 'NIST Special Publication 800-53 Revision 5'\n- 'AWS Resource Tagging Standard v1.0.0'\n- 'PCI DSS v3.2.1'\n- 'PCI DSS v4.0.1'\n\nNote: AWS may add new standards over time. This field accepts any string to allow for future standards without requiring code changes."
+        }
+      },
+      "required": [
+        "name",
+        "enable"
+      ],
+      "type": "object"
+    },
+    "IShareTargets": {
+      "additionalProperties": false,
+      "description": "## Resource Access Manager (RAM) Share Targets Interface\n\nInterface for AWS Resource Access Manager (RAM) share targets, which defines where shared resources should be made available within your AWS organization. RAM enables secure sharing of resources between AWS accounts and organizational units without duplicating resources or compromising security.\n\n### Key Features\n\n- **Cross-Account Sharing**: Share resources across multiple AWS accounts\n- **OU-Level Sharing**: Share with entire organizational units at once\n- **Centralized Management**: Manage shared resources from a central account\n- **Cost Optimization**: Avoid resource duplication across accounts\n- **Security**: Maintain resource ownership while enabling controlled access\n\n### Example\n\n```yaml shareTargets:   organizationalUnits:     - Root ```\n\nLearn more about [AWS Resource Access Manager](https://docs.aws.amazon.com/ram/latest/userguide/what-is.html).",
+      "properties": {
+        "accounts": {
+          "description": "**Target Accounts** *(Optional)*\n\nList of specific account names that should receive access to the shared resource. Use this for precise, account-level control over resource sharing.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "organizationalUnits": {
+          "description": "**Organizational Units** *(Optional)*\n\nList of organizational unit names that should receive access to the shared resource. When specified, all accounts within these OUs will be able to consume the shared resource.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ISnsSubscriptionConfig": {
+      "additionalProperties": false,
+      "deprecated": true,
+      "description": "This interface is deprecated and has been replaced by the snsTopics configuration in the global config.\nOrganizations should migrate to the new SNS topic configuration.\n\nConfiguration for legacy SNS notification subscriptions that send security alerts to email addresses.",
+      "properties": {
+        "email": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Email address that will receive the security notifications for the specified severity level."
+        },
+        "level": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "Defines the severity level for security notifications that will trigger email alerts. Higher levels indicate more critical security events requiring immediate attention. Notification level can be high, medium or low."
+        }
+      },
+      "required": [
+        "level",
+        "email"
+      ],
+      "type": "object"
+    },
+    "ISsmAutomationConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for AWS Systems Manager (SSM) automation that enables centralized management and distribution of SSM documents\nacross your AWS Organization.",
+      "properties": {
+        "documentSets": {
+          "description": "Array of document sets that define which SSM documents to create and share across organizational units.",
+          "items": {
+            "$ref": "#/definitions/IDocumentSetConfig"
+          },
+          "type": "array"
+        },
+        "excludeRegions": {
+          "description": "List of AWS regions where SSM automation documents should not be deployed.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "documentSets"
+      ],
+      "type": "object"
+    },
+    "ISsmSettingsConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for AWS Systems Manager (SSM) security settings and controls across your organization.\nThis enables centralized management of SSM security features to ensure secure and governed access\nto your managed resources while preventing unauthorized sharing of sensitive automation documents.",
+      "properties": {
+        "blockPublicDocumentSharing": {
+          "$ref": "#/definitions/IBlockPublicDocumentSharingConfig",
+          "description": "Configuration for preventing AWS Systems Manager documents from being shared publicly. This security control helps protect sensitive automation scripts and operational procedures from unauthorized access by blocking public document sharing across your organization."
+        }
+      },
+      "type": "object"
+    },
+    "ITag": {
+      "additionalProperties": false,
+      "description": "## AWS Resource Tag Configuration\n\nDefines key-value pairs used for tagging AWS resources. Tags provide metadata for resource organization, cost allocation, access control, and automation.\n\n### Key Features\n\n- **Resource Organization**: Group and categorize resources logically\n- **Cost Allocation**: Track costs by project, department, or environment\n- **Access Control**: Use tags in IAM policies for conditional access\n- **Automation**: Trigger automated actions based on tag values\n- **Compliance**: Meet organizational and regulatory tagging requirements\n\n### Example\n\n```yaml tags:   - key: Environment     value: Production   - key: Project     value: WebApplication   - key: Owner     value: Platform-Team   - key: CostCenter     value: Engineering   - key: Backup     value: Daily ```",
+      "properties": {
+        "key": {
+          "description": "**Tag Key** *(Required)*\n\nThe tag key name that identifies the type of metadata being stored. Tag keys should follow consistent naming conventions across your organization.",
+          "type": "string"
+        },
+        "value": {
+          "description": "**Tag Value** *(Required)*\n\nThe tag value that provides the actual metadata content for the tag key. Values should be meaningful and follow organizational standards.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "value"
+      ],
+      "type": "object"
+    },
+    "ITransition": {
+      "additionalProperties": false,
+      "description": "## S3 Storage Class Transition Configuration\n\nDefines when and how objects should transition from their current storage class to a different storage class. Used in S3 lifecycle rules to optimize storage costs based on data access patterns and retention requirements.\n\n### Key Components\n\n- **Storage Class**: Target storage class for the transition\n- **Transition Timing**: Number of days after object creation or version change\n\n### Example\n\n```yaml transitions:   - storageClass: STANDARD_IA     transitionAfter: 30   - storageClass: GLACIER     transitionAfter: 365   - storageClass: DEEP_ARCHIVE     transitionAfter: 2555 ```",
+      "properties": {
+        "storageClass": {
+          "$ref": "#/definitions/StorageClass",
+          "description": "**Target Storage Class** *(Required)*\n\nThe S3 storage class that objects should transition to after the specified time period."
+        },
+        "transitionAfter": {
+          "description": "**Transition After (Days)** *(Required)*\n\nNumber of days after object creation (for current versions) or after becoming non-current (for non-current versions) when the transition should occur.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "storageClass",
+        "transitionAfter"
+      ],
+      "type": "object"
+    },
+    "ITriggeringResourceType": {
+      "additionalProperties": false,
+      "description": "Configuration for defining which AWS resources trigger evaluations for custom AWS Config rules.",
+      "properties": {
+        "lookupKey": {
+          "$ref": "#/definitions/NonEmptyString",
+          "description": "The lookup key used to identify resources based on the specified lookup type."
+        },
+        "lookupType": {
+          "description": "The method used to identify which resources should trigger Config rule evaluations. This determines how the Config rule will find and evaluate AWS resources for compliance.",
+          "type": "string"
+        },
+        "lookupValue": {
+          "description": "Array of values used to match resources based on the lookup type and key.",
+          "items": {
+            "$ref": "#/definitions/NonEmptyString"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "lookupType",
+        "lookupValue"
+      ],
+      "type": "object"
+    },
+    "NonEmptyString": {
+      "description": "## Non-Empty String Type\n\nRepresents a string that must contain at least one character. Used for required text fields throughout the Landing Zone Accelerator configuration where empty values are not permitted.\n\n```",
+      "minLength": 1,
+      "type": "string"
+    },
+    "SecurityHubSeverityLevel": {
+      "description": "## Security Hub Severity Level Type\n\nDefines the severity levels used by AWS Security Hub for categorizing security findings and compliance issues.\n\n### Values (Highest to Lowest Severity)\n- **CRITICAL**: Immediate action required, severe security risk\n- **HIGH**: Urgent attention needed, significant security concern\n- **MEDIUM**: Important but not urgent, moderate security risk\n- **LOW**: Minor security concern, low priority\n- **INFORMATIONAL**: Informational findings, no immediate action needed",
+      "enum": [
+        "CRITICAL",
+        "HIGH",
+        "MEDIUM",
+        "LOW",
+        "INFORMATIONAL"
+      ],
+      "type": "string"
+    },
+    "StorageClass": {
+      "description": "## S3 Storage Class Type\n\nDefines the available Amazon S3 storage classes for lifecycle transitions. Each storage class is optimized for different access patterns, durability requirements, and cost considerations.",
+      "enum": [
+        "DEEP_ARCHIVE",
+        "GLACIER",
+        "GLACIER_IR",
+        "STANDARD_IA",
+        "INTELLIGENT_TIERING",
+        "ONEZONE_IA"
+      ],
+      "type": "string"
+    }
+  }
+}

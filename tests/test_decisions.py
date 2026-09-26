@@ -143,3 +143,21 @@ def test_unusable_value_is_not_a_gap(catalog):
 def test_each_rule_names_its_own_cause(catalog, sample_facts, overrides, expected):
     conflicts = semantic_conflicts(catalog, _override(sample_facts, **overrides))
     assert expected in _codes(conflicts)
+
+
+@pytest.mark.parametrize(
+    "mapping,code",
+    [
+        ("BreakGlassAdmin=AdministratorAccess", "POLICY_MAPPING_MISSING"),
+        ("Unknown=ReadOnlyAccess", "POLICY_MAPPING_INVALID"),
+        ("ReadOnlyAccess=", "POLICY_MAPPING_INVALID"),
+    ],
+)
+def test_identity_policies_must_be_explicit(catalog, sample_facts, mapping, code):
+    facts = _override(sample_facts, identity_center_policy_mappings=mapping)
+    assert code in _codes(semantic_conflicts(catalog, facts))
+
+
+def test_data_regions_must_be_enabled(catalog, sample_facts):
+    facts = _override(sample_facts, data_regions="us-east-1")
+    assert "DATA_REGION_NOT_ENABLED" in _codes(semantic_conflicts(catalog, facts))

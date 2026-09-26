@@ -21,7 +21,9 @@ document ──ingest──▶ Neo4j ──review──▶ gaps + conflicts ─�
 ```
 
 1. **Ingest** reads the whole document. Every run replaces the graph: no
-   incremental diff, no baseline, nothing to reconcile.
+   incremental diff, no baseline, nothing to reconcile. Replacement is atomic:
+   a failed reload preserves the previous graph. Use a dedicated database because
+   ingestion replaces every node in it.
 2. **Neo4j** holds the decision catalog, the document, each prose statement, and
    each accepted fact with the statement it came from.
 3. **Review** finds gaps and conflicts deterministically. Gaps come from graph
@@ -31,11 +33,11 @@ document ──ingest──▶ Neo4j ──review──▶ gaps + conflicts ─�
 4. **The LLM is optional and advisory.** It never sees the document and never
    decides anything. It receives the deterministic frontier and turns it into a
    discussion agenda.
-5. **Emit** writes AWS LZA sample-style configuration, fail-closed: any gap or
-   conflict blocks the bundle. Account root emails are owner input and are never
-   generated.
-6. **Scan** runs OPA against the landing-zone policy, plus Checkov and Trivy for
-   misconfiguration and secret findings.
+5. **Emit** writes foundation configuration checked against **LZA 1.16.3** schemas,
+   plus a decision trace and owner handoff. Gaps, conflicts, or schema errors block
+   the bundle. Account emails and identity policy mappings are explicit inputs.
+6. **Scan** rechecks the LZA schemas, runs OPA policy, Checkov secrets, and Trivy
+   checks. Each result states its coverage.
 
 ## Layout
 
@@ -48,6 +50,8 @@ src/intent_engine/
   analysis.py         applicability and named conflict rules
   llm.py              optional narration of the deterministic frontier
   emit.py             AWS LZA configuration and the decision trace
+  contract.py         offline validation against one pinned LZA version
+  schemas/            unchanged upstream LZA schemas and license notices
   scan.py             OPA, Checkov, Trivy
   policy/lza.rego     the landing-zone policy
 samples/              one realistic customer packet
@@ -96,6 +100,35 @@ uv run iac-llm-wrapper emit --out build/lza
 uv run iac-llm-wrapper scan build/lza
 ```
 
+## Integration contract
+
+| Output | Consumer |
+| --- | --- |
+| Six `*-config.yaml` files | The owner's LZA **1.16.3** configuration repository, after review and completion |
+| `decision-trace.yaml` | Architect: stated answers, source lines, and opt-in defaults |
+| `handoff.yaml` | Network, identity, data, and application owners: remaining integration work |
+
+Schemas are bundled and validated offline. There are no AWS lookups, credentials,
+or downloads during validation. A different LZA version requires an explicit
+contract update; there is no automatic version fallback or baseline selector.
+
+The network output is a foundation skeleton. Owners must complete routes,
+subnets, attachments, DNS, and inspection. Identity mappings currently support
+AWS-managed policies explicitly named in the packet; owners verify availability
+and connect their identity provider. Data classification, approved data/backup
+regions, recovery objectives, and the application owner travel in the handoff;
+this tool does not provision workload databases, backups, or applications.
+
+Keep each packet to one shared workload handoff scope. Different residency or
+recovery requirements need separate design review; this is not yet a per-asset
+architecture model. The bundled banking packet is an illustrative example.
+
+The handoff always says `requires-owner-validation`. The consuming pipeline runs
+the matching LZA validator, reviews synthesized changes, and owns deployment.
+Schema success means the configuration has the expected shape, not that the
+architecture is complete. Fixed emitter choices such as log retention and session
+duration also require owner review; the decision trace records catalog answers.
+
 Narrate the same review with a model. Provider and model are always explicit:
 
 ```bash
@@ -105,7 +138,7 @@ uv run iac-llm-wrapper review --llm openai --model gpt-4o-mini \
   --base-url https://api.openai.com/v1 --api-key "$OPENAI_API_KEY"
 ```
 
-Exit codes: `0` clean, `1` findings (open gaps, conflicts, or scan findings),
+Exit codes: `0` clean, `1` findings (open gaps, conflicts, or unsuccessful scans),
 `2` the command could not run.
 
 ## Checks
@@ -128,7 +161,14 @@ opa fmt --fail --list src/intent_engine/policy
 ```
 
 `opa`, `checkov`, and `trivy` are external tools. When one is absent, `scan`
-reports `not-installed` for it. It is never reported as a pass.
+reports `not-installed`. When a scanner provides no evidence of assessed checks,
+it reports `not-assessed`. Tool errors, missing tools, unassessed checks, and
+findings all make `scan` exit with code `1`.
+
+The current sample's LZA YAML can produce zero assessed checks in Checkov and
+Trivy. Such a scan is incomplete even when OPA passes. A secret scan without
+findings does not necessarily report which files it assessed. A passing schema or
+policy check alone is not a deployment-readiness claim.
 
 ## Scope
 
@@ -153,3 +193,4 @@ the consuming pipeline. Use sanitized examples in issues and tests.
 
 Copyright 2026 Cemreoguz Ersahin. Licensed under the [Apache License 2.0](LICENSE).
 Contributions are accepted under the same license.
+Bundled LZA schemas retain their [upstream notices](src/intent_engine/schemas/NOTICE.txt).

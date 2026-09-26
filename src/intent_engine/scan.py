@@ -3,7 +3,7 @@
 Three external tools, three separate verdicts:
 
     opa      the landing-zone policy the organization agreed to
-    checkov  misconfiguration and secret checks on the emitted files
+    checkov  secret checks on the emitted files
     trivy    independent secret and misconfiguration scan
 
 A missing tool, a tool that failed to run, and a tool that found something are
@@ -23,16 +23,11 @@ from typing import Any, Literal
 
 from ruamel.yaml import YAML, YAMLError
 
-ToolStatus = Literal["passed", "findings", "not-installed", "error"]
+from .contract import CONFIG_FILES, LZA_VERSION, validate_configs
 
-_BUNDLE_INPUTS = {
-    "organization": "organization-config.yaml",
-    "accounts": "accounts-config.yaml",
-    "global": "global-config.yaml",
-    "iam": "iam-config.yaml",
-    "network": "network-config.yaml",
-    "security": "security-config.yaml",
-}
+ToolStatus = Literal["passed", "findings", "not-installed", "not-assessed", "error"]
+
+_BUNDLE_INPUTS = {name.removesuffix("-config.yaml"): name for name in CONFIG_FILES}
 _TIMEOUT = 300
 
 
@@ -49,7 +44,7 @@ class ToolResult:
 
     @property
     def blocking(self) -> bool:
-        return self.status in {"findings", "error"}
+        return self.status != "passed"
 
 
 def bundle_input(bundle_dir: Path) -> dict[str, Any]:
@@ -75,9 +70,14 @@ def default_policy() -> Path:
 
 
 def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(  # noqa: S603 - fixed argument list, no shell
-        command, capture_output=True, text=True, timeout=_TIMEOUT, check=False
-    )
+    try:
+        return subprocess.run(  # noqa: S603 - fixed argument list, no shell
+            command, capture_output=True, text=True, timeout=_TIMEOUT, check=False
+        )
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(command, 2, "", f"timed out after {_TIMEOUT}s")
+    except OSError as exc:
+        return subprocess.CompletedProcess(command, 2, "", f"could not run: {exc}")
 
 
 def run_opa(bundle_dir: Path, policy: Path | None = None) -> ToolResult:
@@ -130,9 +130,10 @@ def _parse_opa(payload: Any) -> list[str]:
             "data.lza.deny is undefined: no rule by that name loaded from the policy. "
             "An undefined policy is not a passing policy."
         )
-    expressions = results[0].get("expressions") or []
+    results = _objects(results, "OPA result")
+    expressions = _objects(results[0].get("expressions"), "OPA expressions")
     value = expressions[0].get("value") if expressions else None
-    if not isinstance(value, list):
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise ScanError(
             f"data.lza.deny evaluated to {type(value).__name__}, expected a set of messages"
         )
@@ -155,29 +156,58 @@ def run_checkov(bundle_dir: Path) -> ToolResult:
             "--compact",
         ]
     )
-    if not completed.stdout.strip():
-        detail = completed.stderr.strip() or "checkov produced no output"
-        return ToolResult("checkov", "error", detail)
+    if completed.returncode not in {0, 1}:
+        return ToolResult("checkov", "error", completed.stderr.strip() or "checkov failed")
     try:
-        payload = json.loads(completed.stdout)
-    except json.JSONDecodeError:
-        return ToolResult("checkov", "error", "checkov returned output that is not JSON")
-    return _result("checkov", _parse_checkov(payload))
+        findings, assessed = _parse_checkov(json.loads(completed.stdout))
+    except (json.JSONDecodeError, ScanError) as exc:
+        return ToolResult("checkov", "error", str(exc))
+    if completed.returncode == 1 and not findings:
+        return ToolResult("checkov", "error", "exit code 1 without reported findings")
+    return _result("checkov", findings, assessed, "secret checks only; LZA semantics not assessed")
 
 
-def _parse_checkov(payload: Any) -> list[str]:
-    reports = payload if isinstance(payload, list) else [payload]
+def _objects(value: Any, label: str) -> list[dict[str, Any]]:
+    if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+        raise ScanError(f"{label}: expected an array of objects")
+    return value
+
+
+def _count(report: dict[str, Any], key: str) -> int:
+    value = report.get(key)
+    if type(value) is not int or value < 0:
+        raise ScanError(f"{key}: expected a nonnegative integer")
+    return value
+
+
+def _parse_checkov(payload: Any) -> tuple[list[str], int]:
+    reports = _objects(payload if isinstance(payload, list) else [payload], "Checkov reports")
+    if not reports:
+        raise ScanError("Checkov returned no report")
     findings: list[str] = []
+    assessed = 0
     for report in reports:
-        if not isinstance(report, dict):
-            continue
-        failed = (report.get("results") or {}).get("failed_checks") or []
-        for check in failed:
+        # With no checks, Checkov returns the summary alone (no results wrapper).
+        summary = report.get("summary", report)
+        if not isinstance(summary, dict):
+            raise ScanError("Checkov summary: expected an object")
+        passed, failed = _count(summary, "passed"), _count(summary, "failed")
+        if _count(summary, "parsing_errors"):
+            raise ScanError("Checkov reported parsing errors")
+        results = report.get("results", {})
+        if not isinstance(results, dict):
+            raise ScanError("Checkov results: expected an object")
+        checks = _objects(results.get("failed_checks", []), "Checkov failed_checks")
+        if failed != len(checks):
+            raise ScanError("Checkov failed count does not match reported findings")
+        for check in checks:
+            if not check.get("file_path") or not check.get("check_id"):
+                raise ScanError("Checkov finding is missing file_path or check_id")
             findings.append(
-                f"{check.get('file_path', '?')}: {check.get('check_id', '?')} "
-                f"{check.get('check_name', '')}".strip()
+                f"{check['file_path']}: {check['check_id']} {check.get('check_name', '')}".strip()
             )
-    return sorted(findings)
+        assessed += passed + failed
+    return sorted(findings), assessed
 
 
 def run_trivy(bundle_dir: Path) -> ToolResult:
@@ -189,40 +219,89 @@ def run_trivy(bundle_dir: Path) -> ToolResult:
             "fs",
             "--scanners",
             "secret,misconfig",
+            "--exit-code",
+            "0",
             "--format",
             "json",
             "--quiet",
             str(bundle_dir),
         ]
     )
-    if completed.returncode != 0 and not completed.stdout.strip():
+    # Trivy's default findings exit code is zero; any nonzero code is a failure.
+    if completed.returncode != 0:
         return ToolResult("trivy", "error", completed.stderr.strip() or "trivy failed")
     try:
-        payload = json.loads(completed.stdout)
-    except json.JSONDecodeError:
-        return ToolResult("trivy", "error", "trivy returned output that is not JSON")
-    return _result("trivy", _parse_trivy(payload))
+        findings, assessed = _parse_trivy(json.loads(completed.stdout))
+    except (json.JSONDecodeError, ScanError) as exc:
+        return ToolResult("trivy", "error", str(exc))
+    return _result(
+        "trivy",
+        findings,
+        assessed,
+        "reported secret/misconfiguration checks; no LZA schema validation",
+    )
 
 
-def _parse_trivy(payload: Any) -> list[str]:
-    results = payload.get("Results") if isinstance(payload, dict) else None
+def _parse_trivy(payload: Any) -> tuple[list[str], int]:
+    if not isinstance(payload, dict) or payload.get("SchemaVersion") != 2:
+        raise ScanError("Trivy report: expected SchemaVersion 2")
+    if payload.get("ArtifactType") != "filesystem" or not payload.get("ArtifactName"):
+        raise ScanError("Trivy report: expected a filesystem artifact")
+    results = _objects(payload.get("Results", []), "Trivy Results")
     findings: list[str] = []
-    for result in results or []:
-        target = result.get("Target", "?")
-        for secret in result.get("Secrets") or []:
-            findings.append(f"{target}: secret {secret.get('RuleID', '?')}")
-        for misconfig in result.get("Misconfigurations") or []:
-            findings.append(f"{target}: {misconfig.get('ID', '?')} {misconfig.get('Title', '')}")
-    return sorted(findings)
+    assessed = 0
+    for result in results:
+        target = result.get("Target")
+        if not isinstance(target, str) or not target:
+            raise ScanError("Trivy result is missing Target")
+        secrets = _objects(result.get("Secrets", []), "Trivy Secrets")
+        for secret in secrets:
+            if not secret.get("RuleID"):
+                raise ScanError("Trivy secret is missing RuleID")
+            findings.append(f"{target}: secret {secret['RuleID']}")
+        assessed += len(secrets)
+        messages, checked = _trivy_misconfigurations(result, target)
+        findings.extend(messages)
+        assessed += checked
+    return sorted(findings), assessed
 
 
-def _result(tool: str, findings: list[str]) -> ToolResult:
+def _trivy_misconfigurations(result: dict[str, Any], target: str) -> tuple[list[str], int]:
+    findings: list[str] = []
+    misconfigs = _objects(result.get("Misconfigurations", []), "Trivy Misconfigurations")
+    failures = 0
+    for misconfig in misconfigs:
+        if not misconfig.get("ID") or misconfig.get("Status") not in ("FAIL", "PASS", "EXCEPTION"):
+            raise ScanError("Trivy misconfiguration is missing ID or a valid Status")
+        if misconfig["Status"] == "FAIL":
+            failures += 1
+            findings.append(f"{target}: {misconfig['ID']} {misconfig.get('Title', '')}".strip())
+    summary = result.get("MisconfSummary")
+    if summary is not None:
+        if not isinstance(summary, dict):
+            raise ScanError("Trivy MisconfSummary: expected an object")
+        if _count(summary, "Failures") != failures:
+            raise ScanError("Trivy failure count does not match reported findings")
+        assessed = _count(summary, "Successes") + failures
+    else:
+        assessed = sum(item["Status"] != "EXCEPTION" for item in misconfigs)
+    return findings, assessed
+
+
+def _result(
+    tool: str, findings: list[str], assessed: int = 1, scope: str = "LZA policy rules"
+) -> ToolResult:
     if findings:
-        return ToolResult(tool, "findings", f"{len(findings)} finding(s)", findings)
-    return ToolResult(tool, "passed", "no findings")
+        return ToolResult(tool, "findings", f"{len(findings)} finding(s); {scope}", findings)
+    if not assessed:
+        return ToolResult(tool, "not-assessed", f"no assessed checks reported; {scope}")
+    return ToolResult(tool, "passed", f"no findings; {scope}")
 
 
 def scan_bundle(bundle_dir: Path, policy: Path | None = None) -> list[ToolResult]:
     if not bundle_dir.is_dir():
         raise ScanError(f"{bundle_dir}: bundle directory not found")
-    return [run_opa(bundle_dir, policy), run_checkov(bundle_dir), run_trivy(bundle_dir)]
+    documents = bundle_input(bundle_dir)
+    errors = validate_configs({_BUNDLE_INPUTS[key]: value for key, value in documents.items()})
+    schema = _result("lza-schema", errors, scope=f"LZA {LZA_VERSION} configuration shape only")
+    return [schema, run_opa(bundle_dir, policy), run_checkov(bundle_dir), run_trivy(bundle_dir)]

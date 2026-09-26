@@ -1,10 +1,10 @@
 """Command line interface.
 
-    ingest   read a whole document into the knowledge graph (replaces it)
-    status   show what the graph currently holds
-    review   deterministic gaps and conflicts, optionally narrated by a model
-    emit     write AWS LZA configuration from accepted decisions
-    scan     run OPA, Checkov, and Trivy over an emitted bundle
+ingest   read a whole document into the knowledge graph (replaces it)
+status   show what the graph currently holds
+review   deterministic gaps and conflicts, optionally narrated by a model
+emit     write AWS LZA configuration from accepted decisions
+scan     run OPA, Checkov, and Trivy over an emitted bundle
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ import typer
 
 from .analysis import review as build_review
 from .catalog import CatalogError, load_catalog
+from .contract import LZA_VERSION
 from .emit import EmitBlocked, emit_bundle, resolve
 from .graph import GraphConfig, GraphEmpty, GraphUnavailable, KnowledgeGraph
 from .ingest import IngestError, extract_facts, read_document
@@ -114,9 +115,7 @@ def review(
     model: str | None = typer.Option(
         None, "--model", help="Explicit model name. Required with --llm."
     ),
-    base_url: str = typer.Option(
-        "http://localhost:11434", "--base-url", help="Provider base URL."
-    ),
+    base_url: str = typer.Option("http://localhost:11434", "--base-url", help="Provider base URL."),
     api_key: str | None = typer.Option(None, "--api-key", help="Provider API key when required."),
     uri: str | None = _URI,
     user: str | None = _USER,
@@ -178,9 +177,7 @@ def _narrate(
     api_key: str | None,
 ) -> None:
     try:
-        config = LlmConfig(
-            provider=provider, model=model or "", base_url=base_url, api_key=api_key
-        )
+        config = LlmConfig(provider=provider, model=model or "", base_url=base_url, api_key=api_key)
         agenda = narrate(result, decisions, config)
     except LlmError as exc:
         typer.secho(f"llm narration unavailable: {exc}", fg=typer.colors.YELLOW, err=True)
@@ -215,18 +212,15 @@ def emit(
     defaulted = [entry["decision"] for entry in resolution.trace if entry["origin"] == "default"]
     for path in written:
         typer.echo(f"wrote {path}")
+    typer.echo(f"LZA {LZA_VERSION} schemas passed; owner validation remains in handoff.yaml")
     if defaulted:
-        typer.secho(
-            f"filled from catalog defaults: {', '.join(defaulted)}", fg=typer.colors.YELLOW
-        )
+        typer.secho(f"filled from catalog defaults: {', '.join(defaulted)}", fg=typer.colors.YELLOW)
 
 
 @app.command()
 def scan(
     bundle: Path = typer.Argument(..., help="Emitted bundle directory."),
-    policy: Path | None = typer.Option(
-        None, "--policy", help="Override the packaged rego policy."
-    ),
+    policy: Path | None = typer.Option(None, "--policy", help="Override the packaged rego policy."),
     as_json: bool = typer.Option(False, "--json", help="Emit results as JSON."),
 ) -> None:
     """Run OPA, Checkov, and Trivy over an emitted bundle."""
@@ -253,6 +247,7 @@ def scan(
                 "passed": typer.colors.GREEN,
                 "findings": typer.colors.RED,
                 "not-installed": typer.colors.YELLOW,
+                "not-assessed": typer.colors.YELLOW,
                 "error": typer.colors.RED,
             }[result.status]
             typer.secho(f"{result.tool}: {result.status} — {result.detail}", fg=colour)

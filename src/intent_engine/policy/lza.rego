@@ -20,12 +20,12 @@ approved_regions := {
 secret_smell := ["password", "secret_key", "aws_access_key_id", "private_key", "BEGIN RSA"]
 
 deny contains msg if {
-	input.global.terminationProtection != true
+	not input.global.terminationProtection == true
 	msg := "global-config: terminationProtection must be enabled"
 }
 
 deny contains msg if {
-	input.global.logging.cloudtrail.organizationTrail != true
+	not input.global.logging.cloudtrail.organizationTrail == true
 	msg := "global-config: an organization CloudTrail is required"
 }
 
@@ -42,26 +42,31 @@ home_region_enabled if {
 
 deny contains msg if {
 	not home_region_enabled
-	msg := sprintf("global-config: home region %q is not enabled", [input.global.homeRegion])
+	msg := "global-config: homeRegion must be present in enabledRegions"
 }
 
 deny contains msg if {
-	input.security.centralSecurityServices.guardduty.enable != true
+	not input.security.centralSecurityServices.guardduty.enable == true
 	msg := "security-config: GuardDuty must be enabled organization-wide"
 }
 
 deny contains msg if {
-	input.security.centralSecurityServices.s3PublicAccessBlock.enable != true
+	not input.security.centralSecurityServices.s3PublicAccessBlock.enable == true
 	msg := "security-config: S3 public access block must be enabled"
 }
 
 deny contains msg if {
-	input.security.centralSecurityServices.ebsDefaultVolumeEncryption.enable != true
+	not input.security.centralSecurityServices.ebsDefaultVolumeEncryption.enable == true
 	msg := "security-config: EBS default volume encryption must be enabled"
 }
 
+password_length_valid if {
+	is_number(input.security.iamPasswordPolicy.minimumPasswordLength)
+	input.security.iamPasswordPolicy.minimumPasswordLength >= 14
+}
+
 deny contains msg if {
-	input.security.iamPasswordPolicy.minimumPasswordLength < 14
+	not password_length_valid
 	msg := "security-config: minimum password length must be at least 14"
 }
 
@@ -91,6 +96,62 @@ deny contains msg if {
 
 deny contains msg if {
 	some assignment in input.iam.identityCenter.identityCenterAssignments
-	count(assignment.deploymentTargets.accounts) == 0
-	msg := sprintf("iam-config: assignment %q targets no account", [assignment.name])
+	not assignment_targets_valid(assignment)
+	msg := "iam-config: every assignment must target a nonempty array of account names"
+}
+
+# Preconditions for the rules above, not a substitute for the LZA schema.
+required_fields := [
+	[["organization"], "object"],
+	[["network"], "object"],
+	[["global", "homeRegion"], "string"],
+	[["global", "enabledRegions"], "array"],
+	[["accounts", "mandatoryAccounts"], "array"],
+	[["accounts", "workloadAccounts"], "array"],
+	[["iam", "identityCenter", "identityCenterAssignments"], "array"],
+]
+
+deny contains msg if {
+	some field in required_fields
+	type_name(object.get(input, field[0], null)) != field[1]
+	msg := sprintf("%s: required %s is missing or has the wrong type", [concat(".", field[0]), field[1]])
+}
+
+deny contains msg if {
+	some region in input.global.enabledRegions
+	not is_string(region)
+	msg := "global-config: enabledRegions must contain region names"
+}
+
+deny contains msg if {
+	some kind in ["mandatoryAccounts", "workloadAccounts"]
+	some account in input.accounts[kind]
+	some field in ["name", "description", "email", "organizationalUnit"]
+	not nonempty_string(object.get(account, field, null))
+	msg := sprintf("accounts-config: every %s entry needs a nonempty %s", [kind, field])
+}
+
+deny contains msg if {
+	some kind in ["mandatoryAccounts", "workloadAccounts"]
+	some account in input.accounts[kind]
+	not is_object(account)
+	msg := sprintf("accounts-config: %s entries must be objects", [kind])
+}
+
+deny contains msg if {
+	count(input.accounts.mandatoryAccounts) == 0
+	msg := "accounts-config: mandatoryAccounts must not be empty"
+}
+
+nonempty_string(value) if {
+	is_string(value)
+	count(trim_space(value)) > 0
+}
+
+assignment_targets_valid(assignment) if {
+	is_array(assignment.deploymentTargets.accounts)
+	count(assignment.deploymentTargets.accounts) > 0
+	every account in assignment.deploymentTargets.accounts {
+		nonempty_string(account)
+	}
 }
