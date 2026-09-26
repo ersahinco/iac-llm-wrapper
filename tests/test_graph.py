@@ -9,11 +9,15 @@ them at the local development instance only:
 
 from __future__ import annotations
 
+import json
 import os
 
 import pytest
+from ruamel.yaml import YAML
+from typer.testing import CliRunner
 
 from intent_engine.analysis import review
+from intent_engine.cli import app
 from intent_engine.graph import GraphConfig, KnowledgeGraph
 from intent_engine.ingest import extract_facts, read_document
 
@@ -120,3 +124,48 @@ def test_failed_replacement_preserves_previous_graph(
     with pytest.raises(GraphUnavailable, match="graph replacement failed"):
         _ingest(graph, catalog, changed)
     assert (graph.document(), graph.facts(), graph.counts(), review(graph, catalog)) == original
+
+
+def test_client_discussion_to_owner_handoff(sample_path, tmp_path, monkeypatch):
+    """Exercise actual CLI commands and Neo4j, including the unanswered-to-resolved loop."""
+    runner = CliRunner()
+    packet = tmp_path / "client.md"
+    packet.write_text("- home_region: eu-central-1\n", encoding="utf-8")
+    assert runner.invoke(app, ["ingest", str(packet)]).exit_code == 0
+    open_review = runner.invoke(app, ["review", "--json"])
+    assert open_review.exit_code == 1
+    assert "application_owner" in {
+        gap["decision_key"] for gap in json.loads(open_review.stdout)["gaps"]
+    }
+    out = tmp_path / "bundle"
+    assert runner.invoke(app, ["emit", "--out", str(out)]).exit_code == 2
+    assert not out.exists()
+
+    packet.write_text(sample_path.read_text("utf-8"), encoding="utf-8")
+    assert runner.invoke(app, ["ingest", str(packet)]).exit_code == 0
+    assert runner.invoke(app, ["review"]).exit_code == 0
+    assert runner.invoke(app, ["emit", "--out", str(out)]).exit_code == 0
+
+    yaml = YAML(typ="safe")
+    network = yaml.load((out / "network-config.yaml").read_text("utf-8"))
+    # A representative owner edit, not a claim of a complete bank network design.
+    network["vpcs"][0]["routeTables"] = [{"name": "OwnerPrivateRoutes", "routes": []}]
+    owner_file = tmp_path / "owner-network.yaml"
+    with owner_file.open("w") as handle:
+        yaml.dump(network, handle)
+    original = owner_file.read_bytes()
+    emitted = runner.invoke(app, ["emit", "--out", str(out), "--network-config", str(owner_file)])
+    assert emitted.exit_code == 0, emitted.output
+    assert owner_file.read_bytes() == original
+    assert yaml.load((out / "network-config.yaml").read_text("utf-8")) == network
+    handoff = yaml.load((out / "handoff.yaml").read_text("utf-8"))
+    assert handoff["layers"]["network"]["source"]["origin"] == "owner-file"
+    assert handoff["status"] == "requires-owner-validation"
+
+    # Local schema validation is always available; absent external tools remain visible.
+    monkeypatch.setattr("intent_engine.scan.shutil.which", lambda _: None)
+    scanned = runner.invoke(app, ["scan", str(out), "--json"])
+    assert scanned.exit_code == 1
+    reports = json.loads(scanned.stdout)
+    assert reports[0]["tool"] == "lza-schema" and reports[0]["status"] == "passed"
+    assert all(report["status"] == "not-installed" for report in reports[1:])

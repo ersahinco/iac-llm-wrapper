@@ -81,7 +81,7 @@ review, optional AI narration, and the configuration-only deployment boundary.
 
 ### Status
 
-- **Pinned integration contract implemented locally.** The six LZA configuration
+- **Pinned integration contract published.** The six LZA configuration
   files validate offline against unchanged v1.16.3 schemas, before emission and
   during scan. The unused baseline selector is removed. JSON Schema validation
   is the one new runtime dependency; no AWS calls or runtime schema downloads.
@@ -93,7 +93,7 @@ review, optional AI narration, and the configuration-only deployment boundary.
   trace and handoff go to reviewers. Network routes/subnets/attachments, identity
   provider integration, workload data controls, and application delivery remain
   owner work. Handoff status is always `requires-owner-validation`.
-- **First banking milestone implemented locally.** Scanner failures, malformed
+- **First banking milestone published.** Scanner failures, malformed
   reports, unavailable tools, and zero assessed checks cannot produce scan
   success. `not-assessed` distinguishes absent coverage from findings.
 - **Policy fails closed for its existing controls.** Missing or mistyped control
@@ -108,15 +108,19 @@ review, optional AI narration, and the configuration-only deployment boundary.
 - **Layered direction accepted.** REVIEW.md records the banking review and the
   network, identity, data, application, and operations boundaries. The network
   skeleton still needs owner completion; schema success is not deployment readiness.
-- **Fresh-start history.** Public repository uses Apache 2.0 with one initial
-  commit on main; current milestone changes remain uncommitted. The requested
-  local recovery bundle was deleted.
+- **Owner network integration.** `emit --network-config PATH` carries an existing
+  owner file into the bundle, checks its schema and basic packet alignment, and
+  records its source hash. Keep the source outside generated output. Detailed
+  routing and cross-file checks remain in the owner's LZA pipeline.
+- **Fresh-start history.** Public repository uses Apache 2.0. The initial commit
+  is followed by the published milestone commit `bfde764`; further development
+  uses ordinary commits. The requested local recovery bundle was deleted.
 - **Kept focused.** One small contract module and upstream schemas were added.
   Whole-document ingestion, optional advisory AI, and no deployment remain boundaries.
 
 ### Verified (2026-09-26, Python 3.14.7, macOS)
 
-- 124 tests pass with no skips, including all 8 local Neo4j tests. Ruff and mypy
+- 135 tests pass with no skips, including all 9 local Neo4j tests. Ruff and mypy
   pass over 12 source files. Strict OPA validation passes.
 - Full sample journey: 25 decisions captured, 8 files emitted. The six config
   files pass LZA 1.16.3 schemas. Explicit policy mappings are preserved, and data
@@ -125,12 +129,17 @@ review, optional AI narration, and the configuration-only deployment boundary.
   `not-assessed`. CLI correctly exits 1 for incomplete coverage.
 - Built source distribution and wheel. Validated all six configs using the wheel
   with socket connections blocked: packaged schemas work offline.
-- CI includes checksum-pinned OPA 1.21.0 in Python 3.11. Remote CI not run this
-  turn; changes remain local. Existing Neo4j/Python 3.14 warnings are third-party.
+- CLI integration covers incomplete input, corrected input, owner-network
+  handoff, and unavailable scan tools against local Neo4j. The owner source stays
+  unchanged; region/CIDR/topology mismatches block emission.
+- CI includes checksum-pinned OPA 1.21.0 in Python 3.11. All five GitHub CI jobs
+  passed for milestone commit `bfde764` (run `36250474457`). Existing
+  Neo4j/Python 3.14 warnings are third-party.
 
 ### Next
 
-Exercise this handoff with the owner's actual LZA 1.16.3 consumer. Complete the
-network design there and verify identity policy/group references. Add richer
+Exercise this handoff with the owner's actual LZA 1.16.3 consumer, using
+`--network-config` for their network design, and verify identity policy/group
+references. No owner repository was supplied this session. Add richer
 workload modeling only when a concrete integration requires it. Bank connectivity,
 IdP, actual data-location constraints, and recovery objectives remain owner input.

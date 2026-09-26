@@ -7,11 +7,12 @@ open gap or an unresolved conflict blocks the bundle.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from ruamel.yaml import YAML
+from ruamel.yaml import YAML, YAMLError
 
 from .analysis import raw_values, semantic_conflicts
 from .catalog import coerce
@@ -96,7 +97,12 @@ def resolve(
     return resolution
 
 
-def emit_bundle(resolution: Resolution, review: Review, out_dir: Path) -> list[Path]:
+def emit_bundle(
+    resolution: Resolution,
+    review: Review,
+    out_dir: Path,
+    network_config: Path | None = None,
+) -> list[Path]:
     values = resolution.values
     documents = {
         "organization-config.yaml": _organization_config(values),
@@ -106,9 +112,26 @@ def emit_bundle(resolution: Resolution, review: Review, out_dir: Path) -> list[P
         "network-config.yaml": _network_config(values),
         "security-config.yaml": _security_config(values),
     }
+    network_source = None
+    if network_config is not None:
+        source = network_config.resolve()
+        output_names = (*CONFIG_FILES, "decision-trace.yaml", "handoff.yaml")
+        if source.is_relative_to(out_dir.resolve()) or any(
+            (out_dir / name).resolve() == source for name in output_names
+        ):
+            raise EmitBlocked("keep the owner network file separate from the output bundle")
+        documents["network-config.yaml"], network_source = _read_network(network_config)
     errors = validate_configs(documents)
     if errors:
         raise EmitBlocked(f"LZA {LZA_VERSION} schema validation failed:\n" + "\n".join(errors))
+    if network_source is not None:
+        _check_network_intent(documents["network-config.yaml"], values)
+    handoff = _handoff(values)
+    if network_source is not None:
+        handoff["layers"]["network"]["source"] = network_source
+        handoff["layers"]["network"]["ownerAction"] = (
+            "Validate routing and connectivity in the owner pipeline."
+        )
     documents.update(
         {
             "decision-trace.yaml": {
@@ -116,7 +139,7 @@ def emit_bundle(resolution: Resolution, review: Review, out_dir: Path) -> list[P
                 "sourceSha256": review.sha256,
                 "decisions": resolution.trace,
             },
-            "handoff.yaml": _handoff(values),
+            "handoff.yaml": handoff,
         }
     )
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -124,6 +147,47 @@ def emit_bundle(resolution: Resolution, review: Review, out_dir: Path) -> list[P
     for name, data in documents.items():
         written.append(_write_yaml(out_dir / name, data, review.sha256))
     return written
+
+
+def _read_network(path: Path) -> tuple[dict[str, Any], dict[str, str]]:
+    try:
+        content = path.read_bytes()
+        network = YAML(typ="safe").load(content.decode("utf-8"))
+    except (OSError, UnicodeError, YAMLError) as exc:
+        raise EmitBlocked(f"{path}: cannot read owner network configuration: {exc}") from exc
+    if not isinstance(network, dict):
+        raise EmitBlocked(f"{path}: owner network configuration must be a YAML mapping")
+    return network, {
+        "origin": "owner-file",
+        "path": str(path),
+        "sha256": hashlib.sha256(content).hexdigest(),
+    }
+
+
+def _check_network_intent(network: dict[str, Any], values: dict[str, Any]) -> None:
+    """Keep the integration aligned with the packet; detailed routing remains owner work."""
+    host = _network_host_account(values)
+    home = values["home_region"]
+    if network.get("homeRegion") != home:
+        raise EmitBlocked("owner network homeRegion differs from the packet home_region")
+    vpcs = network.get("vpcs", [])
+    if not any(
+        vpc["account"] == host
+        and vpc["region"] == home
+        and values["network_cidr"] in vpc.get("cidrs", [])
+        for vpc in vpcs
+    ):
+        raise EmitBlocked(
+            "owner network needs a VPC matching the packet's host, region and network_cidr"
+        )
+    gateways = network.get("transitGateways", [])
+    if values["topology"] == "hub-spoke":
+        if not any(tgw["account"] == host and tgw["region"] == home for tgw in gateways):
+            raise EmitBlocked(
+                "owner hub-spoke network needs a transit gateway in the packet's host and region"
+            )
+    elif gateways:
+        raise EmitBlocked("owner network has transit gateways but the packet selects single-vpc")
 
 
 def _write_yaml(path: Path, data: dict[str, Any], sha256: str) -> Path:
@@ -151,6 +215,7 @@ def _handoff(values: dict[str, Any]) -> dict[str, Any]:
         "layers": {
             "network": {
                 "topology": values["topology"],
+                "source": {"origin": "generated-skeleton"},
                 "ownerAction": "Complete routes, subnets, attachments, DNS and inspection.",
             },
             "identity": {

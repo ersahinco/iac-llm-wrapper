@@ -582,3 +582,89 @@ def test_missing_policy_mapping_blocks_emit(catalog, sample_facts, make_review):
     facts = _drop(sample_facts, "identity_center_policy_mappings")
     with pytest.raises(EmitBlocked, match="identity_center_policy_mappings"):
         resolve(catalog, make_review(facts), facts)
+
+
+def test_owner_network_provenance_and_content(catalog, sample_facts, make_review, tmp_path):
+    import hashlib
+
+    result = make_review(sample_facts)
+    resolution = resolve(catalog, result, sample_facts)
+    skeleton = tmp_path / "skeleton"
+    emit_bundle(resolution, result, skeleton)
+    network = _load(skeleton / "network-config.yaml")
+    network["vpcs"][0]["routeTables"] = [{"name": "OwnerPrivate", "routes": []}]
+    owner = tmp_path / "approved-network.yaml"
+    with owner.open("w") as handle:
+        _YAML.dump(network, handle)
+    original = owner.read_bytes()
+    out = tmp_path / "bundle"
+    emit_bundle(resolution, result, out, network_config=owner)
+    assert _load(out / "network-config.yaml") == network
+    assert owner.read_bytes() == original
+    source = _load(out / "handoff.yaml")["layers"]["network"]["source"]
+    assert source == {
+        "origin": "owner-file",
+        "path": str(owner),
+        "sha256": hashlib.sha256(original).hexdigest(),
+    }
+
+
+@pytest.mark.parametrize(
+    "case,message",
+    [
+        ("missing", "cannot read owner"),
+        ("malformed", "cannot read owner"),
+        ("list", "must be a YAML mapping"),
+        ("schema", "schema validation failed"),
+        ("home", "homeRegion differs"),
+        ("cidr", "matching the packet"),
+        ("gateway", "needs a transit gateway"),
+    ],
+)
+def test_bad_owner_network_blocks_before_writing(
+    catalog, sample_facts, make_review, tmp_path, case, message
+):
+    result = make_review(sample_facts)
+    resolution = resolve(catalog, result, sample_facts)
+    skeleton = tmp_path / "skeleton"
+    emit_bundle(resolution, result, skeleton)
+    network = _load(skeleton / "network-config.yaml")
+    owner = tmp_path / "owner.yaml"
+    if case == "malformed":
+        owner.write_text("vpcs: [\n", encoding="utf-8")
+    elif case == "list":
+        owner.write_text("[]\n", encoding="utf-8")
+    elif case != "missing":
+        if case == "schema":
+            del network["endpointPolicies"]
+        elif case == "home":
+            network["homeRegion"] = "eu-west-1"
+        elif case == "cidr":
+            network["vpcs"][0]["cidrs"] = ["10.99.0.0/16"]
+        elif case == "gateway":
+            network["transitGateways"] = []
+        with owner.open("w") as handle:
+            _YAML.dump(network, handle)
+    out = tmp_path / "bundle"
+    with pytest.raises(EmitBlocked, match=message):
+        emit_bundle(resolution, result, out, network_config=owner)
+    assert not out.exists()
+
+
+@pytest.mark.parametrize("symlink", [False, True])
+def test_owner_source_cannot_be_overwritten(catalog, sample_facts, make_review, tmp_path, symlink):
+    result = make_review(sample_facts)
+    resolution = resolve(catalog, result, sample_facts)
+    out = tmp_path / "bundle"
+    emit_bundle(resolution, result, out)
+    source = out / "network-config.yaml"
+    original = source.read_bytes()
+    if symlink:
+        owner = tmp_path / "owner.yaml"
+        owner.write_bytes(original)
+        source.unlink()
+        source.symlink_to(owner)
+        source = owner
+    with pytest.raises(EmitBlocked, match="separate from the output"):
+        emit_bundle(resolution, result, out, network_config=source)
+    assert source.read_bytes() == original

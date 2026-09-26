@@ -193,6 +193,9 @@ def emit(
     allow_defaults: bool = typer.Option(
         False, "--allow-defaults", help="Fill unanswered decisions from catalog defaults."
     ),
+    network_config: Path | None = typer.Option(
+        None, "--network-config", help="Owner's LZA network configuration; replaces the skeleton."
+    ),
     uri: str | None = _URI,
     user: str | None = _USER,
     password: str | None = _PASSWORD,
@@ -205,7 +208,7 @@ def emit(
             result = build_review(graph, decisions)
             facts = graph.facts()
         resolution = resolve(decisions, result, facts, allow_defaults=allow_defaults)
-        written = emit_bundle(resolution, result, out)
+        written = emit_bundle(resolution, result, out, network_config=network_config)
     except _KNOWN_FAILURES as exc:
         _fail(str(exc))
         return

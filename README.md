@@ -113,7 +113,21 @@ or downloads during validation. A different LZA version requires an explicit
 contract update; there is no automatic version fallback or baseline selector.
 
 The network output is a foundation skeleton. Owners must complete routes,
-subnets, attachments, DNS, and inspection. Identity mappings currently support
+subnets, attachments, DNS, and inspection. To carry their network file into a new
+bundle without recreating the skeleton:
+
+```bash
+uv run iac-llm-wrapper emit --out build/lza \
+  --network-config ../owner-lza-config/network-config.yaml
+uv run iac-llm-wrapper scan build/lza
+```
+
+Keep the owner file outside the generated output directory. Its configuration
+data is preserved and schema-checked; the handoff records its path and SHA-256.
+The packet's home region, host/CIDR, and topology must match. Detailed routing and
+cross-file validation still run in the owner's LZA pipeline.
+
+Identity mappings currently support
 AWS-managed policies explicitly named in the packet; owners verify availability
 and connect their identity provider. Data classification, approved data/backup
 regions, recovery objectives, and the application owner travel in the handoff;
