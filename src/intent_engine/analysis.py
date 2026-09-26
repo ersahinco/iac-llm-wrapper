@@ -407,4 +407,6 @@ def review(graph: KnowledgeGraph, catalog: dict[str, Decision]) -> Review:
         answered=sorted({fact.decision_key for fact in facts}),
         gaps=graph.gaps(applicable),
         conflicts=graph.contradictions() + semantic_conflicts(catalog, facts),
+        facts=facts,
+        architecture=graph.architecture(),
     )

@@ -31,7 +31,7 @@ from neo4j.exceptions import (
     ServiceUnavailable,
 )
 
-from .models import Conflict, Decision, Document, Fact, Gap
+from .models import Architecture, Conflict, Decision, Document, Fact, Gap
 
 _CONSTRAINT = (
     "CREATE CONSTRAINT decision_key IF NOT EXISTS FOR (d:Decision) REQUIRE d.key IS UNIQUE"
@@ -113,13 +113,19 @@ class KnowledgeGraph:
 
     # ------------------------------------------------------------------ write
 
-    def replace(self, catalog: dict[str, Decision], document: Document, facts: list[Fact]) -> None:
+    def replace(
+        self,
+        catalog: dict[str, Decision],
+        document: Document,
+        facts: list[Fact],
+        architecture: Architecture | None = None,
+    ) -> None:
         """Replace the whole document atomically; failed loads preserve the old graph."""
         # Schema changes cannot share a transaction with data changes.
         self._run(_CONSTRAINT)
         try:
             with self._driver.session(database=self._config.database) as session:
-                session.execute_write(self._replace, catalog, document, facts)
+                session.execute_write(self._replace, catalog, document, facts, architecture)
         except (Neo4jError, ServiceUnavailable) as exc:
             raise GraphUnavailable(f"graph replacement failed: {exc}") from exc
 
@@ -129,11 +135,66 @@ class KnowledgeGraph:
         catalog: dict[str, Decision],
         document: Document,
         facts: list[Fact],
+        architecture: Architecture | None = None,
     ) -> None:
         tx.run("MATCH (n) DETACH DELETE n").consume()
         self._load_catalog(tx, catalog)
         self._load_document(tx, document)
         self._load_facts(tx, facts)
+        if architecture is not None:
+            self._load_architecture(tx, architecture)
+
+    def _load_architecture(self, tx: ManagedTransaction, architecture: Architecture) -> None:
+        tx.run(
+            "MATCH (d:Document) SET d.extraction_warnings = $warnings",
+            warnings=architecture.warnings,
+        ).consume()
+        for label in ("System", "Candidate"):
+            tx.run(
+                f"""
+                UNWIND $nodes AS n
+                MATCH (st:Statement {{id: n.properties.statement_id}})
+                CREATE (a:{label}) SET a = n.properties, a.architecture_id = n.id
+                CREATE (a)-[:EVIDENCE]->(st)
+                """,
+                nodes=[n.model_dump() for n in architecture.nodes if n.label == label],
+            ).consume()
+        tx.run(
+            """MATCH (c:Candidate), (d:Decision {key: c.decision_key})
+               CREATE (c)-[:PROPOSES]->(d)"""
+        ).consume()
+        for kind in ("ABOUT", "CONNECTS_TO"):
+            tx.run(
+                f"""UNWIND $edges AS e
+                    MATCH (s {{architecture_id: e.start_node_id}})
+                    MATCH (t {{architecture_id: e.end_node_id}})
+                    CREATE (s)-[:{kind}]->(t)""",
+                edges=[r.model_dump() for r in architecture.relationships if r.type == kind],
+            ).consume()
+
+    def architecture(self) -> Architecture:
+        rows = self._run(
+            """MATCH (n) WHERE n:Candidate OR n:System
+               RETURN n.architecture_id AS id, labels(n)[0] AS label, properties(n) AS properties
+               ORDER BY id"""
+        )
+        for row in rows:
+            row["properties"].pop("architecture_id")
+        links = self._run(
+            """MATCH (s)-[r:ABOUT|CONNECTS_TO]->(t)
+               RETURN s.architecture_id AS start_node_id, t.architecture_id AS end_node_id,
+                      type(r) AS type ORDER BY start_node_id, end_node_id"""
+        )
+        warnings = self._run(
+            "MATCH (d:Document) RETURN coalesce(d.extraction_warnings, []) AS warnings"
+        )
+        return Architecture.model_validate(
+            {
+                "nodes": rows,
+                "relationships": links,
+                "warnings": warnings[0]["warnings"] if warnings else [],
+            }
+        )
 
     def _load_catalog(self, tx: ManagedTransaction, catalog: dict[str, Decision]) -> None:
         tx.run(

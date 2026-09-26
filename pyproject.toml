@@ -41,6 +41,9 @@ dev = [
     "ruff>=0.15.21,<0.16",
     "mypy>=2.3.0,<3",
 ]
+graphrag = [
+    "neo4j-graphrag[ollama]==1.21.0",
+]
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -67,6 +70,11 @@ show_error_codes = true
 warn_unused_ignores = true
 warn_return_any = true
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["neo4j_graphrag.*", "numpy", "numpy.*"]
+follow_imports = "skip"
+follow_imports_for_stubs = true
 
 [tool.setuptools.packages.find]
 where = ["src"]

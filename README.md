@@ -30,9 +30,10 @@ document ──ingest──▶ Neo4j ──review──▶ gaps + conflicts ─�
    applicability in Cypher; conflicts come from named rules. A missing answer, an
    unusable value, and two answers that cannot both hold are three different
    findings.
-4. **The LLM is optional and advisory.** It never sees the document and never
-   decides anything. It receives the deterministic frontier and turns it into a
-   discussion agenda.
+4. **The LLM is optional and advisory.** Review narration receives facts,
+   evidence, proposed architecture relationships, and the deterministic frontier.
+   Opt-in GraphRAG ingestion sends document statements to the explicitly selected
+   local model; its extracted proposals never become accepted answers automatically.
 5. **Emit** writes foundation configuration checked against **LZA 1.16.3** schemas,
    plus a decision trace and owner handoff. Gaps, conflicts, or schema errors block
    the bundle. Account emails and identity policy mappings are explicit inputs.
@@ -40,6 +41,10 @@ document ──ingest──▶ Neo4j ──review──▶ gaps + conflicts ─�
    checks. Each result states its coverage.
 
 ## Layout
+
+The next ontology design is in [ONTOLOGY.md](ONTOLOGY.md): existing enterprise
+systems, planned AWS systems, their integration decisions, policy constraints,
+and LZA mappings. It distinguishes the proposed model from today's decision graph.
 
 ```
 src/intent_engine/
@@ -59,12 +64,39 @@ samples/              one realistic customer packet
 
 ## Setup
 
-Requires Python 3.11+, [uv](https://docs.astral.sh/uv/), and Docker with Compose
-for the local Neo4j database.
+The quickest local example needs only Docker with Compose. Run from the repository
+directory; the application waits for Neo4j to be healthy.
 
 ```bash
 git clone https://github.com/ersahinco/iac-llm-wrapper.git
 cd iac-llm-wrapper
+docker compose build app
+docker compose run --rm app ingest samples/banking-packet.md
+docker compose run --rm app review
+docker compose run --rm app emit --out build/lza
+docker compose run --rm app scan build/lza
+```
+
+Generated files appear in `build/lza` on your machine. Ingestion replaces the
+local graph; use a dedicated checkout/Compose project for each client. The image
+includes OPA and the pinned LZA schemas. Checkov and Trivy are not included, so
+`scan` reports them as `not-installed` and exits 1 for incomplete coverage.
+
+To use a local Ollama server already running on your host, choose its installed
+model explicitly:
+
+```bash
+docker compose run --rm app review --llm ollama --model YOUR_MODEL \
+  --base-url http://host.docker.internal:11434
+```
+
+No model is downloaded or selected automatically. Stop the database with
+`docker compose down`; its data volume is retained.
+
+For development on the host, install Python 3.11+ and
+[uv](https://docs.astral.sh/uv/), then:
+
+```bash
 uv sync --locked --extra dev
 docker compose up -d --wait
 export NEO4J_URI=bolt://127.0.0.1:7687
@@ -101,6 +133,56 @@ uv run iac-llm-wrapper scan build/lza
 ```
 
 ## Integration contract
+
+### GraphRAG and an existing Terraform module
+
+The image includes Neo4j GraphRAG 1.21.0. For host development, use
+`uv sync --extra dev --extra graphrag`. The example uses the installed Ollama model
+`qwen2.5:7b`; select another installed model explicitly if needed.
+
+```bash
+docker compose build app
+docker compose run --rm app ingest samples/vpc/requirements.md \
+  --catalog samples/vpc/decisions.yaml --extract-model qwen2.5:7b \
+  --base-url http://host.docker.internal:11434
+docker compose run --rm app review --catalog samples/vpc/decisions.yaml
+```
+
+`review` exits 1 while questions remain. It shows extracted systems and candidate
+answers with source quotes. Neo4j GraphRAG's schema-guided graph-builder extractor
+is reused directly; one small packet does not need an embedding model or vector
+index. This first slice accepts UTF-8 text/Markdown up to 32,000 characters of
+statements. The upstream schema pruner discards unsupported graph items with
+warnings in review. Invalid evidence or malformed extraction fails before graph
+replacement. Correct JSON and matching quotes do not establish semantic accuracy;
+the architect still reviews proposals and relationships.
+
+The architect confirms or corrects answers in the document using `decision: value`
+lines, then ingests it again. This explicit record, not the model's proposal, feeds
+configuration. The completed synthetic example demonstrates that step:
+
+```bash
+docker compose run --rm app ingest samples/vpc/confirmed.md \
+  --catalog samples/vpc/decisions.yaml
+docker compose run --rm app emit-tfvars --catalog samples/vpc/decisions.yaml \
+  --contract samples/vpc/module-inputs.json --out build/vpc
+```
+
+This writes `terraform.tfvars.json` and `decision-trace.json` for four inputs of
+[`terraform-aws-modules/vpc/aws` 6.7.3](https://github.com/terraform-aws-modules/terraform-aws-vpc/tree/v6.7.3):
+name, CIDR, availability zones, and private subnet CIDRs. The contract is a small
+reviewed input subset, not a claim of complete network design. It uses JSON Schema
+plus `x-decision` mappings and `x-module` provenance; it performs no remote schema
+fetches. Unmapped, unanswered, conflicting, or incorrectly typed inputs block export.
+
+The consuming root module must declare these variables and pass them to its VPC
+module call. Other module settings retain the consumer's chosen values/defaults.
+Upstream requires Terraform >= 1.0 and AWS provider >= 6.28. Providers, backend,
+subnet/routing validation, and plan review belong to that consumer; this tool runs
+no Terraform command, generates no resource definitions, and handles no state.
+The existing `scan` command checks LZA output, not Terraform variable files.
+
+### LZA output
 
 | Output | Consumer |
 | --- | --- |

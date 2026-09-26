@@ -20,6 +20,7 @@ from intent_engine.analysis import review
 from intent_engine.cli import app
 from intent_engine.graph import GraphConfig, KnowledgeGraph
 from intent_engine.ingest import extract_facts, read_document
+from intent_engine.models import Architecture
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get("NEO4J_PASSWORD"),
@@ -38,6 +39,80 @@ def _ingest(graph, catalog, path):
     facts = extract_facts(document, catalog)
     graph.replace(catalog, document, facts)
     return document, facts
+
+
+def test_extracted_candidate_has_evidence_but_does_not_answer_gap(graph, catalog, tmp_path):
+    packet = tmp_path / "prose.md"
+    packet.write_text("The planned VPC uses 10.42.0.0/16.\n")
+    document = read_document(packet)
+    architecture = Architecture.model_validate(
+        {
+            "nodes": [
+                {
+                    "id": "s",
+                    "label": "System",
+                    "properties": {
+                        "name": "VPC",
+                        "lifecycle": "planned",
+                        "statement_id": "s1",
+                        "quote": "The planned VPC uses 10.42.0.0/16.",
+                    },
+                },
+                {
+                    "id": "c",
+                    "label": "Candidate",
+                    "properties": {
+                        "decision_key": "network_cidr",
+                        "value": "10.42.0.0/16",
+                        "statement_id": "s1",
+                        "quote": "10.42.0.0/16",
+                    },
+                },
+            ],
+            "relationships": [{"start_node_id": "c", "end_node_id": "s", "type": "ABOUT"}],
+        }
+    )
+    graph.replace(catalog, document, [], architecture)
+    result = review(graph, catalog)
+    assert {n.id: n for n in result.architecture.nodes} == {n.id: n for n in architecture.nodes}
+    assert result.architecture.relationships == architecture.relationships
+    assert "network_cidr" in {gap.decision_key for gap in result.gaps}
+    assert not graph.facts()
+    evidence = graph._run("MATCH (:Candidate)-[:EVIDENCE]->(s:Statement) RETURN s.line AS line")
+    assert evidence == [{"line": 1}]
+    packet.write_text("network_cidr: 10.42.0.0/16\n")
+    _ingest(graph, catalog, packet)
+    assert not graph.architecture().nodes
+    assert "network_cidr" not in {gap.decision_key for gap in review(graph, catalog).gaps}
+
+
+def test_tfvars_cli_uses_confirmed_decisions(graph, tmp_path):
+    from pathlib import Path
+
+    sample = Path(__file__).resolve().parents[1] / "samples" / "vpc"
+    runner = CliRunner()
+    catalog_args = ["--catalog", str(sample / "decisions.yaml")]
+    assert (
+        runner.invoke(app, ["ingest", str(sample / "requirements.md"), *catalog_args]).exit_code
+        == 0
+    )
+    output = tmp_path / "variables"
+    command = [
+        "emit-tfvars",
+        "--contract",
+        str(sample / "module-inputs.json"),
+        "--out",
+        str(output),
+        *catalog_args,
+    ]
+    assert runner.invoke(app, command).exit_code == 2
+    assert not output.exists()
+    assert (
+        runner.invoke(app, ["ingest", str(sample / "confirmed.md"), *catalog_args]).exit_code == 0
+    )
+    emitted = runner.invoke(app, command)
+    assert emitted.exit_code == 0, emitted.output
+    assert json.loads((output / "terraform.tfvars.json").read_text())["cidr"] == "10.42.0.0/16"
 
 
 def test_ingest_replaces_the_previous_document(graph, catalog, tmp_path):

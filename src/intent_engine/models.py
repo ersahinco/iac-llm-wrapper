@@ -91,6 +91,29 @@ class Conflict(BaseModel):
     evidence: list[str] = Field(default_factory=list)
 
 
+class ArchitectureNode(BaseModel):
+    """A sourced model proposal, never an accepted answer."""
+
+    model_config = ConfigDict(extra="forbid")
+    id: str
+    label: Literal["System", "Candidate"]
+    properties: dict[str, str]
+
+
+class ArchitectureLink(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    start_node_id: str
+    end_node_id: str
+    type: Literal["ABOUT", "CONNECTS_TO"]
+
+
+class Architecture(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    nodes: list[ArchitectureNode] = Field(default_factory=list)
+    relationships: list[ArchitectureLink] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
 class Review(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -100,6 +123,8 @@ class Review(BaseModel):
     answered: list[str]
     gaps: list[Gap]
     conflicts: list[Conflict]
+    facts: list[Fact] = Field(default_factory=list)
+    architecture: Architecture = Field(default_factory=Architecture)
 
     @property
     def clean(self) -> bool:

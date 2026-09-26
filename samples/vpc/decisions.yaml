@@ -1,0 +1,20 @@
+- key: vpc_name
+  label: VPC Name
+  category: network
+  type: string
+  question: What is the approved VPC name?
+- key: network_cidr
+  label: Network CIDR
+  category: network
+  type: string
+  question: Which private CIDR is allocated to the VPC?
+- key: availability_zones
+  label: Availability Zones
+  category: network
+  type: string_list
+  question: Which availability zones are approved? Comma-separated.
+- key: private_subnets
+  label: Private Subnets
+  category: network
+  type: string_list
+  question: Which private subnet CIDRs are approved, in availability-zone order?

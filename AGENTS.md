@@ -11,9 +11,9 @@ credentials.
 ## Commands
 
 ```bash
-uv run --locked --extra dev pytest
-uv run --locked --extra dev ruff check .
-uv run --locked --extra dev mypy
+uv run --locked --extra dev --extra graphrag pytest
+uv run --locked --extra dev --extra graphrag ruff check .
+uv run --locked --extra dev --extra graphrag mypy
 NEO4J_PASSWORD=localdevpassword uv run --extra dev pytest tests/test_graph.py
 opa check --strict src/intent_engine/policy
 ```
@@ -25,11 +25,13 @@ src/intent_engine/
   decisions.yaml   decision catalog: questions only a human can answer
   catalog.py       catalog load/validate, document value coercion
   ingest.py        whole-document read into statements and facts
+  extraction.py    opt-in Neo4j GraphRAG proposals with source evidence
   graph.py         Neo4j schema, full replace, gap and contradiction Cypher
   analysis.py      gate applicability and named conflict rules
   llm.py           optional narration of the deterministic frontier
   emit.py          AWS LZA configuration, decision trace, and layered owner handoff
   contract.py      offline validation against pinned LZA 1.16.3 schemas
+  tfvars.py        confirmed values mapped to a module JSON Schema input contract
   schemas/         unchanged upstream JSON schemas and notices
   scan.py          OPA, Checkov, Trivy over an emitted bundle
   policy/lza.rego  landing-zone policy
@@ -48,9 +50,10 @@ into a client agenda → emit LZA configuration fail-closed → scan the bundle.
 - **Gaps are graph-derived, conflicts are named rules.** A missing answer, a value
   that cannot be coerced, and two answers that cannot both hold are three separate
   findings with three separate messages.
-- **The LLM decides nothing.** It never reads the document. It receives the
-  computed frontier and produces discussion questions. Provider and model are
-  always explicit; there is no implicit local fallback.
+- **The LLM decides nothing.** Opt-in GraphRAG ingestion sends source statements
+  to an explicit Ollama model and stores unconfirmed System/Candidate proposals.
+  Only explicit document answers become Facts. Review narration receives the
+  computed frontier, values, evidence, and proposals. No implicit model fallback.
 - **Emission is fail-closed.** Any gap or conflict blocks the bundle. Defaults are
   only used with `--allow-defaults` and are recorded as `origin: default` in the
   decision trace.
@@ -60,6 +63,7 @@ into a client agenda → emit LZA configuration fail-closed → scan the bundle.
 - **One decision catalog.** `decisions.yaml` holds decisions only: no derived
   values, no bookkeeping about itself.
 - **Nothing here deploys.** No AWS API calls, no credentials, no state, no apply.
+  Terraform output means variable JSON only, never resource definitions/execution.
   Owner pipelines keep every execution, approval, and drift decision.
 - **Keep the distribution and import names** (`iac-llm-wrapper`, `intent_engine`)
   for compatibility.
@@ -75,71 +79,83 @@ Checkov, Trivy. Tests: pytest. Lint/type: ruff, mypy.
 
 ### Current Goal
 
-Make the banking experiment credible through scoped network, identity, data,
-and application decisions, while preserving whole-document capture, deterministic
-review, optional AI narration, and the configuration-only deployment boundary.
+Support sourced functional requirements and architectural discussions from a
+client document and selected organisation references, then emit supported LZA
+configuration. Prioritise easy Compose startup and one complete example. Keep
+only essential integration context, deterministic checks, and advisory AI; no
+general-purpose platform extension framework.
 
 ### Status
 
-- **Pinned integration contract published.** The six LZA configuration
-  files validate offline against unchanged v1.16.3 schemas, before emission and
-  during scan. The unused baseline selector is removed. JSON Schema validation
-  is the one new runtime dependency; no AWS calls or runtime schema downloads.
-- **Small layered handoff.** Explicit permission-set policy mappings, data
-  classification/regions, recovery objectives, and application ownership feed
-  `handoff.yaml`. Unsupported data regions and incomplete policy mappings block
-  emission. Example inputs are explicitly illustrative, not bank approvals.
-- **Owner boundary is explicit.** Six config files go to the LZA consumer; the
-  trace and handoff go to reviewers. Network routes/subnets/attachments, identity
-  provider integration, workload data controls, and application delivery remain
-  owner work. Handoff status is always `requires-owner-validation`.
-- **First banking milestone published.** Scanner failures, malformed
-  reports, unavailable tools, and zero assessed checks cannot produce scan
-  success. `not-assessed` distinguishes absent coverage from findings.
-- **Policy fails closed for its existing controls.** Missing or mistyped control
-  fields and malformed account/assignment inputs are denied. This is not yet
-  validation against the full LZA schema.
-- **Atomic whole-document replace.** Catalog, document, statements, and facts
-  reload in one data transaction. Failed loads preserve the prior graph. Schema
-  initialization happens before replacement. Concurrent review snapshot
-  consistency remains separate work.
-- **Defaults are revalidated.** After opt-in defaults are resolved, semantic
-  conflicts block emission before writing the bundle.
-- **Layered direction accepted.** REVIEW.md records the banking review and the
-  network, identity, data, application, and operations boundaries. The network
-  skeleton still needs owner completion; schema success is not deployment readiness.
-- **Owner network integration.** `emit --network-config PATH` carries an existing
-  owner file into the bundle, checks its schema and basic packet alignment, and
-  records its source hash. Keep the source outside generated output. Detailed
-  routing and cross-file checks remain in the owner's LZA pipeline.
-- **Fresh-start history.** Public repository uses Apache 2.0. The initial commit
-  is followed by the published milestone commit `bfde764`; further development
-  uses ordinary commits. The requested local recovery bundle was deleted.
-- **Kept focused.** One small contract module and upstream schemas were added.
-  Whole-document ingestion, optional advisory AI, and no deployment remain boundaries.
+- **GraphRAG ingestion implemented.** The optional `graphrag` extra pins
+  Neo4j GraphRAG 1.21.0; Compose includes it. `ingest --extract-model MODEL`
+  uses the upstream extraction and schema-pruning components against an explicit
+  Ollama endpoint. One UTF-8 text/Markdown packet, up to 32,000 characters of
+  statements; no embeddings or vector index are needed for this slice.
+- **Proposals stay separate.** System/Candidate nodes carry source quotes and
+  EVIDENCE links. Candidates PROPOSE answers; only Fact nodes ANSWER decisions.
+  ABOUT/CONNECTS_TO relationships support discussion. Unsupported graph items
+  are pruned with visible warnings; invalid evidence aborts before replacement.
+  The architect records confirmed answers in the document and ingests again.
+- **Upstream compatibility kept small.** GraphRAG 1.21.0's async Ollama adapter
+  drops format settings. A short adapter invokes its synchronous method in a
+  thread to preserve native JSON Schema output. Remove when upstream fixes it.
+- **Discussion context is richer.** Review narration receives stated values,
+  source locations, findings, and the unconfirmed architecture projection.
+  Conflicted facts are excluded from accepted LLM context. Source text remains
+  untrusted evidence, never model instructions.
+- **Terraform variable export implemented.** `emit-tfvars` validates
+  confirmed decisions against an explicit JSON Schema contract, then emits
+  `terraform.tfvars.json` and `decision-trace.json`. The example covers name,
+  CIDR, availability zones, and private subnets for community VPC module 6.7.3.
+  It records module version, contract hash, and source evidence. No HCL resources,
+  module discovery, Terraform execution, or state handling. The consuming root
+  must declare/pass these variables; this is input validation, not a plan.
+- **Compose application available.** Locked Python dependencies, OPA 1.21.0,
+  and packaged LZA schemas run without host Python. An explicit local model is
+  optional; none is downloaded automatically. Checkov/Trivy are absent from the
+  image and correctly reported as unavailable rather than passing.
+- **Existing boundaries preserved.** Atomic whole-document replacement,
+  deterministic gap/conflict review, opt-in defaults with conflict revalidation,
+  offline LZA 1.16.3 schema checks, owner network-file preservation, and honest
+  scanner coverage remain. Existing enterprise systems are never provisioned.
+- **Still pending.** Organisation-reference ingestion and policy-result graph
+  links are not implemented. Integration/Policy/ConfigTarget nodes remain design
+  ideas in ONTOLOGY.md. The separate LZA handoff file still needs consolidation.
+  The graph does not prove real connectivity, identity integration, or compliance.
+- **Distribution and CI.** Apache 2.0 public repository. This milestone includes
+  the Compose application, GraphRAG ingestion, and VPC input export. GitHub CI
+  includes the GraphRAG extra; the verification below records local results.
 
-### Verified (2026-09-26, Python 3.14.7, macOS)
+### Verified (2026-09-27)
 
-- 135 tests pass with no skips, including all 9 local Neo4j tests. Ruff and mypy
-  pass over 12 source files. Strict OPA validation passes.
-- Full sample journey: 25 decisions captured, 8 files emitted. The six config
-  files pass LZA 1.16.3 schemas. Explicit policy mappings are preserved, and data
-  region conflicts block emission. No network or application deployment is claimed.
-- Real scan: schemas and OPA pass; Checkov 3.3.10 and Trivy 0.74.0 report
-  `not-assessed`. CLI correctly exits 1 for incomplete coverage.
-- Built source distribution and wheel. Validated all six configs using the wheel
-  with socket connections blocked: packaged schemas work offline.
-- CLI integration covers incomplete input, corrected input, owner-network
-  handoff, and unavailable scan tools against local Neo4j. The owner source stays
-  unchanged; region/CIDR/topology mismatches block emission.
-- CI includes checksum-pinned OPA 1.21.0 in Python 3.11. All five GitHub CI jobs
-  passed for milestone commit `bfde764` (run `36250474457`). Existing
-  Neo4j/Python 3.14 warnings are third-party.
+- 152 tests pass with no skips, including 11 isolated Neo4j tests. Ruff, mypy
+  (14 source files), and strict OPA validation pass. Updated Docker image builds.
+  The real model output was persisted and reviewed in Neo4j: three proposals,
+  four still-unconfirmed decisions, and the pruning warning survived storage.
+  The final container ingested the confirmed VPC packet and exported both JSON
+  files successfully. These checks used a disposable Compose graph project.
+- Live local Ollama `qwen2.5:7b` extracted the three stated VPC decisions with
+  matching source quotes; the undecided private-subnet value remained absent.
+  One unsupported relationship was pruned and reported. Earlier runs produced
+  poor or malformed graphs: valid structure is not semantic accuracy, and
+  architect confirmation remains necessary. No new model was downloaded.
+- Offline tests exercise actual GraphRAG components with controlled responses,
+  source validation, pruning, typed export, missing mappings, remote-reference
+  rejection, provenance, and the Ollama compatibility adapter.
+- Neo4j tests prove candidate evidence survives storage, candidates do not close
+  gaps, re-ingestion replaces proposals, and missing answers block variable output.
+- The community VPC 6.7.3 input declarations were read from upstream. Its stated
+  floors are Terraform >= 1.0 and AWS provider >= 6.28. No runtime, provider,
+  backend, or plan was invoked or validated here.
+- Earlier LZA sample/scanner checks remain: schemas and OPA pass; absent or
+  unassessed Checkov/Trivy coverage makes scan exit 1. This is not deployment
+  readiness. Local Python 3.14/Neo4j deprecation warnings are upstream.
 
 ### Next
 
-Exercise this handoff with the owner's actual LZA 1.16.3 consumer, using
-`--network-config` for their network design, and verify identity policy/group
-references. No owner repository was supplied this session. Add richer
-workload modeling only when a concrete integration requires it. Bank connectivity,
-IdP, actual data-location constraints, and recovery objectives remain owner input.
+Use one client case with selected organisation references to connect policy
+findings to sourced functional decisions. Consolidate the redundant LZA handoff
+output. Keep extraction proposals advisory and exports restricted to explicit
+input contracts. Improve local-model quality using representative packets rather
+than adding a larger ontology or a general-purpose module framework.

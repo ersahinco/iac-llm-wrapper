@@ -24,13 +24,13 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: uv sync --locked --extra dev
+        run: uv sync --locked --extra dev --extra graphrag
 
       - name: Lint
-        run: uv run --locked --extra dev ruff check .
+        run: uv run --locked --extra dev --extra graphrag ruff check .
 
       - name: Type check
-        run: uv run --locked --extra dev mypy
+        run: uv run --locked --extra dev --extra graphrag mypy
 
   test:
     runs-on: ubuntu-latest
@@ -50,7 +50,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync --locked --extra dev
+        run: uv sync --locked --extra dev --extra graphrag
 
       - name: Install and check OPA
         if: matrix.python-version == '3.11'
@@ -62,7 +62,7 @@ jobs:
           opa fmt --fail --list src/intent_engine/policy
 
       - name: Test
-        run: uv run --locked --extra dev pytest -v --tb=short
+        run: uv run --locked --extra dev --extra graphrag pytest -v --tb=short
 
   graph:
     runs-on: ubuntu-latest
@@ -91,14 +91,14 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: uv sync --locked --extra dev
+        run: uv sync --locked --extra dev --extra graphrag
 
       - name: Graph tests
         env:
           NEO4J_URI: bolt://localhost:7687
           NEO4J_USER: neo4j
           NEO4J_PASSWORD: cipassword
-        run: uv run --locked --extra dev pytest tests/test_graph.py -v
+        run: uv run --locked --extra dev --extra graphrag pytest tests/test_graph.py -v
 
       - name: End-to-end journey
         env:
@@ -106,7 +106,7 @@ jobs:
           NEO4J_USER: neo4j
           NEO4J_PASSWORD: cipassword
         run: |
-          uv run --locked --extra dev iac-llm-wrapper ingest samples/banking-packet.md
-          uv run --locked --extra dev iac-llm-wrapper review
-          uv run --locked --extra dev iac-llm-wrapper emit --out build/lza
+          uv run --locked --extra dev --extra graphrag iac-llm-wrapper ingest samples/banking-packet.md
+          uv run --locked --extra dev --extra graphrag iac-llm-wrapper review
+          uv run --locked --extra dev --extra graphrag iac-llm-wrapper emit --out build/lza
           test -f build/lza/accounts-config.yaml

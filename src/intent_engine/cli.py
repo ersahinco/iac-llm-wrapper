@@ -19,11 +19,13 @@ from .analysis import review as build_review
 from .catalog import CatalogError, load_catalog
 from .contract import LZA_VERSION
 from .emit import EmitBlocked, emit_bundle, resolve
+from .extraction import extract_architecture
 from .graph import GraphConfig, GraphEmpty, GraphUnavailable, KnowledgeGraph
 from .ingest import IngestError, extract_facts, read_document
 from .llm import LlmConfig, LlmError, deterministic_questions, narrate
 from .models import Decision, Review
 from .scan import ScanError, scan_bundle
+from .tfvars import emit_tfvars
 
 app = typer.Typer(add_completion=False, help=__doc__)
 
@@ -64,6 +66,10 @@ _CATALOG = typer.Option(None, "--catalog", help="Override the packaged decision 
 def ingest(
     document: Path = typer.Argument(..., help="Architecture document to ingest in full."),
     catalog: Path | None = _CATALOG,
+    extract_model: str | None = typer.Option(
+        None, "--extract-model", help="Opt-in GraphRAG extraction using this Ollama model."
+    ),
+    base_url: str = typer.Option("http://localhost:11434", "--base-url"),
     uri: str | None = _URI,
     user: str | None = _USER,
     password: str | None = _PASSWORD,
@@ -74,8 +80,13 @@ def ingest(
         decisions = _catalog(catalog)
         parsed = read_document(document)
         facts = extract_facts(parsed, decisions)
+        architecture = (
+            extract_architecture(parsed, decisions, extract_model, base_url)
+            if extract_model
+            else None
+        )
         with _graph(uri, user, password, database) as graph:
-            graph.replace(decisions, parsed, facts)
+            graph.replace(decisions, parsed, facts, architecture)
             counts = graph.counts()
     except _KNOWN_FAILURES as exc:
         _fail(str(exc))
@@ -148,6 +159,18 @@ def _render(result: Review, decisions: dict[str, Decision]) -> None:
         f"applicable decisions: {len(result.applicable)}  answered: {len(result.answered)}  "
         f"gaps: {len(result.gaps)}  conflicts: {len(result.conflicts)}"
     )
+    for warning in result.architecture.warnings:
+        typer.echo(f"extraction: {warning}")
+    if result.architecture.nodes:
+        typer.echo("\nextracted proposals — confirm answers in the document and ingest again:")
+        for node in result.architecture.nodes:
+            props = node.properties
+            summary = (
+                f"{props['decision_key']}: {props['value']}"
+                if node.label == "Candidate"
+                else props["name"]
+            )
+            typer.echo(f"  - {summary} [{props['statement_id']}]: {props['quote']}")
     if result.gaps:
         typer.secho("\ngaps", fg=typer.colors.YELLOW)
         for gap in result.gaps:
@@ -218,6 +241,34 @@ def emit(
     typer.echo(f"LZA {LZA_VERSION} schemas passed; owner validation remains in handoff.yaml")
     if defaulted:
         typer.secho(f"filled from catalog defaults: {', '.join(defaulted)}", fg=typer.colors.YELLOW)
+
+
+@app.command("emit-tfvars")
+def export_tfvars(
+    contract: Path = typer.Option(
+        ..., "--contract", help="Module JSON Schema with decision mappings."
+    ),
+    out: Path = typer.Option(..., "--out"),
+    catalog: Path | None = _CATALOG,
+    uri: str | None = _URI,
+    user: str | None = _USER,
+    password: str | None = _PASSWORD,
+    database: str | None = _DATABASE,
+) -> None:
+    """Export confirmed values and evidence. No Terraform resources or execution."""
+    try:
+        decisions = _catalog(catalog)
+        with _graph(uri, user, password, database) as graph:
+            result = build_review(graph, decisions)
+            facts = graph.facts()
+        resolution = resolve(decisions, result, facts)
+        paths = emit_tfvars(resolution, result, contract, out)
+    except _KNOWN_FAILURES as exc:
+        _fail(str(exc))
+        return
+    for path in paths:
+        typer.echo(f"wrote {path}")
+    typer.echo("module input contract passed; downstream Terraform validation remains required")
 
 
 @app.command()

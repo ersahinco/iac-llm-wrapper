@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Reviewed input subset for terraform-aws-modules/vpc/aws 6.7.3",
+  "x-module": {
+    "source": "terraform-aws-modules/vpc/aws",
+    "version": "6.7.3",
+    "inputReference": "https://github.com/terraform-aws-modules/terraform-aws-vpc/blob/v6.7.3/variables.tf",
+    "terraform": ">= 1.0",
+    "awsProvider": ">= 6.28"
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "cidr", "azs", "private_subnets"],
+  "properties": {
+    "name": {"type": "string", "minLength": 1, "x-decision": "vpc_name"},
+    "cidr": {"type": "string", "minLength": 1, "x-decision": "network_cidr"},
+    "azs": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1},
+      "x-decision": "availability_zones"
+    },
+    "private_subnets": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1},
+      "x-decision": "private_subnets"
+    }
+  }
+}
