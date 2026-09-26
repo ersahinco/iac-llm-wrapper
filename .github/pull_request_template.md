@@ -8,7 +8,7 @@
 - [ ] `uv run --locked --extra dev pytest` passes
 - [ ] `uv run --locked --extra dev ruff check .` is clean
 - [ ] `uv run --locked --extra dev mypy` is clean
-- [ ] `NEO4J_PASSWORD=... uv run --extra dev pytest tests/test_graph_integration.py` passes
+- [ ] `NEO4J_PASSWORD=... uv run --locked --extra dev pytest tests/test_graph.py` passes (graph changes only; local development database)
 - [ ] `opa check --strict src/intent_engine/policy` is clean (policy changes only)
 
 ## Risk

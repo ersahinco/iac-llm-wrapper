@@ -1,4 +1,4 @@
-# iac-llm-wrapper
+# IaC Accelerator (`iac-llm-wrapper`)
 
 A knowledge-graph tool that captures requirements and architecture decisions from
 a customer document, surfaces gaps and conflicts so architects can steer the
@@ -7,6 +7,10 @@ client discussion, and emits configuration for an existing AWS accelerator.
 It does not deploy anything. It holds no credentials, calls no AWS API, and runs
 no Terraform. The output is configuration an owner reviews and feeds to their own
 pipeline.
+
+Open source under [Apache 2.0](LICENSE). Use it, fork it, and contribute focused
+improvements through [issues](https://github.com/ersahinco/iac-llm-wrapper/issues)
+and pull requests.
 
 ## How it works
 
@@ -51,9 +55,13 @@ samples/              one realistic customer packet
 
 ## Setup
 
+Requires Python 3.11+, [uv](https://docs.astral.sh/uv/), and Docker with Compose
+for the local Neo4j database.
+
 ```bash
-uv lock
-uv sync --extra dev
+git clone https://github.com/ersahinco/iac-llm-wrapper.git
+cd iac-llm-wrapper
+uv sync --locked --extra dev
 docker compose up -d --wait
 export NEO4J_URI=bolt://127.0.0.1:7687
 export NEO4J_USER=neo4j
@@ -73,6 +81,12 @@ brew install opa checkov trivy
 ```
 
 ## Use
+
+Start with the [example packet](samples/banking-packet.md). Answers use
+`decision_key: value` lines, with keys from
+[`decisions.yaml`](src/intent_engine/decisions.yaml). Other prose is retained as
+context; the tool does not infer answers from free-form text. Replace the sample
+account emails with owner-provided addresses before using the output.
 
 ```bash
 uv run iac-llm-wrapper ingest samples/banking-packet.md
@@ -97,9 +111,9 @@ Exit codes: `0` clean, `1` findings (open gaps, conflicts, or scan findings),
 ## Checks
 
 ```bash
-uv run --extra dev pytest
-uv run --extra dev ruff check .
-uv run --extra dev mypy
+uv run --locked --extra dev pytest
+uv run --locked --extra dev ruff check .
+uv run --locked --extra dev mypy
 NEO4J_PASSWORD=localdevpassword uv run --extra dev pytest tests/test_graph.py
 ```
 
@@ -123,3 +137,19 @@ policy and secret scanning of that output.
 
 Out: deploying anything, generating Terraform, holding credentials, owning state,
 approvals, or drift.
+
+## Contributing
+
+Fork the repository, make a focused change, run the checks above, and open a pull
+request explaining the problem and how you verified the fix. Include a regression
+test for behavior changes. Graph tests require the local Neo4j instance; policy
+changes require OPA.
+
+Add a catalog decision or conflict rule when a concrete use case needs it. Keep
+the deterministic review and optional AI agenda separate, and keep deployment in
+the consuming pipeline. Use sanitized examples in issues and tests.
+
+## License
+
+Copyright 2026 Cemreoguz Ersahin. Licensed under the [Apache License 2.0](LICENSE).
+Contributions are accepted under the same license.

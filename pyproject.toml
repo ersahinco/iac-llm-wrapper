@@ -1,7 +1,7 @@
 [project]
 name = "iac-llm-wrapper"
 version = "0.2.0"
-description = "Knowledge-graph capture of requirements and architecture decisions, with AI-surfaced gaps and conflicts, emitting configuration for existing AWS IaC modules."
+description = "Knowledge-graph decision capture, deterministic gap and conflict review, and optional AI discussion agendas, emitting AWS Landing Zone Accelerator configuration."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"

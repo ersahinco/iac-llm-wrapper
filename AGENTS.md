@@ -79,6 +79,10 @@ and security tools.
 
 ### Status
 
+- **Open-source contribution path prepared.** README covers cloning, setup,
+  explicit decision input, scope, and contributions under Apache 2.0. Corrected
+  the license text typo and stale graph-test command in the PR template. Local
+  environment files are ignored. Runtime behavior is unchanged.
 - **Hard refactor applied.** Every file of the old engine is deleted: 35 core
   modules, 4 pattern packages, 9 eval/validation scripts, 47 old tests, 10 docs,
   all 6 fixture bundles, the packaged Terraform root, and the release/supply-chain
@@ -100,6 +104,9 @@ and security tools.
 
 ### Verified (2026-09-26, Python 3.14.7, macOS)
 
+- Publication checks: 45 unit/output tests and all 5 local Neo4j integration
+  tests pass; Ruff, mypy, and strict OPA validation pass. Gitleaks scanned all
+  fetched Git history (233 commits) and reported no leaks.
 - 50 tests pass, including the 5 Neo4j tests against `neo4j:5.26.4-community`
   and the OPA negative test. Ruff clean. Mypy clean over 11 source files.
   `opa check --strict src/intent_engine/policy` passes.
