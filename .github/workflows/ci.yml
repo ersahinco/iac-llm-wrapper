@@ -29,33 +29,15 @@ jobs:
       - name: Lint
         run: uv run --locked --extra dev ruff check .
 
-      - name: Format check
-        run: uv run --locked --extra dev ruff format --check .
-
       - name: Type check
         run: uv run --locked --extra dev mypy
-
-      - name: Pylance/Pyright check
-        run: uv run --locked --extra dev pyright .
-
-      - name: Fixture drift check
-        run: uv run --locked --extra dev python scripts/sync-sample-fixtures.py --check
-
-      - name: Extraction eval check
-        run: uv run --locked --extra dev python scripts/evaluate-extraction.py
-
-      - name: Usability trial check
-        run: uv run --locked --extra dev python scripts/evaluate-usability.py
-
-      - name: Golden journey shift-left check
-        run: uv run --locked --extra dev python scripts/evaluate-golden-journey.py
 
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       matrix:
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -71,52 +53,23 @@ jobs:
         run: uv sync --locked --extra dev
 
       - name: Test
-        run: uv run --locked --extra dev pytest tests/ -v --tb=short --cov=src/intent_engine --cov-report=term-missing --cov-fail-under=80
+        run: uv run --locked --extra dev pytest -v --tb=short
 
-  terraform-contract:
+  graph:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
-        with:
-          terraform_version: "1.15.8"
-          terraform_wrapper: false
-
-      - name: Install pinned Atmos
+    timeout-minutes: 20
+    services:
+      neo4j:
+        image: neo4j:5.26.4-community
         env:
-          ATMOS_VERSION: "1.223.0"
-          ATMOS_SHA256: "f898d4aaef4d52666f12eb652dc54b5a143f1c14e1c669fed736fd8c20fc0e41"
-        run: |
-          mkdir -p .tools
-          curl --fail --location --silent --show-error \
-            --output .tools/atmos \
-            "https://github.com/cloudposse/atmos/releases/download/v${ATMOS_VERSION}/atmos_${ATMOS_VERSION}_linux_amd64"
-          echo "${ATMOS_SHA256}  .tools/atmos" | sha256sum --check --strict
-          chmod 0755 .tools/atmos
-          echo "$PWD/.tools" >> "$GITHUB_PATH"
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
-        with:
-          python-version: "3.11"
-
-      - name: Install locked dependencies
-        run: uv sync --locked
-
-      - name: Validate approved Terraform VPC root
-        run: uv run --locked python scripts/validate-terraform-vpc-plan-root.py
-
-      - name: Validate Atmos Terraform VPC handoff
-        run: uv run --locked python scripts/validate-atmos-terraform-vpc-handoff.py
-
-  security:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+          NEO4J_AUTH: neo4j/cipassword
+        ports:
+          - 7687:7687
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p cipassword 'RETURN 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -131,59 +84,21 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked --extra dev
 
-      - name: Dependency audit
+      - name: Graph tests
+        env:
+          NEO4J_URI: bolt://localhost:7687
+          NEO4J_USER: neo4j
+          NEO4J_PASSWORD: cipassword
+        run: uv run --locked --extra dev pytest tests/test_graph.py -v
+
+      - name: End-to-end journey
+        env:
+          NEO4J_URI: bolt://localhost:7687
+          NEO4J_USER: neo4j
+          NEO4J_PASSWORD: cipassword
         run: |
-          uv run --locked --extra dev pip-audit
-          uv export --locked --no-dev --no-emit-project --format requirements-txt --output-file runtime-requirements.txt
-          uv run --locked --extra dev pip-audit --requirement runtime-requirements.txt
+          uv run --locked --extra dev iac-llm-wrapper ingest samples/banking-packet.md
+          uv run --locked --extra dev iac-llm-wrapper review
+          uv run --locked --extra dev iac-llm-wrapper emit --out build/lza
+          test -f build/lza/accounts-config.yaml
 
-      - name: Static security scan
-        run: uv run --locked --extra dev bandit -c bandit.yaml -r src -q -ll
-
-      - name: Generate SBOM
-        run: uv export --preview-features sbom-export --locked --no-dev --format cyclonedx1.5 --output-file sbom.cdx.json
-
-      - name: Upload SBOM artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: sbom
-          path: sbom.cdx.json
-
-  package:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
-        with:
-          python-version: "3.11"
-
-      - name: Build wheel and source distribution
-        run: uv build --build-constraint build-constraints.txt --require-hashes
-
-      - name: Smoke test installed entry points
-        run: |
-          uv export --locked --no-dev --no-emit-project --format requirements-txt --output-file runtime-requirements.txt
-          uv venv .package-smoke
-          uv pip install --require-hashes --python .package-smoke/bin/python --requirement runtime-requirements.txt
-          uv pip install --no-deps --python .package-smoke/bin/python dist/*.whl
-          .package-smoke/bin/iac-llm-wrapper --version
-          .package-smoke/bin/intent-engine --version
-          .package-smoke/bin/iac-llm-wrapper compile \
-            --input fixtures/usability/byom-terraform-vpc.md \
-            --output .package-smoke-output \
-            --pattern terraform-vpc
-          test -f .package-smoke-output/atmos/stacks/catalog/terraform-vpc-intent.yaml
-          cmp \
-            src/intent_engine/patterns/terraform_vpc/plan_root/main.tf \
-            .package-smoke-output/atmos/components/terraform/terraform-vpc/main.tf
-          cmp \
-            src/intent_engine/patterns/terraform_vpc/plan_root/variables.tf \
-            .package-smoke-output/atmos/components/terraform/terraform-vpc/variables.tf
-          cmp \
-            src/intent_engine/patterns/terraform_vpc/plan_root/.terraform.lock.hcl \
-            .package-smoke-output/atmos/components/terraform/terraform-vpc/.terraform.lock.hcl

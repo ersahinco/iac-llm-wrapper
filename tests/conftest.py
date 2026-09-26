@@ -1,26 +1,50 @@
-"""Shared pytest fixtures for intent-engine tests."""
-
 from __future__ import annotations
+
+from collections.abc import Callable, Iterable
+from pathlib import Path
 
 import pytest
 
-from intent_engine.core.llm_caller import LLMBackend, LLMCaller
+from intent_engine.analysis import applicable_keys
+from intent_engine.catalog import load_catalog
+from intent_engine.ingest import extract_facts, read_document
+from intent_engine.models import Conflict, Decision, Document, Fact, Review
+
+SAMPLE = Path(__file__).resolve().parents[1] / "samples" / "banking-packet.md"
 
 
-class MockLLMBackend(LLMBackend):
-    """Mock LLM backend that returns a fixed response."""
+@pytest.fixture(scope="session")
+def sample_path() -> Path:
+    return SAMPLE
 
-    def __init__(self, response: str = '{"primary_region": "eu-west-1"}') -> None:
-        self.response = response
-        self.calls: list[dict] = []
 
-    def complete(self, prompt: str, **kwargs):
-        self.calls.append({"prompt": prompt, "kwargs": kwargs})
-        return self.response
+@pytest.fixture(scope="session")
+def catalog() -> dict[str, Decision]:
+    return load_catalog()
+
+
+@pytest.fixture(scope="session")
+def sample_document() -> Document:
+    return read_document(SAMPLE)
+
+
+@pytest.fixture(scope="session")
+def sample_facts(sample_document: Document, catalog: dict[str, Decision]) -> list[Fact]:
+    return extract_facts(sample_document, catalog)
 
 
 @pytest.fixture
-def mock_llm_caller() -> LLMCaller:
-    """Create an LLMCaller backed by MockLLMBackend."""
-    backend = MockLLMBackend()
-    return LLMCaller(backend)
+def make_review(catalog: dict[str, Decision]) -> Callable[..., Review]:
+    """A review as the graph would report it, without needing Neo4j."""
+
+    def factory(facts: list[Fact], conflicts: Iterable[Conflict] = ()) -> Review:
+        return Review(
+            document=str(SAMPLE),
+            sha256="0" * 64,
+            applicable=sorted(applicable_keys(catalog, facts)),
+            answered=sorted({fact.decision_key for fact in facts}),
+            gaps=[],
+            conflicts=list(conflicts),
+        )
+
+    return factory

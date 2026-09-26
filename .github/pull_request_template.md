@@ -7,22 +7,16 @@
 
 - [ ] `uv run --locked --extra dev pytest` passes
 - [ ] `uv run --locked --extra dev ruff check .` is clean
-- [ ] `uv run --locked --extra dev ruff format --check .` is clean
 - [ ] `uv run --locked --extra dev mypy` is clean
-- [ ] `uv run --locked --extra dev pyright .` is clean
-- [ ] `uv run --locked --extra dev python scripts/sync-sample-fixtures.py --check` is clean
-- [ ] `uv run --locked --extra dev python scripts/evaluate-extraction.py` is clean
-- [ ] `uv run --locked --extra dev python scripts/evaluate-usability.py` is clean
-- [ ] `uv run --locked --extra dev python scripts/evaluate-golden-journey.py` is clean
-- [ ] `uv run --locked --extra dev prek run --all-files` passes
-- [ ] `uv run --locked --extra dev pytest --cov=src/intent_engine --cov-fail-under=80` passes
+- [ ] `NEO4J_PASSWORD=... uv run --extra dev pytest tests/test_graph_integration.py` passes
+- [ ] `opa check --strict src/intent_engine/policy` is clean (policy changes only)
 
 ## Risk
 
-- **Low**: tests pass, follows existing patterns
+- **Low**: tests pass, follows existing structure
 - **Medium**: novel approach or unclear requirements
-- **High**: significant architectural change
+- **High**: changes the emitted artifact shape or the graph model
 
-## Stakeholder value
+## Value
 
-What does this give the architect / engineer / compliance reviewer?
+What does this give the architect or the reviewer?

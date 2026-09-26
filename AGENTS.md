@@ -1,155 +1,71 @@
 # AGENTS.md
 
-## Project: iac-llm-wrapper / intent-engine core
+## Project: iac-llm-wrapper
 
-Core engine for `iac-llm-wrapper`, an architect-exchange-to-registered-target
-configuration framework. It captures architecture intent from prose, validates
-decisions through requirement graphs and target contracts, and emits traceable
-target configuration artifacts that engineers use with existing deployment
-mechanisms. Direct deployment and whole-IaC-from-scratch generation stay out of
-runtime scope.
-
-AWS Landing Zone Accelerator is the first product path: collected inputs become
-contract-checked LZA YAML/config files for the downstream LZA deployment process.
-The core must stay generic: patterns own domain models, contracts, validators,
-samples, and target configuration emitters.
+A knowledge-graph tool that captures requirements and architecture decisions from
+a customer document, surfaces gaps and conflicts so architects can steer client
+discussions, and emits configuration for an existing AWS accelerator (Landing Zone
+Accelerator). It does not deploy, does not generate Terraform, and holds no
+credentials.
 
 ## Commands
 
 ```bash
 uv run --locked --extra dev pytest
 uv run --locked --extra dev ruff check .
-uv run --locked --extra dev ruff format --check .
 uv run --locked --extra dev mypy
-uv run --locked --extra dev pyright .
-uv run --locked --extra dev python scripts/sync-sample-fixtures.py --check
-uv run --locked --extra dev python scripts/evaluate-golden-journey.py
-uv run --locked --extra dev python scripts/evaluate-extraction.py
-uv run --locked --extra dev python scripts/evaluate-usability.py
-uv run --locked --extra dev prek run --all-files
+NEO4J_PASSWORD=localdevpassword uv run --extra dev pytest tests/test_graph.py
+opa check --strict src/intent_engine/policy
 ```
 
 ## Architecture
 
-- **Models** (`src/intent_engine/patterns/*/models.py`): Pydantic v2 intent data
-  models. Pattern-specific models drive extraction, graph sync, validation,
-  semantic model derivation, and artifact emission.
-- **Extract** (`extractor.py`): Single graph-driven `Extractor`. Prompts come
-  from requirement nodes, not regex or fixed document layout. Without LLM,
-  deterministic fallback applies graph defaults and structured Markdown entity
-  recovery.
-- **Patterns** (`patterns.py`): Lean registry for pluggable product paths.
-  Current built-ins: `aws-lza`, `cloudformation-parameters`,
-  `kubernetes-cluster`, `terraform-vpc`.
-- **Requirements** (`requirements.py`): Decision graph with `applies_if`,
-  `blocked_if`, expression gates, dependencies, cascade rules, tradeoffs,
-  compliance controls, signals, and audit trail.
-- **Semantic model** (`semantic_model.py` + pattern `semantic.py`): Lightweight
-  typed entities, relationships, and predicate constraint results for
-  real-world dependencies without RDF/OWL, Datalog, or a graph database.
-- **Interview** (`interview.py`): Graph-ordered requirement capture. Shows
-  context, asks only applicable gaps, supports save/resume, and records
-  rationale.
-- **Validate** (`validator.py`): Fail-closed graph and pattern validation.
-  Missing required applicable decisions become compile errors.
-- **Generate** (`generator.py`): Registry-driven emitter for decision report,
-  handoff plan, target configuration artifacts, lineage, runbook, module inputs
-  when pattern-owned, sample recommendations, and static review artifacts.
-- **Contracts** (`contracts.py`): Target artifact contracts define required
-  files, paths, decisions, lineage, and stable value assertions.
-- **Samples** (`sample_config.py`): Registered reference bundles with pinned
-  source metadata, module refs, tags, fixture dirs, and match recommendations.
-- **LLM** (`llm_caller.py`): Pluggable OpenAI-compatible, Bedrock-through-local
-  AWS CLI, and Ollama backends with retry/backoff and evidence capture.
-- **CLI** (`cli.py`): `compile`, `compile-git`, `interview`, `validate`,
-  `explain`, `sample`, `contract`, `graph`, `discover`, `template`, `review`,
-  `shift-left`, Terraform VPC speculative plan conformance, and AWS LZA validation
-  helpers. Default pattern is `aws-lza`.
+```
+src/intent_engine/
+  decisions.yaml   decision catalog: questions only a human can answer
+  catalog.py       catalog load/validate, document value coercion
+  ingest.py        whole-document read into statements and facts
+  graph.py         Neo4j schema, full replace, gap and contradiction Cypher
+  analysis.py      gate applicability and named conflict rules
+  llm.py           optional narration of the deterministic frontier
+  emit.py          AWS LZA configuration plus decision trace
+  scan.py          OPA, Checkov, Trivy over an emitted bundle
+  policy/lza.rego  landing-zone policy
+  cli.py           ingest, status, review, emit, scan
+samples/           one realistic customer packet
+```
 
-## Current Pattern Surface
-
-- `aws-lza`: Contract-backed AWS LZA registered target path. Emits official-style
-  LZA YAML target configuration artifacts, decision report, lineage manifest,
-  deployment runbook, plan/replay metadata, target capability graph, and sample
-  recommendations. It does not emit deployable Terraform/Terragrunt
-  landing-zone stacks.
-- `cloudformation-parameters`: BYOM CloudFormation parameter handoff for an
-  approved existing template. Emits parameters and decision report, not a stack
-  or deployment.
-- `kubernetes-cluster`: Contract-backed Kubernetes handoff for
-  cluster/namespace config with optional Terraform EKS module input references.
-- `terraform-vpc`: Exact approved Terraform AWS VPC module input capture and
-  requirement-to-plan conformance. Emits module variables/tfvars, an abstract
-  Atmos catalog plus approved component root, plan/replay manifests, and
-  sanitized account-bound v2 evidence with requirement/control outcomes,
-  deferred gates, and resource provenance. Its code-owned root pins Terraform
-  1.15.8, module 6.6.1 by source-tree digest, and AWS provider 6.53.0; it never
-  applies or retains state, raw plan JSON, or a plan binary.
+Flow: ingest a whole document → Neo4j holds catalog, document, statements, facts →
+deterministic review reports gaps and conflicts → optional LLM turns that frontier
+into a client agenda → emit LZA configuration fail-closed → scan the bundle.
 
 ## Key Decisions
 
-- Core stays domain-agnostic. Use-case logic lives in pattern packages.
-- Graphs own decision order, branching, blocked paths, cascades, gaps,
-  provenance, and handoff sequencing.
-- Existing accelerators/modules are registered targets with contracts and data
-  models before emitted configuration artifacts are trusted.
-- Current compile/generation paths make no AWS API calls and do not deploy. The
-  AWS LZA validation-only adapter may run the official local validator, which can
-  perform read-only account lookup through the provided AWS/LZA context.
-- The Terraform VPC plan adapter is deliberately target-specific. It may run a
-  temporary speculative plan for the exact approved module and compare caller
-  identity and plan-observable values with accepted requirements; it cannot
-  apply, destroy, own a backend, or retain state/raw plan data. Extract a shared
-  execution protocol only after a second real target proves the same boundary.
-- "Wrapper" means architect exchange to registered target configuration, not
-  bypassing IaC tools, accelerators, owner pipelines, or gates.
-- Sample recommendations must persist as artifacts, not terminal-only hints.
-- `src/intent_engine/patterns/aws_lza` is the only AWS LZA path.
-- Handoff artifacts are not deployments. `handoffReadiness` and
-  `handoffAllowed` are the canonical readiness fields.
-- Secrets travel as secret-store references and expected parameter names, never
-  raw values.
-- Add data-modeling or graph depth only when real packets expose a missed
-  relationship or repeated review failure.
-
-## Fixtures
-
-- `fixtures/aws-lza-standard-v1/`, `fixtures/aws-lza-regulated-v1/`,
-  `fixtures/aws-lza-healthcare-v1/`: emitted AWS LZA sample handoff bundles.
-- `fixtures/k8s-cluster-v1/`: emitted Kubernetes sample handoff bundle.
-- `fixtures/usability/`: role trials for architect gap capture, engineer
-  handoff, BYOM Terraform, and BYOM CloudFormation parameter flow.
-- `fixtures/eval/`: extraction gold corpus with expected handoff artifact
-  checks.
-- Version suffixes (`-v1`) are fixture contract versions. They protect emitted
-  artifact shape from silent drift.
-
-## Model-Driven Flow
-
-1. Architect writes Markdown or runs interview.
-2. Extractor asks LLM for graph decisions, or deterministic fallback applies
-   explicit structured inputs plus defaults.
-3. Graph applies decisions in dependency order and records provenance.
-4. Discovery reports applicable gaps and detected signals.
-5. Interview fills only missing applicable decisions.
-6. Validate and emit deterministic target configuration artifacts for engineers.
-
-## Extension Contract
-
-Add a new target path by registering a pattern with:
-
-- Pydantic intent model.
-- Requirement graph.
-- Optional deployment target contract.
-- Optional sample configs.
-- Optional validators, target configuration emitters, policy packs, target
-  capability report, or module mapping.
-
-Do not add provider-specific branches to core CLI/compiler/extractor/generator.
+- **Whole-document ingest only.** Every run replaces the graph. No incremental
+  diff, no baseline, no reconciliation. If the document changes, ingest it again.
+- **Gaps are graph-derived, conflicts are named rules.** A missing answer, a value
+  that cannot be coerced, and two answers that cannot both hold are three separate
+  findings with three separate messages.
+- **The LLM decides nothing.** It never reads the document. It receives the
+  computed frontier and produces discussion questions. Provider and model are
+  always explicit; there is no implicit local fallback.
+- **Emission is fail-closed.** Any gap or conflict blocks the bundle. Defaults are
+  only used with `--allow-defaults` and are recorded as `origin: default` in the
+  decision trace.
+- **Account root emails are owner input.** They are never generated or inferred.
+- **Tool absence is not a pass.** OPA, Checkov, and Trivy each report
+  `not-installed` rather than passing silently.
+- **One decision catalog.** `decisions.yaml` holds decisions only: no derived
+  values, no bookkeeping about itself.
+- **Nothing here deploys.** No AWS API calls, no credentials, no state, no apply.
+  Owner pipelines keep every execution, approval, and drift decision.
+- **Keep the distribution and import names** (`iac-llm-wrapper`, `intent_engine`)
+  for compatibility.
 
 ## Stack
 
-Python 3.11+, Pydantic v2, Typer, ruamel.yaml, pytest, ruff, mypy, pyright.
+Python 3.11+, Pydantic v2, Typer, ruamel.yaml, neo4j driver, Neo4j 5, OPA,
+Checkov, Trivy. Tests: pytest. Lint/type: ruff, mypy.
 
 ## Session State
 
@@ -157,347 +73,45 @@ Python 3.11+, Pydantic v2, Typer, ruamel.yaml, pytest, ruff, mypy, pyright.
 
 ### Current Goal
 
-Keep the requirements-to-target foundation maintainable and extensible for OSS
-composition: emit native, contract-backed artifacts while owner repositories and
-OSS platforms retain every backend, credential, workspace, approval, apply,
-drift, and audit decision. Treat OSS as leverage, not territory to absorb.
+Keep the tool to the functional requirement: capture decisions in a graph, find
+gaps and conflicts, emit accelerator configuration, check that output with policy
+and security tools.
 
 ### Status
 
-- **Repo-wide AI slop audit**: removed roughly 9,000 lines of unused or
-  duplicative surface, led by the 4,236-line typed bundle impact graph, its
-  1,681-line test suite, unused suggestion paths, hidden compatibility models,
-  and provider behavior that had leaked into generic core.
-- **Enforced quality checks**: removed 20 external `prek` hooks that silently
-  passed when tools were absent. `prek` now runs installed checks that fail on
-  evidence gaps; Checkov remains the explicit first-class shift-left evidence
-  command for owner-provided IaC.
-- **Fail-closed behavior**: patterns must register a Pydantic intent model,
-  generator payload/model mismatches raise, mutated models are revalidated,
-  malformed booleans no longer become `false`, Terraform AZ counts are bounded,
-  Kubernetes node-pool bounds are checked, and malformed CloudFormation
-  parameter entries block the handoff.
-- **AWS LZA placement trust boundary**: removed the model-only top-level entity
-  side channel. Structured Markdown account inventories are now the placement
-  authority, `Accounts Inventory` headings are recovered deterministically,
-  decision bullets are not misread as entities, and workload accounts must have
-  explicit OU mappings when multiple workload-capable OUs exist.
-- **Deterministic model boundary**: compile and discovery no longer silently
-  select an installed Ollama model. LLM extraction is opt-in and requires an
-  explicit provider plus pinned model; deterministic compile remains the local
-  product baseline.
-- **Lean cleanup**: deleted unused, test-only model-introspection helpers,
-  consolidated duplicate script YAML loaders, removed stale NetworkX claims,
-  and made broken built-in pattern imports fail visibly.
-- **Code craftsmanship repair**: registry and contributor checks now share one
-  pattern-reference validator, graph/extraction/comparison paths share one
-  fail-closed requirement coercion path, and JSON recovery uses one ordered
-  candidate pipeline. CLI, battle scoring, template, discovery, interview, and
-  usability flows now separate validation, orchestration, and rendering without
-  changing their public contracts.
-- **Complexity contract**: Ruff now enforces cyclomatic complexity at 15,
-  branches at 15, and statements at 60. The only localized exception is the
-  linear AWS LZA end-to-end artifact contract test; argument and return counts
-  remain deliberately ungated. Broad exception catches remain only at parser,
-  plugin, evaluation, or external-backend boundaries.
-- **Trust-boundary repair**: LLM extraction now accepts valid JSON plus harmless
-  presentation wrappers only, validates graph responses with forbidden extras,
-  and records parse failures as evidence. Graph-owned typed equality preserves
-  account/name case while normalizing valid booleans, integers, lists, enums,
-  and optionals.
-- **Incremental and artifact safety**: incremental baselines must match the
-  requested pattern and pass the generated-bundle contract before seeding.
-  Registered artifact and fixture paths must be portable relative paths,
-  generated symlinks are unlinked without following them, required YAML fails
-  with path-specific errors, and malformed Checkov evidence cannot pass.
-- **Package cohesion and supply chain**: Terraform VPC graph, target contract,
-  generators, and samples now have separate pattern-owned modules. CLI version
-  comes from package metadata; CI and `prek` use the locked uv/Ruff toolchain,
-  actions are pinned to verified commit SHAs, Python 3.14 and clean-wheel smoke
-  tests are covered, and the SBOM comes directly from the lockfile.
-- **Compatible toolchain refresh**: runtime and development dependency floors
-  now match the fully tested lock, future breaking releases are capped, and uv
-  0.11.29 is declared once in `pyproject.toml`. Builds use a hashed setuptools
-  constraint, release tags must match the package version before build or
-  publish, and weekly uv/Actions maintenance is grouped for review.
-- **Bundle trust boundary**: trust-sensitive bundle reads now share one
-  resolver that rejects unsafe portable paths, directories, containment
-  escapes, and leaf, parent, or root symlinks. Optional YAML is empty only when
-  absent; malformed or non-mapping content fails visibly across validation,
-  comparison, review, and AWS LZA staging.
-- **Git and provider boundaries**: `compile-git` resolves an accepted ref once
-  to an immutable commit, parses NUL-delimited paths, rejects unsafe paths, and
-  records the resolved commit. OpenAI-compatible and Bedrock success envelopes
-  require usable typed content while malformed usage evidence is ignored;
-  retries are limited to transient failures, one to five attempts, and a
-  30-second maximum server-directed delay.
-- **Pattern ownership**: AWS named-entity recovery, validator-to-requirement
-  review mapping, LZA validation evidence, artifact review owners, incremental
-  reconfirmation policy, and forbidden artifact checks now live on the AWS LZA
-  pattern instead of generic core branches.
-- **Terraform VPC plan foundation**: `terraform-vpc` emits exact target/toolchain
-  identities, three distinct maturity states, immutable input digests, and a
-  replay manifest. `iac-llm-wrapper terraform plan --bundle` verifies those
-  contracts, stages the code-owned root in a temporary workspace, runs locked
-  init/validate/plan/show, binds success to the requested AWS account, blocks
-  delete/replace actions, and emits sanitized evidence without apply, state,
-  credentials, raw values, or retained plan files.
-- **Requirement-to-Plan Conformance v1**: the unchanged Terraform plan command
-  now writes strict `intent-engine/terraform-plan-evidence/v2`. A pattern-local
-  evaluator recomputes graph applicability, verifies plan JSON/tool/configuration
-  shape, compares replay-bound inputs with VPC/subnet/AZ/NAT/DNS/account
-  observations, maps every managed resource to the approved module, target
-  contract, requirements, and controls, and fails on contradictions, unknowns,
-  sensitive required values, missing observations, unexpected origins, or
-  incomplete/errored plans. Normal success is
-  `conformant-with-deferred-gates`, not global policy compliance.
-- **Lean conformance repair**: the Terraform VPC evaluator is now exactly 750
-  physical lines, down from 1,144. Strict evidence models and the immutable
-  observation specification remain pattern-local; specification v2 verifies
-  requirement-observable VPC/subnet/NAT sentinels plus reviewed resource
-  families without treating incidental default ACL, security-group, or route
-  table counts as business requirements. Evidence-schema v1 renders as
-  `legacy-plan-only`; v2 evidence using conformance specification v1 renders as
-  `legacy-conformance-spec`. Both fail current conformance.
-- **OSS-native Atmos bridge**: every successful `terraform-vpc` compile emits an
-  abstract `terraform-vpc/intent-defaults` catalog plus a byte-for-byte copy of
-  the approved Terraform root and provider lockfile. A second pattern-owned
-  contract validates exact variables and the abstract boundary; recursive replay
-  now binds nested regular files and rejects missing, changed, unsafe, or
-  symlinked entries. Generated artifacts contain no owner backend, authentication,
-  workspace, environment, secret, stack name, approval, or apply configuration.
-- **Real credential-free interoperability proof**: checksum-pinned Atmos 1.223.0
-  validates the synthetic owner stack, resolves inherited variables exactly,
-  emits provenance, initializes the locked component through Atmos, reproduces
-  the approved module-tree digest, and validates Terraform 1.15.8. The synthetic
-  owner project disables workspaces and backend generation; those choices are
-  not embedded in the generated bridge. No plan, apply, destroy, credentials, or
-  cloud API is used.
-- **Native OSS owner boundary**: this repository stops after native target
-  artifacts, an evidence sidecar, and a PR-ready handoff. AWS LZA configuration,
-  Atmos catalog/component configuration, and CloudFormation parameters are
-  current native outputs. A fixed-template AFT `account-request.tf` is the next
-  candidate only after an owner supplies its repository contract, approved
-  account/SSO email handling, one real request, and repeat use. Score workloads
-  and Crossplane XRs remain demand-gated.
-- **Explicit artifact ownership**: every core and pattern generator declares its
-  portable output paths. Pattern registration now rejects missing or unsafe
-  declarations, duplicate generator names, ambiguous file ownership, attempts
-  to replace core-owned outputs, and required contract artifacts with no
-  producer. Generation also blocks undeclared file changes and symlinked
-  artifacts. Target contracts remain the external native-file inventory; no
-  integration registry, runner, API client, or dependency was added.
-- **Module-content identity**: locked init must produce the reviewed module
-  6.6.1 portable source tree at release commit
-  `3ffbd46fb1c7733e1b34d8666893280454e27436`, SHA-256
-  `38386a5d1a9e99cc1fdf8273a70b25b6f9dddca836545a960159d019d193c807`.
-  Local planning, CI/release root validation, and the installed-wheel proof use
-  the same check; Terraform transport `.git` metadata is deliberately excluded.
-- **Plan trust and cohesion**: shared replay verification rejects missing,
-  changed, unsafe, or symlinked bundle inputs and changed contracts. Terraform
-  VPC compile metadata, execution, and evidence shaping remain separate cohesive
-  pattern modules; no generic executor or new Python dependency was added.
-- **Terraform build proof**: the packaged root pins Terraform 1.15.8,
-  `terraform-aws-modules/vpc/aws` 6.6.1, and `hashicorp/aws` 6.53.0 with a
-  four-platform provider lockfile. The real credential-free locked init and JSON
-  validate passed; CI and release jobs run the same proof through the pinned
-  setup-terraform action.
-- **Validation**: 551 tests passed with five optional integration tests skipped.
-  Under uv 0.11.29, Ruff, Ruff
-  format, mypy, Pyright, fixture drift, golden journey, extraction (8/8),
-  usability (8/8), all-files `prek`, the credential-free approved-root proof,
-  checksum-pinned Atmos 1.223.0 integration proof, constrained package build,
-  both installed CLI entry points, and wheel-installed Atmos artifact generation
-  with all three byte-identical root assets in a clean Python 3.14 environment
-  passed. Previously recorded Bandit, runtime/development `pip-audit`, and
-  CycloneDX checks remain green; no fixture drift or known dependency
-  vulnerabilities remain.
-- **Model comparison**: the historical implicit local Ollama fallback used
-  `llama3.2:3b`, took about 79 seconds, and produced a graph delta from the
-  deterministic bundle. It inferred `SandboxDev` belongs to the `Sandbox` OU,
-  while deterministic recovery assigned it to `Workloads`; the packet does not
-  explicitly map workload accounts to OUs. That ready verdict is now invalidated:
-  current compilation blocks with `AWS_LZA_WORKLOAD_ACCOUNT_OU_AMBIGUOUS` until
-  the packet supplies explicit mappings.
-- **AWS cost boundary**: validation-only remains the recommended LZA cloud
-  ceiling. Current AWS guidance estimates the sample LZA environment at roughly
-  $430.22/month even with no activity or workloads, so full personal-account LZA
-  deployment is not a minimum-cost test.
-- **Principal architecture audit (2026-07-17; decision pending review)**: the
-  proposed next slice is to make the existing `terraform-vpc` review path
-  fail-closed before its first owner PR, then prove one owner-authorized
-  non-production journey and one repeat use. The audit found that separately
-  produced Terraform and AWS LZA evidence can survive recompilation and be
-  rendered without current-bundle validation, CLI bundle validation does not
-  verify replay digests, and nine of eleven Terraform VPC decisions may be
-  defaulted while still becoming plan-allowed. The Terraform conformance
-  evaluator also proves managed `resource_changes`, not a reconciled inventory
-  of every plan representation. No implementation, new dependency, target,
-  policy engine, execution protocol, or apply path was added. The existing
-  environment's full test run passed with 551 tests and five optional
-  integrations skipped; the locked `uv` command was not rerun because the local
-  uv version is older than the repository's required version.
-- **AI/IaC platform addendum (2026-07-17; decision pending review)**: current
-  Spacelift Intent and Pulumi Neo evidence confirms that managed platforms are
-  strongest at provider operations, repositories, credentials, state, policy
-  attachment, approvals, execution, drift, and audit. `gofireflyio/aiac` is an
-  unrestricted prompt-to-code utility, while `aliyun/iac-code` is a young,
-  stateful generation-and-deployment agent; neither supplies authoritative
-  requirement acceptance or end-to-end evidence lineage. Architecture-as-Code,
-  agent guardrails, and intent compilers validate different representations and
-  do not by composition prove that prose was understood, policy is complete, or
-  apply/runtime will satisfy intent. The proposed value remains a portable,
-  pre-execution requirements-to-evidence compiler for immutable registered
-  targets. No CALM, agent framework, policy engine, managed API, generator, or
-  other dependency was added. If real landing-zone and repeated approved-module
-  trials do not produce material review value over native forms and owner
-  pipelines, shrink to externally demanded trust primitives or stop; do not
-  build a meta-toolkit as a consolation product.
-- **Architect-to-engineer handoff landscape (2026-07-17; decision pending
-  review)**: no mature project found spans landscape discovery, deterministic
-  infrastructure-decision traversal, explicit human acceptance, immutable
-  registered-target lowering, and requirement-to-evidence lineage. FINOS CALM,
-  SAP LeanIX, and Ardoq are strongest on architecture discovery and decision
-  context; Cartography, Fix Inventory, CloudQuery, and Steampipe observe the
-  estate; Score, Humanitec, Crossplane, Kratix, Backstage, and Massdriver begin
-  after a platform offering is already defined. The proposed product boundary is
-  the missing handoff seam, not another EA repository or IDP: keep separately
-  authoritative landscape-evidence, requirement/decision, target-mapping, and
-  evidence-obligation graphs, let the LLM navigate and explain only the
-  deterministic applicable frontier, and require human acceptance before target
-  compilation. Current repository primitives are close, but defaults still need
-  explicit confirmation semantics and the owner-review value remains unproven.
-  No implementation, CALM/DMN/graph dependency, discovery adapter, portal, or
-  execution integration was added; the supporting diagram is a research
-  artifact outside the repository.
-- **Remaining blockers**: the requested Terraform owner acceptance plan needs an
-  owner-approved non-production packet/account and matching restricted AWS
-  credentials; the core can observe account identity but cannot prove permission
-  scope, and the local environment does not establish that authorization, so no
-  cloud plan was attempted. Downstream-clean AWS LZA evidence still requires
-  owner-approved account emails and an AWS/LZA validation context with read-only
-  account lookup permission; no deploy/apply path was added.
-  The Atmos bridge also lacks its required real owner PR and repeat use, so no
-  portal, MCP facade, second orchestrator, or additional semantic evaluator is
-  justified.
+- **Hard refactor applied.** Every file of the old engine is deleted: 35 core
+  modules, 4 pattern packages, 9 eval/validation scripts, 47 old tests, 10 docs,
+  all 6 fixture bundles, the packaged Terraform root, and the release/supply-chain
+  machinery (bandit, pyright, prek, build constraints, release workflow).
+- **Kept deliberately small.** 10 source files, 1 decision catalog, 1 rego policy,
+  1 sample packet, 3 test modules, 3 markdown files (README, AGENTS, LICENSE).
+- **Connection errors name their cause.** Rejected credentials, an unusable URI,
+  and nothing answering Bolt are three messages. The driver is closed before the
+  error is raised so its destructor cannot warn later. Default URI is
+  `bolt://127.0.0.1:7687`; `localhost` made the driver fail on `::1` first.
+- **Neo4j is the graph.** The previous in-memory requirement graph is gone.
+  Applicability, blocking chains, and contradictions are Cypher over
+  `(:Decision)`, `(:Document)`, `(:Statement)`, `(:Fact)`.
+- **Salvaged:** the AWS LZA decision content (now `decisions.yaml`), the LZA
+  config shapes (now `emit.py`), and the banking customer packet (now
+  `samples/banking-packet.md`).
+- **Added:** `policy/lza.rego` for OPA, plus Checkov and Trivy runners with
+  distinct not-installed, error, and findings verdicts.
 
-### Durable Decisions
+### Verified (2026-09-26, Python 3.14.7, macOS)
 
-- Keep the product boundary narrow: registered target configuration handoff,
-  contract checks, review evidence, and owner-controlled downstream execution.
-- Position the product as a requirements-to-target handoff compiler. Keep the
-  historical package name for compatibility and treat LLMs only as optional
-  conversational adapters; freeze provider expansion.
-- Prefer packet-driven fixes over imagined platform features.
-- Prefer deletion and shared local helpers over new abstractions.
-- Share domain knowledge only when its meaning and change boundary are the same;
-  leave coincidental repetition local when a shared abstraction would add flags
-  or coupling.
-- Treat complexity metrics as enforceable investigation thresholds, not a reason
-  to fragment linear contract assertions or introduce indirection.
-- Require a real packet, contract, review failure, or measured gap before adding
-  a feature; do not preserve test-only feature families without product callers.
-- Do not register quality checks that pass when their required tool is absent.
-- Parse model output without syntax repair; invalid JSON is evidence, not a
-  decision source.
-- Validate incremental bundles and portable artifact paths before reading them
-  as trusted handoff state.
-- Keep CI dependency audits scoped to the locked dependencies shipped by the
-  product, and verify the full development environment during compatibility
-  upgrades.
-- Keep the uv version single-sourced in `pyproject.toml` and require hashed
-  build constraints plus hash-locked runtime installation for release evidence.
-- Treat generated bundles as untrusted filesystem input: validate containment,
-  type, and every path component before reading, and never follow bundle
-  symlinks.
-- Resolve Git refs to immutable commits before diff or historical reads; keep
-  the original ref only as user-facing provenance.
-- Validate provider content independently from optional token evidence, and
-  retry only explicitly transient failures within bounded attempts and delays.
-- Keep pattern-specific review, extraction, and validation behavior on the
-  owning pattern rather than branching in generic core.
-- Keep LLMs out of HCL and version selection. Approved roots, modules, providers,
-  contracts, and replay identities are code-owned and human-reviewed.
-- Treat configuration readiness, plan invocation allowance, plan production,
-  and plan conformance as separate states. A speculative plan never grants apply
-  authority.
-- Keep Terraform plan evidence portable and allowlisted: record only approved
-  non-secret VPC observations, identities, outcomes, actions, counts, blockers,
-  and hashes; discard temporary state, generic/raw resource values, raw plan
-  JSON, environment, credentials, and the binary plan.
-- Keep requirement/control outcome semantics and resource provenance on the
-  owning Terraform VPC pattern. Policy-pack metadata is not an evaluator, and a
-  shared policy/execution protocol is premature before a second real target.
-- Do not create an executor registry for one target. Generalize only after a
-  second real plan-capable target demonstrates the same protocol.
-- Use Git plus contract-backed artifacts as the integration protocol. Atmos is
-  the first pattern-local bridge. Repository ownership ends after target-native
-  configuration, evidence, and a PR-ready handoff; it does not create the PR.
-- Require each generator to declare its output paths and each required contract
-  artifact to have exactly one core or pattern producer. This is a maintainability
-  invariant, not a generic integration runtime or a new artifact format.
-- Require a self-hosted, OSI-licensed path for every mandatory integration;
-  proprietary services may remain optional owner choices only.
-- Keep Atlantis downstream; owner-defined custom workflows may call Atmos
-  without any API integration here. Defer Terramate because it duplicates the
-  unproven Atmos bridge. Terragrunt remains an owner-selected alternative.
-- Select AFT as the next native target candidate, not the next implementation.
-  Require an owner AFT repository contract, one real request, approved account
-  and SSO email handling, and repeat use before registration. Any future emitter
-  renders only the owner-approved fixed module call; it never pushes Git, invokes
-  CodePipeline, obtains credentials, or adds plan conformance. Required identity
-  and email fields are explicit owner input and never LLM-inferred.
-- Add cfn-lint/cfn-guard to `cloudformation-parameters` only when an owner supplies
-  the approved local template and rules. They validate template/policy while the
-  intent-engine contract continues to own parameter correctness. The AWS IaC MCP
-  server may expose those tools conversationally but remains optional and
-  non-authoritative.
-- Score and Crossplane remain demand-gated. Do not emit a Crossplane XR until an
-  owner supplies the exact XRD/Composition contract, including organization-owned
-  `apiVersion`, `kind`, and schema.
-- Require one owner PR, one repeated use, and a material review benefit before
-  adding MCP, portal code, service APIs, a second orchestration bridge, or a new
-  semantic evaluator. Remove the Atmos bridge if schema/form generation proves
-  equivalent in practice or reviewers ignore its evidence.
-- Keep generated/ignored evidence out of committed source unless it is an
-  intentional fixture or contract artifact.
-- Treat deterministic compile as the local product baseline and explicit,
-  pinned-model compile as a separate extraction-quality experiment.
-- Never accept model-inferred account-to-OU placement as handoff evidence;
-  require explicit structured packet data when more than one OU is eligible.
-- Compare deterministic and model bundles before handoff; an exit-zero result
-  alone does not prove interpretation equivalence.
-- Do not use a full personal LZA deployment as a cost-minimal validation path.
+- 50 tests pass, including the 5 Neo4j tests against `neo4j:5.26.4-community`
+  and the OPA negative test. Ruff clean. Mypy clean over 11 source files.
+  `opa check --strict src/intent_engine/policy` passes.
+- Full journey on `samples/banking-packet.md`: ingest, review reporting no gaps
+  and no conflicts, 7 emitted files, and `scan` passing on real binaries —
+  opa 1.21.0, checkov 3.3.10, trivy 0.74.0.
+- The policy is proven able to fail: flipping `terminationProtection` to false
+  produces an OPA denial naming that field.
+- Remaining noise is third-party: the neo4j driver calls
+  `asyncio.iscoroutinefunction`, deprecated in Python 3.14. Nothing to fix here.
 
 ### Next
 
-1. Review the 2026-07-17 principal architecture decision before implementation.
-   If accepted, first invalidate derived evidence on recompile, make validate and
-   review verify replay/current-bundle identities, require explicit confirmation
-   of applicable `terraform-vpc` decisions before plan invocation, and reconcile
-   all relevant plan inventories. Keep evidence semantics target-specific and add
-   no dependency, generic executor, or generic policy protocol.
-2. After those trust-boundary repairs, run one owner-authorized PR using the
-   Atmos bundle with an approved non-production packet/account and matching
-   restricted AWS credentials. Require v2
-   `conformant-with-deferred-gates` evidence, validate credential scope out of
-   band, verify no state, raw JSON, or plan binary remains, and require at least
-   one material benefit—missing decision discovery, contradiction blocking,
-   misleading-plan rejection, or evidence used in review—and one repeat use
-   before expanding the integration surface. Compare the result with the direct
-   approved-module form/owner-PR baseline; if reviewers ignore the evidence or
-   the wrapper catches nothing beyond ordinary schema validation, remove or
-   demote the extra bridge rather than broadening it.
-3. Do not register AFT until an owner supplies the AFT request-repository
-   contract, one approved real account request, approved handling for account and
-   SSO emails, and repeat demand. If those gates are met, review a fixed-template
-   configuration-only proposal; do not implement Git push or CodePipeline calls.
-4. Add cfn-lint/cfn-guard validation only when an owner provides an approved
-   CloudFormation template and rules with a concrete review failure to address.
-5. Clarify the intended OU for each workload account in the banking customer
-   packet and record the mappings under an account inventory; compilation now
-   fails closed until that evidence exists.
-6. Re-run official `iac-llm-wrapper lza validate` with owner-approved account
-   emails and an AWS/LZA lookup-capable validation context.
-7. If validation still fails, fix only packet-backed repo issues or record
-   owner-side failures as downstream evidence.
+Nothing is queued. Add a decision to `decisions.yaml` or a conflict rule to
+`analysis.py` only when a real packet exposes the gap.

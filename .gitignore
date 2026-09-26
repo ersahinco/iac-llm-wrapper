@@ -27,18 +27,11 @@ Thumbs.db
 .coverage
 htmlcov/
 
-# Ruff
+# Tooling caches
 .ruff_cache/
+.mypy_cache/
+.pytest_cache/
 
-# Generated
-output/
-tests/results/*
-!tests/results/.gitkeep
-*.generated.yaml
-raw-evidence.yaml
-*.evidence.yaml
-iac-llm-evidence/
-.terraform/
-*.tfstate
-*.tfstate.*
-*.tfplan
+# Emitted bundles
+build/
+out/

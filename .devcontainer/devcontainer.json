@@ -2,16 +2,11 @@
     "name": "iac-llm-wrapper",
     "image": "mcr.microsoft.com/devcontainers/python:3.12-bookworm",
     "features": {
-        "ghcr.io/devcontainers/features/aws-cli:1": {},
-        "ghcr.io/devcontainers/features/node:1": {"version": "lts"},
         "ghcr.io/devcontainers/features/github-cli:1": {},
     },
     "remoteEnv": {"UV_LINK_MODE": "copy"},
-    "mounts": [
-        "source=${localEnv:HOME}/.aws,target=/home/vscode/.aws,type=bind,consistency=cached"
-    ],
-    "onCreateCommand": "sudo apt-get update && sudo apt-get install -y graphviz jq",
-    "postCreateCommand": "python -m pip install --user uv && uv sync --extra dev && uv run pre-commit install && uv run python scripts/render-dev-views.py",
+    "onCreateCommand": "sudo apt-get update && sudo apt-get install -y jq",
+    "postCreateCommand": "python -m pip install --user uv && uv sync --extra dev",
     "customizations": {
         "vscode": {
             "extensions": [
