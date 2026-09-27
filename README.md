@@ -35,7 +35,7 @@ document ──ingest──▶ Neo4j ──review──▶ gaps + conflicts ─�
    Opt-in GraphRAG ingestion sends document statements to the explicitly selected
    local model; its extracted proposals never become accepted answers automatically.
 5. **Emit** writes foundation configuration checked against **LZA 1.16.3** schemas,
-   plus a decision trace and owner handoff. Gaps, conflicts, or schema errors block
+   plus a decision trace with integration context. Gaps, conflicts, or schema errors block
    the bundle. Account emails and identity policy mappings are explicit inputs.
 6. **Scan** rechecks the LZA schemas, runs OPA policy, Checkov secrets, and Trivy
    checks. Each result states its coverage.
@@ -54,12 +54,14 @@ src/intent_engine/
   graph.py            Neo4j schema, full replace, gap and contradiction Cypher
   analysis.py         applicability and named conflict rules
   llm.py              optional narration of the deterministic frontier
+  organisation.py     selected reference snapshot and scoped OPA assessment
+  extraction.py       optional GraphRAG proposals with source evidence
   emit.py             AWS LZA configuration and the decision trace
   contract.py         offline validation against one pinned LZA version
   schemas/            unchanged upstream LZA schemas and license notices
   scan.py             OPA, Checkov, Trivy
   policy/lza.rego     the landing-zone policy
-samples/              one realistic customer packet
+samples/              banking intake, organisation discussion, and VPC input examples
 ```
 
 ## Setup
@@ -132,6 +134,27 @@ uv run iac-llm-wrapper emit --out build/lza
 uv run iac-llm-wrapper scan build/lza
 ```
 
+## Organisation-aware example
+
+The [complete example](samples/organisation/README.md) loads a client packet with
+selected existing-estate, LZA configuration and OPA policy references. It shows one
+missing hybrid-network decision and one region-policy conflict, each with source
+evidence. Corrected answers produce six LZA configuration files and one trace.
+The example also includes queries for inspecting the graph in Neo4j Browser.
+
+```bash
+docker compose run --rm app ingest samples/organisation/client.md \
+  --organisation samples/organisation/organisation.yaml
+docker compose run --rm app review  # exits 1: one gap and one conflict
+docker compose run --rm app ingest samples/organisation/confirmed.md
+docker compose run --rm app review
+docker compose run --rm app emit --out build/organisation
+```
+
+Re-ingestion preserves selected organisation references. Refresh them by supplying
+`--organisation` again; start an unrelated case with `--without-organisation`.
+Reference configurations constrain answers; they never silently supply them.
+
 ## Integration contract
 
 ### GraphRAG and an existing Terraform module
@@ -142,7 +165,7 @@ The image includes Neo4j GraphRAG 1.21.0. For host development, use
 
 ```bash
 docker compose build app
-docker compose run --rm app ingest samples/vpc/requirements.md \
+docker compose run --rm app ingest samples/vpc/requirements.md --without-organisation \
   --catalog samples/vpc/decisions.yaml --extract-model qwen2.5:7b \
   --base-url http://host.docker.internal:11434
 docker compose run --rm app review --catalog samples/vpc/decisions.yaml
@@ -187,8 +210,7 @@ The existing `scan` command checks LZA output, not Terraform variable files.
 | Output | Consumer |
 | --- | --- |
 | Six `*-config.yaml` files | The owner's LZA **1.16.3** configuration repository, after review and completion |
-| `decision-trace.yaml` | Architect: stated answers, source lines, and opt-in defaults |
-| `handoff.yaml` | Network, identity, data, and application owners: remaining integration work |
+| `decision-trace.yaml` | Stated answers, evidence, reference hashes, policy assessments, and remaining integration work |
 
 Schemas are bundled and validated offline. There are no AWS lookups, credentials,
 or downloads during validation. A different LZA version requires an explicit
@@ -205,21 +227,21 @@ uv run iac-llm-wrapper scan build/lza
 ```
 
 Keep the owner file outside the generated output directory. Its configuration
-data is preserved and schema-checked; the handoff records its path and SHA-256.
+data is preserved and schema-checked; the trace records its path and SHA-256.
 The packet's home region, host/CIDR, and topology must match. Detailed routing and
 cross-file validation still run in the owner's LZA pipeline.
 
 Identity mappings currently support
 AWS-managed policies explicitly named in the packet; owners verify availability
 and connect their identity provider. Data classification, approved data/backup
-regions, recovery objectives, and the application owner travel in the handoff;
+regions, recovery objectives, and the application owner travel in the trace;
 this tool does not provision workload databases, backups, or applications.
 
-Keep each packet to one shared workload handoff scope. Different residency or
+Keep each packet to one shared workload scope. Different residency or
 recovery requirements need separate design review; this is not yet a per-asset
 architecture model. The bundled banking packet is an illustrative example.
 
-The handoff always says `requires-owner-validation`. The consuming pipeline runs
+The integration context always says `requires-owner-validation`. The consuming pipeline runs
 the matching LZA validator, reviews synthesized changes, and owns deployment.
 Schema success means the configuration has the expected shape, not that the
 architecture is complete. Fixed emitter choices such as log retention and session

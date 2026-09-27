@@ -1,0 +1,51 @@
+name: Blue River Bank illustrative organisation
+references:
+  - {id: estate, path: estate.md, kind: context}
+  - {id: lza, path: lza-reference.yaml, kind: configuration}
+  - {id: regional-policy, path: policy.rego, kind: policy}
+systems:
+  - id: enterprise-network
+    name: Hybrid on-premises, SD-WAN and Azure network
+    lifecycle: existing
+    evidence: {reference: estate, line: 2, quote: 'Existing enterprise networking combines on-premises datacentres, SD-WAN and Azure.'}
+  - id: enterprise-identity
+    name: Microsoft Entra ID
+    lifecycle: existing
+    evidence: {reference: estate, line: 3, quote: 'Microsoft Entra ID is the existing workforce identity provider.'}
+  - id: aws-landing-zone
+    name: AWS landing zone (LZA 1.16.3)
+    lifecycle: planned
+    evidence: {reference: estate, line: 4, quote: 'The planned AWS landing zone uses LZA 1.16.3 with AWS IAM Identity Center.'}
+  - id: aws-identity-center
+    name: AWS IAM Identity Center
+    lifecycle: planned
+    evidence: {reference: estate, line: 4, quote: 'The planned AWS landing zone uses LZA 1.16.3 with AWS IAM Identity Center.'}
+integrations:
+  - id: hybrid-connectivity
+    source: enterprise-network
+    target: aws-landing-zone
+    decision_keys: [hybrid_connection, network_cidr]
+    evidence: {reference: estate, line: 5, quote: 'AWS needs connectivity to the existing enterprise network; the connection method must be decided.'}
+  - id: workforce-access
+    source: enterprise-identity
+    target: aws-identity-center
+    decision_keys: [workforce_federation, identity_center_assignments]
+    evidence: {reference: estate, line: 6, quote: 'Workforce access to AWS must integrate with the existing Entra ID provider.'}
+questions:
+  - key: hybrid_connection
+    label: Hybrid connection method
+    category: network
+    type: enum
+    options: [site-to-site-vpn, direct-connect]
+    question: How will AWS connect to the existing hybrid enterprise network?
+    hint: Connection method only; routes, DNS and attachment implementation remain with the network team.
+  - key: workforce_federation
+    label: Workforce federation
+    category: identity
+    type: enum
+    options: [entra-saml-scim]
+    question: Is Entra ID SAML federation with SCIM provisioning agreed for AWS IAM Identity Center?
+policies:
+  - id: approved-regions
+    decision_keys: [enabled_regions]
+    evidence: {reference: regional-policy, line: 3, quote: "AWS enabled regions must be within the organisation's selected LZA region standard."}

@@ -13,8 +13,10 @@ from ipaddress import ip_network
 from typing import Any
 
 from .catalog import coerce
+from .contract import CONFIG_FILES, LZA_VERSION
 from .graph import KnowledgeGraph
 from .models import Conflict, Decision, Fact, Review
+from .organisation import assess, evidence_text, policy_conflicts
 
 _STRICT_OVERLAYS = {"regulated", "financial-services", "healthcare"}
 _IMPLICIT_ACCOUNTS = {"Management"}
@@ -400,13 +402,74 @@ def review(graph: KnowledgeGraph, catalog: dict[str, Decision]) -> Review:
     path, sha256 = graph.document()
     facts = graph.facts()
     applicable = applicable_keys(catalog, facts)
-    return Review(
+    organisation = graph.organisation()
+    gaps = graph.gaps(applicable)
+    if organisation:
+        for gap in gaps:
+            for integration in organisation.integrations:
+                if gap.decision_key in integration.decision_keys:
+                    gap.evidence.append(evidence_text(organisation, integration.evidence))
+    typed, _ = typed_values(catalog, facts)
+    conflicts = graph.contradictions() + semantic_conflicts(catalog, facts)
+    unusable = {key for conflict in conflicts for key in conflict.decision_keys}
+    assessments = assess(organisation, {k: v for k, v in typed.items() if k not in unusable})
+    conflicts += policy_conflicts(organisation, assessments, facts, path)
+    result = Review(
         document=path,
         sha256=sha256,
         applicable=sorted(applicable),
         answered=sorted({fact.decision_key for fact in facts}),
-        gaps=graph.gaps(applicable),
-        conflicts=graph.contradictions() + semantic_conflicts(catalog, facts),
+        gaps=gaps,
+        conflicts=conflicts,
         facts=facts,
         architecture=graph.architecture(),
+        organisation=organisation,
+        assessments=assessments,
+        integration_context=integration_context(typed),
     )
+    graph.record_review(result)
+    return result
+
+
+def integration_context(values: dict[str, Any]) -> dict[str, Any]:
+    required = {
+        "application_owner",
+        "topology",
+        "identity_center_policy_mappings",
+        "data_classification",
+        "data_regions",
+        "recovery_objectives",
+    }
+    if not required <= values.keys():
+        return {}
+    return {
+        "target": {"name": "AWS Landing Zone Accelerator", "version": LZA_VERSION},
+        "status": "requires-owner-validation",
+        "configurationFiles": list(CONFIG_FILES),
+        "owner": values["application_owner"],
+        "layers": {
+            "network": {
+                "topology": values["topology"],
+                "source": {"origin": "generated-skeleton"},
+                "ownerAction": "Complete routes, subnets, attachments, DNS and inspection.",
+            },
+            "identity": {
+                "policyMappings": values["identity_center_policy_mappings"],
+                "ownerAction": "Verify policies, identity-provider groups and assignments.",
+            },
+            "data": {
+                "classification": values["data_classification"],
+                "approvedRegions": values["data_regions"],
+                "recoveryObjectives": values["recovery_objectives"],
+                "ownerAction": "Configure keys, retention and backups; prove restore objectives.",
+            },
+            "application": {
+                "ownerAction": "Integrate runtime and dependencies in the application pipeline.",
+            },
+        },
+        "validation": {
+            "schema": "checked during emission",
+            "ownerPipeline": "Run LZA validation and review synthesized changes before deployment.",
+            "scope": "Schema checks do not establish completeness, compliance or deployability.",
+        },
+    }

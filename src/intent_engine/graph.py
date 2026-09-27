@@ -18,6 +18,7 @@ This module owns the whole database it connects to. Ingest replaces every node.
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -31,7 +32,7 @@ from neo4j.exceptions import (
     ServiceUnavailable,
 )
 
-from .models import Architecture, Conflict, Decision, Document, Fact, Gap
+from .models import Architecture, Conflict, Decision, Document, Fact, Gap, Organisation, Review
 
 _CONSTRAINT = (
     "CREATE CONSTRAINT decision_key IF NOT EXISTS FOR (d:Decision) REQUIRE d.key IS UNIQUE"
@@ -119,13 +120,16 @@ class KnowledgeGraph:
         document: Document,
         facts: list[Fact],
         architecture: Architecture | None = None,
+        organisation: Organisation | None = None,
     ) -> None:
         """Replace the whole document atomically; failed loads preserve the old graph."""
         # Schema changes cannot share a transaction with data changes.
         self._run(_CONSTRAINT)
         try:
             with self._driver.session(database=self._config.database) as session:
-                session.execute_write(self._replace, catalog, document, facts, architecture)
+                session.execute_write(
+                    self._replace, catalog, document, facts, architecture, organisation
+                )
         except (Neo4jError, ServiceUnavailable) as exc:
             raise GraphUnavailable(f"graph replacement failed: {exc}") from exc
 
@@ -136,13 +140,108 @@ class KnowledgeGraph:
         document: Document,
         facts: list[Fact],
         architecture: Architecture | None = None,
+        organisation: Organisation | None = None,
     ) -> None:
         tx.run("MATCH (n) DETACH DELETE n").consume()
         self._load_catalog(tx, catalog)
         self._load_document(tx, document)
         self._load_facts(tx, facts)
+        tx.run(
+            "MATCH (d:Document) SET d.catalog = $catalog, d.organisation = $organisation",
+            catalog=json.dumps([d.model_dump() for d in catalog.values()]),
+            organisation=organisation.model_dump_json() if organisation else None,
+        ).consume()
+        if organisation is not None:
+            self._load_organisation(tx, organisation)
         if architecture is not None:
             self._load_architecture(tx, architecture)
+
+    def _load_organisation(self, tx: ManagedTransaction, org: Organisation) -> None:
+        for reference in org.references:
+            tx.run(
+                """CREATE (r:Reference {id: $id, path: $path, sha256: $sha256, kind: $kind})
+                   WITH r UNWIND $lines AS line
+                   CREATE (s:ReferenceStatement {reference: $id, line: line.number,
+                                                text: line.text})
+                   CREATE (s)-[:FROM]->(r)""",
+                id=reference.id,
+                path=reference.path,
+                sha256=reference.sha256,
+                kind=reference.kind,
+                lines=[
+                    {"number": n, "text": text}
+                    for n, text in enumerate(reference.content.splitlines(), 1)
+                    if text.strip()
+                ],
+            ).consume()
+        for label, items in (
+            ("System", org.systems),
+            ("Integration", org.integrations),
+            ("Policy", org.policies),
+        ):
+            for item in items:
+                props = item.model_dump(exclude={"evidence"})
+                props["organisation_id"] = props.pop("id")
+                tx.run(
+                    f"""MATCH (s:ReferenceStatement {{reference: $reference, line: $line}})
+                        CREATE (n:{label}) SET n = $props
+                        CREATE (n)-[:EVIDENCE]->(s)""",
+                    props=props,
+                    reference=item.evidence.reference,
+                    line=item.evidence.line,
+                ).consume()
+        tx.run(
+            """MATCH (i:Integration), (s:System {organisation_id: i.source}),
+                     (t:System {organisation_id: i.target})
+               CREATE (s)-[:SOURCE_OF]->(i) CREATE (i)-[:TARGETS]->(t)
+               WITH i UNWIND i.decision_keys AS key
+               MATCH (d:Decision {key: key}) CREATE (d)-[:ABOUT]->(i)"""
+        ).consume()
+        tx.run(
+            """MATCH (p:Policy) UNWIND p.decision_keys AS key
+               MATCH (d:Decision {key: key}) CREATE (p)-[:CONSTRAINS]->(d)"""
+        ).consume()
+
+    def organisation(self) -> Organisation | None:
+        rows = self._run("MATCH (d:Document) RETURN d.organisation AS organisation")
+        value = rows[0]["organisation"] if rows else None
+        return Organisation.model_validate_json(value) if value else None
+
+    def catalog(self) -> dict[str, Decision]:
+        rows = self._run("MATCH (d:Document) RETURN d.catalog AS catalog")
+        if not rows or not rows[0]["catalog"]:
+            raise GraphEmpty("ingest the document again to store its selected catalog")
+        return {
+            d.key: d
+            for d in (Decision.model_validate(row) for row in json.loads(rows[0]["catalog"]))
+        }
+
+    def record_review(self, result: Review) -> None:
+        # Labels/status let Neo4j Browser show the same frontier as the CLI.
+        self._run(
+            """MATCH (d:Decision) SET d.status = CASE
+                 WHEN d.key IN $conflicted THEN 'conflict'
+                 WHEN d.key IN $gaps THEN 'gap'
+                 WHEN d.key IN $answered THEN 'answered' ELSE 'not-applicable' END""",
+            conflicted=list({key for c in result.conflicts for key in c.decision_keys}),
+            gaps=[g.decision_key for g in result.gaps],
+            answered=result.answered,
+        )
+        self._run("MATCH (a:Assessment) DETACH DELETE a")
+        self._run(
+            """UNWIND $results AS row MATCH (p:Policy {organisation_id: row.policy_id})
+               CREATE (a:Assessment) SET a = row
+               SET p.status = row.status
+               CREATE (a)-[:ASSESSES]->(p)
+               WITH a, p MATCH (d:Document)
+               SET a.document_sha256 = d.sha256
+               CREATE (a)-[:FOR_DOCUMENT]->(d)
+               WITH a, p MATCH (p)-[:CONSTRAINS]->(decision:Decision)
+               OPTIONAL MATCH (f:Fact)-[:ANSWERS]->(decision)
+               FOREACH (fact IN CASE WHEN f IS NULL THEN [] ELSE [f] END |
+                   CREATE (a)-[:ASSESSED]->(fact))""",
+            results=[r.model_dump() for r in result.assessments],
+        )
 
     def _load_architecture(self, tx: ManagedTransaction, architecture: Architecture) -> None:
         tx.run(
@@ -174,7 +273,7 @@ class KnowledgeGraph:
 
     def architecture(self) -> Architecture:
         rows = self._run(
-            """MATCH (n) WHERE n:Candidate OR n:System
+            """MATCH (n) WHERE (n:Candidate OR n:System) AND n.architecture_id IS NOT NULL
                RETURN n.architecture_id AS id, labels(n)[0] AS label, properties(n) AS properties
                ORDER BY id"""
         )
@@ -182,6 +281,7 @@ class KnowledgeGraph:
             row["properties"].pop("architecture_id")
         links = self._run(
             """MATCH (s)-[r:ABOUT|CONNECTS_TO]->(t)
+               WHERE s.architecture_id IS NOT NULL AND t.architecture_id IS NOT NULL
                RETURN s.architecture_id AS start_node_id, t.architecture_id AS end_node_id,
                       type(r) AS type ORDER BY start_node_id, end_node_id"""
         )
@@ -292,7 +392,8 @@ class KnowledgeGraph:
             """
             MATCH (f:Fact)-[:ANSWERS]->(d:Decision)
             RETURN d.key AS decision_key, f.value AS value, f.section AS section,
-                   f.line AS line, f.origin AS origin
+                   f.line AS line, f.origin AS origin,
+                   head([(f)-[:EVIDENCE]->(s) | s.id]) AS statement_id
             ORDER BY d.key, f.line
             """
         )

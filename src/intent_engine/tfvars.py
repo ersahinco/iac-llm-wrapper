@@ -33,6 +33,8 @@ def emit_tfvars(
         raise EmitBlocked("module input validation failed: " + "; ".join(errors))
     outputs = [out_dir / "terraform.tfvars.json", out_dir / "decision-trace.json"]
     sources = {contract.resolve(), Path(review.document).resolve()}
+    if review.organisation:
+        sources.update(Path(r.path).resolve() for r in review.organisation.references)
     if any(path.resolve() in sources for path in outputs):
         raise EmitBlocked("keep source documents and contracts separate from generated files")
     trace = {
@@ -41,6 +43,12 @@ def emit_tfvars(
         "module": schema["x-module"],
         "contractSha256": hashlib.sha256(content).hexdigest(),
         "validation": "input-contract-only",
+        "organisation": review.organisation.model_dump(
+            exclude={"references": {"__all__": {"content"}}}
+        )
+        if review.organisation
+        else None,
+        "policyAssessments": [a.model_dump() for a in resolution.assessments],
         "variables": {
             name: next(
                 entry for entry in resolution.trace if entry["decision"] == spec["x-decision"]

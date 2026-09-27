@@ -58,8 +58,8 @@ jobs:
           curl --fail --location --retry 3 https://github.com/open-policy-agent/opa/releases/download/v1.21.0/opa_linux_amd64_static -o /tmp/opa_linux_amd64_static
           echo '5eef70644868bb04d0556bcc795ee42f2ab379e73f51d1bfa30f83e1305bc9b9  /tmp/opa_linux_amd64_static' | sha256sum --check
           sudo install -m 755 /tmp/opa_linux_amd64_static /usr/local/bin/opa
-          opa check --strict src/intent_engine/policy
-          opa fmt --fail --list src/intent_engine/policy
+          opa check --strict src/intent_engine/policy samples/organisation/policy.rego
+          opa fmt --fail --list src/intent_engine/policy samples/organisation/policy.rego
 
       - name: Test
         run: uv run --locked --extra dev --extra graphrag pytest -v --tb=short
@@ -93,6 +93,14 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked --extra dev --extra graphrag
 
+      - name: Install and check OPA
+        run: |
+          curl --fail --location --retry 3 https://github.com/open-policy-agent/opa/releases/download/v1.21.0/opa_linux_amd64_static -o /tmp/opa_linux_amd64_static
+          echo '5eef70644868bb04d0556bcc795ee42f2ab379e73f51d1bfa30f83e1305bc9b9  /tmp/opa_linux_amd64_static' | sha256sum --check
+          sudo install -m 755 /tmp/opa_linux_amd64_static /usr/local/bin/opa
+          opa check --strict src/intent_engine/policy samples/organisation/policy.rego
+          opa fmt --fail --list src/intent_engine/policy samples/organisation/policy.rego
+
       - name: Graph tests
         env:
           NEO4J_URI: bolt://localhost:7687
@@ -106,7 +114,7 @@ jobs:
           NEO4J_USER: neo4j
           NEO4J_PASSWORD: cipassword
         run: |
-          uv run --locked --extra dev --extra graphrag iac-llm-wrapper ingest samples/banking-packet.md
+          uv run --locked --extra dev --extra graphrag iac-llm-wrapper ingest samples/banking-packet.md --without-organisation
           uv run --locked --extra dev --extra graphrag iac-llm-wrapper review
           uv run --locked --extra dev --extra graphrag iac-llm-wrapper emit --out build/lza
           test -f build/lza/accounts-config.yaml

@@ -1,0 +1,5 @@
+# Selected organisation region standard, not answers to a client's intake.
+homeRegion: eu-central-1
+enabledRegions:
+  - eu-central-1
+  - eu-west-1

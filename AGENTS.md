@@ -26,17 +26,18 @@ src/intent_engine/
   catalog.py       catalog load/validate, document value coercion
   ingest.py        whole-document read into statements and facts
   extraction.py    opt-in Neo4j GraphRAG proposals with source evidence
+  organisation.py  selected organisation references and scoped OPA assessment
   graph.py         Neo4j schema, full replace, gap and contradiction Cypher
   analysis.py      gate applicability and named conflict rules
   llm.py           optional narration of the deterministic frontier
-  emit.py          AWS LZA configuration, decision trace, and layered owner handoff
+  emit.py          AWS LZA configuration and decision trace with integration context
   contract.py      offline validation against pinned LZA 1.16.3 schemas
   tfvars.py        confirmed values mapped to a module JSON Schema input contract
   schemas/         unchanged upstream JSON schemas and notices
   scan.py          OPA, Checkov, Trivy over an emitted bundle
   policy/lza.rego  landing-zone policy
   cli.py           ingest, status, review, emit, scan
-samples/           one realistic customer packet
+samples/           banking intake, organisation discussion, and VPC examples
 ```
 
 Flow: ingest a whole document → Neo4j holds catalog, document, statements, facts →
@@ -87,75 +88,77 @@ general-purpose platform extension framework.
 
 ### Status
 
-- **GraphRAG ingestion implemented.** The optional `graphrag` extra pins
-  Neo4j GraphRAG 1.21.0; Compose includes it. `ingest --extract-model MODEL`
-  uses the upstream extraction and schema-pruning components against an explicit
-  Ollama endpoint. One UTF-8 text/Markdown packet, up to 32,000 characters of
-  statements; no embeddings or vector index are needed for this slice.
-- **Proposals stay separate.** System/Candidate nodes carry source quotes and
-  EVIDENCE links. Candidates PROPOSE answers; only Fact nodes ANSWER decisions.
-  ABOUT/CONNECTS_TO relationships support discussion. Unsupported graph items
-  are pruned with visible warnings; invalid evidence aborts before replacement.
-  The architect records confirmed answers in the document and ingests again.
-- **Upstream compatibility kept small.** GraphRAG 1.21.0's async Ollama adapter
-  drops format settings. A short adapter invokes its synchronous method in a
-  thread to preserve native JSON Schema output. Remove when upstream fixes it.
-- **Discussion context is richer.** Review narration receives stated values,
-  source locations, findings, and the unconfirmed architecture projection.
-  Conflicted facts are excluded from accepted LLM context. Source text remains
-  untrusted evidence, never model instructions.
-- **Terraform variable export implemented.** `emit-tfvars` validates
-  confirmed decisions against an explicit JSON Schema contract, then emits
-  `terraform.tfvars.json` and `decision-trace.json`. The example covers name,
-  CIDR, availability zones, and private subnets for community VPC module 6.7.3.
-  It records module version, contract hash, and source evidence. No HCL resources,
-  module discovery, Terraform execution, or state handling. The consuming root
-  must declare/pass these variables; this is input validation, not a plan.
-- **Compose application available.** Locked Python dependencies, OPA 1.21.0,
-  and packaged LZA schemas run without host Python. An explicit local model is
-  optional; none is downloaded automatically. Checkov/Trivy are absent from the
-  image and correctly reported as unavailable rather than passing.
-- **Existing boundaries preserved.** Atomic whole-document replacement,
-  deterministic gap/conflict review, opt-in defaults with conflict revalidation,
-  offline LZA 1.16.3 schema checks, owner network-file preservation, and honest
-  scanner coverage remain. Existing enterprise systems are never provisioned.
-- **Still pending.** Organisation-reference ingestion and policy-result graph
-  links are not implemented. Integration/Policy/ConfigTarget nodes remain design
-  ideas in ONTOLOGY.md. The separate LZA handoff file still needs consolidation.
-  The graph does not prove real connectivity, identity integration, or compliance.
-- **Distribution and CI.** Apache 2.0 public repository. This milestone includes
-  the Compose application, GraphRAG ingestion, and VPC input export. GitHub CI
-  includes the GraphRAG extra; the verification below records local results.
+- **Organisation-aware example implemented.** `samples/organisation/README.md`
+  documents one client document plus selected estate, LZA region standard and OPA
+  policy references. Four sourced systems describe existing hybrid networking and
+  Entra ID alongside planned AWS LZA and IAM Identity Center. Two integrations
+  link them to explicit decisions. Reference values never become client answers.
+- **One gap, one conflict.** The incomplete packet lacks `hybrid_connection` and
+  requests `us-east-1` outside the selected organisation standard. Review cites
+  the estate requirement, client answer, policy statement and configuration hash.
+  The corrected packet selects site-to-site VPN and Frankfurt/Ireland. Connection
+  and federation decisions remain context-only, not generated infrastructure.
+- **Whole-case reference snapshot.** Organisation contents/hashes and the selected
+  decision catalog live on the client Document in the same atomic replacement.
+  Corrections preserve references; `--organisation` refreshes them and
+  `--without-organisation` deliberately clears them. Review/emission use the
+  ingested catalog; mismatched explicit catalogs require re-ingestion.
+- **Scoped policy assessment.** OPA receives usable stated decisions plus selected
+  configuration data. `data.organisation.assessments` must return one assessment
+  per selected policy. Missing OPA, malformed/undefined output or missing coverage
+  is `not-assessed` and blocks output. Assessments link to policy and client facts
+  in Neo4j, with input/document hashes. Policy/configuration hashes live on linked
+  references. Resolved values are reassessed before emission.
+- **Handoff consolidated.** LZA emits six configuration files plus
+  `decision-trace.yaml`. Review and trace include network, identity, data and
+  application integration work. Trace includes reference hashes, scoped policy
+  results and context-only questions. A recognised old generated handoff is removed
+  during re-emission; arbitrary files are protected. No separate delivery workflow.
+- **GraphRAG remains advisory.** Neo4j GraphRAG 1.21.0 extracts System/Candidate
+  proposals from one small UTF-8 packet using explicit Ollama model/endpoint.
+  Evidence validation and schema pruning remain; candidates never answer gaps.
+  The small async Ollama compatibility adapter preserves native JSON Schema format.
+- **Existing outputs preserved.** Offline LZA 1.16.3 schemas, owner-network file
+  preservation, explicit permission mappings, and VPC 6.7.3 variable input contract
+  remain. No deployment, Terraform resource generation or credentials. Compose
+  includes OPA/GraphRAG; missing Checkov/Trivy never count as passes.
+- **Limits remain explicit.** Only selected local references with reviewed links
+  are supported, not arbitrary module discovery or automatic policy translation.
+  No ConfigTarget ontology, enterprise discovery, working-connectivity proof or
+  general-purpose extension framework. Concurrent review/ingest snapshots remain
+  separate work. User-facing graph statuses describe the latest review.
+- **Distribution and CI.** Apache 2.0 repository. Prior milestone `9a9a7bf` passed
+  all five CI jobs. This milestone adds the organisation example and installs OPA
+  in the graph CI job so the complete discussion-to-export check runs there.
 
 ### Verified (2026-09-27)
 
-- 152 tests pass with no skips, including 11 isolated Neo4j tests. Ruff, mypy
-  (14 source files), and strict OPA validation pass. Updated Docker image builds.
-  The real model output was persisted and reviewed in Neo4j: three proposals,
-  four still-unconfirmed decisions, and the pruning warning survived storage.
-  The final container ingested the confirmed VPC packet and exported both JSON
-  files successfully. These checks used a disposable Compose graph project.
-- Live local Ollama `qwen2.5:7b` extracted the three stated VPC decisions with
-  matching source quotes; the undecided private-subnet value remained absent.
-  One unsupported relationship was pruned and reported. Earlier runs produced
-  poor or malformed graphs: valid structure is not semantic accuracy, and
-  architect confirmation remains necessary. No new model was downloaded.
-- Offline tests exercise actual GraphRAG components with controlled responses,
-  source validation, pruning, typed export, missing mappings, remote-reference
-  rejection, provenance, and the Ollama compatibility adapter.
-- Neo4j tests prove candidate evidence survives storage, candidates do not close
-  gaps, re-ingestion replaces proposals, and missing answers block variable output.
-- The community VPC 6.7.3 input declarations were read from upstream. Its stated
-  floors are Terraform >= 1.0 and AWS provider >= 6.28. No runtime, provider,
-  backend, or plan was invoked or validated here.
-- Earlier LZA sample/scanner checks remain: schemas and OPA pass; absent or
-  unassessed Checkov/Trivy coverage makes scan exit 1. This is not deployment
-  readiness. Local Python 3.14/Neo4j deprecation warnings are upstream.
+- Initial full suite: 164 tests, no skips, including real Neo4j and OPA organisation
+  checks. All 135 affected tests pass after final changes, including explicit
+  reference reset and removal of the old generated handoff. Ruff, mypy (15 source
+  files), and strict OPA validation pass. No new runtime dependencies were added.
+- Tests use a separate `iac-organisation-example` Compose project on Bolt 17687
+  and Browser 17474, preserving the existing development graph on 7687.
+- The final image passed the full Compose journey: 27 applicable questions,
+  26 answers, one gap and one policy conflict; emission blocked without creating
+  files. Corrected intake has 27 answers, no gaps/conflicts, and identical selected
+  references. Six LZA schemas passed; seven files were emitted under
+  `build/organisation-example`. Before/after review JSON is retained under `build/`.
+  OPA uses the snapshot rather than mutable host files during review.
+- Neo4j Browser is connected to the isolated corrected example at
+  `http://localhost:17474/browser/` / `bolt://localhost:17687`. The focused graph
+  view shows 13 nodes and 10 relationships; the selected region policy is `passed`.
+  The example container/volume remain available for the user. Compose override:
+  `/tmp/iac-organisation-compose.yaml`. Existing development data was preserved.
+- Earlier live Ollama `qwen2.5:7b` extracted three stated VPC proposals, leaving
+  private subnets undecided; invalid relationships were visibly pruned. Model
+  quality still requires architect confirmation. No model downloads.
+- Prior VPC/LZA output checks validate input contracts/schema shape only. No
+  Terraform plan, AWS API, enterprise integration or deployment was run.
 
 ### Next
 
-Use one client case with selected organisation references to connect policy
-findings to sourced functional decisions. Consolidate the redundant LZA handoff
-output. Keep extraction proposals advisory and exports restricted to explicit
-input contracts. Improve local-model quality using representative packets rather
-than adding a larger ontology or a general-purpose module framework.
+Try the documented workflow with one representative, sanitised client packet and
+its actual selected references. Improve only questions or source mappings that
+that exercise shows are missing. Keep the example lean; broaden module coverage
+or ontology only when a concrete functional requirement needs it.

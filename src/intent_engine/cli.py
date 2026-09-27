@@ -24,6 +24,7 @@ from .graph import GraphConfig, GraphEmpty, GraphUnavailable, KnowledgeGraph
 from .ingest import IngestError, extract_facts, read_document
 from .llm import LlmConfig, LlmError, deterministic_questions, narrate
 from .models import Decision, Review
+from .organisation import load_organisation, organisation_catalog
 from .scan import ScanError, scan_bundle
 from .tfvars import emit_tfvars
 
@@ -66,6 +67,14 @@ _CATALOG = typer.Option(None, "--catalog", help="Override the packaged decision 
 def ingest(
     document: Path = typer.Argument(..., help="Architecture document to ingest in full."),
     catalog: Path | None = _CATALOG,
+    organisation: Path | None = typer.Option(
+        None, "--organisation", help="Selected organisation references and integration questions."
+    ),
+    without_organisation: bool = typer.Option(
+        False,
+        "--without-organisation",
+        help="Start a case without the previous organisation snapshot.",
+    ),
     extract_model: str | None = typer.Option(
         None, "--extract-model", help="Opt-in GraphRAG extraction using this Ollama model."
     ),
@@ -77,16 +86,27 @@ def ingest(
 ) -> None:
     """Replace the graph with the decision catalog and one complete document."""
     try:
-        decisions = _catalog(catalog)
+        if organisation and without_organisation:
+            raise IngestError("choose --organisation or --without-organisation, not both")
+        base_catalog = _catalog(catalog)
         parsed = read_document(document)
-        facts = extract_facts(parsed, decisions)
-        architecture = (
-            extract_architecture(parsed, decisions, extract_model, base_url)
-            if extract_model
-            else None
-        )
         with _graph(uri, user, password, database) as graph:
-            graph.replace(decisions, parsed, facts, architecture)
+            # Corrections keep the selected reference snapshot unless explicitly refreshed.
+            org = (
+                load_organisation(organisation, base_catalog)
+                if organisation
+                else graph.organisation()
+            )
+            if without_organisation:
+                org = None
+            decisions = organisation_catalog(base_catalog, org)
+            facts = extract_facts(parsed, decisions)
+            architecture = (
+                extract_architecture(parsed, decisions, extract_model, base_url)
+                if extract_model
+                else None
+            )
+            graph.replace(decisions, parsed, facts, architecture, org)
             counts = graph.counts()
     except _KNOWN_FAILURES as exc:
         _fail(str(exc))
@@ -135,8 +155,12 @@ def review(
 ) -> None:
     """Report gaps and conflicts found deterministically in the graph."""
     try:
-        decisions = _catalog(catalog)
         with _graph(uri, user, password, database) as graph:
+            decisions = graph.catalog()
+            if catalog is not None:
+                selected = organisation_catalog(_catalog(catalog), graph.organisation())
+                if selected != decisions:
+                    raise CatalogError("catalog differs from the ingested snapshot; ingest again")
             result = build_review(graph, decisions)
     except _KNOWN_FAILURES as exc:
         _fail(str(exc))
@@ -159,6 +183,7 @@ def _render(result: Review, decisions: dict[str, Decision]) -> None:
         f"applicable decisions: {len(result.applicable)}  answered: {len(result.answered)}  "
         f"gaps: {len(result.gaps)}  conflicts: {len(result.conflicts)}"
     )
+    _render_context(result)
     for warning in result.architecture.warnings:
         typer.echo(f"extraction: {warning}")
     if result.architecture.nodes:
@@ -177,6 +202,8 @@ def _render(result: Review, decisions: dict[str, Decision]) -> None:
             default = f"  [default available: {gap.default}]" if gap.default else ""
             blocks = f"  [blocks: {', '.join(gap.blocks)}]" if gap.blocks else ""
             typer.echo(f"  - {gap.decision_key}: {gap.question}{default}{blocks}")
+            for evidence in gap.evidence:
+                typer.echo(f"      evidence: {evidence}")
     if result.conflicts:
         typer.secho("\nconflicts", fg=typer.colors.RED)
         for conflict in result.conflicts:
@@ -189,6 +216,23 @@ def _render(result: Review, decisions: dict[str, Decision]) -> None:
         typer.echo("\nquestions to take to the client:")
         for line in deterministic_questions(result, decisions):
             typer.echo(f"  - {line}")
+
+
+def _render_context(result: Review) -> None:
+    if result.organisation:
+        typer.echo(f"organisation: {result.organisation.name} (selected reference snapshot)")
+        for system in result.organisation.systems:
+            typer.echo(f"  {system.lifecycle}: {system.name}")
+        for assessment in result.assessments:
+            typer.echo(
+                f"  policy {assessment.policy_id}: {assessment.status} — {assessment.message}"
+            )
+    if result.integration_context:
+        typer.echo("\nIntegration work for the consuming teams:")
+        layers = result.integration_context.get("layers", {})
+        if isinstance(layers, dict):
+            for name, layer in layers.items():
+                typer.echo(f"  {name}: {layer['ownerAction']}")
 
 
 def _narrate(
@@ -226,8 +270,12 @@ def emit(
 ) -> None:
     """Write AWS LZA configuration. Blocked by any gap or conflict."""
     try:
-        decisions = _catalog(catalog)
         with _graph(uri, user, password, database) as graph:
+            decisions = graph.catalog()
+            if catalog is not None:
+                selected = organisation_catalog(_catalog(catalog), graph.organisation())
+                if selected != decisions:
+                    raise CatalogError("catalog differs from the ingested snapshot; ingest again")
             result = build_review(graph, decisions)
             facts = graph.facts()
         resolution = resolve(decisions, result, facts, allow_defaults=allow_defaults)
@@ -238,7 +286,7 @@ def emit(
     defaulted = [entry["decision"] for entry in resolution.trace if entry["origin"] == "default"]
     for path in written:
         typer.echo(f"wrote {path}")
-    typer.echo(f"LZA {LZA_VERSION} schemas passed; owner validation remains in handoff.yaml")
+    typer.echo(f"LZA {LZA_VERSION} schemas passed; integration context is in decision-trace.yaml")
     if defaulted:
         typer.secho(f"filled from catalog defaults: {', '.join(defaulted)}", fg=typer.colors.YELLOW)
 
@@ -257,8 +305,12 @@ def export_tfvars(
 ) -> None:
     """Export confirmed values and evidence. No Terraform resources or execution."""
     try:
-        decisions = _catalog(catalog)
         with _graph(uri, user, password, database) as graph:
+            decisions = graph.catalog()
+            if catalog is not None:
+                selected = organisation_catalog(_catalog(catalog), graph.organisation())
+                if selected != decisions:
+                    raise CatalogError("catalog differs from the ingested snapshot; ingest again")
             result = build_review(graph, decisions)
             facts = graph.facts()
         resolution = resolve(decisions, result, facts)

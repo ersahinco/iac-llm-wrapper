@@ -78,6 +78,7 @@ class Gap(BaseModel):
     category: str
     default: str | None = None
     blocks: list[str] = Field(default_factory=list)
+    evidence: list[str] = Field(default_factory=list)
 
 
 class Conflict(BaseModel):
@@ -125,7 +126,71 @@ class Review(BaseModel):
     conflicts: list[Conflict]
     facts: list[Fact] = Field(default_factory=list)
     architecture: Architecture = Field(default_factory=Architecture)
+    organisation: Organisation | None = None
+    assessments: list[Assessment] = Field(default_factory=list)
+    integration_context: dict[str, object] = Field(default_factory=dict)
 
     @property
     def clean(self) -> bool:
         return not self.gaps and not self.conflicts
+
+
+class Reference(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str
+    path: str
+    kind: Literal["configuration", "context", "policy"]
+    sha256: str = ""
+    content: str = ""
+
+
+class Evidence(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    reference: str
+    line: int = Field(ge=1)
+    quote: str = Field(min_length=1)
+
+
+class EstateSystem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str
+    name: str
+    lifecycle: Literal["existing", "planned"]
+    evidence: Evidence
+
+
+class Integration(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str
+    source: str
+    target: str
+    decision_keys: list[str] = Field(min_length=1)
+    evidence: Evidence
+
+
+class Policy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str
+    decision_keys: list[str] = Field(min_length=1)
+    evidence: Evidence
+
+
+class Organisation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    references: list[Reference]
+    systems: list[EstateSystem]
+    integrations: list[Integration]
+    questions: list[Decision]
+    policies: list[Policy]
+
+
+class Assessment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    policy_id: str
+    status: Literal["passed", "conflict", "not-assessed"]
+    message: str = Field(min_length=1)
+    input_sha256: str = ""
+
+
+Review.model_rebuild()

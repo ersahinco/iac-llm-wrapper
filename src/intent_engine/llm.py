@@ -72,6 +72,13 @@ def build_prompt(review: Review, catalog: dict[str, Decision]) -> str:
     context = {
         "facts": [f.model_dump() for f in review.facts if f.decision_key not in conflicted],
         "unconfirmed_architecture": review.architecture.model_dump(),
+        "organisation": review.organisation.model_dump(exclude={"references"})
+        if review.organisation
+        else None,
+        "policy_assessments": [a.model_dump() for a in review.assessments],
+        "gaps": [g.model_dump() for g in review.gaps],
+        "conflicts": [c.model_dump() for c in review.conflicts],
+        "integration_context": review.integration_context,
     }
     return (
         f"Source document: {review.document}\n"

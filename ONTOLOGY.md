@@ -1,11 +1,11 @@
 # Architecture ontology for the experiment
 
-Design and implementation boundaries for the experiment. Optional GraphRAG
-ingestion now adds sourced System and Candidate proposals linked by ABOUT and
-CONNECTS_TO. Integration, Policy, and ConfigTarget nodes below remain design
-ideas, not implemented features. Scope: understand the existing enterprise, decide how a new AWS
-landing zone connects, and produce configuration for LZA 1.16.3. Existing
-networks and identity systems are referenced, never provisioned by this tool.
+Implementation boundaries for the experiment. Optional GraphRAG ingestion adds
+unconfirmed System and Candidate proposals. A selected organisation snapshot now
+adds sourced System, Integration and Policy nodes; OPA Assessment nodes link scoped
+results to decisions and their input evidence. ConfigTarget remains a design idea.
+The working example is in [samples/organisation](samples/organisation/README.md).
+Existing networks and identity systems are referenced, never provisioned here.
 `Policy` means a stated enterprise constraint. Open Policy Agent (OPA) evaluates
 executable checks for supported constraints; it is not the enterprise policy itself.
 
@@ -16,13 +16,14 @@ statements; decisions have dependencies and applicability gates. Opt-in GraphRAG
 adds unconfirmed System and Candidate nodes with source evidence. Only Fact nodes
 answer catalog decisions; an extracted Candidate never closes a gap.
 
-OPA checks generated configuration separately. Its bundled rules are example
+OPA checks generated configuration separately; selected organisation rules also assess
+stated decisions against reference configuration before emission. Its bundled rules are example
 controls, not evidence of bank approval. Discussion narration receives stated
 values, source locations, findings, and the unconfirmed architecture projection.
 
 ## Small model
 
-Keep the evidence model. Add four concepts, with stable IDs and explicit links:
+Keep the evidence model. The small model uses these concepts; ConfigTarget is deferred:
 
 | Concept | Minimum meaning | Example |
 | --- | --- | --- |
@@ -130,7 +131,7 @@ The structured view should answer one practical chain: **which system or
 integration is affected → what is stated and where → what remains undecided or
 conflicting → which check and LZA field, if any, are affected**. Retrieve it through
 fixed application queries. Keep proposed questions separate from recorded facts;
-there is no LLM write-back to the graph. Include source/configuration hashes on
+only opt-in extraction writes unconfirmed proposals; narration never writes to the graph. Include source/configuration hashes on
 assessment results so an old policy result cannot describe a changed configuration.
 
 ## One workflow, two outputs
@@ -139,7 +140,7 @@ Capture the packet → review the architecture graph → discuss open questions 
 update the packet → emit the supported LZA configuration.
 
 Keep the LZA config files and a decision trace linking answers to source evidence
-and affected fields. Consolidate useful content from `handoff.yaml` into review
+and affected fields. Integration context formerly in `handoff.yaml` is consolidated into review
 and trace; do not add a separate handoff workflow. “Bundle” means only the output
 directory. Platform-team extensibility is outside this experiment's scope.
 
@@ -159,7 +160,7 @@ The purpose is a sourced architecture discussion, followed by configuration for 
 known consumer. Graph size and the number of integrated frameworks are not goals.
 
 Reuse schema-guided knowledge extraction and GraphRAG for discussion context.
-Evaluate [Neo4j GraphRAG for Python](https://neo4j.com/docs/neo4j-graphrag-python/current/)
+Use [Neo4j GraphRAG for Python](https://neo4j.com/docs/neo4j-graphrag-python/current/)
 because Neo4j is already present; its knowledge graph builder is experimental.
 The schema-guided extraction component is now integrated at version 1.21.0.
 Neither it nor an alternative library replaces

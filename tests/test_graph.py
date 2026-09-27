@@ -233,7 +233,7 @@ def test_client_discussion_to_owner_handoff(sample_path, tmp_path, monkeypatch):
     assert emitted.exit_code == 0, emitted.output
     assert owner_file.read_bytes() == original
     assert yaml.load((out / "network-config.yaml").read_text("utf-8")) == network
-    handoff = yaml.load((out / "handoff.yaml").read_text("utf-8"))
+    handoff = yaml.load((out / "decision-trace.yaml").read_text("utf-8"))["integrationContext"]
     assert handoff["layers"]["network"]["source"]["origin"] == "owner-file"
     assert handoff["status"] == "requires-owner-validation"
 
@@ -244,3 +244,61 @@ def test_client_discussion_to_owner_handoff(sample_path, tmp_path, monkeypatch):
     reports = json.loads(scanned.stdout)
     assert reports[0]["tool"] == "lza-schema" and reports[0]["status"] == "passed"
     assert all(report["status"] == "not-installed" for report in reports[1:])
+
+
+def test_organisation_discussion_then_lza_export(graph, tmp_path):
+    """Real CLI, Neo4j and OPA: references survive the corrected document reload."""
+    import shutil
+    from pathlib import Path
+
+    from typer.testing import CliRunner
+
+    from intent_engine.cli import app
+
+    if shutil.which("opa") is None:
+        pytest.skip("OPA not installed")
+    sample = Path(__file__).resolve().parents[1] / "samples" / "organisation"
+    runner = CliRunner()
+    loaded = runner.invoke(
+        app,
+        ["ingest", str(sample / "client.md"), "--organisation", str(sample / "organisation.yaml")],
+    )
+    assert loaded.exit_code == 0, loaded.output
+    reviewed = runner.invoke(app, ["review", "--json"])
+    assert reviewed.exit_code == 1, reviewed.output
+    result = json.loads(reviewed.output)
+    assert [gap["decision_key"] for gap in result["gaps"]] == ["hybrid_connection"]
+    assert "estate.md:5" in result["gaps"][0]["evidence"][0]
+    assert [c["code"] for c in result["conflicts"]] == ["ORG_POLICY_CONFLICT"]
+    assert "us-east-1" in result["conflicts"][0]["message"]
+    assert any("policy.rego:3" in e for e in result["conflicts"][0]["evidence"])
+    out = tmp_path / "lza"
+    blocked = runner.invoke(app, ["emit", "--out", str(out)])
+    assert blocked.exit_code == 2
+    assert not out.exists()
+    assert graph.counts()["System"] == 4
+    assert graph.counts()["Integration"] == 2
+    assert graph.counts()["Assessment"] == 1
+
+    # No repeated organisation flag: corrections preserve its selected snapshot.
+    loaded = runner.invoke(app, ["ingest", str(sample / "confirmed.md")])
+    assert loaded.exit_code == 0, loaded.output
+    reviewed = runner.invoke(app, ["review", "--json"])
+    assert reviewed.exit_code == 0, reviewed.output
+    clean = json.loads(reviewed.output)
+    assert clean["organisation"] == result["organisation"]
+    assert clean["assessments"][0]["status"] == "passed"
+    assert clean["assessments"][0]["input_sha256"] != result["assessments"][0]["input_sha256"]
+    emitted = runner.invoke(app, ["emit", "--out", str(out)])
+    assert emitted.exit_code == 0, emitted.output
+    assert len(list(out.glob("*.yaml"))) == 7
+    assert not (out / "handoff.yaml").exists()
+    trace = YAML(typ="safe").load((out / "decision-trace.yaml").read_text())
+    assert trace["organisation"]["name"] == result["organisation"]["name"]
+    assert trace["policyAssessments"][0]["status"] == "passed"
+    assert trace["integrationContext"]["status"] == "requires-owner-validation"
+
+    cleared = runner.invoke(app, ["ingest", str(sample / "confirmed.md"), "--without-organisation"])
+    assert cleared.exit_code == 0, cleared.output
+    assert graph.organisation() is None
+    assert "System" not in graph.counts()
