@@ -24,8 +24,12 @@ document ──ingest──▶ Neo4j ──review──▶ gaps + conflicts ─�
    incremental diff, no baseline, nothing to reconcile. Replacement is atomic:
    a failed reload preserves the previous graph. Use a dedicated database because
    ingestion replaces every node in it.
-2. **Neo4j** holds the decision catalog, the document, each prose statement, and
-   each accepted fact with the statement it came from.
+2. **Neo4j** holds the case: document statements, confirmed facts, decision
+   questions, selected organisation references, systems, integrations, policies,
+   and assessments, linked to their evidence. The model is implemented in
+   [`graph.py`](src/intent_engine/graph.py); the
+   [organisation example](samples/organisation/README.md#see-the-graph) includes
+   queries to inspect it. Catalogs and input contracts stay versioned in the repository.
 3. **Review** finds gaps and conflicts deterministically. Gaps come from graph
    applicability in Cypher; conflicts come from named rules. A missing answer, an
    unusable value, and two answers that cannot both hold are three different
@@ -41,10 +45,6 @@ document ──ingest──▶ Neo4j ──review──▶ gaps + conflicts ─�
    checks. Each result states its coverage.
 
 ## Layout
-
-The next ontology design is in [ONTOLOGY.md](ONTOLOGY.md): existing enterprise
-systems, planned AWS systems, their integration decisions, policy constraints,
-and LZA mappings. It distinguishes the proposed model from today's decision graph.
 
 ```
 src/intent_engine/
@@ -306,6 +306,11 @@ changes require OPA.
 Add a catalog decision or conflict rule when a concrete use case needs it. Keep
 the deterministic review and optional AI agenda separate, and keep deployment in
 the consuming pipeline. Use sanitized examples in issues and tests.
+
+Reuse native Neo4j/Cypher, GraphRAG, OPA, and JSON Schema capabilities before adding
+custom code. Keep custom wiring limited to demonstrated gaps, source evidence,
+human confirmation, and supported output mappings. Do not maintain a separate
+speculative ontology or review roadmap alongside the implementation.
 
 ## License
 

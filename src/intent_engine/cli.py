@@ -113,6 +113,13 @@ def ingest(
         return
 
     typer.echo(f"ingested {parsed.path} (sha256 {parsed.sha256[:12]})")
+    if org is not None:
+        action = "loaded" if organisation else "reused"
+        typer.echo(f"organisation references: {action} snapshot — {org.name}")
+    elif without_organisation:
+        typer.echo("organisation references: cleared (--without-organisation)")
+    else:
+        typer.echo("organisation references: none")
     typer.echo(f"statements: {len(parsed.statements)}  facts: {len(facts)}")
     typer.echo("graph: " + ", ".join(f"{label}={total}" for label, total in counts.items()))
 

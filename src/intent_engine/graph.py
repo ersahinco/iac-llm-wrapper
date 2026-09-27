@@ -1,18 +1,7 @@
-"""Neo4j knowledge graph.
+"""Neo4j case graph: sourced facts, decisions, integrations and policy assessments.
 
-The graph owns four kinds of node:
-
-    (:Decision)  a question a human must answer, from the catalog
-    (:Document)  the ingested source document
-    (:Statement) one prose line of that document
-    (:Fact)      an accepted answer, bound to the statement that carries it
-
-    (:Decision)-[:REQUIRES]->(:Decision)
-    (:Decision)-[:GATED_BY {equals}]->(:Decision)
-    (:Statement)-[:FROM]->(:Document)
-    (:Fact)-[:ANSWERS]->(:Decision)
-    (:Fact)-[:EVIDENCE]->(:Statement)
-
+The Cypher below defines the stored model and its evidence links. Extracted
+proposals remain separate from confirmed facts.
 This module owns the whole database it connects to. Ingest replaces every node.
 """
 

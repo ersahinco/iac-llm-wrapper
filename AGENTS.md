@@ -63,6 +63,11 @@ into a client agenda → emit LZA configuration fail-closed → scan the bundle.
   `not-installed` rather than passing silently.
 - **One decision catalog.** `decisions.yaml` holds decisions only: no derived
   values, no bookkeeping about itself.
+- **Keep the model in the working graph.** Neo4j holds sourced case knowledge;
+  versioned code, catalogs and input contracts define the supported boundaries.
+  Reuse native Neo4j/Cypher, GraphRAG, OPA and JSON Schema capabilities first.
+  Add custom wiring only for a demonstrated missing capability; no parallel
+  ontology document, speculative roadmap or general-purpose framework.
 - **Nothing here deploys.** No AWS API calls, no credentials, no state, no apply.
   Terraform output means variable JSON only, never resource definitions/execution.
   Owner pipelines keep every execution, approval, and drift decision.
@@ -127,9 +132,9 @@ general-purpose platform extension framework.
   No ConfigTarget ontology, enterprise discovery, working-connectivity proof or
   general-purpose extension framework. Concurrent review/ingest snapshots remain
   separate work. User-facing graph statuses describe the latest review.
-- **Distribution and CI.** Apache 2.0 repository. Prior milestone `9a9a7bf` passed
-  all five CI jobs. This milestone adds the organisation example and installs OPA
-  in the graph CI job so the complete discussion-to-export check runs there.
+- **Distribution and CI.** Apache 2.0 repository. Organisation milestone `0f71372`
+  was pushed to main and passed all five CI jobs (run `36284026882`). OPA is
+  installed in the graph CI job for the complete discussion-to-export check.
 
 ### Verified (2026-09-27)
 
@@ -158,7 +163,68 @@ general-purpose platform extension framework.
 
 ### Next
 
-Try the documented workflow with one representative, sanitised client packet and
-its actual selected references. Improve only questions or source mappings that
-that exercise shows are missing. Keep the example lean; broaden module coverage
-or ontology only when a concrete functional requirement needs it.
+Simplicity review: improve the first-run experience before adding functionality.
+Use the organisation example as the main quickstart; keep optional scanner setup
+separate from its successful completion. Reduce repeated findings in text review.
+Announce whether ingest loaded, reused or cleared organisation references. These
+are review recommendations, not implemented changes. No tests were rerun for this
+read-only application review; the existing deletion of `.opencode/AGENTS.md` was
+left untouched.
+
+Next session should test one isolated Compose journey, make only one small
+evidence-backed improvement, then report the result and the next smallest step.
+Try adapting one representative, sanitised client packet before broadening module
+coverage or ontology. Preserve provenance, human confirmation and blocked export
+when findings or unassessed policies remain.
+
+### Focused review session (2026-09-27)
+
+- The organisation example reproduced one `hybrid_connection` gap sourced to
+  `estate.md:5` and one `ORG_POLICY_CONFLICT` citing the client answer,
+  `policy.rego:3`, and the selected configuration hash. Export exited 2 without
+  creating its output directory. Correction preserved the full organisation
+  snapshot, passed its scoped policy, and emitted six LZA 1.16.3 schema-valid
+  files plus one decision trace.
+- Three usability findings: quickstart isolation needs extra setup; text review
+  repeats the conflict three times and the missing question twice; ingest does
+  not explain snapshot reuse. Only the last was changed: successful ingest now
+  reports organisation references as loaded, reused, cleared, or none, naming
+  the organisation when present. No reference, evidence, or policy logic changed.
+- All 165 tests passed without skips using the new isolated graph; Ruff, mypy
+  (15 source files), and strict OPA validation passed. The host test run reports
+  upstream Neo4j deprecation warnings on Python 3.14.
+- The rebuilt Compose image passed the complete journey again and all four new
+  ingest messages were checked. The final seven-file bundle is in
+  `build/review-20260927/after-change/lza`; its six schemas and trace reference
+  hashes were independently checked. The isolated graph retains the corrected case.
+- Isolation: `iac-review-20260927`, Browser 27474, Bolt 27687, data volume
+  `iac-review-20260927_graph-data`; override `/tmp/iac-review-20260927-compose.yaml`.
+  The existing development and earlier example graphs/volumes were untouched.
+  Evidence and bundles are under `build/review-20260927/`. Existing deletions of
+  `.devcontainer/devcontainer.json` and `.opencode/AGENTS.md` and earlier edits
+  to this file were preserved.
+- Next smallest step: document explicit project/port isolation in the organisation
+  quickstart. Stop here; no additional functionality or ontology work in this session.
+
+### Simplicity cleanup (2026-09-27)
+
+- Removed the root ontology proposal and historical review; the README now points
+  to the implemented graph and example queries. Native capabilities come first;
+  custom wiring needs a demonstrated gap. Corrected the stale graph docstring.
+- Read-only inspection confirmed the example's systems, integrations, policies,
+  assessments and evidence links in Neo4j. The installed GraphRAG async Ollama
+  path still misroutes model parameters, so its small compatibility adapter stays.
+- README local links, unchanged graph runtime AST, Ruff, mypy and diff whitespace
+  checks passed. No runtime behavior changed; tests were not rerun for this cleanup.
+  Earlier user changes and graph data remain intact. The next step remains the
+  isolated organisation quickstart, without adding a separate design document.
+
+### User testing handoff (2026-09-27)
+
+- User requested committing and pushing the reviewed changes, including cleanup.
+- Next: test slowly before adding features. Walk through the organisation packet's
+  evidence and blocked export, then correction and trace; try advisory GraphRAG
+  separately, then the VPC variable contract. Finally adapt one sanitised client
+  packet. Change only friction or missing integration behavior demonstrated there.
+- This is a usable guided prototype. Schema checks do not establish working
+  connectivity, federation, deployment readiness, or reliable LLM interpretation.
