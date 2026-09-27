@@ -22,8 +22,8 @@ services:
   neo4j:
     image: neo4j:5.26.4-community
     ports:
-      - "127.0.0.1:7474:7474"
-      - "127.0.0.1:7687:7687"
+      - "127.0.0.1:${NEO4J_BROWSER_PORT:-7474}:7474"
+      - "127.0.0.1:${NEO4J_BOLT_PORT:-7687}:7687"
     environment:
       NEO4J_AUTH: neo4j/localdevpassword
       NEO4J_server_memory_heap_max__size: 512m

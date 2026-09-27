@@ -56,6 +56,7 @@ src/intent_engine/
   llm.py              optional narration of the deterministic frontier
   organisation.py     selected reference snapshot and scoped OPA assessment
   extraction.py       optional GraphRAG proposals with source evidence
+  rag.py              native GraphRAG retrieval and advisory case answers
   emit.py             AWS LZA configuration and the decision trace
   contract.py         offline validation against one pinned LZA version
   schemas/            unchanged upstream LZA schemas and license notices
@@ -66,23 +67,36 @@ samples/              banking intake, organisation discussion, and VPC input exa
 
 ## Setup
 
-The quickest local example needs only Docker with Compose. Run from the repository
-directory; the application waits for Neo4j to be healthy.
+The first walkthrough needs Docker with Compose; no Python or LLM setup is needed.
+It demonstrates a missing answer, a policy conflict, correction, and sourced output.
+Run from the repository directory; the application waits for Neo4j to be healthy.
 
 ```bash
 git clone https://github.com/ersahinco/iac-llm-wrapper.git
 cd iac-llm-wrapper
+export COMPOSE_PROJECT_NAME=iac-quickstart
+export NEO4J_BROWSER_PORT=18474 NEO4J_BOLT_PORT=18687
 docker compose build app
-docker compose run --rm app ingest samples/banking-packet.md
+docker compose run --rm app ingest samples/organisation/client.md \
+  --organisation samples/organisation/organisation.yaml
+docker compose run --rm app review  # expected exit 1: one gap and one conflict
+docker compose run --rm app emit --out build/quickstart  # expected exit 2: blocked
+docker compose run --rm app ingest samples/organisation/confirmed.md
 docker compose run --rm app review
-docker compose run --rm app emit --out build/lza
-docker compose run --rm app scan build/lza
+docker compose run --rm app emit --out build/quickstart
+docker compose stop
 ```
 
-Generated files appear in `build/lza` on your machine. Ingestion replaces the
-local graph; use a dedicated checkout/Compose project for each client. The image
-includes OPA and the pinned LZA schemas. Checkov and Trivy are not included, so
-`scan` reports them as `not-installed` and exits 1 for incomplete coverage.
+Success means six schema-valid LZA configuration files and `decision-trace.yaml`
+in `build/quickstart`. The initial failures are expected; the corrected packet
+reuses the selected references. This is a synthetic example, not an approved design.
+Keep the environment variables for the whole walkthrough. Choose unused ports and
+a different project name for each case: ingestion replaces that project's graph.
+Stopping retains its data volume. The image includes OPA and the pinned LZA schemas.
+
+Scanning is a separate optional check: `docker compose run --rm app scan build/quickstart`.
+Checkov and Trivy are not included; their `not-installed` results cause exit 1 for
+incomplete coverage. They are not required to finish this walkthrough.
 
 To use a local Ollama server already running on your host, choose its installed
 model explicitly:
@@ -155,7 +169,79 @@ Re-ingestion preserves selected organisation references. Refresh them by supplyi
 `--organisation` again; start an unrelated case with `--without-organisation`.
 Reference configurations constrain answers; they never silently supply them.
 
+### Pilot with another architect
+
+Use one local Compose project per client and keep the packet, selected references,
+question catalog and output contract together in your team's approved version control.
+A maintainer prepares the questions, reviewed OPA checks and variable mappings;
+architects edit the client answers and inspect the review. Engineers validate the
+handoff in their existing pipeline. Use its normal review/approval process: this
+tool records document evidence, not reviewer identity or sign-off.
+
+Start with the walkthrough above, then copy a packet for one small real integration.
+For each important requirement, record its source, owner and measurable acceptance
+condition. A requirement only blocks export if represented by an applicable question,
+executable policy or output contract. Prose such as "recover within four hours" is
+context until explicitly covered; a clean review is not enterprise readiness.
+Add [local GraphRAG questions](#ask-about-the-ingested-case-with-graphrag) after the
+deterministic flow is understood. The current Compose setup is for a local operator;
+it is not a shared service with per-client authentication and concurrent editing.
+
 ## Integration contract
+
+### Ask about the ingested case with GraphRAG
+
+Start with the [organisation example](samples/organisation/README.md) in a dedicated
+Compose project with unused ports. Each project has its own data volume; ingestion
+replaces the selected project's case. Use two explicitly selected, already installed
+Ollama models: one for embeddings and one for answers. No models are downloaded.
+
+```bash
+export COMPOSE_PROJECT_NAME=iac-graphrag
+export NEO4J_BROWSER_PORT=37474 NEO4J_BOLT_PORT=37687
+docker compose build app
+docker compose run --rm app ingest samples/organisation/client.md \
+  --organisation samples/organisation/organisation.yaml
+docker compose run --rm app index --embedding-model embeddinggemma:latest \
+  --base-url http://host.docker.internal:11434
+docker compose run --rm app ask \
+  "What remains undecided about connecting this estate to AWS?" \
+  --model qwen2.5:7b --base-url http://host.docker.internal:11434
+```
+
+Keep those environment variables for all commands in this walkthrough. `index`
+embeds the stored client statements and selected reference contents, including
+caller-supplied standards, preferences, policies or module contracts. It does not
+reread mutable host files. Re-ingestion removes the embeddings; run `index` again.
+Use the same embedding model/server for indexing and questions.
+
+The native Neo4j GraphRAG `VectorCypherRetriever` finds source statements and
+follows their evidence links to decisions and integrations. Its `GraphRAG` pipeline
+passes that context and deterministic findings to the local answer model. `ask`
+shows document answers with source lines and exact missing questions from the
+deterministic review before the advisory answer. Entered values can still conflict;
+they are not a policy pass. Retrieved evidence includes source paths, lines and
+hashes; `--json` includes the same facts and findings. This makes contradictions
+visible but does not validate the model's claims. Questions do not become confirmed
+answers or unblock export. Review refreshes policy assessments, while model output
+never writes facts.
+
+This experiment supports up to 500 source statements, each at most 4,000 characters.
+Prompts above 32,000 characters are rejected; reduce `--top-k` or narrow the case.
+It uses the library's candidate-pool control to search the small case, then sends
+the top four hits and their graph context to the model (`--top-k` can adjust this).
+An invented source identifier blocks the answer. A valid citation does not prove
+the claim is supported, and retrieval can still miss relevant evidence: inspect
+the returned sources. Index and ask are sequential operations; do not ingest or
+re-index concurrently. No model-generated Cypher is executed.
+
+To test a different scenario, change the supplied packet and selected references,
+ingest with `--organisation` to refresh them, re-index, and ask the same question.
+Evaluate changed evidence and answers, missing information, conflicts and output
+boundaries. Changing inputs must not require a scenario-specific retriever or a
+built-in module catalog. New executable checks and output mappings still require
+explicit reviewed contracts; reference text alone does not add that capability.
+Stop this example with `docker compose stop`; its data volume is retained.
 
 ### GraphRAG and an existing Terraform module
 

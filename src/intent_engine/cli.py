@@ -3,6 +3,8 @@
 ingest   read a whole document into the knowledge graph (replaces it)
 status   show what the graph currently holds
 review   deterministic gaps and conflicts, optionally narrated by a model
+index    embed the current case for local GraphRAG retrieval
+ask      retrieve evidence and answer an architecture question (advisory)
 emit     write AWS LZA configuration from accepted decisions
 scan     run OPA, Checkov, and Trivy over an emitted bundle
 """
@@ -25,6 +27,7 @@ from .ingest import IngestError, extract_facts, read_document
 from .llm import LlmConfig, LlmError, deterministic_questions, narrate
 from .models import Decision, Review
 from .organisation import load_organisation, organisation_catalog
+from .rag import ask_case, index_case
 from .scan import ScanError, scan_bundle
 from .tfvars import emit_tfvars
 
@@ -122,6 +125,76 @@ def ingest(
         typer.echo("organisation references: none")
     typer.echo(f"statements: {len(parsed.statements)}  facts: {len(facts)}")
     typer.echo("graph: " + ", ".join(f"{label}={total}" for label, total in counts.items()))
+
+
+@app.command()
+def index(
+    embedding_model: str = typer.Option(
+        ..., "--embedding-model", help="Installed Ollama embedding model."
+    ),
+    base_url: str = typer.Option("http://localhost:11434", "--base-url"),
+    uri: str | None = _URI,
+    user: str | None = _USER,
+    password: str | None = _PASSWORD,
+    database: str | None = _DATABASE,
+) -> None:
+    """Embed the ingested client and selected references for advisory questions."""
+    try:
+        with _graph(uri, user, password, database) as graph:
+            count = index_case(graph, embedding_model, base_url)
+    except Exception as exc:
+        _fail(f"index unavailable: {exc}")
+        return
+    typer.echo(f"indexed {count} source statements with {embedding_model}; re-index after ingest")
+
+
+@app.command()
+def ask(
+    question: str = typer.Argument(..., help="Architecture question about this ingested case."),
+    model: str = typer.Option(..., "--model", help="Installed Ollama answer model."),
+    base_url: str = typer.Option("http://localhost:11434", "--base-url"),
+    top_k: int = typer.Option(4, "--top-k", min=1, max=10),
+    as_json: bool = typer.Option(False, "--json"),
+    uri: str | None = _URI,
+    user: str | None = _USER,
+    password: str | None = _PASSWORD,
+    database: str | None = _DATABASE,
+) -> None:
+    """Retrieve case evidence and answer with native GraphRAG; answers are advisory."""
+    try:
+        with _graph(uri, user, password, database) as graph:
+            result = ask_case(graph, question, model, base_url, top_k)
+    except Exception as exc:
+        _fail(f"answer unavailable: {exc}")
+        return
+    if as_json:
+        typer.echo(json.dumps(result, indent=2))
+        return
+    findings = result["findings"]
+    typer.echo(f"review: {len(findings['gaps'])} gaps, {len(findings['conflicts'])} conflicts")
+    for assessment in findings["assessments"]:
+        typer.echo(f"policy {assessment['policy_id']}: {assessment['status']}")
+    typer.echo("\nDocument answers (may still have conflicts):")
+    for fact in findings["facts"]:
+        typer.echo(
+            f"  {fact['decision_key']}: {fact['value']} "
+            f"({result['document']}:{fact['line']})"
+        )
+    if not findings["facts"]:
+        typer.echo("  none")
+    typer.echo("\nMissing questions (deterministic review):")
+    for gap in findings["gaps"]:
+        typer.echo(f"  {gap['decision_key']}: {gap['question']}")
+    if not findings["gaps"]:
+        typer.echo("  none")
+    typer.echo("\nadvisory answer — confirm decisions in the document and ingest again:\n")
+    typer.echo(result["answer"])
+    typer.echo("\nRetrieved evidence (retrieval is not proof of relevance):")
+    for source in result["sources"]:
+        typer.echo(
+            f"  [{source['citation']}] {source['path']}:{source['line']} "
+            f"(sha256 {source['sha256'][:12]}) — {source['text']}"
+        )
 
 
 @app.command()
