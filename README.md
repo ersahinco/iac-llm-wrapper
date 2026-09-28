@@ -1,75 +1,20 @@
-# IaC Accelerator (`iac-llm-wrapper`)
+# iac-llm-wrapper
 
-A knowledge-graph tool that captures requirements and architecture decisions from
-a customer document, surfaces gaps and conflicts so architects can steer the
-client discussion, and emits configuration for an existing AWS accelerator.
+Turn client requirements and selected organisation references into sourced
+architecture reviews and configuration inputs. Architects resolve missing answers
+and policy conflicts before handing work to an engineering team.
 
-It does not deploy anything. It holds no credentials, calls no AWS API, and runs
-no Terraform. The output is configuration an owner reviews and feeds to their own
-pipeline.
+Neo4j stores the evidence; optional Neo4j GraphRAG and local LLMs help explore it.
+Supported exports are AWS Landing Zone Accelerator (LZA) configuration and Terraform
+module variable JSON, each with a decision trace. Nothing deploys or runs Terraform.
 
-Open source under [Apache 2.0](LICENSE). Use it, fork it, and contribute focused
-improvements through [issues](https://github.com/ersahinco/iac-llm-wrapper/issues)
-and pull requests.
+**Status: guided local prototype.** The example workflow is tested. Real client
+adoption and model answer quality still need evaluation; output requires owner review.
 
-## How it works
+## Quickstart
 
-```
-document ──ingest──▶ Neo4j ──review──▶ gaps + conflicts ──▶ architect discussion
-                       │
-                       └────emit────▶ AWS LZA config ──scan──▶ OPA / Checkov / Trivy
-```
-
-1. **Ingest** reads the whole document. Every run replaces the graph: no
-   incremental diff, no baseline, nothing to reconcile. Replacement is atomic:
-   a failed reload preserves the previous graph. Use a dedicated database because
-   ingestion replaces every node in it.
-2. **Neo4j** holds the case: document statements, confirmed facts, decision
-   questions, selected organisation references, systems, integrations, policies,
-   and assessments, linked to their evidence. The model is implemented in
-   [`graph.py`](src/intent_engine/graph.py); the
-   [organisation example](samples/organisation/README.md#see-the-graph) includes
-   queries to inspect it. Catalogs and input contracts stay versioned in the repository.
-3. **Review** finds gaps and conflicts deterministically. Gaps come from graph
-   applicability in Cypher; conflicts come from named rules. A missing answer, an
-   unusable value, and two answers that cannot both hold are three different
-   findings.
-4. **The LLM is optional and advisory.** Review narration receives facts,
-   evidence, proposed architecture relationships, and the deterministic frontier.
-   Opt-in GraphRAG ingestion sends document statements to the explicitly selected
-   local model; its extracted proposals never become accepted answers automatically.
-5. **Emit** writes foundation configuration checked against **LZA 1.16.3** schemas,
-   plus a decision trace with integration context. Gaps, conflicts, or schema errors block
-   the bundle. Account emails and identity policy mappings are explicit inputs.
-6. **Scan** rechecks the LZA schemas, runs OPA policy, Checkov secrets, and Trivy
-   checks. Each result states its coverage.
-
-## Layout
-
-```
-src/intent_engine/
-  decisions.yaml      the decision catalog: questions only a human can answer
-  catalog.py          load and validate the catalog, coerce document values
-  ingest.py           whole-document read: statements + facts
-  graph.py            Neo4j schema, full replace, gap and contradiction Cypher
-  analysis.py         applicability and named conflict rules
-  llm.py              optional narration of the deterministic frontier
-  organisation.py     selected reference snapshot and scoped OPA assessment
-  extraction.py       optional GraphRAG proposals with source evidence
-  rag.py              native GraphRAG retrieval and advisory case answers
-  emit.py             AWS LZA configuration and the decision trace
-  contract.py         offline validation against one pinned LZA version
-  schemas/            unchanged upstream LZA schemas and license notices
-  scan.py             OPA, Checkov, Trivy
-  policy/lza.rego     the landing-zone policy
-samples/              banking intake, organisation discussion, and VPC input examples
-```
-
-## Setup
-
-The first walkthrough needs Docker with Compose; no Python or LLM setup is needed.
-It demonstrates a missing answer, a policy conflict, correction, and sourced output.
-Run from the repository directory; the application waits for Neo4j to be healthy.
+Requires Docker with Compose. No Python or LLM setup is needed. Run the commands
+in order; the first review and export deliberately fail to demonstrate the gates.
 
 ```bash
 git clone https://github.com/ersahinco/iac-llm-wrapper.git
@@ -87,319 +32,201 @@ docker compose run --rm app emit --out build/quickstart
 docker compose stop
 ```
 
-Success means six schema-valid LZA configuration files and `decision-trace.yaml`
-in `build/quickstart`. The initial failures are expected; the corrected packet
-reuses the selected references. This is a synthetic example, not an approved design.
-Keep the environment variables for the whole walkthrough. Choose unused ports and
-a different project name for each case: ingestion replaces that project's graph.
-Stopping retains its data volume. The image includes OPA and the pinned LZA schemas.
+The initial packet lacks a hybrid connection decision and requests a region outside
+its selected organisation policy. The corrected packet records VPN and permitted
+regions, reuses the references, and produces **six schema-valid LZA files plus
+`decision-trace.yaml`** in `build/quickstart`. These are synthetic inputs.
 
-Scanning is a separate optional check: `docker compose run --rm app scan build/quickstart`.
-Checkov and Trivy are not included; their `not-installed` results cause exit 1 for
-incomplete coverage. They are not required to finish this walkthrough.
+Keep the environment variables for the whole walkthrough. Use a different project
+name and unused ports for each case: **ingestion replaces every node in that
+project's database**. Replacement is atomic; a failed ingest preserves the prior
+case. Stopping retains the data volume. The image includes OPA and LZA schemas.
 
-To use a local Ollama server already running on your host, choose its installed
-model explicitly:
+The [organisation guide](samples/organisation/README.md) explains the evidence,
+policy contract and [graph view](samples/organisation/README.md#see-the-graph).
+
+## Use your own case
+
+```text
+client document + selected references
+                  ↓ ingest
+             Neo4j evidence
+                  ↓ review
+             gaps + conflicts
+                  ↓ architect records answers and ingests again
+             checked configuration + decision trace
+```
+
+Answers use `decision_key: value` lines, with questions from the
+[default catalog](src/intent_engine/decisions.yaml) or an explicit `--catalog`.
+Other prose is retained as context. Account emails and identity policy mappings
+must come from the owner; the tool does not invent them.
+
+Selected references can describe existing hybrid estates, preferences, standards,
+policies and module contracts. Re-ingestion preserves their stored contents and
+hashes. Supply `--organisation` again to refresh them, or `--without-organisation`
+to clear them for an unrelated case. Reference values never become client answers.
+
+A maintainer prepares the questions, reviewed Rego checks and output mappings;
+architects edit answers and inspect findings. Keep these inputs together in approved
+version control. Engineers validate the handoff through their existing approvals
+and pipeline. The trace records evidence, not reviewer identity or sign-off.
+
+A requirement only blocks export when covered by an applicable question, executable
+policy or output contract. Requirements such as recovery time, capacity and device
+trust need explicit coverage and owner validation. Adding reference text does not
+create checks or mappings. The local Compose setup supports one operator; it has
+no per-client authentication or concurrent editing guarantees.
+
+## Optional GraphRAG
+
+### Ask about the ingested case with GraphRAG
+
+After the quickstart, keep its Compose environment settings and use two already
+installed Ollama models: one for embeddings and one for answers. These names are
+examples; select models available on your server. No model is downloaded automatically.
+
+```bash
+docker compose run --rm app index --embedding-model embeddinggemma:latest \
+  --base-url http://host.docker.internal:11434
+docker compose run --rm app ask \
+  "What connection method is recorded for this estate, and what evidence supports it?" \
+  --model qwen2.5:7b --base-url http://host.docker.internal:11434
+docker compose stop
+```
+
+`index` embeds the stored client and reference snapshot. Native Neo4j GraphRAG
+`VectorCypherRetriever` expands source hits through evidence links; `GraphRAG`
+passes the context to the answer model. `ask` shows sourced document answers,
+deterministic gaps and policy statuses before the model's advisory response.
+Use `--json` for structured facts, findings and retrieved sources.
+
+Re-ingestion invalidates retrieval: run `index` again. Use the same embedding
+model/server for indexing and questions. To test another scenario, change the
+inputs, refresh selected references and re-index; no scenario-specific retriever
+is needed. Run ingest, index and ask sequentially.
+
+The current limits are 500 source statements, 4,000 characters per statement and
+32,000 characters per prompt. Reduce `--top-k` or narrow the case if needed.
+Unknown citation identifiers are rejected, but valid citations do not prove a
+claim is supported. Live tests have produced incorrect statements despite matching
+citations. Inspect the sources; model answers never supply confirmed facts or
+unblock export. No model-generated Cypher is executed.
+
+### Extract proposals or narrate a review
+
+`ingest DOCUMENT --extract-model YOUR_MODEL --base-url http://host.docker.internal:11434`
+adds sourced System/Candidate proposals through Neo4j GraphRAG's schema-guided
+extractor. It accepts one UTF-8 packet of up to 32,000 statement characters and
+needs no vector index. Invalid evidence fails before graph replacement; unsupported
+items are pruned with warnings. Architects confirm answers in the document and
+re-ingest. Matching quotes and valid JSON do not establish semantic accuracy.
+
+To turn the deterministic review into a discussion agenda:
 
 ```bash
 docker compose run --rm app review --llm ollama --model YOUR_MODEL \
   --base-url http://host.docker.internal:11434
+docker compose stop
 ```
 
-No model is downloaded or selected automatically. Stop the database with
-`docker compose down`; its data volume is retained.
+Provider and model are always explicit. `review --help` also documents the
+OpenAI-compatible provider options; only use an external endpoint approved for
+the case's data.
 
-For development on the host, install Python 3.11+ and
-[uv](https://docs.astral.sh/uv/), then:
+## Output contracts
+
+### AWS Landing Zone Accelerator
+
+| Output | Consumer |
+| --- | --- |
+| Six `*-config.yaml` files | The owner's LZA **1.16.3** configuration repository |
+| `decision-trace.yaml` | Answers, evidence, reference hashes, policy assessments and integration context |
+
+Bundled schemas are validated offline. Gaps, conflicts, unassessed selected
+policies and schema errors block export. Defaults require `--allow-defaults`
+and are recorded as `origin: default`. Changing LZA versions requires an explicit
+contract update. No AWS API calls or cloud credentials are needed.
+
+Network output is a foundation skeleton. Owners complete routes, subnets,
+attachments, DNS and inspection. To preserve an owner-maintained network file:
 
 ```bash
-uv sync --locked --extra dev
-docker compose up -d --wait
-export NEO4J_URI=bolt://127.0.0.1:7687
-export NEO4J_USER=neo4j
-export NEO4J_PASSWORD=localdevpassword
+docker compose run --rm app emit --out build/lza \
+  --network-config /workspace/build/owner-lza/network-config.yaml
 ```
 
-`--wait` matters: the Docker port proxy accepts connections before Bolt is ready,
-and the driver then reports an incomplete handshake rather than a refusal.
+Place the owner file in the ignored `build/owner-lza/` directory locally.
+Keep it outside the generated output directory. Its data is preserved
+and schema-checked; the trace records its path and SHA-256. The packet's region,
+host/CIDR and topology must match. Cross-file and routing validation remain in the
+owner's LZA pipeline.
 
-`NEO4J_PASSWORD` has no default. Without it the tool refuses to connect rather
-than falling back to an anonymous session.
+Identity output supports explicitly named AWS-managed policies; owners verify them
+and connect their identity provider. Hybrid networking, federation, data/backup
+regions, recovery objectives and application ownership also travel as integration
+context; the tool does not provision those external systems or workloads.
+Keep a packet to one shared workload scope.
 
-The external tools are optional and separate:
+Integration context is labelled `requires-owner-validation`. Schema success
+establishes shape, not working connectivity or a complete architecture. Fixed
+emitter choices such as retention and session duration also need owner review.
 
-```bash
-brew install opa checkov trivy
-```
+### Terraform module variables
 
-## Use
-
-Start with the [example packet](samples/banking-packet.md). Answers use
-`decision_key: value` lines, with keys from
-[`decisions.yaml`](src/intent_engine/decisions.yaml). Other prose is retained as
-context; the tool does not infer answers from free-form text. Replace the sample
-account emails with owner-provided addresses before using the output.
-
-```bash
-uv run iac-llm-wrapper ingest samples/banking-packet.md
-uv run iac-llm-wrapper status
-uv run iac-llm-wrapper review
-uv run iac-llm-wrapper emit --out build/lza
-uv run iac-llm-wrapper scan build/lza
-```
-
-## Organisation-aware example
-
-The [complete example](samples/organisation/README.md) loads a client packet with
-selected existing-estate, LZA configuration and OPA policy references. It shows one
-missing hybrid-network decision and one region-policy conflict, each with source
-evidence. Corrected answers produce six LZA configuration files and one trace.
-The example also includes queries for inspecting the graph in Neo4j Browser.
+The [VPC example](samples/vpc/requirements.md) uses a caller-supplied catalog and
+JSON Schema input contract. Run it in a separate case:
 
 ```bash
-docker compose run --rm app ingest samples/organisation/client.md \
-  --organisation samples/organisation/organisation.yaml
-docker compose run --rm app review  # exits 1: one gap and one conflict
-docker compose run --rm app ingest samples/organisation/confirmed.md
-docker compose run --rm app review
-docker compose run --rm app emit --out build/organisation
-```
-
-Re-ingestion preserves selected organisation references. Refresh them by supplying
-`--organisation` again; start an unrelated case with `--without-organisation`.
-Reference configurations constrain answers; they never silently supply them.
-
-### Pilot with another architect
-
-Use one local Compose project per client and keep the packet, selected references,
-question catalog and output contract together in your team's approved version control.
-A maintainer prepares the questions, reviewed OPA checks and variable mappings;
-architects edit the client answers and inspect the review. Engineers validate the
-handoff in their existing pipeline. Use its normal review/approval process: this
-tool records document evidence, not reviewer identity or sign-off.
-
-Start with the walkthrough above, then copy a packet for one small real integration.
-For each important requirement, record its source, owner and measurable acceptance
-condition. A requirement only blocks export if represented by an applicable question,
-executable policy or output contract. Prose such as "recover within four hours" is
-context until explicitly covered; a clean review is not enterprise readiness.
-Add [local GraphRAG questions](#ask-about-the-ingested-case-with-graphrag) after the
-deterministic flow is understood. The current Compose setup is for a local operator;
-it is not a shared service with per-client authentication and concurrent editing.
-
-## Integration contract
-
-### Ask about the ingested case with GraphRAG
-
-Start with the [organisation example](samples/organisation/README.md) in a dedicated
-Compose project with unused ports. Each project has its own data volume; ingestion
-replaces the selected project's case. Use two explicitly selected, already installed
-Ollama models: one for embeddings and one for answers. No models are downloaded.
-
-```bash
-export COMPOSE_PROJECT_NAME=iac-graphrag
-export NEO4J_BROWSER_PORT=37474 NEO4J_BOLT_PORT=37687
+export COMPOSE_PROJECT_NAME=iac-vpc
+export NEO4J_BROWSER_PORT=48474 NEO4J_BOLT_PORT=48687
 docker compose build app
-docker compose run --rm app ingest samples/organisation/client.md \
-  --organisation samples/organisation/organisation.yaml
-docker compose run --rm app index --embedding-model embeddinggemma:latest \
-  --base-url http://host.docker.internal:11434
-docker compose run --rm app ask \
-  "What remains undecided about connecting this estate to AWS?" \
-  --model qwen2.5:7b --base-url http://host.docker.internal:11434
-```
-
-Keep those environment variables for all commands in this walkthrough. `index`
-embeds the stored client statements and selected reference contents, including
-caller-supplied standards, preferences, policies or module contracts. It does not
-reread mutable host files. Re-ingestion removes the embeddings; run `index` again.
-Use the same embedding model/server for indexing and questions.
-
-The native Neo4j GraphRAG `VectorCypherRetriever` finds source statements and
-follows their evidence links to decisions and integrations. Its `GraphRAG` pipeline
-passes that context and deterministic findings to the local answer model. `ask`
-shows document answers with source lines and exact missing questions from the
-deterministic review before the advisory answer. Entered values can still conflict;
-they are not a policy pass. Retrieved evidence includes source paths, lines and
-hashes; `--json` includes the same facts and findings. This makes contradictions
-visible but does not validate the model's claims. Questions do not become confirmed
-answers or unblock export. Review refreshes policy assessments, while model output
-never writes facts.
-
-This experiment supports up to 500 source statements, each at most 4,000 characters.
-Prompts above 32,000 characters are rejected; reduce `--top-k` or narrow the case.
-It uses the library's candidate-pool control to search the small case, then sends
-the top four hits and their graph context to the model (`--top-k` can adjust this).
-An invented source identifier blocks the answer. A valid citation does not prove
-the claim is supported, and retrieval can still miss relevant evidence: inspect
-the returned sources. Index and ask are sequential operations; do not ingest or
-re-index concurrently. No model-generated Cypher is executed.
-
-To test a different scenario, change the supplied packet and selected references,
-ingest with `--organisation` to refresh them, re-index, and ask the same question.
-Evaluate changed evidence and answers, missing information, conflicts and output
-boundaries. Changing inputs must not require a scenario-specific retriever or a
-built-in module catalog. New executable checks and output mappings still require
-explicit reviewed contracts; reference text alone does not add that capability.
-Stop this example with `docker compose stop`; its data volume is retained.
-
-### GraphRAG and an existing Terraform module
-
-The image includes Neo4j GraphRAG 1.21.0. For host development, use
-`uv sync --extra dev --extra graphrag`. The example uses the installed Ollama model
-`qwen2.5:7b`; select another installed model explicitly if needed.
-
-```bash
-docker compose build app
-docker compose run --rm app ingest samples/vpc/requirements.md --without-organisation \
-  --catalog samples/vpc/decisions.yaml --extract-model qwen2.5:7b \
-  --base-url http://host.docker.internal:11434
-docker compose run --rm app review --catalog samples/vpc/decisions.yaml
-```
-
-`review` exits 1 while questions remain. It shows extracted systems and candidate
-answers with source quotes. Neo4j GraphRAG's schema-guided graph-builder extractor
-is reused directly; one small packet does not need an embedding model or vector
-index. This first slice accepts UTF-8 text/Markdown up to 32,000 characters of
-statements. The upstream schema pruner discards unsupported graph items with
-warnings in review. Invalid evidence or malformed extraction fails before graph
-replacement. Correct JSON and matching quotes do not establish semantic accuracy;
-the architect still reviews proposals and relationships.
-
-The architect confirms or corrects answers in the document using `decision: value`
-lines, then ingests it again. This explicit record, not the model's proposal, feeds
-configuration. The completed synthetic example demonstrates that step:
-
-```bash
+docker compose run --rm app ingest samples/vpc/requirements.md \
+  --without-organisation --catalog samples/vpc/decisions.yaml
+docker compose run --rm app review  # expected exit 1: four questions need explicit answers
 docker compose run --rm app ingest samples/vpc/confirmed.md \
   --catalog samples/vpc/decisions.yaml
-docker compose run --rm app emit-tfvars --catalog samples/vpc/decisions.yaml \
+docker compose run --rm app emit-tfvars \
   --contract samples/vpc/module-inputs.json --out build/vpc
+docker compose stop
 ```
 
 This writes `terraform.tfvars.json` and `decision-trace.json` for four inputs of
 [`terraform-aws-modules/vpc/aws` 6.7.3](https://github.com/terraform-aws-modules/terraform-aws-vpc/tree/v6.7.3):
-name, CIDR, availability zones, and private subnet CIDRs. The contract is a small
-reviewed input subset, not a claim of complete network design. It uses JSON Schema
-plus `x-decision` mappings and `x-module` provenance; it performs no remote schema
-fetches. Unmapped, unanswered, conflicting, or incorrectly typed inputs block export.
+name, CIDR, availability zones and private subnet CIDRs. The
+[contract](samples/vpc/module-inputs.json) uses `x-decision` mappings and `x-module`
+provenance. Missing mappings, unanswered or conflicting decisions and invalid
+values block export. No schema is fetched remotely.
 
-The consuming root module must declare these variables and pass them to its VPC
-module call. Other module settings retain the consumer's chosen values/defaults.
-Upstream requires Terraform >= 1.0 and AWS provider >= 6.28. Providers, backend,
-subnet/routing validation, and plan review belong to that consumer; this tool runs
-no Terraform command, generates no resource definitions, and handles no state.
-The existing `scan` command checks LZA output, not Terraform variable files.
+The consuming root module declares and passes these variables. It owns other
+module settings, providers, backend, network validation and plan review. This is
+a reviewed input subset, not complete module coverage. No resources are generated,
+no Terraform command runs, and no state is handled.
 
-### LZA output
+## Optional scans
 
-| Output | Consumer |
-| --- | --- |
-| Six `*-config.yaml` files | The owner's LZA **1.16.3** configuration repository, after review and completion |
-| `decision-trace.yaml` | Stated answers, evidence, reference hashes, policy assessments, and remaining integration work |
+`docker compose run --rm app scan build/quickstart` rechecks LZA schemas and runs
+OPA, Checkov secrets and Trivy checks. It does not scan Terraform variable output.
+Checkov and Trivy are not bundled; install them separately for host use
+(`brew install opa checkov trivy` on macOS). See [host setup](CONTRIBUTING.md#local-checks).
 
-Schemas are bundled and validated offline. There are no AWS lookups, credentials,
-or downloads during validation. A different LZA version requires an explicit
-contract update; there is no automatic version fallback or baseline selector.
+Missing tools report `not-installed`; no evidence of assessed checks reports
+`not-assessed`. Either makes a scan incomplete, even if OPA passes. The sample LZA
+YAML can produce zero assessed checks in Checkov and Trivy. Each result states its
+coverage; a secret scan without findings is not proof of a complete assessment.
 
-The network output is a foundation skeleton. Owners must complete routes,
-subnets, attachments, DNS, and inspection. To carry their network file into a new
-bundle without recreating the skeleton:
-
-```bash
-uv run iac-llm-wrapper emit --out build/lza \
-  --network-config ../owner-lza-config/network-config.yaml
-uv run iac-llm-wrapper scan build/lza
-```
-
-Keep the owner file outside the generated output directory. Its configuration
-data is preserved and schema-checked; the trace records its path and SHA-256.
-The packet's home region, host/CIDR, and topology must match. Detailed routing and
-cross-file validation still run in the owner's LZA pipeline.
-
-Identity mappings currently support
-AWS-managed policies explicitly named in the packet; owners verify availability
-and connect their identity provider. Data classification, approved data/backup
-regions, recovery objectives, and the application owner travel in the trace;
-this tool does not provision workload databases, backups, or applications.
-
-Keep each packet to one shared workload scope. Different residency or
-recovery requirements need separate design review; this is not yet a per-asset
-architecture model. The bundled banking packet is an illustrative example.
-
-The integration context always says `requires-owner-validation`. The consuming pipeline runs
-the matching LZA validator, reviews synthesized changes, and owns deployment.
-Schema success means the configuration has the expected shape, not that the
-architecture is complete. Fixed emitter choices such as log retention and session
-duration also require owner review; the decision trace records catalog answers.
-
-Narrate the same review with a model. Provider and model are always explicit:
-
-```bash
-uv run iac-llm-wrapper review --llm ollama --model llama3.2:3b \
-  --base-url http://localhost:11434
-uv run iac-llm-wrapper review --llm openai --model gpt-4o-mini \
-  --base-url https://api.openai.com/v1 --api-key "$OPENAI_API_KEY"
-```
-
-Exit codes: `0` clean, `1` findings (open gaps, conflicts, or unsuccessful scans),
-`2` the command could not run.
-
-## Checks
-
-```bash
-uv run --locked --extra dev pytest
-uv run --locked --extra dev ruff check .
-uv run --locked --extra dev mypy
-NEO4J_PASSWORD=localdevpassword uv run --extra dev pytest tests/test_graph.py
-```
-
-The Neo4j tests wipe the database they connect to. Point them at the local
-development instance only.
-
-The policy is checked with OPA directly:
-
-```bash
-opa check --strict src/intent_engine/policy
-opa fmt --fail --list src/intent_engine/policy
-```
-
-`opa`, `checkov`, and `trivy` are external tools. When one is absent, `scan`
-reports `not-installed`. When a scanner provides no evidence of assessed checks,
-it reports `not-assessed`. Tool errors, missing tools, unassessed checks, and
-findings all make `scan` exit with code `1`.
-
-The current sample's LZA YAML can produce zero assessed checks in Checkov and
-Trivy. Such a scan is incomplete even when OPA passes. A secret scan without
-findings does not necessarily report which files it assessed. A passing schema or
-policy check alone is not a deployment-readiness claim.
-
-## Scope
-
-In: decision capture, gap and conflict detection, AWS LZA configuration output,
-policy and secret scanning of that output.
-
-Out: deploying anything, generating Terraform, holding credentials, owning state,
-approvals, or drift.
+CLI exit codes: `0` clean, `1` review findings or unsuccessful scans, `2` blocked
+export or a command failure. Use `docker compose run --rm app COMMAND --help`
+for options. Stop the database after optional commands with `docker compose stop`.
 
 ## Contributing
 
-Fork the repository, make a focused change, run the checks above, and open a pull
-request explaining the problem and how you verified the fix. Include a regression
-test for behavior changes. Graph tests require the local Neo4j instance; policy
-changes require OPA.
-
-Add a catalog decision or conflict rule when a concrete use case needs it. Keep
-the deterministic review and optional AI agenda separate, and keep deployment in
-the consuming pipeline. Use sanitized examples in issues and tests.
-
-Reuse native Neo4j/Cypher, GraphRAG, OPA, and JSON Schema capabilities before adding
-custom code. Keep custom wiring limited to demonstrated gaps, source evidence,
-human confirmation, and supported output mappings. Do not maintain a separate
-speculative ontology or review roadmap alongside the implementation.
+[CONTRIBUTING.md](CONTRIBUTING.md) covers setup, isolated tests and pull requests.
+Start with an observed problem or small sanitised case. Keep evidence, human
+confirmation and explicit output contracts; reuse existing tools before adding
+custom code. The [code map](AGENTS.md#code-map) shows where changes belong.
 
 ## License
 
-Copyright 2026 Cemreoguz Ersahin. Licensed under the [Apache License 2.0](LICENSE).
-Contributions are accepted under the same license.
+Copyright 2026 Cemreoguz Ersahin. [Apache License 2.0](LICENSE).
 Bundled LZA schemas retain their [upstream notices](src/intent_engine/schemas/NOTICE.txt).

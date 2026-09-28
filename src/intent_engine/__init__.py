@@ -1,9 +1,4 @@
-"""Knowledge-graph capture of requirements and architecture decisions.
-
-Ingest a document, hold requirements and decisions in Neo4j, surface gaps and
-conflicts deterministically, then emit configuration for an existing AWS
-accelerator. Deployment stays with the owner's pipeline.
-"""
+"""Sourced architecture review and configuration inputs; nothing deploys."""
 
 from __future__ import annotations
 

@@ -24,7 +24,7 @@ from .emit import EmitBlocked, emit_bundle, resolve
 from .extraction import extract_architecture
 from .graph import GraphConfig, GraphEmpty, GraphUnavailable, KnowledgeGraph
 from .ingest import IngestError, extract_facts, read_document
-from .llm import LlmConfig, LlmError, deterministic_questions, narrate
+from .llm import LlmConfig, LlmError, narrate
 from .models import Decision, Review
 from .organisation import load_organisation, organisation_catalog
 from .rag import ask_case, index_case
@@ -282,6 +282,8 @@ def _render(result: Review, decisions: dict[str, Decision]) -> None:
             default = f"  [default available: {gap.default}]" if gap.default else ""
             blocks = f"  [blocks: {', '.join(gap.blocks)}]" if gap.blocks else ""
             typer.echo(f"  - {gap.decision_key}: {gap.question}{default}{blocks}")
+            if hint := decisions[gap.decision_key].hint:
+                typer.echo(f"      hint: {hint}")
             for evidence in gap.evidence:
                 typer.echo(f"      evidence: {evidence}")
     if result.conflicts:
@@ -292,10 +294,6 @@ def _render(result: Review, decisions: dict[str, Decision]) -> None:
                 typer.echo(f"      evidence: {line}")
     if result.clean:
         typer.secho("\nno gaps, no conflicts", fg=typer.colors.GREEN)
-    else:
-        typer.echo("\nquestions to take to the client:")
-        for line in deterministic_questions(result, decisions):
-            typer.echo(f"  - {line}")
 
 
 def _render_context(result: Review) -> None:
@@ -304,9 +302,7 @@ def _render_context(result: Review) -> None:
         for system in result.organisation.systems:
             typer.echo(f"  {system.lifecycle}: {system.name}")
         for assessment in result.assessments:
-            typer.echo(
-                f"  policy {assessment.policy_id}: {assessment.status} — {assessment.message}"
-            )
+            typer.echo(f"  policy {assessment.policy_id}: {assessment.status}")
     if result.integration_context:
         typer.echo("\nIntegration work for the consuming teams:")
         layers = result.integration_context.get("layers", {})

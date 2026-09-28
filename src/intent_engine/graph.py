@@ -61,7 +61,13 @@ class KnowledgeGraph:
         if not config.password:
             raise GraphUnavailable("NEO4J_PASSWORD is not set; refusing to connect anonymously")
         try:
-            driver: Driver = GraphDatabase.driver(config.uri, auth=(config.user, config.password))
+            driver: Driver = GraphDatabase.driver(
+                config.uri,
+                auth=(config.user, config.password),
+                # Internal queries expect absent optional fields; silence query advisories.
+                # Authentication, connection and query errors still raise normally.
+                notifications_min_severity="OFF",
+            )
         except (ValueError, ConfigurationError) as exc:
             raise GraphUnavailable(f"{config.uri}: not a usable Bolt URI: {exc}") from exc
 

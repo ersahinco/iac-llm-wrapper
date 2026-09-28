@@ -65,8 +65,20 @@ assessment or a substitute for downstream LZA validation.
 
 ## See the graph
 
-Open [Neo4j Browser](http://localhost:7474/browser/), connect to
-`bolt://localhost:7687`, user `neo4j`, local example password `localdevpassword`.
+Use the same `COMPOSE_PROJECT_NAME`, `NEO4J_BROWSER_PORT` and `NEO4J_BOLT_PORT`
+settings as ingestion. If you stopped the example, start it again and check its
+published addresses:
+
+```bash
+docker compose up -d --wait neo4j
+docker compose port neo4j 7474
+docker compose port neo4j 7687
+```
+
+Open `http://<first address>/browser/` and connect to `bolt://<second address>`.
+For the root README quickstart, these are [Neo4j Browser](http://localhost:18474/browser/)
+and `bolt://localhost:18687`; without port overrides they are 7474 and 7687.
+Use user `neo4j` and local example password `localdevpassword`.
 Run `review` first to update decision and policy statuses, then use this focused
 query (the full database also holds every source statement):
 

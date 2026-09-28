@@ -1,10 +1,7 @@
 """Neo4j-backed tests.
 
-Skipped unless NEO4J_PASSWORD is set. These wipe the target database, so point
-them at the local development instance only:
-
-    docker compose up -d
-    NEO4J_PASSWORD=localdevpassword uv run --extra dev pytest tests/test_graph.py
+Skipped unless NEO4J_PASSWORD is set. These wipe the target database;
+use the dedicated test project described in CONTRIBUTING.md.
 """
 
 from __future__ import annotations
@@ -39,6 +36,16 @@ def _ingest(graph, catalog, path):
     facts = extract_facts(document, catalog)
     graph.replace(catalog, document, facts)
     return document, facts
+
+
+def test_query_advisories_are_quiet_but_query_errors_still_fail(graph, caplog):
+    from intent_engine.graph import GraphUnavailable
+
+    with caplog.at_level("WARNING", logger="neo4j.notifications"):
+        assert graph._run("MATCH (n:AbsentOptionalSystem) RETURN n") == []
+    assert not [r for r in caplog.records if r.name == "neo4j.notifications"]
+    with pytest.raises(GraphUnavailable, match="query failed"):
+        graph._run("RETURN 1 +")
 
 
 def test_extracted_candidate_has_evidence_but_does_not_answer_gap(graph, catalog, tmp_path):
