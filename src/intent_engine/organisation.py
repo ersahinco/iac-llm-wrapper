@@ -193,5 +193,5 @@ def policy_conflicts(
             ],
         )
         for result in assessments
-        if result.status != "passed"
+        if result.status in {"conflict", "not-assessed"}
     ]

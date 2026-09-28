@@ -1,0 +1,39 @@
+name: Synthetic workload review
+references:
+  - {id: estate, path: estate.yaml, kind: configuration}
+  - {id: workload-policy, path: policy.rego, kind: policy}
+systems: []
+integrations: []
+questions:
+  - key: routing_domain
+    label: Routing domain
+    category: network
+    type: string
+    question: Which reviewed routing domain will this VPC join?
+  - key: environment
+    label: Environment
+    category: compute
+    type: enum
+    options: [development, production]
+    question: Which environment will run this workload?
+  - key: instance_type
+    label: Instance type
+    category: compute
+    type: string
+    question: Which instance type has the workload owner requested?
+    hint: Policy checks the environment allowlist; it does not establish capacity or availability.
+  - key: detailed_monitoring
+    label: Detailed monitoring
+    category: security
+    type: bool
+    question: Should the instance have detailed monitoring?
+policies:
+  - id: existing-networks
+    decision_keys: [network_cidr, routing_domain]
+    evidence: {reference: workload-policy, line: 3, quote: 'New VPCs must not overlap allocations in the selected routing domain.'}
+  - id: instance-size
+    decision_keys: [environment, instance_type]
+    evidence: {reference: workload-policy, line: 4, quote: 'Instance types follow the environment allowlist; scoped exceptions remain warnings.'}
+  - id: monitoring
+    decision_keys: [detailed_monitoring]
+    evidence: {reference: workload-policy, line: 5, quote: 'Disabled detailed monitoring is an advisory discussion item.'}

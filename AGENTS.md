@@ -36,7 +36,7 @@ Terraform, calls AWS APIs or needs cloud credentials.
 - **Human answers.** Only explicit document answers become Facts. Account root
   emails are owner input. References and extracted System/Candidate proposals
   never become answers automatically. The catalog contains decisions only.
-- **Advisory models.** Extraction and narration require explicit provider/model
+- **Advisory models.** Extraction and retrieval require explicit model/endpoint
   choices, with no fallback. Preserve the small async Ollama adapter while upstream
   GraphRAG misroutes model parameters; it retains native JSON Schema format.
 - **Advisory retrieval.** `index` embeds the stored snapshot; `ask` uses native
@@ -47,13 +47,17 @@ Terraform, calls AWS APIs or needs cloud credentials.
 - **Scoped policy.** OPA's `data.organisation.assessments` must return one assessment
   per selected policy. Missing tools, malformed/undefined output or missing coverage
   are `not-assessed` and block export. Retain evidence and input/document/reference
-  hashes. Reassess resolved values before emission.
+  hashes. Reassess resolved values before emission. Explicit `warning` assessments
+  remain visible in review/export/trace and do not block; the model cannot downgrade findings.
 - **Fail-closed export.** Gaps, conflicts and invalid contracts block output.
   Defaults require `--allow-defaults` and `origin: default` in the trace. Preserve
-  owner files and do not overwrite unrelated output files.
+  owner files. Exports require unused destinations, reject symlinks and never
+  overwrite earlier output; use a fresh output directory for each revision.
 - **Honest coverage.** Missing scanners report `not-installed`; no assessed checks
   means `not-assessed`. Neither is a pass. Schema validation proves shape, not
-  connectivity, federation, recovery or deployment readiness.
+  connectivity, federation, recovery or deployment readiness. Keep Checkov/Trivy
+  adapters: security findings are advisory by default, `scan --strict` gates open
+  findings, and reported native exceptions stay visible with their reasons.
 - **Owner execution.** Integration context remains `requires-owner-validation`.
   The owner's pipeline keeps deployment, approvals and drift decisions. Terraform
   output is variable JSON only: no resources, state or execution.
@@ -70,12 +74,12 @@ src/intent_engine/
   organisation.py  reference snapshots and scoped OPA assessment
   graph.py         Neo4j schema, atomic replacement and queries
   analysis.py      applicability and named conflict rules
-  llm.py           optional narration of deterministic review
   emit.py          LZA configuration and decision trace
+  output.py        shared exclusive bundle creation; no replacement of existing files
   contract.py      offline validation against pinned LZA 1.16.3 schemas
   tfvars.py        confirmed values mapped through a JSON Schema contract
   schemas/         unchanged upstream schemas and notices
-  scan.py          OPA, Checkov and Trivy over LZA output
+  scan.py          LZA shape/OPA and advisory Checkov/Trivy over owner IaC
   policy/lza.rego  landing-zone policy
   cli.py           ingest, status, review, index, ask, emit, emit-tfvars, scan
 samples/           synthetic organisation, banking and VPC inputs
@@ -92,54 +96,49 @@ an observed need.
 
 ### Current outcome
 
-- Guided local prototype with sourced gap/conflict review, architect-confirmed
-  answers, six LZA 1.16.3 files plus a trace, or explicitly mapped module variables
-  plus a trace. Hybrid networking and Entra ID remain integration context.
-- Input-only scenario changes were exercised with Entra/Okta references and a
-  synthetic factory case using a custom catalog, retention policy and input
-  contract. No scenario-specific retriever or module catalog was added.
-- Live Ollama embeddinggemma and qwen2.5:7b integration works, but answers have
-  falsely called a stated CIDR missing and described evidenced systems as unclear.
-  Citations do not resolve this. Automated model responses are controlled;
-  independent user feedback and live semantic reliability remain unproven.
-- Retrieval is bounded to 500 statements, 4,000 characters per statement and 32,000
-  prompt characters. Selected references use reviewed links. No automatic policy
-  translation, enterprise discovery, shared-service isolation or authenticated
-  reviewer sign-off.
+- Guided local prototype: sourced gap/conflict review, explicit architect answers,
+  six LZA 1.16.3 files plus a trace, or mapped module variables plus a trace.
+  Hybrid networking and Entra ID remain integration context.
+- Network consistency now rejects malformed/noncanonical CIDRs, peer subnet
+  overlaps, subnets outside their VPC and subnet/zone count mismatch. The scoped
+  VPC workload example adds existing allocation checks by routing domain,
+  environment instance allowlists, evidenced exceptions and monitoring advice.
+  VPC and EC2 module contracts export separate reviewed subsets, not deployed resources.
+- Checkov and Trivy are retained for architecture discussions. `review --scan`
+  accepts owner IaC; findings are warnings, reported native exceptions remain
+  visible, and missing/error/unassessed scans are unsuccessful. `scan --strict`
+  additionally fails on open findings. LZA schema failures stay blocking.
+- Exports never replace existing destinations. One shared writer validates all
+  destinations and creates files exclusively. `review` is deterministic; `ask`
+  replaces the separate narration path. Removed the requests runtime dependency
+  and duplicate graph fact reads. Design boundaries: `docs/design.md`.
+- Live Ollama embeddinggemma and qwen2.5:7b previously produced incorrect answers
+  despite valid citations. Live semantic reliability and independent architect
+  feedback remain unproven. Retrieval remains bounded to 500 statements, 4,000
+  characters per statement and 32,000 prompt characters.
+- No live estate discovery, automatic CIDR allocation, capacity recommendation,
+  concurrent editing, automatic policy translation or authenticated exception sign-off.
 
 ### Latest verification
 
-- Published commit `f64f226` passed all five CI jobs (run `36319150998`). The fresh
-  clone walkthrough passed as an informed self-test, not independent human testing.
-- First-use fixes quiet native query notifications while preserving
-  connection/query errors; show each text-review finding once with evidence/hints;
-  discover graph-view ports from the active Compose project. JSON and export gates
-  are unchanged. All **175 tests passed without skips** on 2026-09-27 using isolated
-  Neo4j and OPA; Ruff, mypy and strict OPA checks passed. Host Python 3.14 emits
-  upstream Neo4j deprecation warnings.
-- Rebuilt Compose verified blocked export, reference reuse after correction,
-  seven-file output and visible bad-login failure. Evidence: ignored
-  `build/usability-fixes/`; fresh-clone results: `build/colleague-test/self-test/`.
-  Input variation and live-model findings: `build/enterprise-review/`,
-  `build/graphrag-evaluation/` and `build/graphrag-walkthrough/`.
-- Project test containers are stopped, volumes retained. Do not remove saved
-  cases or touch unrelated services during housekeeping.
-- 2026-09-28 housekeeping consolidates contributor setup, removes repeated README
-  instructions and historical session notes, and aligns project descriptions.
-  The pre-cleanup working files are retained locally in ignored
-  `build/repo-housekeeping/before/`. No runtime logic or dependencies changed.
-- GitHub About now describes sourced review, GraphRAG and supported configuration
-  inputs; the `graphrag` topic was added. The documented local check passed 153
-  tests with 22 database tests deliberately skipped. Ruff, mypy, OPA, local
-  links/anchors, shell examples, CLI help and locked
-  package metadata passed. The quickstart commands are unchanged; contributor
-  Compose isolation was checked without starting services. Existing fixes were
-  compared with the saved working files and preserved.
-- The user authorised committing and pushing the first-use fixes and housekeeping
-  together on 2026-09-28. Generated evidence and saved cases remain ignored;
-  check GitHub for the resulting commit's CI status.
+- 2026-09-28: all 217 tests passed without skips on isolated Compose project
+  `iac-lean-20260928` (ports 58474/58687), with real Neo4j and OPA. Ruff, mypy and
+  strict OPA checks passed. Python 3.14 emits upstream Neo4j deprecation warnings.
+- Real Checkov 3.3.10 and Trivy scans of synthetic owner IaC reported security
+  findings and retained scoped exception reasons. Checkov's quiet JSON mode hid
+  skipped details, so the adapter no longer uses it. Trivy inline suppressions can
+  be absent from reports; the demonstrated `.trivyignore.yaml` preserves reasons.
+- Rebuilt Compose passed 13 sequential walkthrough steps: blocked inputs,
+  reference reuse, LZA output, refusal to overwrite, corrected scoped policy and
+  separate VPC/instance exports with warnings. The real combined `review --scan`
+  returned zero blockers while showing both policy and native scanner warnings.
+- Locked installation/local checks passed 194 tests with 23 database tests skipped.
+  Local Markdown links and CLI help passed. Evidence is ignored under
+  `build/security-discussion/`. Earlier saved graphs and unrelated services were
+  not changed. The isolated test project is stopped at session end; its volume is retained.
+- The user authorised implementation, tests, commit and push for these changes.
 
 ### Next
 
 Try one small sanitised client integration with an architect. Record observed
-friction and uncovered requirements before adding functionality.
+friction and missing requirements before adding further capabilities.

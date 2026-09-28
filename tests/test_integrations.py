@@ -10,7 +10,6 @@ from intent_engine.catalog import load_catalog
 from intent_engine.emit import EmitBlocked, resolve
 from intent_engine.extraction import build_architecture, extract_architecture, validate_architecture
 from intent_engine.ingest import IngestError, extract_facts, read_document
-from intent_engine.llm import build_prompt
 from intent_engine.models import Architecture, Review
 from intent_engine.tfvars import emit_tfvars
 
@@ -171,12 +170,3 @@ def test_invalid_module_contract_blocks_before_writing(tmp_path, change):
     with pytest.raises(EmitBlocked):
         emit_tfvars(resolution, review, contract, tmp_path / "output")
     assert not (tmp_path / "output").exists()
-
-
-def test_discussion_prompt_includes_values_and_unconfirmed_context(proposal):
-    _, review = vpc_resolution()
-    review = review.model_copy(update={"architecture": Architecture.model_validate(proposal)})
-    prompt = build_prompt(review, load_catalog(VPC / "decisions.yaml"))
-    assert '"value": "10.42.0.0/16"' in prompt
-    assert "unconfirmed_architecture" in prompt
-    assert "The approved VPC address range" in prompt

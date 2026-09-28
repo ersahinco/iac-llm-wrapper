@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from ipaddress import ip_network
+from itertools import combinations
 from typing import Any
 
 from .catalog import coerce
@@ -132,7 +133,7 @@ def _rule_network_cidr(values: dict[str, Any]) -> list[Conflict]:
     if not isinstance(cidr, str):
         return []
     try:
-        network = ip_network(cidr, strict=False)
+        network = ip_network(cidr)
     except ValueError:
         return [
             Conflict(
@@ -150,6 +151,58 @@ def _rule_network_cidr(values: dict[str, Any]) -> list[Conflict]:
             decision_keys=["network_cidr"],
         )
     ]
+
+
+def _rule_private_subnets(values: dict[str, Any]) -> list[Conflict]:
+    """Peer subnets must be valid, disjoint and contained in their parent VPC."""
+    subnets = values.get("private_subnets")
+    if not subnets:
+        return []
+    networks = []
+    conflicts: list[Conflict] = []
+    for cidr in subnets:
+        try:
+            networks.append(ip_network(cidr))
+        except ValueError:
+            conflicts.append(
+                Conflict(
+                    code="SUBNET_CIDR_MALFORMED",
+                    message=f"private subnet '{cidr}' is not a canonical IPv4/IPv6 network",
+                    decision_keys=["private_subnets"],
+                )
+            )
+    try:
+        parent = ip_network(values.get("network_cidr", ""))
+    except ValueError:
+        parent = None  # The missing/invalid parent has its own finding.
+    for subnet in networks:
+        if parent and not (subnet.network_address in parent and subnet.broadcast_address in parent):
+            conflicts.append(
+                Conflict(
+                    code="SUBNET_OUTSIDE_VPC",
+                    message=f"private subnet {subnet} is outside VPC {parent}",
+                    decision_keys=["private_subnets", "network_cidr"],
+                )
+            )
+    for first, second in combinations(networks, 2):
+        if first.version == second.version and first.overlaps(second):
+            conflicts.append(
+                Conflict(
+                    code="SUBNET_CIDR_OVERLAP",
+                    message=f"private subnets {first} and {second} overlap",
+                    decision_keys=["private_subnets"],
+                )
+            )
+    zones = values.get("availability_zones")
+    if zones and len(zones) != len(subnets):
+        conflicts.append(
+            Conflict(
+                code="SUBNET_ZONE_COUNT",
+                message="provide one private subnet per availability zone, in the same order",
+                decision_keys=["private_subnets", "availability_zones"],
+            )
+        )
+    return conflicts
 
 
 def _rule_overlay_logging(values: dict[str, Any]) -> list[Conflict]:
@@ -378,6 +431,7 @@ _RULES: tuple[Callable[[dict[str, Any]], list[Conflict]], ...] = (
     _rule_home_region,
     _rule_network_account_scope,
     _rule_network_cidr,
+    _rule_private_subnets,
     _rule_overlay_logging,
     _rule_overlay_detection,
     _rule_assignments,

@@ -113,7 +113,7 @@ claim is supported. Live tests have produced incorrect statements despite matchi
 citations. Inspect the sources; model answers never supply confirmed facts or
 unblock export. No model-generated Cypher is executed.
 
-### Extract proposals or narrate a review
+### Extract proposals
 
 `ingest DOCUMENT --extract-model YOUR_MODEL --base-url http://host.docker.internal:11434`
 adds sourced System/Candidate proposals through Neo4j GraphRAG's schema-guided
@@ -122,19 +122,15 @@ needs no vector index. Invalid evidence fails before graph replacement; unsuppor
 items are pruned with warnings. Architects confirm answers in the document and
 re-ingest. Matching quotes and valid JSON do not establish semantic accuracy.
 
-To turn the deterministic review into a discussion agenda:
-
-```bash
-docker compose run --rm app review --llm ollama --model YOUR_MODEL \
-  --base-url http://host.docker.internal:11434
-docker compose stop
-```
-
-Provider and model are always explicit. `review --help` also documents the
-OpenAI-compatible provider options; only use an external endpoint approved for
-the case's data.
+`review` itself supplies the questions and evidence for a discussion; use `ask`
+for model-assisted exploration. The former `review --llm` narration path has been
+removed so there is one model-answer workflow. Models and endpoints remain explicit.
 
 ## Output contracts
+
+Exports create new files only. Use a fresh output directory for each revision;
+existing files, directories at file destinations and symlinks are refused before
+writing. Owner files and earlier bundles stay intact.
 
 ### AWS Landing Zone Accelerator
 
@@ -196,35 +192,70 @@ This writes `terraform.tfvars.json` and `decision-trace.json` for four inputs of
 name, CIDR, availability zones and private subnet CIDRs. The
 [contract](samples/vpc/module-inputs.json) uses `x-decision` mappings and `x-module`
 provenance. Missing mappings, unanswered or conflicting decisions and invalid
-values block export. No schema is fetched remotely.
+values block export. Native subnet checks reject malformed or noncanonical CIDRs,
+subnets outside their VPC, peer overlaps and mismatched subnet/zone counts.
+No schema is fetched remotely.
+
+The [workload policy walkthrough](samples/vpc/README.md) adds routing-domain
+allocation checks, environment-specific instance allowlists, recorded exceptions
+and advisory monitoring warnings. It also exports two mapped inputs for the pinned
+EC2 instance module. These are selected input policies, not live inventory or
+capacity recommendations.
 
 The consuming root module declares and passes these variables. It owns other
-module settings, providers, backend, network validation and plan review. This is
+module settings, providers, backend, routing validation and plan review. This is
 a reviewed input subset, not complete module coverage. No resources are generated,
 no Terraform command runs, and no state is handled.
 
-## Optional scans
+## Security discussion and scans
 
-`docker compose run --rm app scan build/quickstart` rechecks LZA schemas and runs
-OPA, Checkov secrets and Trivy checks. It does not scan Terraform variable output.
-Checkov and Trivy are not bundled; install them separately for host use
-(`brew install opa checkov trivy` on macOS). See [host setup](CONTRIBUTING.md#local-checks).
+Checkov and Trivy inspect owner-supplied IaC for common security issues. Install
+both on the host (`brew install opa checkov trivy` on macOS) and use the
+[host environment](CONTRIBUTING.md#local-checks). The Compose app includes OPA
+but does not bundle these two scanners.
 
-Missing tools report `not-installed`; no evidence of assessed checks reports
-`not-assessed`. Either makes a scan incomplete, even if OPA passes. The sample LZA
-YAML can produce zero assessed checks in Checkov and Trivy. Each result states its
-coverage; a secret scan without findings is not proof of a complete assessment.
+```bash
+# Uses the Neo4j connection variables for the currently selected case.
+uv run --locked --extra dev --extra graphrag iac-llm-wrapper review --scan PATH_TO_OWNER_IAC
+uv run --locked --extra dev --extra graphrag iac-llm-wrapper scan PATH_TO_OWNER_IAC
+uv run --locked --extra dev --extra graphrag iac-llm-wrapper scan PATH_TO_OWNER_IAC --strict
+```
 
-CLI exit codes: `0` clean, `1` review findings or unsuccessful scans, `2` blocked
-export or a command failure. Use `docker compose run --rm app COMMAND --help`
-for options. Stop the database after optional commands with `docker compose stop`.
+Security findings are advisory warnings by default. `--strict` makes open scan
+findings return exit 1 for pipeline use. Native exceptions reported by Checkov and
+Trivy remain visible, including their reasons when provided. Prefer scoped Checkov
+inline exceptions and a `.trivyignore.yaml` in the scanned directory; its statement
+should identify the owner's decision and rationale. Scanners can omit inline
+suppressions from their reports, so a missing exception entry does not prove there
+are none. This tool neither grants nor authenticates an exception.
+
+`scan build/quickstart` additionally checks all six LZA schemas and the bundled OPA
+artifact policy. Schema failures remain blocking. Selected organisation policies
+are assessed by `review` and reassessed on export: `conflict` and `not-assessed`
+block; explicit `warning` outcomes remain visible in review, export and the trace.
+A policy author can use that outcome for advice or a scoped, evidenced exception.
+
+Missing tools report `not-installed`; no assessed checks reports `not-assessed`.
+Failures and incomplete coverage return exit 1 even without `--strict`. Neither
+LZA YAML nor standalone tfvars establishes resource security coverage; scan the
+consuming IaC too. Checkov is scoped to Terraform, CloudFormation, Kubernetes,
+Dockerfile and secrets. Trivy runs secret/misconfiguration checks. Neither tool
+runs Terraform or contacts AWS. Checkov module downloads and Trivy check updates
+are disabled during scans; owners maintain scanner versions and checks separately.
+
+`review --scan` includes a separate `security_scans` array in JSON. Artifact scans
+are current directory observations, not stored client facts or automatic export
+approvals. CLI exit codes: `0` no blockers (warnings may remain), `1` review blockers,
+incomplete scans or strict scan findings, `2` blocked export or command failure.
+Use `COMMAND --help` for options and stop Compose with `docker compose stop`.
 
 ## Contributing
 
 [CONTRIBUTING.md](CONTRIBUTING.md) covers setup, isolated tests and pull requests.
 Start with an observed problem or small sanitised case. Keep evidence, human
 confirmation and explicit output contracts; reuse existing tools before adding
-custom code. The [code map](AGENTS.md#code-map) shows where changes belong.
+custom code. The [design guide](docs/design.md) explains the boundaries and extension points;
+the [code map](AGENTS.md#code-map) shows where changes belong.
 
 ## License
 

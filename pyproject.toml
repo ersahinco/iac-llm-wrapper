@@ -23,7 +23,6 @@ dependencies = [
     "pydantic>=2.13.4,<3",
     "typer>=0.27.0,<1",
     "ruamel.yaml>=0.19.1,<0.20",
-    "requests>=2.34.2,<3",
     "neo4j>=5.28.3,<6",
     "jsonschema>=4.23,<5",
 ]

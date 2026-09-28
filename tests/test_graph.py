@@ -48,6 +48,88 @@ def test_query_advisories_are_quiet_but_query_errors_still_fail(graph, caplog):
         graph._run("RETURN 1 +")
 
 
+def test_workload_warnings_and_exceptions_survive_review_and_export(graph, tmp_path, monkeypatch):
+    from pathlib import Path
+
+    from intent_engine.scan import ToolResult
+
+    sample = Path(__file__).resolve().parents[1] / "samples" / "vpc"
+    runner = CliRunner()
+    catalog_args = ["--catalog", str(sample / "decisions.yaml")]
+    initial = runner.invoke(
+        app,
+        [
+            "ingest",
+            str(sample / "client-policy.md"),
+            *catalog_args,
+            "--organisation",
+            str(sample / "organisation.yaml"),
+        ],
+    )
+    assert initial.exit_code == 0, initial.output
+    blocked = runner.invoke(app, ["review", "--json"])
+    assert blocked.exit_code == 1, blocked.output
+    findings = json.loads(blocked.stdout)
+    assert "security_scans" not in findings  # Ordinary review JSON retains its original shape.
+    assert len(findings["conflicts"]) == 3
+    assert any(c["code"] == "SUBNET_CIDR_OVERLAP" for c in findings["conflicts"])
+    assert (
+        runner.invoke(
+            app,
+            [
+                "emit-tfvars",
+                "--contract",
+                str(sample / "instance-inputs.json"),
+                "--out",
+                str(tmp_path / "blocked"),
+            ],
+        ).exit_code
+        == 2
+    )
+    assert not (tmp_path / "blocked").exists()
+    assert (
+        runner.invoke(app, ["ingest", str(sample / "confirmed-policy.md"), *catalog_args]).exit_code
+        == 0
+    )
+    reviewed = runner.invoke(app, ["review"])
+    assert reviewed.exit_code == 0, reviewed.output
+    assert "warning [instance-size]" in reviewed.stdout
+    assert "EXAMPLE-42" in reviewed.stdout
+    assert "warning [monitoring]" in reviewed.stdout
+    for contract, directory in (
+        ("module-inputs.json", "vpc"),
+        ("instance-inputs.json", "instance"),
+    ):
+        emitted = runner.invoke(
+            app,
+            [
+                "emit-tfvars",
+                "--contract",
+                str(sample / contract),
+                "--out",
+                str(tmp_path / directory),
+            ],
+        )
+        assert emitted.exit_code == 0, emitted.output
+        assert "EXAMPLE-42" in emitted.stdout
+        trace = json.loads((tmp_path / directory / "decision-trace.json").read_text())
+        assert sum(a["status"] == "warning" for a in trace["policyAssessments"]) == 2
+        assert all("output" not in value for value in trace["variables"].values())
+    assert json.loads((tmp_path / "instance" / "terraform.tfvars.json").read_text()) == {
+        "instance_type": "m5.large",
+        "monitoring": False,
+    }
+    monkeypatch.setattr(
+        "intent_engine.cli.scan_bundle",
+        lambda path: [
+            ToolResult("checkov", "findings", "static review", ["encryption warning"], ["ARCH-42"]),
+        ],
+    )
+    combined = runner.invoke(app, ["review", "--scan", str(tmp_path), "--json"])
+    assert combined.exit_code == 0, combined.output
+    assert json.loads(combined.stdout)["security_scans"][0]["exceptions"] == ["ARCH-42"]
+
+
 def test_extracted_candidate_has_evidence_but_does_not_answer_gap(graph, catalog, tmp_path):
     packet = tmp_path / "prose.md"
     packet.write_text("The planned VPC uses 10.42.0.0/16.\n")
@@ -236,9 +318,15 @@ def test_client_discussion_to_owner_handoff(sample_path, tmp_path, monkeypatch):
     with owner_file.open("w") as handle:
         yaml.dump(network, handle)
     original = owner_file.read_bytes()
+    previous_bundle = out
+    out = tmp_path / "bundle-revised"
     emitted = runner.invoke(app, ["emit", "--out", str(out), "--network-config", str(owner_file)])
     assert emitted.exit_code == 0, emitted.output
     assert owner_file.read_bytes() == original
+    assert (
+        yaml.load((previous_bundle / "network-config.yaml").read_text())["vpcs"][0]["routeTables"]
+        == []
+    )
     assert yaml.load((out / "network-config.yaml").read_text("utf-8")) == network
     handoff = yaml.load((out / "decision-trace.yaml").read_text("utf-8"))["integrationContext"]
     assert handoff["layers"]["network"]["source"]["origin"] == "owner-file"

@@ -14,6 +14,7 @@ from referencing.exceptions import Unresolvable
 
 from .emit import EmitBlocked, Resolution
 from .models import Review
+from .output import write_bundle
 
 
 def emit_tfvars(
@@ -57,10 +58,13 @@ def emit_tfvars(
             if name in values
         },
     }
-    out_dir.mkdir(parents=True, exist_ok=True)
-    for path, payload in zip(outputs, (values, trace), strict=True):
-        path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    return outputs
+    return write_bundle(
+        out_dir,
+        {
+            path.name: json.dumps(payload, indent=2) + "\n"
+            for path, payload in zip(outputs, (values, trace), strict=True)
+        },
+    )
 
 
 def _map_values(schema: Any, resolution: Resolution) -> dict[str, Any]:

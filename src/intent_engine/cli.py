@@ -2,18 +2,18 @@
 
 ingest   read a whole document into the knowledge graph (replaces it)
 status   show what the graph currently holds
-review   deterministic gaps and conflicts, optionally narrated by a model
+review   deterministic gaps, conflicts and advisory security findings
 index    embed the current case for local GraphRAG retrieval
 ask      retrieve evidence and answer an architecture question (advisory)
 emit     write AWS LZA configuration from accepted decisions
-scan     run OPA, Checkov, and Trivy over an emitted bundle
+scan     report security warnings over owner IaC or an emitted bundle
 """
 
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from pathlib import Path
-from typing import Any
 
 import typer
 
@@ -24,11 +24,10 @@ from .emit import EmitBlocked, emit_bundle, resolve
 from .extraction import extract_architecture
 from .graph import GraphConfig, GraphEmpty, GraphUnavailable, KnowledgeGraph
 from .ingest import IngestError, extract_facts, read_document
-from .llm import LlmConfig, LlmError, narrate
-from .models import Decision, Review
-from .organisation import load_organisation, organisation_catalog
+from .models import Assessment, Decision, Review
+from .organisation import evidence_text, load_organisation, organisation_catalog
 from .rag import ask_case, index_case
-from .scan import ScanError, scan_bundle
+from .scan import ScanError, ToolResult, scan_bundle
 from .tfvars import emit_tfvars
 
 app = typer.Typer(add_completion=False, help=__doc__)
@@ -53,10 +52,6 @@ def _graph(
             database=database or base.database,
         )
     )
-
-
-def _catalog(path: Path | None) -> dict[str, Decision]:
-    return load_catalog(path)
 
 
 _URI = typer.Option(None, "--uri", help="Neo4j bolt URI (default $NEO4J_URI).")
@@ -91,7 +86,7 @@ def ingest(
     try:
         if organisation and without_organisation:
             raise IngestError("choose --organisation or --without-organisation, not both")
-        base_catalog = _catalog(catalog)
+        base_catalog = load_catalog(catalog)
         parsed = read_document(document)
         with _graph(uri, user, password, database) as graph:
             # Corrections keep the selected reference snapshot unless explicitly refreshed.
@@ -177,8 +172,7 @@ def ask(
     typer.echo("\nDocument answers (may still have conflicts):")
     for fact in findings["facts"]:
         typer.echo(
-            f"  {fact['decision_key']}: {fact['value']} "
-            f"({result['document']}:{fact['line']})"
+            f"  {fact['decision_key']}: {fact['value']} ({result['document']}:{fact['line']})"
         )
     if not findings["facts"]:
         typer.echo("  none")
@@ -220,14 +214,9 @@ def status(
 def review(
     catalog: Path | None = _CATALOG,
     as_json: bool = typer.Option(False, "--json", help="Emit the review as JSON."),
-    llm_provider: str | None = typer.Option(
-        None, "--llm", help="Narrate the review with 'openai' or 'ollama'."
+    scan_path: Path | None = typer.Option(
+        None, "--scan", help="Also scan an owner IaC directory or LZA bundle for security warnings."
     ),
-    model: str | None = typer.Option(
-        None, "--model", help="Explicit model name. Required with --llm."
-    ),
-    base_url: str = typer.Option("http://localhost:11434", "--base-url", help="Provider base URL."),
-    api_key: str | None = typer.Option(None, "--api-key", help="Provider API key when required."),
     uri: str | None = _URI,
     user: str | None = _USER,
     password: str | None = _PASSWORD,
@@ -238,22 +227,25 @@ def review(
         with _graph(uri, user, password, database) as graph:
             decisions = graph.catalog()
             if catalog is not None:
-                selected = organisation_catalog(_catalog(catalog), graph.organisation())
+                selected = organisation_catalog(load_catalog(catalog), graph.organisation())
                 if selected != decisions:
                     raise CatalogError("catalog differs from the ingested snapshot; ingest again")
             result = build_review(graph, decisions)
+        scans = scan_bundle(scan_path) if scan_path is not None else []
     except _KNOWN_FAILURES as exc:
         _fail(str(exc))
         return
 
     if as_json:
-        typer.echo(result.model_dump_json(indent=2))
+        payload = result.model_dump()
+        if scan_path is not None:
+            payload["security_scans"] = [asdict(scan) for scan in scans]
+        typer.echo(json.dumps(payload, indent=2))
     else:
         _render(result, decisions)
+        _render_scans(scans)
 
-    if llm_provider:
-        _narrate(result, decisions, llm_provider, model, base_url, api_key)
-    if not result.clean:
+    if not result.clean or any(scan.blocking for scan in scans):
         raise typer.Exit(code=1)
 
 
@@ -303,30 +295,13 @@ def _render_context(result: Review) -> None:
             typer.echo(f"  {system.lifecycle}: {system.name}")
         for assessment in result.assessments:
             typer.echo(f"  policy {assessment.policy_id}: {assessment.status}")
+        _render_policy_warnings(result, result.assessments)
     if result.integration_context:
         typer.echo("\nIntegration work for the consuming teams:")
         layers = result.integration_context.get("layers", {})
         if isinstance(layers, dict):
             for name, layer in layers.items():
                 typer.echo(f"  {name}: {layer['ownerAction']}")
-
-
-def _narrate(
-    result: Review,
-    decisions: dict[str, Decision],
-    provider: str,
-    model: str | None,
-    base_url: str,
-    api_key: str | None,
-) -> None:
-    try:
-        config = LlmConfig(provider=provider, model=model or "", base_url=base_url, api_key=api_key)
-        agenda = narrate(result, decisions, config)
-    except LlmError as exc:
-        typer.secho(f"llm narration unavailable: {exc}", fg=typer.colors.YELLOW, err=True)
-        return
-    typer.secho("\nmodel agenda (advisory, not a decision source)", fg=typer.colors.CYAN)
-    typer.echo(agenda)
 
 
 @app.command()
@@ -349,12 +324,11 @@ def emit(
         with _graph(uri, user, password, database) as graph:
             decisions = graph.catalog()
             if catalog is not None:
-                selected = organisation_catalog(_catalog(catalog), graph.organisation())
+                selected = organisation_catalog(load_catalog(catalog), graph.organisation())
                 if selected != decisions:
                     raise CatalogError("catalog differs from the ingested snapshot; ingest again")
             result = build_review(graph, decisions)
-            facts = graph.facts()
-        resolution = resolve(decisions, result, facts, allow_defaults=allow_defaults)
+        resolution = resolve(decisions, result, result.facts, allow_defaults=allow_defaults)
         written = emit_bundle(resolution, result, out, network_config=network_config)
     except _KNOWN_FAILURES as exc:
         _fail(str(exc))
@@ -362,6 +336,7 @@ def emit(
     defaulted = [entry["decision"] for entry in resolution.trace if entry["origin"] == "default"]
     for path in written:
         typer.echo(f"wrote {path}")
+    _render_policy_warnings(result, resolution.assessments)
     typer.echo(f"LZA {LZA_VERSION} schemas passed; integration context is in decision-trace.yaml")
     if defaulted:
         typer.secho(f"filled from catalog defaults: {', '.join(defaulted)}", fg=typer.colors.YELLOW)
@@ -384,59 +359,68 @@ def export_tfvars(
         with _graph(uri, user, password, database) as graph:
             decisions = graph.catalog()
             if catalog is not None:
-                selected = organisation_catalog(_catalog(catalog), graph.organisation())
+                selected = organisation_catalog(load_catalog(catalog), graph.organisation())
                 if selected != decisions:
                     raise CatalogError("catalog differs from the ingested snapshot; ingest again")
             result = build_review(graph, decisions)
-            facts = graph.facts()
-        resolution = resolve(decisions, result, facts)
+        resolution = resolve(decisions, result, result.facts)
         paths = emit_tfvars(resolution, result, contract, out)
     except _KNOWN_FAILURES as exc:
         _fail(str(exc))
         return
     for path in paths:
         typer.echo(f"wrote {path}")
+    _render_policy_warnings(result, resolution.assessments)
     typer.echo("module input contract passed; downstream Terraform validation remains required")
+
+
+def _render_policy_warnings(result: Review, assessments: list[Assessment]) -> None:
+    for assessment in assessments:
+        if assessment.status != "warning":
+            continue
+        typer.secho(
+            f"warning [{assessment.policy_id}]: {assessment.message}", fg=typer.colors.YELLOW
+        )
+        if result.organisation:
+            policy = next(p for p in result.organisation.policies if p.id == assessment.policy_id)
+            typer.echo(f"  evidence: {evidence_text(result.organisation, policy.evidence)}")
+
+
+def _render_scans(results: list[ToolResult]) -> None:
+    for result in results:
+        status = "warning" if result.status == "findings" and not result.blocking else result.status
+        colour = (
+            typer.colors.RED
+            if result.blocking
+            else (
+                typer.colors.YELLOW if result.findings or result.exceptions else typer.colors.GREEN
+            )
+        )
+        typer.secho(f"{result.tool}: {status} — {result.detail}", fg=colour)
+        for finding in result.findings:
+            typer.echo(f"    {finding}")
+        for exception in result.exceptions:
+            typer.secho(f"    exception (still review): {exception}", fg=typer.colors.YELLOW)
 
 
 @app.command()
 def scan(
-    bundle: Path = typer.Argument(..., help="Emitted bundle directory."),
-    policy: Path | None = typer.Option(None, "--policy", help="Override the packaged rego policy."),
+    bundle: Path = typer.Argument(..., help="Owner IaC directory or emitted LZA bundle."),
+    policy: Path | None = typer.Option(None, "--policy", help="Override the LZA Rego policy."),
     as_json: bool = typer.Option(False, "--json", help="Emit results as JSON."),
+    strict: bool = typer.Option(False, "--strict", help="Return exit 1 for security warnings too."),
 ) -> None:
-    """Run OPA, Checkov, and Trivy over an emitted bundle."""
+    """Report security warnings and native exceptions; missing coverage is never a pass."""
     try:
         results = scan_bundle(bundle, policy)
     except _KNOWN_FAILURES as exc:
         _fail(str(exc))
         return
-
     if as_json:
-        payload: list[dict[str, Any]] = [
-            {
-                "tool": result.tool,
-                "status": result.status,
-                "detail": result.detail,
-                "findings": result.findings,
-            }
-            for result in results
-        ]
-        typer.echo(json.dumps(payload, indent=2))
+        typer.echo(json.dumps([asdict(result) for result in results], indent=2))
     else:
-        for result in results:
-            colour = {
-                "passed": typer.colors.GREEN,
-                "findings": typer.colors.RED,
-                "not-installed": typer.colors.YELLOW,
-                "not-assessed": typer.colors.YELLOW,
-                "error": typer.colors.RED,
-            }[result.status]
-            typer.secho(f"{result.tool}: {result.status} — {result.detail}", fg=colour)
-            for finding in result.findings:
-                typer.echo(f"    {finding}")
-
-    if any(result.blocking for result in results):
+        _render_scans(results)
+    if any(result.blocking or (strict and result.status != "passed") for result in results):
         raise typer.Exit(code=1)
 
 

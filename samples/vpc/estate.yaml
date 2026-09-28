@@ -1,0 +1,15 @@
+# Synthetic owner-reviewed inputs, not discovered infrastructure or capacity advice.
+routing_domains:
+  corporate:
+    - {name: datacentre, cidr: 10.20.0.0/16}
+    - {name: shared-services, cidr: 10.30.0.0/16}
+  isolated-lab:
+    - {name: disconnected-lab, cidr: 10.42.0.0/16}
+instance_types:
+  development: [t3.micro, t3.small]
+  production: [m5.large]
+instance_exceptions:
+  - environment: development
+    instance_type: m5.large
+    owner: Synthetic workload architect
+    reason: 'EXAMPLE-42: development performance test; revisit before production.'

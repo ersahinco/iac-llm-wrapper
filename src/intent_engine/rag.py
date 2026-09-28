@@ -9,7 +9,11 @@ from typing import Any
 
 from .analysis import review
 from .graph import KnowledgeGraph
-from .llm import LlmError
+
+
+class LlmError(Exception):
+    """Retrieval or the explicitly selected model could not produce a usable answer."""
+
 
 _INDEX = "case_evidence"
 # Source lines stay in the existing graph; no second document store or accepted facts.

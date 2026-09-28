@@ -1,9 +1,9 @@
-"""Policy and security checks over an emitted bundle.
+"""Advisory security checks over LZA output or owner-supplied IaC.
 
 Three external tools, three separate verdicts:
 
     opa      the landing-zone policy the organization agreed to
-    checkov  secret checks on the emitted files
+    checkov  supported IaC and secret checks
     trivy    independent secret and misconfiguration scan
 
 A missing tool, a tool that failed to run, and a tool that found something are
@@ -41,10 +41,13 @@ class ToolResult:
     status: ToolStatus
     detail: str = ""
     findings: list[str] = field(default_factory=list)
+    exceptions: list[str] = field(default_factory=list)
 
     @property
     def blocking(self) -> bool:
-        return self.status != "passed"
+        return self.status in {"not-installed", "not-assessed", "error"} or (
+            self.tool == "lza-schema" and self.status == "findings"
+        )
 
 
 def bundle_input(bundle_dir: Path) -> dict[str, Any]:
@@ -149,22 +152,36 @@ def run_checkov(bundle_dir: Path) -> ToolResult:
             "--directory",
             str(bundle_dir),
             "--framework",
+            "terraform",
+            "cloudformation",
+            "kubernetes",
+            "dockerfile",
             "secrets",
+            "--skip-download",
+            "--skip-results-upload",
+            "--download-external-modules",
+            "false",
+            "--include-all-checkov-policies",
             "--output",
             "json",
-            "--quiet",
             "--compact",
         ]
     )
     if completed.returncode not in {0, 1}:
         return ToolResult("checkov", "error", completed.stderr.strip() or "checkov failed")
     try:
-        findings, assessed = _parse_checkov(json.loads(completed.stdout))
+        findings, assessed, exceptions = _parse_checkov(json.loads(completed.stdout))
     except (json.JSONDecodeError, ScanError) as exc:
         return ToolResult("checkov", "error", str(exc))
     if completed.returncode == 1 and not findings:
         return ToolResult("checkov", "error", "exit code 1 without reported findings")
-    return _result("checkov", findings, assessed, "secret checks only; LZA semantics not assessed")
+    return _result(
+        "checkov",
+        findings,
+        assessed,
+        "supported IaC and secrets; LZA semantics not assessed",
+        exceptions,
+    )
 
 
 def _objects(value: Any, label: str) -> list[dict[str, Any]]:
@@ -180,11 +197,12 @@ def _count(report: dict[str, Any], key: str) -> int:
     return value
 
 
-def _parse_checkov(payload: Any) -> tuple[list[str], int]:
+def _parse_checkov(payload: Any) -> tuple[list[str], int, list[str]]:
     reports = _objects(payload if isinstance(payload, list) else [payload], "Checkov reports")
     if not reports:
         raise ScanError("Checkov returned no report")
     findings: list[str] = []
+    exceptions: list[str] = []
     assessed = 0
     for report in reports:
         # With no checks, Checkov returns the summary alone (no results wrapper).
@@ -206,32 +224,62 @@ def _parse_checkov(payload: Any) -> tuple[list[str], int]:
             findings.append(
                 f"{check['file_path']}: {check['check_id']} {check.get('check_name', '')}".strip()
             )
+        exceptions.extend(_checkov_exceptions(results, summary))
         assessed += passed + failed
-    return sorted(findings), assessed
+    return sorted(findings), assessed, sorted(exceptions)
+
+
+def _checkov_exceptions(results: dict[str, Any], summary: dict[str, Any]) -> list[str]:
+    exceptions = []
+    skipped = _objects(results.get("skipped_checks", []), "Checkov skipped_checks")
+    if _count({"skipped": len(skipped)} | summary, "skipped") != len(skipped):
+        raise ScanError("Checkov skipped count does not match reported exceptions")
+    for check in skipped:
+        if not check.get("file_path") or not check.get("check_id"):
+            raise ScanError("Checkov exception is missing file_path or check_id")
+        result = check.get("check_result", {})
+        if not isinstance(result, dict):
+            raise ScanError("Checkov exception check_result must be an object")
+        exceptions.append(
+            f"{check['file_path']}: {check['check_id']} "
+            f"{check.get('resource', '')} — "
+            f"{result.get('suppress_comment') or 'no reason reported'}"
+        )
+    return exceptions
 
 
 def run_trivy(bundle_dir: Path) -> ToolResult:
     if shutil.which("trivy") is None:
         return ToolResult("trivy", "not-installed", "trivy is not on PATH")
-    completed = _run(
-        [
-            "trivy",
-            "fs",
-            "--scanners",
-            "secret,misconfig",
-            "--exit-code",
-            "0",
-            "--format",
-            "json",
-            "--quiet",
-            str(bundle_dir),
-        ]
-    )
+    command = [
+        "trivy",
+        "fs",
+        "--scanners",
+        "secret,misconfig",
+        "--include-non-failures",
+        "--show-suppressed",
+        "--skip-check-update",
+        "--skip-version-check",
+        "--disable-telemetry",
+        "--offline-scan",
+        "--exit-code",
+        "0",
+        "--format",
+        "json",
+        "--quiet",
+        str(bundle_dir),
+    ]
+    for name in (".trivyignore.yaml", ".trivyignore"):
+        ignorefile = bundle_dir / name
+        if ignorefile.is_file():
+            command.extend(["--ignorefile", str(ignorefile)])
+            break
+    completed = _run(command)
     # Trivy's default findings exit code is zero; any nonzero code is a failure.
     if completed.returncode != 0:
         return ToolResult("trivy", "error", completed.stderr.strip() or "trivy failed")
     try:
-        findings, assessed = _parse_trivy(json.loads(completed.stdout))
+        findings, assessed, exceptions = _parse_trivy(json.loads(completed.stdout))
     except (json.JSONDecodeError, ScanError) as exc:
         return ToolResult("trivy", "error", str(exc))
     return _result(
@@ -239,16 +287,18 @@ def run_trivy(bundle_dir: Path) -> ToolResult:
         findings,
         assessed,
         "reported secret/misconfiguration checks; no LZA schema validation",
+        exceptions,
     )
 
 
-def _parse_trivy(payload: Any) -> tuple[list[str], int]:
+def _parse_trivy(payload: Any) -> tuple[list[str], int, list[str]]:
     if not isinstance(payload, dict) or payload.get("SchemaVersion") != 2:
         raise ScanError("Trivy report: expected SchemaVersion 2")
     if payload.get("ArtifactType") != "filesystem" or not payload.get("ArtifactName"):
         raise ScanError("Trivy report: expected a filesystem artifact")
     results = _objects(payload.get("Results", []), "Trivy Results")
     findings: list[str] = []
+    exceptions: list[str] = []
     assessed = 0
     for result in results:
         target = result.get("Target")
@@ -260,14 +310,35 @@ def _parse_trivy(payload: Any) -> tuple[list[str], int]:
                 raise ScanError("Trivy secret is missing RuleID")
             findings.append(f"{target}: secret {secret['RuleID']}")
         assessed += len(secrets)
-        messages, checked = _trivy_misconfigurations(result, target)
+        messages, checked, skipped = _trivy_misconfigurations(result, target)
         findings.extend(messages)
         assessed += checked
-    return sorted(findings), assessed
+        exceptions.extend(skipped)
+        exceptions.extend(_trivy_suppressions(result, target))
+    return sorted(findings), assessed, sorted(exceptions)
 
 
-def _trivy_misconfigurations(result: dict[str, Any], target: str) -> tuple[list[str], int]:
+def _trivy_suppressions(result: dict[str, Any], target: str) -> list[str]:
+    exceptions = []
+    for item in _objects(result.get("ExperimentalModifiedFindings", []), "Trivy suppressions"):
+        finding = item.get("Finding")
+        if not isinstance(finding, dict) or item.get("Status") != "ignored":
+            raise ScanError("Trivy suppression needs an ignored finding")
+        identifier = finding.get("ID") or finding.get("RuleID")
+        if not identifier:
+            raise ScanError("Trivy suppression is missing a check ID")
+        exceptions.append(
+            f"{target}: {identifier} — {item.get('Statement') or 'no reason reported'} "
+            f"({item.get('Source') or 'native scanner suppression'})"
+        )
+    return exceptions
+
+
+def _trivy_misconfigurations(
+    result: dict[str, Any], target: str
+) -> tuple[list[str], int, list[str]]:
     findings: list[str] = []
+    exceptions: list[str] = []
     misconfigs = _objects(result.get("Misconfigurations", []), "Trivy Misconfigurations")
     failures = 0
     for misconfig in misconfigs:
@@ -276,6 +347,11 @@ def _trivy_misconfigurations(result: dict[str, Any], target: str) -> tuple[list[
         if misconfig["Status"] == "FAIL":
             failures += 1
             findings.append(f"{target}: {misconfig['ID']} {misconfig.get('Title', '')}".strip())
+        elif misconfig["Status"] == "EXCEPTION":
+            exceptions.append(
+                f"{target}: {misconfig['ID']} {misconfig.get('Title', '')} — "
+                f"{misconfig.get('Message') or 'native scanner exception'}"
+            )
     summary = result.get("MisconfSummary")
     if summary is not None:
         if not isinstance(summary, dict):
@@ -285,23 +361,45 @@ def _trivy_misconfigurations(result: dict[str, Any], target: str) -> tuple[list[
         assessed = _count(summary, "Successes") + failures
     else:
         assessed = sum(item["Status"] != "EXCEPTION" for item in misconfigs)
-    return findings, assessed
+    return findings, assessed, exceptions
 
 
 def _result(
-    tool: str, findings: list[str], assessed: int = 1, scope: str = "LZA policy rules"
+    tool: str,
+    findings: list[str],
+    assessed: int = 1,
+    scope: str = "LZA policy rules",
+    exceptions: list[str] | None = None,
 ) -> ToolResult:
+    exceptions = exceptions or []
     if findings:
-        return ToolResult(tool, "findings", f"{len(findings)} finding(s); {scope}", findings)
+        label = "schema error(s)" if tool == "lza-schema" else "warning(s)"
+        return ToolResult(
+            tool, "findings", f"{len(findings)} {label}; {scope}", findings, exceptions
+        )
     if not assessed:
-        return ToolResult(tool, "not-assessed", f"no assessed checks reported; {scope}")
-    return ToolResult(tool, "passed", f"no findings; {scope}")
+        return ToolResult(
+            tool, "not-assessed", f"no assessed checks reported; {scope}", exceptions=exceptions
+        )
+    return ToolResult(
+        tool,
+        "passed",
+        f"{assessed} assessed checks; no open findings; {scope}",
+        exceptions=exceptions,
+    )
 
 
 def scan_bundle(bundle_dir: Path, policy: Path | None = None) -> list[ToolResult]:
     if not bundle_dir.is_dir():
         raise ScanError(f"{bundle_dir}: bundle directory not found")
-    documents = bundle_input(bundle_dir)
-    errors = validate_configs({_BUNDLE_INPUTS[key]: value for key, value in documents.items()})
-    schema = _result("lza-schema", errors, scope=f"LZA {LZA_VERSION} configuration shape only")
-    return [schema, run_opa(bundle_dir, policy), run_checkov(bundle_dir), run_trivy(bundle_dir)]
+    results = []
+    if any((bundle_dir / name).exists() for name in CONFIG_FILES):
+        documents = bundle_input(bundle_dir)
+        errors = validate_configs({_BUNDLE_INPUTS[key]: value for key, value in documents.items()})
+        results = [
+            _result("lza-schema", errors, scope=f"LZA {LZA_VERSION} configuration shape only"),
+            run_opa(bundle_dir, policy),
+        ]
+    elif policy:
+        raise ScanError("--policy expects an LZA bundle with all six configuration files")
+    return [*results, run_checkov(bundle_dir), run_trivy(bundle_dir)]

@@ -32,8 +32,8 @@ export NEO4J_BROWSER_PORT=28474 NEO4J_BOLT_PORT=28687
 docker compose up -d --wait neo4j
 export NEO4J_URI="bolt://127.0.0.1:${NEO4J_BOLT_PORT}"
 export NEO4J_USER=neo4j NEO4J_PASSWORD=localdevpassword NEO4J_DATABASE=neo4j
-opa check --strict src/intent_engine/policy samples/organisation/policy.rego
-opa fmt --fail --list src/intent_engine/policy samples/organisation/policy.rego
+opa check --strict src/intent_engine/policy samples/organisation/policy.rego samples/vpc/policy.rego
+opa fmt --fail --list src/intent_engine/policy samples/organisation/policy.rego samples/vpc/policy.rego
 uv run --locked --extra dev --extra graphrag pytest
 docker compose stop
 unset NEO4J_URI NEO4J_USER NEO4J_PASSWORD NEO4J_DATABASE

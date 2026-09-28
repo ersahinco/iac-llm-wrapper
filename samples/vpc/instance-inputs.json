@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Reviewed instance type and monitoring subset; remaining EC2 settings belong to the owner",
+  "x-module": {
+    "source": "terraform-aws-modules/ec2-instance/aws",
+    "version": "6.4.0",
+    "inputReference": "https://github.com/terraform-aws-modules/terraform-aws-ec2-instance/blob/v6.4.0/variables.tf",
+    "terraform": ">= 1.5.7",
+    "awsProvider": ">= 6.37"
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["instance_type", "monitoring"],
+  "properties": {
+    "instance_type": {"type": "string", "minLength": 1, "x-decision": "instance_type"},
+    "monitoring": {"type": "boolean", "x-decision": "detailed_monitoring"}
+  }
+}

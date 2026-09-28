@@ -82,7 +82,7 @@ class Gap(BaseModel):
 
 
 class Conflict(BaseModel):
-    """Two accepted statements that cannot both hold."""
+    """A named, blocking input or policy finding."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -188,7 +188,7 @@ class Organisation(BaseModel):
 class Assessment(BaseModel):
     model_config = ConfigDict(extra="forbid")
     policy_id: str
-    status: Literal["passed", "conflict", "not-assessed"]
+    status: Literal["passed", "warning", "conflict", "not-assessed"]
     message: str = Field(min_length=1)
     input_sha256: str = ""
 

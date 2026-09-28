@@ -56,7 +56,10 @@ project/database for each client.
 OPA receives `input.decisions` (usable stated values) and `input.references`
 (selected configuration by reference ID). The fixed query is
 `data.organisation.assessments`: a list with exactly one `{policy_id, status,
-message}` per selected policy; status is `passed`, `conflict`, or `not-assessed`.
+message}` per selected policy; status is `passed`, `warning`, `conflict`, or `not-assessed`.
+A warning is advisory and remains in the trace; conflicts and unassessed policies
+block export. Record exception scope and rationale in selected references and Rego,
+not in model output. See the [workload example](../vpc/README.md).
 Missing tools, undefined/malformed results and absent coverage block export.
 Review records assessments in Neo4j, including the input and document hashes.
 Policy code and configuration hashes remain linked through the selected references.
