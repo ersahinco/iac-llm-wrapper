@@ -130,8 +130,6 @@ def test_unusable_value_is_not_a_gap(catalog):
         ({"topology": "single-vpc"}, "NETWORK_ACCOUNT_NOT_APPLICABLE"),
         ({"network_cidr": "1.2.3.0/24"}, "NETWORK_CIDR_NOT_PRIVATE"),
         ({"network_cidr": "10.0.0.0/33"}, "NETWORK_CIDR_MALFORMED"),
-        ({"centralized_logging": "false"}, "OVERLAY_REQUIRES_CENTRAL_LOGGING"),
-        ({"guardduty_enabled": "false"}, "OVERLAY_REQUIRES_DETECTION"),
         ({"organizational_units": "Security, Infrastructure"}, "WORKLOAD_OU_MISSING"),
         ({"workload_accounts": "CardsProd, Audit"}, "ACCOUNT_NAME_RESERVED"),
         ({"workload_accounts": "CardsProd, NewThing"}, "ACCOUNT_EMAIL_MISSING"),

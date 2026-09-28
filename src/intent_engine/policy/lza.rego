@@ -1,21 +1,12 @@
 # Landing-zone policy over the emitted configuration bundle.
 #
 # Input is the merged bundle: {organization, accounts, global, iam, network, security}.
-# These are organization rules about the artifact. Intent-level contradictions are
-# caught earlier by the graph review, not here.
+# General artifact advice. Organisation restrictions and exceptions are assessed
+# from the selected policy snapshot during review and export.
 
 package lza
 
 import rego.v1
-
-approved_regions := {
-	"eu-central-1",
-	"eu-west-1",
-	"eu-west-2",
-	"eu-north-1",
-	"us-east-1",
-	"us-west-2",
-}
 
 secret_smell := ["password", "secret_key", "aws_access_key_id", "private_key", "BEGIN RSA"]
 
@@ -27,12 +18,6 @@ deny contains msg if {
 deny contains msg if {
 	not input.global.logging.cloudtrail.organizationTrail == true
 	msg := "global-config: an organization CloudTrail is required"
-}
-
-deny contains msg if {
-	some region in input.global.enabledRegions
-	not region in approved_regions
-	msg := sprintf("global-config: region %q is outside the approved region set", [region])
 }
 
 home_region_enabled if {
@@ -48,6 +33,11 @@ deny contains msg if {
 deny contains msg if {
 	not input.security.centralSecurityServices.guardduty.enable == true
 	msg := "security-config: GuardDuty must be enabled organization-wide"
+}
+
+deny contains msg if {
+	not input.security.centralSecurityServices.securityHub.enable == true
+	msg := "security-config: consider enabling Security Hub organization-wide"
 }
 
 deny contains msg if {

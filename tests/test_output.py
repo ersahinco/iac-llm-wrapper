@@ -40,7 +40,7 @@ def _load(path):
 
 def test_bundle_matches_the_accepted_decisions(catalog, sample_facts, make_review, tmp_path):
     review = make_review(sample_facts)
-    written = emit_bundle(resolve(catalog, review, sample_facts), review, tmp_path)
+    written = emit_bundle(resolve(catalog, review), review, tmp_path)
 
     assert {path.name for path in written} == {
         "organization-config.yaml",
@@ -78,7 +78,7 @@ def test_stated_decisions_are_traceable_to_the_document(
     catalog, sample_facts, make_review, tmp_path
 ):
     review = make_review(sample_facts)
-    emit_bundle(resolve(catalog, review, sample_facts), review, tmp_path)
+    emit_bundle(resolve(catalog, review), review, tmp_path)
 
     assert review.sha256 in (tmp_path / "global-config.yaml").read_text("utf-8")
     trace = _load(tmp_path / "decision-trace.yaml")
@@ -115,7 +115,7 @@ def test_single_vpc_drops_the_transit_gateway(catalog, sample_facts, make_review
         for fact in facts
     ]
     review = make_review(facts)
-    emit_bundle(resolve(catalog, review, facts), review, tmp_path)
+    emit_bundle(resolve(catalog, review), review, tmp_path)
 
     network = _load(tmp_path / "network-config.yaml")
     assert network["transitGateways"] == []
@@ -126,18 +126,18 @@ def test_conflicts_block_emission(catalog, sample_facts, make_review):
     conflict = Conflict(code="HOME_REGION_NOT_ENABLED", message="x", decision_keys=[])
     review = make_review(sample_facts, conflicts=[conflict])
     with pytest.raises(EmitBlocked, match="HOME_REGION_NOT_ENABLED"):
-        resolve(catalog, review, sample_facts)
+        resolve(catalog, review)
 
 
 def test_unanswered_decision_blocks_emission(catalog, sample_facts, make_review):
     facts = _drop(sample_facts, "network_cidr")
     with pytest.raises(EmitBlocked, match="network_cidr"):
-        resolve(catalog, make_review(facts), facts)
+        resolve(catalog, make_review(facts))
 
 
 def test_defaults_need_opt_in_and_are_recorded(catalog, sample_facts, make_review):
     facts = _drop(sample_facts, "compliance_overlay")
-    resolution = resolve(catalog, make_review(facts), facts, allow_defaults=True)
+    resolution = resolve(catalog, make_review(facts), allow_defaults=True)
     defaulted = [e["decision"] for e in resolution.trace if e["origin"] == "default"]
     assert defaulted == ["compliance_overlay"]
     assert resolution.values["compliance_overlay"] == "none"
@@ -149,7 +149,7 @@ def test_account_without_an_approved_email_blocks_emission(
     facts = _add(sample_facts, account_emails="Management=aws-management@example.com")
     review = make_review(facts)
     with pytest.raises(EmitBlocked, match="ACCOUNT_EMAIL_MISSING"):
-        emit_bundle(resolve(catalog, review, facts), review, tmp_path)
+        emit_bundle(resolve(catalog, review), review, tmp_path)
 
 
 # scan ----------------------------------------------------------------------
@@ -157,7 +157,7 @@ def test_account_without_an_approved_email_blocks_emission(
 
 def test_bundle_input_merges_every_config_file(catalog, sample_facts, make_review, tmp_path):
     review = make_review(sample_facts)
-    emit_bundle(resolve(catalog, review, sample_facts), review, tmp_path)
+    emit_bundle(resolve(catalog, review), review, tmp_path)
 
     document = bundle_input(tmp_path)
     assert set(document) == {"organization", "accounts", "global", "iam", "network", "security"}
@@ -202,7 +202,7 @@ def test_unexpected_policy_result_is_not_a_pass():
 def test_policy_denies_a_weakened_bundle(catalog, sample_facts, make_review, tmp_path):
     """A passing policy has to be able to fail. Prove it against the real binary."""
     review = make_review(sample_facts)
-    emit_bundle(resolve(catalog, review, sample_facts), review, tmp_path)
+    emit_bundle(resolve(catalog, review), review, tmp_path)
     assert scan.run_opa(tmp_path).status == "passed"
 
     weakened = tmp_path / "global-config.yaml"
@@ -229,18 +229,37 @@ def test_absent_tool_is_not_reported_as_a_pass(monkeypatch, tmp_path, runner, to
     assert tool in result.detail
 
 
+@pytest.mark.skipif(shutil.which("opa") is None, reason="OPA not installed")
+@pytest.mark.parametrize(
+    "control,advice",
+    [
+        ("centralized_logging", "CloudTrail"),
+        ("security_hub_enabled", "Security Hub"),
+        ("guardduty_enabled", "GuardDuty"),
+    ],
+)
+def test_security_advice_remains_without_selected_policy(
+    catalog, sample_facts, make_review, tmp_path, control, advice
+):
+    facts = _add(sample_facts, **{control: "false"})
+    assert semantic_conflicts(catalog, facts) == []
+    review = make_review(facts)
+    emit_bundle(resolve(catalog, review), review, tmp_path)
+    result = scan.run_opa(tmp_path)
+    assert result.status == "findings" and not result.blocking
+    assert any(advice in finding for finding in result.findings)
+
+
 # Regression checks for the first banking milestone --------------------------
 
 
 def test_defaults_are_revalidated_for_conflicts(catalog, sample_facts, make_review):
     catalog = dict(catalog)
-    catalog["compliance_overlay"] = catalog["compliance_overlay"].model_copy(
-        update={"default": "financial-services"}
-    )
-    facts = _add(_drop(sample_facts, "compliance_overlay"), centralized_logging="false")
+    catalog["home_region"] = catalog["home_region"].model_copy(update={"default": "us-east-1"})
+    facts = _drop(sample_facts, "home_region")
     assert semantic_conflicts(catalog, facts) == []
-    with pytest.raises(EmitBlocked, match="OVERLAY_REQUIRES_CENTRAL_LOGGING"):
-        resolve(catalog, make_review(facts), facts, allow_defaults=True)
+    with pytest.raises(EmitBlocked, match="HOME_REGION_NOT_ENABLED"):
+        resolve(catalog, make_review(facts), allow_defaults=True)
 
 
 def test_default_account_cannot_collide_with_workload(catalog, sample_facts, make_review):
@@ -253,7 +272,7 @@ def test_default_account_cannot_collide_with_workload(catalog, sample_facts, mak
     ]
     assert semantic_conflicts(catalog, facts) == []
     with pytest.raises(EmitBlocked, match="ACCOUNT_NAME_RESERVED"):
-        resolve(catalog, make_review(facts), facts, allow_defaults=True)
+        resolve(catalog, make_review(facts), allow_defaults=True)
 
 
 @pytest.mark.parametrize("runner", [scan.run_checkov, scan.run_trivy])
@@ -465,7 +484,7 @@ def test_policy_rejects_missing_or_mistyped_fields(
     catalog, sample_facts, make_review, tmp_path, filename, path, mutation
 ):
     review = make_review(sample_facts)
-    emit_bundle(resolve(catalog, review, sample_facts), review, tmp_path)
+    emit_bundle(resolve(catalog, review), review, tmp_path)
     target = tmp_path / filename
     data = _load(target)
     parent = data
@@ -495,7 +514,7 @@ def test_minimal_mapping_bundle_cannot_pass_policy(tmp_path):
 
 def test_emitted_contract_and_owner_handoff(catalog, sample_facts, make_review, tmp_path):
     result = make_review(sample_facts)
-    emit_bundle(resolve(catalog, result, sample_facts), result, tmp_path)
+    emit_bundle(resolve(catalog, result), result, tmp_path)
     documents = {name: _load(tmp_path / name) for name in CONFIG_FILES}
     assert validate_configs(documents) == []
     handoff = _load(tmp_path / "decision-trace.yaml")["integrationContext"]
@@ -519,7 +538,7 @@ def test_emitted_contract_and_owner_handoff(catalog, sample_facts, make_review, 
 @pytest.mark.parametrize("filename", CONFIG_FILES)
 def test_contract_rejects_unknown_fields(catalog, sample_facts, make_review, tmp_path, filename):
     result = make_review(sample_facts)
-    emit_bundle(resolve(catalog, result, sample_facts), result, tmp_path)
+    emit_bundle(resolve(catalog, result), result, tmp_path)
     documents = {name: _load(tmp_path / name) for name in CONFIG_FILES}
     documents[filename]["inventedField"] = True
     errors = validate_configs(documents)
@@ -531,13 +550,13 @@ def test_schema_failure_writes_no_bundle(catalog, sample_facts, make_review, tmp
     result = make_review(sample_facts)
     out = tmp_path / "bundle"
     with pytest.raises(EmitBlocked, match="schema validation failed"):
-        emit_bundle(resolve(catalog, result, sample_facts), result, out)
+        emit_bundle(resolve(catalog, result), result, out)
     assert not out.exists()
 
 
 def test_scan_revalidates_edited_configs(catalog, sample_facts, make_review, tmp_path, monkeypatch):
     result = make_review(sample_facts)
-    emit_bundle(resolve(catalog, result, sample_facts), result, tmp_path)
+    emit_bundle(resolve(catalog, result), result, tmp_path)
     path = tmp_path / "network-config.yaml"
     data = _load(path)
     del data["endpointPolicies"]
@@ -553,14 +572,14 @@ def test_scan_revalidates_edited_configs(catalog, sample_facts, make_review, tmp
 def test_missing_policy_mapping_blocks_emit(catalog, sample_facts, make_review):
     facts = _drop(sample_facts, "identity_center_policy_mappings")
     with pytest.raises(EmitBlocked, match="identity_center_policy_mappings"):
-        resolve(catalog, make_review(facts), facts)
+        resolve(catalog, make_review(facts))
 
 
 def test_owner_network_provenance_and_content(catalog, sample_facts, make_review, tmp_path):
     import hashlib
 
     result = make_review(sample_facts)
-    resolution = resolve(catalog, result, sample_facts)
+    resolution = resolve(catalog, result)
     skeleton = tmp_path / "skeleton"
     emit_bundle(resolution, result, skeleton)
     network = _load(skeleton / "network-config.yaml")
@@ -597,7 +616,7 @@ def test_bad_owner_network_blocks_before_writing(
     catalog, sample_facts, make_review, tmp_path, case, message
 ):
     result = make_review(sample_facts)
-    resolution = resolve(catalog, result, sample_facts)
+    resolution = resolve(catalog, result)
     skeleton = tmp_path / "skeleton"
     emit_bundle(resolution, result, skeleton)
     network = _load(skeleton / "network-config.yaml")
@@ -626,7 +645,7 @@ def test_bad_owner_network_blocks_before_writing(
 @pytest.mark.parametrize("symlink", [False, True])
 def test_owner_source_cannot_be_overwritten(catalog, sample_facts, make_review, tmp_path, symlink):
     result = make_review(sample_facts)
-    resolution = resolve(catalog, result, sample_facts)
+    resolution = resolve(catalog, result)
     out = tmp_path / "bundle"
     emit_bundle(resolution, result, out)
     source = out / "network-config.yaml"
@@ -648,6 +667,6 @@ def test_legacy_handoff_is_preserved(catalog, sample_facts, make_review, tmp_pat
     original = "# Generated by iac-llm-wrapper from accepted architecture decisions.\nold: true\n"
     legacy.write_text(original)
     with pytest.raises(EmitBlocked, match="fresh output directory"):
-        emit_bundle(resolve(catalog, review, sample_facts), review, tmp_path)
+        emit_bundle(resolve(catalog, review), review, tmp_path)
     assert legacy.read_text() == original
     assert list(tmp_path.iterdir()) == [legacy]

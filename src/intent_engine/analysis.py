@@ -19,7 +19,6 @@ from .graph import KnowledgeGraph
 from .models import Conflict, Decision, Fact, Review
 from .organisation import assess, evidence_text, policy_conflicts
 
-_STRICT_OVERLAYS = {"regulated", "financial-services", "healthcare"}
 _IMPLICIT_ACCOUNTS = {"Management"}
 _ACCOUNT_KEYS = (
     "audit_account",
@@ -203,43 +202,6 @@ def _rule_private_subnets(values: dict[str, Any]) -> list[Conflict]:
             )
         )
     return conflicts
-
-
-def _rule_overlay_logging(values: dict[str, Any]) -> list[Conflict]:
-    overlay = values.get("compliance_overlay")
-    if overlay not in _STRICT_OVERLAYS or values.get("centralized_logging") is not False:
-        return []
-    return [
-        Conflict(
-            code="OVERLAY_REQUIRES_CENTRAL_LOGGING",
-            message=(
-                f"compliance overlay '{overlay}' requires centralized logging, "
-                "which is stated as disabled"
-            ),
-            decision_keys=["compliance_overlay", "centralized_logging"],
-        )
-    ]
-
-
-def _rule_overlay_detection(values: dict[str, Any]) -> list[Conflict]:
-    overlay = values.get("compliance_overlay")
-    if overlay not in _STRICT_OVERLAYS:
-        return []
-    disabled = [
-        key for key in ("security_hub_enabled", "guardduty_enabled") if values.get(key) is False
-    ]
-    if not disabled:
-        return []
-    return [
-        Conflict(
-            code="OVERLAY_REQUIRES_DETECTION",
-            message=(
-                f"compliance overlay '{overlay}' requires organization-wide detection, "
-                f"but {' and '.join(disabled)} is stated as disabled"
-            ),
-            decision_keys=["compliance_overlay", *disabled],
-        )
-    ]
 
 
 def _rule_assignments(values: dict[str, Any]) -> list[Conflict]:
@@ -432,8 +394,6 @@ _RULES: tuple[Callable[[dict[str, Any]], list[Conflict]], ...] = (
     _rule_network_account_scope,
     _rule_network_cidr,
     _rule_private_subnets,
-    _rule_overlay_logging,
-    _rule_overlay_detection,
     _rule_assignments,
     _rule_account_emails,
     _rule_missing_account_emails,

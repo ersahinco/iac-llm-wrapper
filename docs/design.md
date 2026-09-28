@@ -32,6 +32,13 @@ OPA must still return one assessment for every selected policy. Re-evaluate afte
 resolving defaults so the exported values have actually been assessed. A warning is
 an explicit policy-author choice; the model cannot downgrade a conflict.
 
+Required security controls and region restrictions live in the selected
+organisation policy, with scoped exceptions in its reference data. Python checks
+value consistency. The bundled LZA scan supplies general security advice without
+a second region allowlist. `compliance_overlay` selects emitted template settings;
+it does not create a required policy. Existing cases keep their stored rules until
+the owner explicitly refreshes `--organisation`.
+
 Artifact scanners are advisory by default; `scan --strict` makes their open
 findings fail CI. Invalid LZA shape and incomplete/error scan results remain
 unsuccessful in either mode. Native exceptions do not count as assessed passes.
@@ -45,7 +52,8 @@ snapshot make corrections and policy review reproducible; explicit re-selection
 refreshes references. Run ingest/index/review sequentially. This is not a live CMDB,
 IP allocator or concurrent editing service.
 
-Both exporters serialize and validate before writing. They preflight every file,
+Both exporters resolve values from the review's facts and reassess selected policy.
+They serialize and validate before writing, preflight every destination,
 then create it exclusively; an existing file, directory or symlink is a collision.
 Use a new output directory per revision. This deliberately avoids overwrite flags,
 ownership manifests and migration logic. Failed writes remove files created by

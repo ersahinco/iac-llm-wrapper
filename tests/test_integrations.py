@@ -131,7 +131,7 @@ def vpc_resolution():
         conflicts=[],
         facts=facts,
     )
-    return resolve(catalog, review, facts), review
+    return resolve(catalog, review), review
 
 
 def test_export_community_vpc_inputs_and_provenance(tmp_path):

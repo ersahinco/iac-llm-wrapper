@@ -235,6 +235,13 @@ are assessed by `review` and reassessed on export: `conflict` and `not-assessed`
 block; explicit `warning` outcomes remain visible in review, export and the trace.
 A policy author can use that outcome for advice or a scoped, evidenced exception.
 
+Region restrictions and required security controls belong to the selected
+organisation policy. The bundled artifact scan supplies general advice and has
+no region allowlist. `compliance_overlay` selects LZA template settings; it does
+not impose security requirements on its own. The [organisation example](samples/organisation/README.md)
+shows required controls with owner/reason exceptions. Existing cases retain their
+stored policy; re-ingest with `--organisation` to select updated requirements.
+
 Missing tools report `not-installed`; no assessed checks reports `not-assessed`.
 Failures and incomplete coverage return exit 1 even without `--strict`. Neither
 LZA YAML nor standalone tfvars establishes resource security coverage; scan the

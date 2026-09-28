@@ -45,6 +45,7 @@ def make_review(catalog: dict[str, Decision]) -> Callable[..., Review]:
             answered=sorted({fact.decision_key for fact in facts}),
             gaps=[],
             conflicts=list(conflicts),
+            facts=facts,
         )
 
     return factory

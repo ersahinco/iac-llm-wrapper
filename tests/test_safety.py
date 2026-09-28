@@ -33,8 +33,9 @@ def test_export_preserves_every_existing_destination(
             answered=list(catalog),
             gaps=[],
             conflicts=[],
+            facts=sample_facts,
         )
-    resolution = resolve(catalog, review, sample_facts)
+    resolution = resolve(catalog, review)
     out = tmp_path / "output"
     out.mkdir()
     # Use the final destination to catch partial writes from insufficient preflight.
@@ -110,7 +111,7 @@ def test_invalid_subnets_block_resolution_even_with_a_stale_clean_review(subnets
         facts=facts,
     )
     with pytest.raises(EmitBlocked, match=code):
-        resolve(catalog, review, facts)
+        resolve(catalog, review)
 
 
 def test_valid_subnets_export_with_parent_containment(tmp_path):
@@ -125,10 +126,9 @@ def test_valid_subnets_export_with_parent_containment(tmp_path):
         answered=list(catalog),
         gaps=[],
         conflicts=[],
+        facts=facts,
     )
-    paths = emit_tfvars(
-        resolve(catalog, review, facts), review, VPC / "module-inputs.json", tmp_path
-    )
+    paths = emit_tfvars(resolve(catalog, review), review, VPC / "module-inputs.json", tmp_path)
     assert json.loads(paths[0].read_text())["private_subnets"] == ["10.42.1.0/24", "10.42.2.0/24"]
 
 

@@ -15,6 +15,8 @@ Terraform, calls AWS APIs or needs cloud credentials.
 - Prefer deletion and native Neo4j/Cypher, GraphRAG, OPA and JSON Schema features.
   Add custom wiring only for a demonstrated functional need. No parallel ontology,
   speculative framework, module-coverage roadmap or all-cloud promise.
+- Prioritise simple, readable implementations of functional requirements. Treat
+  additional nonfunctional tuning as separate work justified by an observed need.
 - Accept different scenarios through explicit client documents, estate references,
   preferences, policies, catalogs and input contracts. Reference text alone adds
   neither executable checks nor output mappings. Keep unsupported needs visible.
@@ -49,6 +51,8 @@ Terraform, calls AWS APIs or needs cloud credentials.
   are `not-assessed` and block export. Retain evidence and input/document/reference
   hashes. Reassess resolved values before emission. Explicit `warning` assessments
   remain visible in review/export/trace and do not block; the model cannot downgrade findings.
+  Required security controls and region restrictions belong to selected policies;
+  `compliance_overlay` selects LZA template settings, not export requirements.
 - **Fail-closed export.** Gaps, conflicts and invalid contracts block output.
   Defaults require `--allow-defaults` and `origin: default` in the trace. Preserve
   owner files. Exports require unused destinations, reject symlinks and never
@@ -111,7 +115,13 @@ an observed need.
 - Exports never replace existing destinations. One shared writer validates all
   destinations and creates files exclusively. `review` is deterministic; `ask`
   replaces the separate narration path. Removed the requests runtime dependency
-  and duplicate graph fact reads. Design boundaries: `docs/design.md`.
+  and duplicate graph fact reads. Resolution uses only `Review.facts`, and review
+  plus both exports share the stored-catalog check. Design boundaries: `docs/design.md`.
+- Organisation restrictions have one selected policy owner. The banking example
+  checks region membership and required security controls, retaining scoped
+  owner/reason exceptions as warnings. The bundled LZA scan keeps generic advice
+  without a second region allowlist. Existing stored cases require an explicit
+  `--organisation` refresh to adopt the updated example policy.
 - Live Ollama embeddinggemma and qwen2.5:7b previously produced incorrect answers
   despite valid citations. Live semantic reliability and independent architect
   feedback remain unproven. Retrieval remains bounded to 500 statements, 4,000
@@ -121,21 +131,20 @@ an observed need.
 
 ### Latest verification
 
-- 2026-09-28: all 217 tests passed without skips on isolated Compose project
-  `iac-lean-20260928` (ports 58474/58687), with real Neo4j and OPA. Ruff, mypy and
-  strict OPA checks passed. Python 3.14 emits upstream Neo4j deprecation warnings.
-- Real Checkov 3.3.10 and Trivy scans of synthetic owner IaC reported security
-  findings and retained scoped exception reasons. Checkov's quiet JSON mode hid
-  skipped details, so the adapter no longer uses it. Trivy inline suppressions can
-  be absent from reports; the demonstrated `.trivyignore.yaml` preserves reasons.
-- Rebuilt Compose passed 13 sequential walkthrough steps: blocked inputs,
-  reference reuse, LZA output, refusal to overwrite, corrected scoped policy and
-  separate VPC/instance exports with warnings. The real combined `review --scan`
-  returned zero blockers while showing both policy and native scanner warnings.
-- Locked installation/local checks passed 194 tests with 23 database tests skipped.
-  Local Markdown links and CLI help passed. Evidence is ignored under
-  `build/security-discussion/`. Earlier saved graphs and unrelated services were
-  not changed. The isolated test project is stopped at session end; its volume is retained.
+- 2026-09-28: all 228 tests passed without skips on isolated Compose project
+  `iac-policy-cleanup-20260928` (ports 58774/58887), with real Neo4j and OPA.
+  Ruff, mypy, strict OPA and policy formatting checks passed. Host Python 3.14
+  emits upstream Neo4j/GraphRAG deprecation warnings.
+- Regression checks cover required security controls, missing/unusable answers,
+  scoped exceptions with owner/reason, general artifact warnings, and catalog
+  mismatch rejection in review and both exports. An end-to-end case approved
+  `ap-southeast-2` and a GuardDuty exception, then exported with the warning intact
+  and no conflicting artifact-region warning.
+- Evidence is ignored under `build/policy-cleanup/`. Saved cases and unrelated
+  services were not changed. The isolated test project is stopped at session end;
+  its volume is retained. No dependencies were added.
+- Earlier real Checkov/Trivy walkthrough evidence remains in
+  `build/security-discussion/`; native scanner adapters and exceptions are retained.
 - The user authorised implementation, tests, commit and push for these changes.
 
 ### Next

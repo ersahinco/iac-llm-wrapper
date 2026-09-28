@@ -182,4 +182,6 @@
   question: Which compliance overlay applies?
   options: [none, regulated, financial-services, healthcare, education]
   default: none
-  hint: An overlay selects stricter decisions. It does not replace attestation.
+  hint: >-
+    Selects LZA template settings. Required controls and exceptions come from
+    selected organisation policy; this is not attestation.

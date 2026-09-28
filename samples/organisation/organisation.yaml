@@ -2,7 +2,7 @@ name: Blue River Bank illustrative organisation
 references:
   - {id: estate, path: estate.md, kind: context}
   - {id: lza, path: lza-reference.yaml, kind: configuration}
-  - {id: regional-policy, path: policy.rego, kind: policy}
+  - {id: organisation-policy, path: policy.rego, kind: policy}
 systems:
   - id: enterprise-network
     name: Hybrid on-premises, SD-WAN and Azure network
@@ -48,4 +48,7 @@ questions:
 policies:
   - id: approved-regions
     decision_keys: [enabled_regions]
-    evidence: {reference: regional-policy, line: 3, quote: "AWS enabled regions must be within the organisation's selected LZA region standard."}
+    evidence: {reference: organisation-policy, line: 3, quote: "AWS enabled regions must be within the organisation's selected LZA region standard."}
+  - id: security-controls
+    decision_keys: [centralized_logging, security_hub_enabled, guardduty_enabled]
+    evidence: {reference: organisation-policy, line: 4, quote: "This organisation requires logging and detection unless a scoped exception is recorded."}

@@ -61,6 +61,15 @@ _DATABASE = typer.Option(None, "--database", help="Neo4j database (default $NEO4
 _CATALOG = typer.Option(None, "--catalog", help="Override the packaged decision catalog.")
 
 
+def _review(graph: KnowledgeGraph, catalog: Path | None) -> tuple[Review, dict[str, Decision]]:
+    decisions = graph.catalog()
+    if catalog is not None:
+        selected = organisation_catalog(load_catalog(catalog), graph.organisation())
+        if selected != decisions:
+            raise CatalogError("catalog differs from the ingested snapshot; ingest again")
+    return build_review(graph, decisions), decisions
+
+
 @app.command()
 def ingest(
     document: Path = typer.Argument(..., help="Architecture document to ingest in full."),
@@ -225,12 +234,7 @@ def review(
     """Report gaps and conflicts found deterministically in the graph."""
     try:
         with _graph(uri, user, password, database) as graph:
-            decisions = graph.catalog()
-            if catalog is not None:
-                selected = organisation_catalog(load_catalog(catalog), graph.organisation())
-                if selected != decisions:
-                    raise CatalogError("catalog differs from the ingested snapshot; ingest again")
-            result = build_review(graph, decisions)
+            result, decisions = _review(graph, catalog)
         scans = scan_bundle(scan_path) if scan_path is not None else []
     except _KNOWN_FAILURES as exc:
         _fail(str(exc))
@@ -322,13 +326,8 @@ def emit(
     """Write AWS LZA configuration. Blocked by any gap or conflict."""
     try:
         with _graph(uri, user, password, database) as graph:
-            decisions = graph.catalog()
-            if catalog is not None:
-                selected = organisation_catalog(load_catalog(catalog), graph.organisation())
-                if selected != decisions:
-                    raise CatalogError("catalog differs from the ingested snapshot; ingest again")
-            result = build_review(graph, decisions)
-        resolution = resolve(decisions, result, result.facts, allow_defaults=allow_defaults)
+            result, decisions = _review(graph, catalog)
+        resolution = resolve(decisions, result, allow_defaults=allow_defaults)
         written = emit_bundle(resolution, result, out, network_config=network_config)
     except _KNOWN_FAILURES as exc:
         _fail(str(exc))
@@ -357,13 +356,8 @@ def export_tfvars(
     """Export confirmed values and evidence. No Terraform resources or execution."""
     try:
         with _graph(uri, user, password, database) as graph:
-            decisions = graph.catalog()
-            if catalog is not None:
-                selected = organisation_catalog(load_catalog(catalog), graph.organisation())
-                if selected != decisions:
-                    raise CatalogError("catalog differs from the ingested snapshot; ingest again")
-            result = build_review(graph, decisions)
-        resolution = resolve(decisions, result, result.facts)
+            result, decisions = _review(graph, catalog)
+        resolution = resolve(decisions, result)
         paths = emit_tfvars(resolution, result, contract, out)
     except _KNOWN_FAILURES as exc:
         _fail(str(exc))

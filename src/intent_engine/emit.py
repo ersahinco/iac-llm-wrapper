@@ -40,15 +40,15 @@ class Resolution:
 def resolve(
     catalog: dict[str, Decision],
     review: Review,
-    facts: list[Fact],
+    *,
     allow_defaults: bool = False,
 ) -> Resolution:
     if review.conflicts:
         codes = ", ".join(sorted({conflict.code for conflict in review.conflicts}))
         raise EmitBlocked(f"unresolved conflicts block emission: {codes}")
 
-    stated = raw_values(facts)
-    evidence = {fact.decision_key: f"{fact.section}:{fact.line}" for fact in facts}
+    stated = raw_values(review.facts)
+    evidence = {fact.decision_key: f"{fact.section}:{fact.line}" for fact in review.facts}
     resolution = Resolution(values={})
     missing: list[str] = []
 
@@ -79,7 +79,7 @@ def resolve(
         listed = "\n  - ".join(missing)
         raise EmitBlocked(f"unanswered applicable decisions block emission:\n  - {listed}")
     # Defaults can introduce conflicts that did not exist among the stated facts.
-    resolved_facts = facts + [
+    resolved_facts = review.facts + [
         Fact(
             decision_key=entry["decision"],
             value=entry["value"],

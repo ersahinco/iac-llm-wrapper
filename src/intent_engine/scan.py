@@ -2,7 +2,7 @@
 
 Three external tools, three separate verdicts:
 
-    opa      the landing-zone policy the organization agreed to
+    opa      LZA artifact advice (or an explicit --policy file)
     checkov  supported IaC and secret checks
     trivy    independent secret and misconfiguration scan
 
@@ -368,7 +368,7 @@ def _result(
     tool: str,
     findings: list[str],
     assessed: int = 1,
-    scope: str = "LZA policy rules",
+    scope: str = "LZA artifact advice",
     exceptions: list[str] | None = None,
 ) -> ToolResult:
     exceptions = exceptions or []

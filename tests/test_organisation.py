@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 from ruamel.yaml import YAML
 
-from intent_engine.analysis import typed_values
+from intent_engine.analysis import semantic_conflicts, typed_values
 from intent_engine.catalog import load_catalog
 from intent_engine.ingest import IngestError, extract_facts, read_document
 from intent_engine.models import Organisation
@@ -89,3 +89,52 @@ def test_snapshot_does_not_need_original_reference_files(tmp_path):
     restored = Organisation.model_validate_json(org.model_dump_json())
     assert restored == org
     assert "enabledRegions" in restored.references[1].content
+
+
+@pytest.mark.skipif(shutil.which("opa") is None, reason="OPA not installed")
+@pytest.mark.parametrize(
+    "control", ["centralized_logging", "security_hub_enabled", "guardduty_enabled"]
+)
+def test_security_requirements_belong_to_selected_policy(control):
+    base = load_catalog()
+    org = load_organisation(SAMPLE / "organisation.yaml", base)
+    catalog = organisation_catalog(base, org)
+    facts = extract_facts(read_document(SAMPLE / "confirmed.md"), catalog)
+    facts = [
+        f.model_copy(update={"value": "false"}) if f.decision_key == control else f for f in facts
+    ]
+    assert not semantic_conflicts(catalog, facts)
+    values, _ = typed_values(catalog, facts)
+    assert assess(None, values) == []
+    result = {r.policy_id: r for r in assess(org, values)}["security-controls"]
+    assert result.status == "conflict"
+    assert control in result.message
+    for value in (None, "false"):
+        invalid = {r.policy_id: r for r in assess(org, values | {control: value})}
+        assert invalid["security-controls"].status == "not-assessed"
+
+
+@pytest.mark.skipif(shutil.which("opa") is None, reason="OPA not installed")
+@pytest.mark.parametrize(
+    "owner,reason,status",
+    [
+        ("Security team", "EXAMPLE-42: temporary alternative detection", "warning"),
+        ("", "EXAMPLE-42", "conflict"),
+        ("Security team", " ", "conflict"),
+    ],
+)
+def test_security_exceptions_require_scope_owner_and_reason(owner, reason, status):
+    org = load_organisation(SAMPLE / "organisation.yaml", load_catalog())
+    reference = next(r for r in org.references if r.id == "lza")
+    data = YAML(typ="safe").load(reference.content)
+    data["securityExceptions"] = {"guardduty_enabled": {"owner": owner, "reason": reason}}
+    reference.content = json.dumps(data)
+    values = {"centralized_logging": True, "security_hub_enabled": True, "guardduty_enabled": False}
+    result = {r.policy_id: r for r in assess(org, values)}["security-controls"]
+    assert result.status == status
+    if status == "warning":
+        assert owner in result.message and reason in result.message
+    # An exception for GuardDuty cannot exempt another disabled control.
+    result = {r.policy_id: r for r in assess(org, values | {"centralized_logging": False})}
+    assert result["security-controls"].status == "conflict"
+    assert "centralized_logging" in result["security-controls"].message

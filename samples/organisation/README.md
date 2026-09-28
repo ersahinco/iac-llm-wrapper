@@ -32,7 +32,7 @@ docker compose run --rm app emit --out build/organisation
 
 Now review exits **0** and emission writes six LZA 1.16.3 schema-valid configuration
 files plus `decision-trace.yaml`. The trace includes source hashes, the scoped OPA
-assessment, integration context and remaining work for consuming teams. Connection
+assessments, integration context and remaining work for consuming teams. Connection
 method and Entra federation are explicitly context-only decisions, not generated
 VPN or identity-provider configuration. No separate handoff file is produced.
 
@@ -44,7 +44,24 @@ integrations, additional questions and policies to exact source lines/quotes:
 - `estate.md`: stated existing and planned systems and required integrations.
 - `lza-reference.yaml`: organisation configuration used as policy reference data.
   Its values never become client answers.
-- `policy.rego`: the organisation's executable region constraint.
+- `policy.rego`: the organisation's region restrictions and required security controls.
+
+This selected policy requires logging, Security Hub and GuardDuty. A disabled
+control is a conflict unless `lza-reference.yaml` records a scoped exception:
+
+```yaml
+securityExceptions:
+  guardduty_enabled:
+    owner: Security team
+    reason: 'EXAMPLE-42: temporary alternative detection agreed for this case'
+```
+
+The exception applies only to that control in this selected case. Missing owner,
+blank reason or an unusable client answer cannot waive the requirement. Refresh
+with `--organisation` after editing references. Review and export show the
+exception as a warning and retain it in the trace. The artifact scan still supplies
+general security advice; it has no independent region allowlist. Requirements come
+from the selected policy, not the document's `compliance_overlay` label.
 
 All selected contents and hashes are stored with the client document in Neo4j.
 Supplying `--organisation` again refreshes the snapshot. Without it, correcting

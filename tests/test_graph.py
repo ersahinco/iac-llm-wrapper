@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+from pathlib import Path
 
 import pytest
 from ruamel.yaml import YAML
@@ -228,6 +230,84 @@ def test_sample_packet_leaves_nothing_open(graph, catalog, sample_path):
     assert len(result.answered) == len(facts)
 
 
+@pytest.mark.parametrize("command", ["review", "emit", "emit-tfvars"])
+def test_review_and_exports_reject_a_different_catalog(
+    graph, catalog, sample_path, tmp_path, command
+):
+    _ingest(graph, catalog, sample_path)
+    changed = [d.model_dump() for d in catalog.values()]
+    changed[0]["question"] = "Different catalog question"
+    path = tmp_path / "catalog.yaml"
+    path.write_text(json.dumps(changed))
+    arguments = [command, "--catalog", str(path)]
+    if command != "review":
+        arguments += ["--out", str(tmp_path / "output")]
+    if command == "emit-tfvars":
+        arguments += ["--contract", "samples/vpc/module-inputs.json"]
+    result = CliRunner().invoke(app, arguments)
+    assert result.exit_code == 2, result.output
+    assert "catalog differs from the ingested snapshot" in result.output
+    assert not (tmp_path / "output").exists()
+
+
+@pytest.mark.skipif(shutil.which("opa") is None, reason="OPA not installed")
+def test_selected_policy_exception_and_region_survive_export(graph, tmp_path):
+    from intent_engine.scan import run_opa
+
+    sample = Path(__file__).resolve().parents[1] / "samples" / "organisation"
+    for source in sample.iterdir():
+        if source.is_file():
+            shutil.copyfile(source, tmp_path / source.name)
+    client = tmp_path / "confirmed.md"
+    client.write_text(
+        client.read_text()
+        .replace("- enabled_regions: eu-central-1, eu-west-1", "- enabled_regions: ap-southeast-2")
+        .replace("- home_region: eu-central-1", "- home_region: ap-southeast-2")
+        .replace("- data_regions: eu-central-1, eu-west-1", "- data_regions: ap-southeast-2")
+        .replace("- guardduty_enabled: true", "- guardduty_enabled: false")
+    )
+    reference = tmp_path / "lza-reference.yaml"
+    data = {"enabledRegions": ["ap-southeast-2"], "securityExceptions": {}}
+    reference.write_text(json.dumps(data))
+    runner = CliRunner()
+    ingest = ["ingest", str(client), "--organisation", str(tmp_path / "organisation.yaml")]
+    assert runner.invoke(app, ingest).exit_code == 0
+    blocked = runner.invoke(app, ["review", "--json"])
+    assert blocked.exit_code == 1, blocked.output
+    findings = json.loads(blocked.stdout)
+    assert {a["policy_id"]: a["status"] for a in findings["assessments"]} == {
+        "approved-regions": "passed",
+        "security-controls": "conflict",
+    }
+    output = tmp_path / "output"
+    assert runner.invoke(app, ["emit", "--out", str(output)]).exit_code == 2
+    assert not output.exists()
+
+    data["securityExceptions"] = {
+        "guardduty_enabled": {
+            "owner": "Security team",
+            "reason": "EXAMPLE-42: alternative detection",
+        }
+    }
+    reference.write_text(json.dumps(data))
+    assert runner.invoke(app, ingest).exit_code == 0
+    reviewed = runner.invoke(app, ["review"])
+    assert reviewed.exit_code == 0, reviewed.output
+    assert "warning [security-controls]" in reviewed.stdout and "EXAMPLE-42" in reviewed.stdout
+    emitted = runner.invoke(app, ["emit", "--out", str(output)])
+    assert emitted.exit_code == 0, emitted.output
+    assert "EXAMPLE-42" in emitted.stdout
+    trace = YAML(typ="safe").load((output / "decision-trace.yaml").read_text())
+    assert {a["policy_id"]: a["status"] for a in trace["policyAssessments"]} == {
+        "approved-regions": "passed",
+        "security-controls": "warning",
+    }
+    # Artifact advice stays visible, but cannot impose a second region allowlist.
+    scan = run_opa(output)
+    assert not scan.blocking
+    assert len(scan.findings) == 1 and "GuardDuty" in scan.findings[0]
+
+
 def test_gaps_report_gating_and_blocking(graph, catalog, tmp_path):
     path = tmp_path / "partial.md"
     path.write_text(
@@ -373,7 +453,7 @@ def test_organisation_discussion_then_lza_export(graph, tmp_path):
     assert not out.exists()
     assert graph.counts()["System"] == 4
     assert graph.counts()["Integration"] == 2
-    assert graph.counts()["Assessment"] == 1
+    assert graph.counts()["Assessment"] == 2
 
     # No repeated organisation flag: corrections preserve its selected snapshot.
     loaded = runner.invoke(app, ["ingest", str(sample / "confirmed.md")])
