@@ -4,8 +4,9 @@ version = "0.2.0"
 description = "Sourced architecture review with Neo4j GraphRAG, deterministic gap and conflict checks, and validated LZA or Terraform module inputs."
 readme = "README.md"
 requires-python = ">=3.11"
-license = "Apache-2.0"
-license-files = ["LICENSE"]
+# Project code is MIT; bundled LZA schemas retain Apache-2.0.
+license = "MIT AND Apache-2.0"
+license-files = ["LICENSE", "src/intent_engine/schemas/LICENSE.txt", "src/intent_engine/schemas/NOTICE.txt"]
 authors = [
     {name = "Cemreoguz Ersahin", email = "ersahin@users.noreply.github.com"},
 ]
@@ -30,6 +31,7 @@ dependencies = [
 [project.urls]
 homepage = "https://github.com/ersahinco/iac-llm-wrapper"
 repository = "https://github.com/ersahinco/iac-llm-wrapper"
+issues = "https://github.com/ersahinco/iac-llm-wrapper/issues"
 
 [project.scripts]
 iac-llm-wrapper = "intent_engine.cli:app"
@@ -45,7 +47,7 @@ graphrag = [
 ]
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [tool.ruff]

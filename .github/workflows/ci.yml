@@ -32,6 +32,9 @@ jobs:
       - name: Type check
         run: uv run --locked --extra dev --extra graphrag mypy
 
+      - name: Build distributions
+        run: uv build
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 20

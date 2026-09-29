@@ -1,9 +1,28 @@
 # Contributing
 
-Start with the [quickstart](README.md#quickstart). For a change, describe an observed
-problem, keep the patch focused, and explain how you verified it. Use sanitised
-examples in issues and tests; keep client packets, credentials and generated
-bundles out of contributions. Contributions use the [Apache 2.0 license](LICENSE).
+Questions, documentation fixes, examples, bug reports and code changes are welcome.
+Start with the [quickstart](README.md#quickstart) and
+[design guide](docs/design.md). You can contribute without running an LLM or using
+cloud credentials.
+
+## Issues and pull requests
+
+- [Open an issue](https://github.com/ersahinco/iac-llm-wrapper/issues) with the command,
+  a minimal sanitised input, and the expected and actual result when reporting a bug.
+- Small fixes can go straight to a pull request. Discuss larger features or new
+  dependencies in an issue first so we can agree on scope.
+- Fork the repository, create a branch, and open a pull request against `main`.
+  Keep it focused, explain the problem and verification, and use a draft if you
+  want early feedback. Maintainers review behavior, clarity and scope; CI runs the
+  automated checks.
+
+Be respectful, explain your reasoning, and leave room for questions and learning.
+Use sanitised examples in issues and tests; keep client packets, credentials and
+generated bundles out of contributions.
+
+By submitting a contribution, you agree to license your original work under the
+project's [MIT License](LICENSE). Retain the original licenses and notices for
+third-party material, including the [bundled LZA schemas](src/intent_engine/schemas/SOURCE.txt).
 
 ## Local checks
 
@@ -13,11 +32,15 @@ Use Python 3.11+ and [uv](https://docs.astral.sh/uv/). From the repository root:
 uv sync --locked --extra dev --extra graphrag
 env -u NEO4J_PASSWORD uv run --locked --extra dev --extra graphrag pytest
 uv run --locked --extra dev --extra graphrag ruff check .
+uv run --locked --extra dev --extra graphrag ruff format --check .
 uv run --locked --extra dev --extra graphrag mypy
 ```
 
 This skips database tests. GraphRAG model calls in automated tests are controlled;
 passing tests do not establish live model answer quality.
+
+For packaging or license changes, also run `uv build`. Built distributions must
+include both the project's MIT license and the upstream schema license/notices.
 
 ## Full suite with Neo4j and OPA
 

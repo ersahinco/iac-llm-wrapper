@@ -11,6 +11,8 @@ module variable JSON, each with a decision trace. Nothing deploys or runs Terraf
 **Status: guided local prototype.** The example workflow is tested. Real client
 adoption and model answer quality still need evaluation; output requires owner review.
 
+Questions, bug reports and contributions are welcome. See [Contributing](#contributing).
+
 ## Quickstart
 
 Requires Docker with Compose. No Python or LLM setup is needed. Run the commands
@@ -254,6 +256,9 @@ Use `COMMAND --help` for options and stop Compose with `docker compose stop`.
 
 ## Contributing
 
+[Open an issue](https://github.com/ersahinco/iac-llm-wrapper/issues) for questions,
+bugs or ideas. Documentation fixes, clearer examples, bug reports and focused code
+changes are all useful; you do not need to be an expert in the whole project.
 [CONTRIBUTING.md](CONTRIBUTING.md) covers setup, isolated tests and pull requests.
 Start with an observed problem or small sanitised case. Keep evidence, human
 confirmation and explicit output contracts; reuse existing tools before adding
@@ -262,5 +267,9 @@ the [code map](AGENTS.md#code-map) shows where changes belong.
 
 ## License
 
-Copyright 2026 Cemreoguz Ersahin. [Apache License 2.0](LICENSE).
-Bundled LZA schemas retain their [upstream notices](src/intent_engine/schemas/NOTICE.txt).
+Copyright 2026 Cemreoguz Ersahin. Original project code and documentation use the
+[MIT License](LICENSE).
+
+The bundled LZA schemas remain under [Apache 2.0](src/intent_engine/schemas/LICENSE.txt),
+with their [upstream notices](src/intent_engine/schemas/NOTICE.txt) intact.
+Package metadata lists `MIT AND Apache-2.0` because distributions include both.

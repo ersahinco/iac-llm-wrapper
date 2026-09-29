@@ -21,6 +21,8 @@ Terraform, calls AWS APIs or needs cloud credentials.
   preferences, policies, catalogs and input contracts. Reference text alone adds
   neither executable checks nor output mappings. Keep unsupported needs visible.
 - Keep the distribution name `iac-llm-wrapper` and import name `intent_engine`.
+- Original code and documentation use MIT. Preserve bundled LZA schemas and their
+  Apache-2.0 license/notices; distribution metadata accounts for both licenses.
 - Run checks appropriate to the change; see [contributor checks](CONTRIBUTING.md#local-checks).
   Do not present simulated usability tests as independent human feedback.
 
@@ -136,6 +138,11 @@ an observed need.
   identified for current requirements. Decisions, source hashes and test results
   are in `build/complete-review/`. Further changes need a concrete readability or
   functional benefit. No dependencies were added; review evidence is ignored.
+- MIT licensing and contributor guidance are in place. Source and wheel builds,
+  lockfile, Ruff, formatting and mypy checks passed; package contents retain all
+  nine upstream schema/provenance files unchanged and include both licenses and
+  upstream notices. Evidence is in `build/open-source-review/`. CI also builds
+  distributions. Runtime code and dependencies are unchanged.
 - The isolated test project is stopped at session end; its volume is retained.
   Saved cases and unrelated services were not changed. Earlier real Checkov/Trivy
   evidence remains in `build/security-discussion/`.
