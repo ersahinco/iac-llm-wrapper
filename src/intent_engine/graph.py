@@ -209,9 +209,8 @@ class KnowledgeGraph:
                SET a.document_sha256 = d.sha256
                CREATE (a)-[:FOR_DOCUMENT]->(d)
                WITH a, p MATCH (p)-[:CONSTRAINS]->(decision:Decision)
-               OPTIONAL MATCH (f:Fact)-[:ANSWERS]->(decision)
-               FOREACH (fact IN CASE WHEN f IS NULL THEN [] ELSE [f] END |
-                   CREATE (a)-[:ASSESSED]->(fact))""",
+               MATCH (f:Fact)-[:ANSWERS]->(decision)
+               CREATE (a)-[:ASSESSED]->(f)""",
             results=[r.model_dump() for r in result.assessments],
         )
 
@@ -316,9 +315,8 @@ class KnowledgeGraph:
                              origin: f.origin})
             CREATE (fa)-[:ANSWERS]->(d)
             WITH fa, f
-            OPTIONAL MATCH (st:Statement {id: f.statement_id})
-            FOREACH (evidence IN CASE WHEN st IS NULL THEN [] ELSE [st] END |
-                CREATE (fa)-[:EVIDENCE]->(evidence))
+            MATCH (st:Statement {id: f.statement_id})
+            CREATE (fa)-[:EVIDENCE]->(st)
             """,
             facts=[f.model_dump() for f in facts],
         ).consume()

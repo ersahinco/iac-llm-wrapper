@@ -214,6 +214,47 @@ def test_ingest_replaces_the_previous_document(graph, catalog, tmp_path):
     assert graph.document()[0] == str(second)
 
 
+@pytest.mark.parametrize("statement_id", [None, "absent"])
+def test_missing_statement_link_preserves_facts(
+    graph, catalog, sample_document, sample_facts, statement_id
+):
+    first, second = sample_facts[:2]
+    graph.replace(
+        catalog, sample_document, [first.model_copy(update={"statement_id": statement_id}), second]
+    )
+    assert {f.decision_key: f for f in graph.facts()} == {
+        first.decision_key: first.model_copy(update={"statement_id": None}),
+        second.decision_key: second,
+    }
+
+
+@pytest.mark.parametrize("answered", [False, True])
+def test_assessments_survive_missing_policy_answers(graph, catalog, tmp_path, answered):
+    from intent_engine.organisation import load_organisation, organisation_catalog
+
+    org = load_organisation(Path("samples/organisation/organisation.yaml"), catalog)
+    catalog = organisation_catalog(catalog, org)
+    path = tmp_path / "partial.md"
+    path.write_text("enabled_regions: eu-central-1\n" if answered else "Discuss region choices.\n")
+    document = read_document(path)
+    graph.replace(catalog, document, extract_facts(document, catalog), organisation=org)
+    result = review(graph, catalog)
+    rows = graph._run(
+        """MATCH (a:Assessment)-[:ASSESSES]->(p:Policy), (a)-[:FOR_DOCUMENT]->(d:Document)
+           OPTIONAL MATCH (a)-[:ASSESSED]->(f:Fact)
+           RETURN p.organisation_id AS policy, a.status AS status,
+                  a.document_sha256 AS sha256, count(f) AS answers"""
+    )
+    assert {row["policy"]: row["answers"] for row in rows} == {
+        "approved-regions": int(answered),
+        "security-controls": 0,
+    }
+    assert {row["policy"]: row["status"] for row in rows} == {
+        a.policy_id: a.status for a in result.assessments
+    }
+    assert all(row["sha256"] == document.sha256 for row in rows)
+
+
 def test_sample_packet_leaves_nothing_open(graph, catalog, sample_path):
     document, facts = _ingest(graph, catalog, sample_path)
     result = review(graph, catalog)

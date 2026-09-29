@@ -20,10 +20,7 @@ deny contains msg if {
 	msg := "global-config: an organization CloudTrail is required"
 }
 
-home_region_enabled if {
-	some region in input.global.enabledRegions
-	region == input.global.homeRegion
-}
+home_region_enabled if input.global.homeRegion in input.global.enabledRegions
 
 deny contains msg if {
 	not home_region_enabled

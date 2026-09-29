@@ -122,19 +122,20 @@ an observed need.
 
 ### Latest verification
 
-- 2026-09-29: all 236 tests passed without skips with real Neo4j and OPA on isolated
-  project `iac-native-review-20260929` (ports 59174/59187). Ruff, formatting,
+- 2026-09-29: all 240 tests passed without skips with real Neo4j and OPA on isolated
+  project `iac-complete-review-20260929` (ports 59274/59287). Ruff, formatting,
   mypy, strict OPA and Rego formatting passed. Upstream Neo4j/GraphRAG warnings
   remain on host Python 3.14; model responses in automated tests are controlled.
-- Model and extraction schemas are unchanged. Extended checks cover native
-  proposal conversion, catalog snapshots, gates and ordered gap dependencies.
-  Existing coverage retains environment/flag precedence, explicit sourced answers,
+- Model and extraction schemas are unchanged. New graph checks retain facts and
+  assessments when evidence links or policy answers are absent. Native Rego
+  membership preserves findings across 72 valid/missing/malformed combinations;
+  the named helper retains warnings on undefined inputs. Existing coverage retains
   atomic replacement, stored snapshots, policy/default gates, no-clobber exports
   and native scanner exception handling.
-- Real CLI VPC ingest/review/export retains warnings with exception reasons and
-  evidence. The 109-function audit is in `build/verbosity-review/review.md`; follow-up
-  changes and full-suite output are in `build/native-review/`. This pass removes
-  24 runtime lines. No dependencies were added; review evidence is ignored.
+- The 109-function complexity review is complete: no further worthwhile cuts
+  identified for current requirements. Decisions, source hashes and test results
+  are in `build/complete-review/`. Further changes need a concrete readability or
+  functional benefit. No dependencies were added; review evidence is ignored.
 - The isolated test project is stopped at session end; its volume is retained.
   Saved cases and unrelated services were not changed. Earlier real Checkov/Trivy
   evidence remains in `build/security-discussion/`.

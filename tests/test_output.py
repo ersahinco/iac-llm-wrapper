@@ -513,6 +513,8 @@ def test_policy_rejects_missing_or_mistyped_fields(
         _YAML.dump(data, handle)
     result = scan.run_opa(bundle_input(tmp_path))
     assert result.status == "findings", result
+    if path in (["homeRegion"], ["enabledRegions"]):
+        assert "global-config: homeRegion must be present in enabledRegions" in result.findings
 
 
 @pytest.mark.skipif(shutil.which("opa") is None, reason="opa is not installed")
