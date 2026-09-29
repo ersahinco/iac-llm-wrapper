@@ -130,19 +130,8 @@ async def build_architecture(
         examples=json.dumps([d.model_dump() for d in catalog.values()]),
     )
     pruned = await GraphPruning().run(graph=graph, schema=schema)
-    graph = pruned.graph
     # The library parses graph shape; enforce our narrower evidence/decision contract.
-    architecture = Architecture.model_validate(
-        {
-            "nodes": [
-                {"id": n.id, "label": n.label, "properties": n.properties} for n in graph.nodes
-            ],
-            "relationships": [
-                {"start_node_id": r.start_node_id, "end_node_id": r.end_node_id, "type": r.type}
-                for r in graph.relationships
-            ],
-        }
-    )
+    architecture = Architecture.model_validate(pruned.graph, from_attributes=True)
     validate_architecture(architecture, document, catalog)
     stats = pruned.pruning_stats
     if stats.pruned_nodes or stats.pruned_relationships or stats.pruned_properties:

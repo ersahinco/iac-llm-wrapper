@@ -269,38 +269,27 @@ class KnowledgeGraph:
         )
 
     def _load_catalog(self, tx: ManagedTransaction, catalog: dict[str, Decision]) -> None:
+        decisions = [d.model_dump() for d in catalog.values()]
         tx.run(
-            """
-            UNWIND $decisions AS d
-            CREATE (n:Decision) SET n = d
-            """,
-            decisions=[d.model_dump(exclude={"gate", "requires"}) for d in catalog.values()],
+            # Gates and prerequisites become relationships, not node properties.
+            """UNWIND $decisions AS d
+               CREATE (n:Decision) SET n = d {.*, gate: null, requires: null}""",
+            decisions=decisions,
         ).consume()
         tx.run(
-            """
-            UNWIND $edges AS e
-            MATCH (d:Decision {key: e.source})
-            MATCH (dep:Decision {key: e.target})
-            MERGE (d)-[:REQUIRES]->(dep)
-            """,
-            edges=[
-                {"source": d.key, "target": required}
-                for d in catalog.values()
-                for required in d.requires
-            ],
+            """UNWIND $decisions AS d
+               MATCH (n:Decision {key: d.key})
+               UNWIND d.requires AS key
+               MATCH (dep:Decision {key: key})
+               MERGE (n)-[:REQUIRES]->(dep)""",
+            decisions=decisions,
         ).consume()
         tx.run(
-            """
-            UNWIND $edges AS e
-            MATCH (d:Decision {key: e.source})
-            MATCH (p:Decision {key: e.target})
-            MERGE (d)-[:GATED_BY {equals: e.equals}]->(p)
-            """,
-            edges=[
-                {"source": d.key, "target": d.gate.decision, "equals": d.gate.equals}
-                for d in catalog.values()
-                if d.gate is not None
-            ],
+            """UNWIND $decisions AS d
+               MATCH (n:Decision {key: d.key})
+               MATCH (p:Decision {key: d.gate.decision})
+               MERGE (n)-[:GATED_BY {equals: d.gate.equals}]->(p)""",
+            decisions=decisions,
         ).consume()
 
     def _load_document(self, tx: ManagedTransaction, document: Document) -> None:
@@ -360,16 +349,14 @@ class KnowledgeGraph:
             MATCH (d:Decision {key: key})
             WHERE NOT EXISTS { MATCH (:Fact)-[:ANSWERS]->(d) }
             OPTIONAL MATCH (blocked:Decision)-[:REQUIRES]->(d)
+            WITH d, blocked ORDER BY blocked.key
             RETURN d.key AS decision_key, d.question AS question, d.category AS category,
                    d.default AS default, collect(DISTINCT blocked.key) AS blocks
             ORDER BY category, decision_key
             """,
             applicable=applicable,
         )
-        return [
-            Gap.model_validate({**row, "blocks": sorted(key for key in row["blocks"] if key)})
-            for row in rows
-        ]
+        return [Gap.model_validate(row) for row in rows]
 
     def contradictions(self) -> list[Conflict]:
         """Two statements answering one decision with different values."""

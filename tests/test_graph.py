@@ -316,6 +316,12 @@ def test_gaps_report_gating_and_blocking(graph, catalog, tmp_path):
         "identity_center_assignments",
         "identity_center_policy_mappings",
     ]
+    assert gaps["network_account"].blocks == []
+    assert graph.catalog() == catalog
+    assert graph._run(
+        """MATCH (n:Decision {key: 'network_account'})-[gate:GATED_BY]->(parent:Decision)
+           RETURN parent.key AS parent, gate.equals AS value, n.options AS options"""
+    ) == [{"parent": "topology", "value": "hub-spoke", "options": []}]
 
 
 def test_gated_decision_disappears_under_single_vpc(graph, catalog, tmp_path):

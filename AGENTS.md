@@ -103,10 +103,10 @@ an observed need.
 - Guided local prototype: sourced gap/conflict review, explicit architect answers,
   six LZA 1.16.3 files plus a trace, or mapped module variables plus a trace.
   Hybrid networking and Entra ID remain integration context.
-- Native Typer options handle connection defaults; Pydantic class options declare
-  strict models. Review converts answers once; exports validate resolved values
-  directly. Values and evidence use the same first fact. Email maps and scan YAML
-  are parsed once. CLI output avoids repeated counts, help and warning summaries.
+- Native Typer options handle connection defaults. Pydantic reads GraphRAG objects
+  directly; Cypher loads catalog relationships and orders gap dependencies.
+  Review converts answers once and keeps each value with its first source.
+  CLI warnings appear once with their reasons and evidence.
 - Selected organisation policy owns region/security restrictions and scoped
   owner/reason exceptions. Existing cases require `--organisation` refresh to
   adopt changed example policies. Checkov/Trivy adapters and exceptions remain.
@@ -123,18 +123,18 @@ an observed need.
 ### Latest verification
 
 - 2026-09-29: all 236 tests passed without skips with real Neo4j and OPA on isolated
-  project `iac-verbosity-review-20260929` (ports 59074/59087). Ruff, formatting,
+  project `iac-native-review-20260929` (ports 59174/59187). Ruff, formatting,
   mypy, strict OPA and Rego formatting passed. Upstream Neo4j/GraphRAG warnings
   remain on host Python 3.14; model responses in automated tests are controlled.
-- All 18 model schemas/configurations and the extraction schema match the
-  previous version. New checks cover native environment/flag precedence and
-  explicit nonempty answers with intact source lines. Existing coverage retains
+- Model and extraction schemas are unchanged. Extended checks cover native
+  proposal conversion, catalog snapshots, gates and ordered gap dependencies.
+  Existing coverage retains environment/flag precedence, explicit sourced answers,
   atomic replacement, stored snapshots, policy/default gates, no-clobber exports
   and native scanner exception handling.
-- A real CLI VPC ingest/review/export retained each warning once with its exception
-  reason and evidence. The current 109 runtime functions have explicit review
-  decisions in `build/verbosity-review/review.md`; evidence is ignored under that
-  directory. No dependencies were added.
+- Real CLI VPC ingest/review/export retains warnings with exception reasons and
+  evidence. The 109-function audit is in `build/verbosity-review/review.md`; follow-up
+  changes and full-suite output are in `build/native-review/`. This pass removes
+  24 runtime lines. No dependencies were added; review evidence is ignored.
 - The isolated test project is stopped at session end; its volume is retained.
   Saved cases and unrelated services were not changed. Earlier real Checkov/Trivy
   evidence remains in `build/security-discussion/`.

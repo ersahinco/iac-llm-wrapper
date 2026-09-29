@@ -69,6 +69,9 @@ def test_real_graphrag_component_with_controlled_model(proposal, bad_link):
     catalog = load_catalog(VPC / "decisions.yaml")
     result = asyncio.run(build_architecture(document, catalog, ControlledModel("test")))
     assert len(result.nodes) == 2
+    assert {node.label: node.properties for node in result.nodes} == {
+        node["label"]: node["properties"] for node in proposal["nodes"]
+    }
     if bad_link:
         assert result.relationships == []
         assert result.warnings
