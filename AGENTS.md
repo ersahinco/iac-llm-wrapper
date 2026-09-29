@@ -103,56 +103,41 @@ an observed need.
 - Guided local prototype: sourced gap/conflict review, explicit architect answers,
   six LZA 1.16.3 files plus a trace, or mapped module variables plus a trace.
   Hybrid networking and Entra ID remain integration context.
-- Network consistency now rejects malformed/noncanonical CIDRs, peer subnet
-  overlaps, subnets outside their VPC and subnet/zone count mismatch. The scoped
-  VPC workload example adds existing allocation checks by routing domain,
-  environment instance allowlists, evidenced exceptions and monitoring advice.
-  VPC and EC2 module contracts export separate reviewed subsets, not deployed resources.
-- Checkov and Trivy are retained for architecture discussions. `review --scan`
-  accepts owner IaC; findings are warnings, reported native exceptions remain
-  visible, and missing/error/unassessed scans are unsuccessful. `scan --strict`
-  additionally fails on open findings. LZA schema failures stay blocking.
-- Exports never replace existing destinations. One shared writer validates all
-  destinations and creates files exclusively. `review` is deterministic; `ask`
-  replaces the separate narration path. Removed the requests runtime dependency
-  and duplicate graph fact reads. Resolution uses only `Review.facts`, and review
-  plus both exports share the stored-catalog check. Design boundaries: `docs/design.md`.
-- Organisation restrictions have one selected policy owner. The banking example
-  checks region membership and required security controls, retaining scoped
-  owner/reason exceptions as warnings. The bundled LZA scan keeps generic advice
-  without a second region allowlist. Existing stored cases require an explicit
-  `--organisation` refresh to adopt the updated example policy.
-- Function review removed eight helpers and 115 runtime lines. Review converts
-  answers once; export checks resolved values directly without synthetic Facts.
-  Selected values and trace evidence use the same first fact. Account email maps
-  and scan YAML are parsed once; OPA artifact checks use stdin. Neo4j catalog/gap
-  mapping uses native serialization. Ungated enums also require options.
-- Live Ollama embeddinggemma and qwen2.5:7b previously produced incorrect answers
-  despite valid citations. Live semantic reliability and independent architect
-  feedback remain unproven. Retrieval remains bounded to 500 statements, 4,000
-  characters per statement and 32,000 prompt characters.
-- No live estate discovery, automatic CIDR allocation, capacity recommendation,
-  concurrent editing, automatic policy translation or authenticated exception sign-off.
+- Native Typer options handle connection defaults; Pydantic class options declare
+  strict models. Review converts answers once; exports validate resolved values
+  directly. Values and evidence use the same first fact. Email maps and scan YAML
+  are parsed once. CLI output avoids repeated counts, help and warning summaries.
+- Selected organisation policy owns region/security restrictions and scoped
+  owner/reason exceptions. Existing cases require `--organisation` refresh to
+  adopt changed example policies. Checkov/Trivy adapters and exceptions remain.
+- The VPC example checks canonical CIDRs, containment, subnet overlap and zone
+  counts; selected OPA adds routing-domain allocations, instance allowlists,
+  evidenced exceptions and monitoring advice. Contracts export reviewed subsets.
+- Live embeddinggemma and qwen2.5:7b previously produced incorrect answers despite
+  valid citations. Semantic reliability and independent architect feedback remain
+  unproven. Retrieval limits: 500 statements, 4,000 characters per statement,
+  32,000 prompt characters.
+- No live estate discovery, CIDR allocation, capacity recommendations, concurrent
+  editing, automatic policy translation or authenticated exception sign-off.
 
 ### Latest verification
 
-- 2026-09-29: all 231 tests passed without skips on isolated Compose project
-  `iac-function-review-20260929` (ports 58974/58987), with real Neo4j and OPA.
-  Ruff, formatting, mypy, strict OPA and policy formatting checks passed. Host
-  Python 3.14 emits upstream Neo4j/GraphRAG deprecation warnings.
-- Regression checks cover required security controls, missing/unusable answers,
-  scoped exceptions with owner/reason, general artifact warnings, and catalog
-  mismatch rejection in review and both exports. An end-to-end case approved
-  `ap-southeast-2` and a GuardDuty exception, then exported with the warning intact
-  and no conflicting artifact-region warning.
-- New regression checks reject enums without options with or without gates and
-  retain the first repeated answer's source in the export trace. All 122 original
-  runtime functions have review decisions in `build/function-review/review.md`.
-- Evidence is ignored under `build/function-review/` and `build/policy-cleanup/`.
-  Saved cases and unrelated services were not changed. The isolated test project
-  is stopped at session end; its volume is retained. No dependencies were added.
-- Earlier real Checkov/Trivy walkthrough evidence remains in
-  `build/security-discussion/`; native scanner adapters and exceptions are retained.
+- 2026-09-29: all 236 tests passed without skips with real Neo4j and OPA on isolated
+  project `iac-verbosity-review-20260929` (ports 59074/59087). Ruff, formatting,
+  mypy, strict OPA and Rego formatting passed. Upstream Neo4j/GraphRAG warnings
+  remain on host Python 3.14; model responses in automated tests are controlled.
+- All 18 model schemas/configurations and the extraction schema match the
+  previous version. New checks cover native environment/flag precedence and
+  explicit nonempty answers with intact source lines. Existing coverage retains
+  atomic replacement, stored snapshots, policy/default gates, no-clobber exports
+  and native scanner exception handling.
+- A real CLI VPC ingest/review/export retained each warning once with its exception
+  reason and evidence. The current 109 runtime functions have explicit review
+  decisions in `build/verbosity-review/review.md`; evidence is ignored under that
+  directory. No dependencies were added.
+- The isolated test project is stopped at session end; its volume is retained.
+  Saved cases and unrelated services were not changed. Earlier real Checkov/Trivy
+  evidence remains in `build/security-discussion/`.
 - The user authorised implementation, tests, commit and push for these changes.
 
 ### Next

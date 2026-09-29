@@ -59,9 +59,9 @@ Use a new output directory per revision. This deliberately avoids overwrite flag
 ownership manifests and migration logic. Failed writes remove files created by
 that attempt; earlier outputs and owner files are never deliberately replaced.
 
-`review` already renders a deterministic discussion agenda. The separate narration
-provider path was removed; `ask` supplies the one model-answer workflow. Keep the
-small extraction adapter until upstream preserves its native JSON Schema format.
+`review` renders a deterministic discussion agenda; `ask` provides advisory model
+answers. Keep the small extraction adapter until upstream preserves its native
+JSON Schema format.
 
 ## Adding a real requirement
 

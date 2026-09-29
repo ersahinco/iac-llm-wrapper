@@ -1,14 +1,4 @@
-"""Advisory security checks over LZA output or owner-supplied IaC.
-
-Three external tools, three separate verdicts:
-
-    opa      LZA artifact advice (or an explicit --policy file)
-    checkov  supported IaC and secret checks
-    trivy    independent secret and misconfiguration scan
-
-A missing tool, a tool that failed to run, and a tool that found something are
-three different results. None of them is silently treated as a pass.
-"""
+"""LZA schema/OPA checks and advisory Checkov/Trivy scans of owner IaC."""
 
 from __future__ import annotations
 

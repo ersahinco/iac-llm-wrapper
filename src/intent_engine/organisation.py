@@ -10,7 +10,6 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from pydantic import ValidationError
 from ruamel.yaml import YAML, YAMLError
 
 from .catalog import _check_references
@@ -53,7 +52,7 @@ def load_organisation(path: Path, catalog: dict[str, Decision]) -> Organisation:
             raise ValueError("duplicate reference IDs")
         _validate_scope(org, catalog)
         configuration_data(org)
-    except (OSError, UnicodeError, YAMLError, ValidationError, ValueError, TypeError) as exc:
+    except (OSError, YAMLError, ValueError, TypeError) as exc:
         raise IngestError(f"{path}: invalid organisation references: {exc}") from exc
     return org
 

@@ -1,8 +1,4 @@
-"""Whole-document ingest.
-
-Every run reads the complete document and replaces the previous graph content.
-There is no incremental path, no diff, and no baseline to reconcile.
-"""
+"""Parse the complete client document into sourced statements and explicit answers."""
 
 from __future__ import annotations
 
@@ -26,15 +22,6 @@ def normalize_key(text: str) -> str:
     cleaned = _DECORATION.sub("", text).strip().lower()
     cleaned = re.sub(r"[\s/-]+", "_", cleaned)
     return re.sub(r"[^a-z0-9_]", "", cleaned)
-
-
-def _key_index(catalog: dict[str, Decision]) -> dict[str, str]:
-    """Accept either the decision key or its human label as the left-hand side."""
-    index: dict[str, str] = {}
-    for decision in catalog.values():
-        index[normalize_key(decision.key)] = decision.key
-        index.setdefault(normalize_key(decision.label), decision.key)
-    return index
 
 
 def read_document(path: Path) -> Document:
@@ -75,15 +62,16 @@ def _statements(text: str) -> list[Statement]:
 
 def extract_facts(document: Document, catalog: dict[str, Decision]) -> list[Fact]:
     """Recover `decision: value` answers. Unmatched prose stays prose."""
-    index = _key_index(catalog)
+    index: dict[str, str] = {}
+    for decision in catalog.values():
+        index[normalize_key(decision.key)] = decision.key
+        index.setdefault(normalize_key(decision.label), decision.key)
     facts: list[Fact] = []
     for statement in document.statements:
-        pair = _split_pair(statement.text)
-        if pair is None:
-            continue
-        left, value = pair
+        left, _, raw = _LIST_MARKER.sub("", statement.text, count=1).partition(":")
+        value = raw.strip()
         decision_key = index.get(normalize_key(left))
-        if decision_key is None:
+        if not left.strip() or not value or decision_key is None:
             continue
         facts.append(
             Fact(
@@ -96,12 +84,3 @@ def extract_facts(document: Document, catalog: dict[str, Decision]) -> list[Fact
             )
         )
     return facts
-
-
-def _split_pair(text: str) -> tuple[str, str] | None:
-    body = _LIST_MARKER.sub("", text, count=1)
-    left, _, right = body.partition(":")
-    value = right.strip()
-    if not value or not left.strip():
-        return None
-    return left, value

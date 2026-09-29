@@ -17,7 +17,6 @@ from typer.testing import CliRunner
 
 from intent_engine.analysis import review
 from intent_engine.cli import app
-from intent_engine.graph import GraphConfig, KnowledgeGraph
 from intent_engine.ingest import extract_facts, read_document
 from intent_engine.models import Architecture
 
@@ -25,12 +24,6 @@ pytestmark = pytest.mark.skipif(
     not os.environ.get("NEO4J_PASSWORD"),
     reason="set NEO4J_PASSWORD to run the Neo4j tests",
 )
-
-
-@pytest.fixture
-def graph():
-    with KnowledgeGraph(GraphConfig.from_env()) as connected:
-        yield connected
 
 
 def _ingest(graph, catalog, path):

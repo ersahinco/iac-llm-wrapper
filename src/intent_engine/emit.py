@@ -1,9 +1,4 @@
-"""Emit AWS LZA sample-style configuration from accepted decisions.
-
-This is configuration for an existing accelerator, not a deployment. Nothing here
-calls AWS, holds credentials, or applies anything. Emission is fail-closed: an
-open gap or an unresolved conflict blocks the bundle.
-"""
+"""Export validated LZA configuration and a sourced decision trace."""
 
 from __future__ import annotations
 
@@ -27,7 +22,6 @@ _HEADER = (
     "# Source document sha256: {sha256}\n"
     "# Configuration for the AWS Landing Zone Accelerator. Not a deployment.\n"
 )
-_WORKLOAD_OU = "Workloads"
 
 
 @dataclass
@@ -271,7 +265,7 @@ def _accounts_config(values: dict[str, Any]) -> dict[str, Any]:
     return {
         "mandatoryAccounts": mandatory,
         "workloadAccounts": [
-            _account(emails, name, _WORKLOAD_OU, "Workload account")
+            _account(emails, name, "Workloads", "Workload account")
             for name in values.get("workload_accounts") or []
         ],
     }

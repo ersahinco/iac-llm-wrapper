@@ -4,25 +4,21 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 DecisionType = Literal["enum", "string", "string_list", "bool"]
 FactOrigin = Literal["document", "default"]
 
 
-class Gate(BaseModel):
+class Gate(BaseModel, extra="forbid", frozen=True):
     """A decision only applies when another decision holds a given value."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     decision: str
     equals: str
 
 
-class Decision(BaseModel):
+class Decision(BaseModel, extra="forbid", frozen=True):
     """A question only a human can answer."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     key: str
     label: str
@@ -36,10 +32,8 @@ class Decision(BaseModel):
     requires: list[str] = Field(default_factory=list)
 
 
-class Statement(BaseModel):
+class Statement(BaseModel, extra="forbid", frozen=True):
     """One prose line of the ingested document, with where it came from."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     id: str
     text: str
@@ -47,18 +41,14 @@ class Statement(BaseModel):
     line: int
 
 
-class Document(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
+class Document(BaseModel, extra="forbid", frozen=True):
     path: str
     sha256: str
     statements: list[Statement]
 
 
-class Fact(BaseModel):
+class Fact(BaseModel, extra="forbid", frozen=True):
     """An answer to a decision, bound to its evidence."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     decision_key: str
     value: str
@@ -68,10 +58,8 @@ class Fact(BaseModel):
     statement_id: str | None = None
 
 
-class Gap(BaseModel):
+class Gap(BaseModel, extra="forbid", frozen=True):
     """An applicable decision with no answer in the document."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     decision_key: str
     question: str
@@ -81,10 +69,8 @@ class Gap(BaseModel):
     evidence: list[str] = Field(default_factory=list)
 
 
-class Conflict(BaseModel):
+class Conflict(BaseModel, extra="forbid", frozen=True):
     """A named, blocking input or policy finding."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     code: str
     message: str
@@ -92,32 +78,27 @@ class Conflict(BaseModel):
     evidence: list[str] = Field(default_factory=list)
 
 
-class ArchitectureNode(BaseModel):
+class ArchitectureNode(BaseModel, extra="forbid"):
     """A sourced model proposal, never an accepted answer."""
 
-    model_config = ConfigDict(extra="forbid")
     id: str
     label: Literal["System", "Candidate"]
     properties: dict[str, str]
 
 
-class ArchitectureLink(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class ArchitectureLink(BaseModel, extra="forbid"):
     start_node_id: str
     end_node_id: str
     type: Literal["ABOUT", "CONNECTS_TO"]
 
 
-class Architecture(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class Architecture(BaseModel, extra="forbid"):
     nodes: list[ArchitectureNode] = Field(default_factory=list)
     relationships: list[ArchitectureLink] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 
 
-class Review(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
+class Review(BaseModel, extra="forbid", frozen=True):
     document: str
     sha256: str
     applicable: list[str]
@@ -135,8 +116,7 @@ class Review(BaseModel):
         return not self.gaps and not self.conflicts
 
 
-class Reference(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class Reference(BaseModel, extra="forbid"):
     id: str
     path: str
     kind: Literal["configuration", "context", "policy"]
@@ -144,23 +124,20 @@ class Reference(BaseModel):
     content: str = ""
 
 
-class Evidence(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class Evidence(BaseModel, extra="forbid"):
     reference: str
     line: int = Field(ge=1)
     quote: str = Field(min_length=1)
 
 
-class EstateSystem(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class EstateSystem(BaseModel, extra="forbid"):
     id: str
     name: str
     lifecycle: Literal["existing", "planned"]
     evidence: Evidence
 
 
-class Integration(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class Integration(BaseModel, extra="forbid"):
     id: str
     source: str
     target: str
@@ -168,15 +145,13 @@ class Integration(BaseModel):
     evidence: Evidence
 
 
-class Policy(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class Policy(BaseModel, extra="forbid"):
     id: str
     decision_keys: list[str] = Field(min_length=1)
     evidence: Evidence
 
 
-class Organisation(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class Organisation(BaseModel, extra="forbid"):
     name: str
     references: list[Reference]
     systems: list[EstateSystem]
@@ -185,8 +160,7 @@ class Organisation(BaseModel):
     policies: list[Policy]
 
 
-class Assessment(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class Assessment(BaseModel, extra="forbid"):
     policy_id: str
     status: Literal["passed", "warning", "conflict", "not-assessed"]
     message: str = Field(min_length=1)

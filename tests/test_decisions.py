@@ -109,6 +109,21 @@ def test_prose_and_fenced_code_are_not_facts(catalog, tmp_path):
     assert [(f.decision_key, f.value) for f in facts] == [("topology", "single-vpc")]
 
 
+def test_only_named_nonempty_answers_are_ingested(catalog, tmp_path):
+    path = tmp_path / "answers.md"
+    path.write_text(
+        "home_region:\n: eu-west-1\nunknown: value\nplain prose\n"
+        "1. **Home Region**: eu-central-1\n"
+        "- identity_center_assignments: Team:ReadOnly:Audit\n",
+        encoding="utf-8",
+    )
+    facts = extract_facts(read_document(path), catalog)
+    assert [(f.decision_key, f.value, f.line) for f in facts] == [
+        ("home_region", "eu-central-1", 5),
+        ("identity_center_assignments", "Team:ReadOnly:Audit", 6),
+    ]
+
+
 def test_missing_and_empty_documents_are_different_errors(tmp_path):
     with pytest.raises(IngestError, match="document not found"):
         read_document(tmp_path / "absent.md")

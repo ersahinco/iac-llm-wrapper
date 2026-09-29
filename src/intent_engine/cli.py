@@ -1,13 +1,4 @@
-"""Command line interface.
-
-ingest   read a whole document into the knowledge graph (replaces it)
-status   show what the graph currently holds
-review   deterministic gaps, conflicts and advisory security findings
-index    embed the current case for local GraphRAG retrieval
-ask      retrieve evidence and answer an architecture question (advisory)
-emit     write AWS LZA configuration from accepted decisions
-scan     report security warnings over owner IaC or an emitted bundle
-"""
+"""Review sourced architecture decisions and export configuration inputs."""
 
 from __future__ import annotations
 
@@ -41,24 +32,13 @@ def _fail(message: str) -> NoReturn:
     raise typer.Exit(code=2)
 
 
-def _graph(
-    uri: str | None, user: str | None, password: str | None, database: str | None
-) -> KnowledgeGraph:
-    base = GraphConfig.from_env()
-    return KnowledgeGraph(
-        GraphConfig(
-            uri=uri or base.uri,
-            user=user or base.user,
-            password=password or base.password,
-            database=database or base.database,
-        )
-    )
-
-
-_URI = typer.Option(None, "--uri", help="Neo4j bolt URI (default $NEO4J_URI).")
-_USER = typer.Option(None, "--user", help="Neo4j user (default $NEO4J_USER).")
-_PASSWORD = typer.Option(None, "--password", help="Neo4j password (default $NEO4J_PASSWORD).")
-_DATABASE = typer.Option(None, "--database", help="Neo4j database (default $NEO4J_DATABASE).")
+# Compose binds IPv4; use its address rather than localhost's possible IPv6 resolution.
+_URI = typer.Option("bolt://127.0.0.1:7687", "--uri", envvar="NEO4J_URI", help="Neo4j Bolt URI.")
+_USER = typer.Option("neo4j", "--user", envvar="NEO4J_USER", help="Neo4j user.")
+_PASSWORD = typer.Option(
+    "", "--password", envvar="NEO4J_PASSWORD", show_default=False, help="Neo4j password."
+)
+_DATABASE = typer.Option(None, "--database", envvar="NEO4J_DATABASE", help="Neo4j database.")
 _CATALOG = typer.Option(None, "--catalog", help="Override the packaged decision catalog.")
 
 
@@ -87,26 +67,25 @@ def ingest(
         None, "--extract-model", help="Opt-in GraphRAG extraction using this Ollama model."
     ),
     base_url: str = typer.Option("http://localhost:11434", "--base-url"),
-    uri: str | None = _URI,
-    user: str | None = _USER,
-    password: str | None = _PASSWORD,
+    uri: str = _URI,
+    user: str = _USER,
+    password: str = _PASSWORD,
     database: str | None = _DATABASE,
 ) -> None:
-    """Replace the graph with the decision catalog and one complete document."""
+    """Replace the case with a complete document and selected references."""
     try:
         if organisation and without_organisation:
             raise IngestError("choose --organisation or --without-organisation, not both")
         base_catalog = load_catalog(catalog)
         parsed = read_document(document)
-        with _graph(uri, user, password, database) as graph:
+        with KnowledgeGraph(GraphConfig(uri, user, password, database)) as graph:
             # Corrections keep the selected reference snapshot unless explicitly refreshed.
-            org = (
-                load_organisation(organisation, base_catalog)
-                if organisation
-                else graph.organisation()
-            )
             if without_organisation:
                 org = None
+            elif organisation:
+                org = load_organisation(organisation, base_catalog)
+            else:
+                org = graph.organisation()
             decisions = organisation_catalog(base_catalog, org)
             facts = extract_facts(parsed, decisions)
             architecture = (
@@ -115,7 +94,6 @@ def ingest(
                 else None
             )
             graph.replace(decisions, parsed, facts, architecture, org)
-            counts = graph.counts()
     except _KNOWN_FAILURES as exc:
         _fail(str(exc))
 
@@ -128,7 +106,6 @@ def ingest(
     else:
         typer.echo("organisation references: none")
     typer.echo(f"statements: {len(parsed.statements)}  facts: {len(facts)}")
-    typer.echo("graph: " + ", ".join(f"{label}={total}" for label, total in counts.items()))
 
 
 @app.command()
@@ -137,14 +114,14 @@ def index(
         ..., "--embedding-model", help="Installed Ollama embedding model."
     ),
     base_url: str = typer.Option("http://localhost:11434", "--base-url"),
-    uri: str | None = _URI,
-    user: str | None = _USER,
-    password: str | None = _PASSWORD,
+    uri: str = _URI,
+    user: str = _USER,
+    password: str = _PASSWORD,
     database: str | None = _DATABASE,
 ) -> None:
-    """Embed the ingested client and selected references for advisory questions."""
+    """Index the stored case for advisory GraphRAG questions."""
     try:
-        with _graph(uri, user, password, database) as graph:
+        with KnowledgeGraph(GraphConfig(uri, user, password, database)) as graph:
             count = index_case(graph, embedding_model, base_url)
     except Exception as exc:
         _fail(f"index unavailable: {exc}")
@@ -158,14 +135,14 @@ def ask(
     base_url: str = typer.Option("http://localhost:11434", "--base-url"),
     top_k: int = typer.Option(4, "--top-k", min=1, max=10),
     as_json: bool = typer.Option(False, "--json"),
-    uri: str | None = _URI,
-    user: str | None = _USER,
-    password: str | None = _PASSWORD,
+    uri: str = _URI,
+    user: str = _USER,
+    password: str = _PASSWORD,
     database: str | None = _DATABASE,
 ) -> None:
-    """Retrieve case evidence and answer with native GraphRAG; answers are advisory."""
+    """Answer a case question with advisory GraphRAG and source citations."""
     try:
-        with _graph(uri, user, password, database) as graph:
+        with KnowledgeGraph(GraphConfig(uri, user, password, database)) as graph:
             result = ask_case(graph, question, model, base_url, top_k)
     except Exception as exc:
         _fail(f"answer unavailable: {exc}")
@@ -200,14 +177,14 @@ def ask(
 
 @app.command()
 def status(
-    uri: str | None = _URI,
-    user: str | None = _USER,
-    password: str | None = _PASSWORD,
+    uri: str = _URI,
+    user: str = _USER,
+    password: str = _PASSWORD,
     database: str | None = _DATABASE,
 ) -> None:
-    """Show the ingested document and node counts."""
+    """Show the stored document and graph counts."""
     try:
-        with _graph(uri, user, password, database) as graph:
+        with KnowledgeGraph(GraphConfig(uri, user, password, database)) as graph:
             path, sha256 = graph.document()
             counts = graph.counts()
     except _KNOWN_FAILURES as exc:
@@ -223,14 +200,14 @@ def review(
     scan_path: Path | None = typer.Option(
         None, "--scan", help="Also scan an owner IaC directory or LZA bundle for security warnings."
     ),
-    uri: str | None = _URI,
-    user: str | None = _USER,
-    password: str | None = _PASSWORD,
+    uri: str = _URI,
+    user: str = _USER,
+    password: str = _PASSWORD,
     database: str | None = _DATABASE,
 ) -> None:
-    """Report gaps and conflicts found deterministically in the graph."""
+    """Report deterministic gaps, conflicts and optional security warnings."""
     try:
-        with _graph(uri, user, password, database) as graph:
+        with KnowledgeGraph(GraphConfig(uri, user, password, database)) as graph:
             result, decisions = _review(graph, catalog)
         scans = scan_bundle(scan_path) if scan_path is not None else []
     except _KNOWN_FAILURES as exc:
@@ -284,8 +261,6 @@ def _render(result: Review, decisions: dict[str, Decision]) -> None:
             typer.echo(f"  - {conflict.code}: {conflict.message}")
             for line in conflict.evidence:
                 typer.echo(f"      evidence: {line}")
-    if result.clean:
-        typer.secho("\nno gaps, no conflicts", fg=typer.colors.GREEN)
 
 
 def _render_context(result: Review) -> None:
@@ -294,7 +269,8 @@ def _render_context(result: Review) -> None:
         for system in result.organisation.systems:
             typer.echo(f"  {system.lifecycle}: {system.name}")
         for assessment in result.assessments:
-            typer.echo(f"  policy {assessment.policy_id}: {assessment.status}")
+            if assessment.status != "warning":
+                typer.echo(f"  policy {assessment.policy_id}: {assessment.status}")
         _render_policy_warnings(result, result.assessments)
     if result.integration_context:
         typer.echo("\nIntegration work for the consuming teams:")
@@ -314,14 +290,14 @@ def emit(
     network_config: Path | None = typer.Option(
         None, "--network-config", help="Owner's LZA network configuration; replaces the skeleton."
     ),
-    uri: str | None = _URI,
-    user: str | None = _USER,
-    password: str | None = _PASSWORD,
+    uri: str = _URI,
+    user: str = _USER,
+    password: str = _PASSWORD,
     database: str | None = _DATABASE,
 ) -> None:
-    """Write AWS LZA configuration. Blocked by any gap or conflict."""
+    """Export an LZA bundle and decision trace."""
     try:
-        with _graph(uri, user, password, database) as graph:
+        with KnowledgeGraph(GraphConfig(uri, user, password, database)) as graph:
             result, decisions = _review(graph, catalog)
         resolution = resolve(decisions, result, allow_defaults=allow_defaults)
         written = emit_bundle(resolution, result, out, network_config=network_config)
@@ -343,14 +319,14 @@ def export_tfvars(
     ),
     out: Path = typer.Option(..., "--out"),
     catalog: Path | None = _CATALOG,
-    uri: str | None = _URI,
-    user: str | None = _USER,
-    password: str | None = _PASSWORD,
+    uri: str = _URI,
+    user: str = _USER,
+    password: str = _PASSWORD,
     database: str | None = _DATABASE,
 ) -> None:
-    """Export confirmed values and evidence. No Terraform resources or execution."""
+    """Export reviewed module variables and their evidence trace."""
     try:
-        with _graph(uri, user, password, database) as graph:
+        with KnowledgeGraph(GraphConfig(uri, user, password, database)) as graph:
             result, decisions = _review(graph, catalog)
         resolution = resolve(decisions, result)
         paths = emit_tfvars(resolution, result, contract, out)
@@ -398,7 +374,7 @@ def scan(
     as_json: bool = typer.Option(False, "--json", help="Emit results as JSON."),
     strict: bool = typer.Option(False, "--strict", help="Return exit 1 for security warnings too."),
 ) -> None:
-    """Report security warnings and native exceptions; missing coverage is never a pass."""
+    """Scan IaC for security warnings and reported exceptions."""
     try:
         results = scan_bundle(bundle, policy)
     except _KNOWN_FAILURES as exc:

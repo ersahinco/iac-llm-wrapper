@@ -122,10 +122,6 @@ needs no vector index. Invalid evidence fails before graph replacement; unsuppor
 items are pruned with warnings. Architects confirm answers in the document and
 re-ingest. Matching quotes and valid JSON do not establish semantic accuracy.
 
-`review` itself supplies the questions and evidence for a discussion; use `ask`
-for model-assisted exploration. The former `review --llm` narration path has been
-removed so there is one model-answer workflow. Models and endpoints remain explicit.
-
 ## Output contracts
 
 Exports create new files only. Use a fresh output directory for each revision;

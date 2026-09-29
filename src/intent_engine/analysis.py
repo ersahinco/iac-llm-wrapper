@@ -1,10 +1,4 @@
-"""Deterministic gap and conflict analysis.
-
-Nothing here asks a model anything. Gaps come from graph applicability, conflicts
-come from named rules. Each rule names its own cause: a missing answer, an
-unusable value, and two answers that cannot both hold are three different
-findings with three different fixes.
-"""
+"""Graph-derived gaps and named input, consistency and policy conflicts."""
 
 from __future__ import annotations
 

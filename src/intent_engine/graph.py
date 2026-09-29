@@ -1,14 +1,11 @@
-"""Neo4j case graph: sourced facts, decisions, integrations and policy assessments.
+"""Neo4j evidence and case snapshots.
 
-The Cypher below defines the stored model and its evidence links. Extracted
-proposals remain separate from confirmed facts.
-This module owns the whole database it connects to. Ingest replaces every node.
+Ingest replaces every node atomically. Extracted proposals remain separate from facts.
 """
 
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -22,10 +19,6 @@ from neo4j.exceptions import (
 )
 
 from .models import Architecture, Conflict, Decision, Document, Fact, Gap, Organisation, Review
-
-_CONSTRAINT = (
-    "CREATE CONSTRAINT decision_key IF NOT EXISTS FOR (d:Decision) REQUIRE d.key IS UNIQUE"
-)
 
 
 class GraphUnavailable(Exception):
@@ -42,17 +35,6 @@ class GraphConfig:
     user: str
     password: str
     database: str | None = None
-
-    @classmethod
-    def from_env(cls) -> GraphConfig:
-        # 127.0.0.1, not localhost: the container binds IPv4 only, and localhost
-        # makes the driver try ::1 first and report a second, irrelevant failure.
-        return cls(
-            uri=os.environ.get("NEO4J_URI", "bolt://127.0.0.1:7687"),
-            user=os.environ.get("NEO4J_USER", "neo4j"),
-            password=os.environ.get("NEO4J_PASSWORD", ""),
-            database=os.environ.get("NEO4J_DATABASE") or None,
-        )
 
 
 class KnowledgeGraph:
@@ -87,14 +69,11 @@ class KnowledgeGraph:
             ) from exc
         self._driver = driver
 
-    def close(self) -> None:
-        self._driver.close()
-
     def __enter__(self) -> KnowledgeGraph:
         return self
 
     def __exit__(self, *_: object) -> None:
-        self.close()
+        self._driver.close()
 
     def _run(self, query: str, **params: Any) -> list[dict[str, Any]]:
         try:
@@ -115,7 +94,9 @@ class KnowledgeGraph:
     ) -> None:
         """Replace the whole document atomically; failed loads preserve the old graph."""
         # Schema changes cannot share a transaction with data changes.
-        self._run(_CONSTRAINT)
+        self._run(
+            "CREATE CONSTRAINT decision_key IF NOT EXISTS FOR (d:Decision) REQUIRE d.key IS UNIQUE"
+        )
         try:
             with self._driver.session(database=self._config.database) as session:
                 session.execute_write(
