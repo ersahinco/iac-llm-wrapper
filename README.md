@@ -1,36 +1,56 @@
 # iac-llm-wrapper
 
-Turn client requirements and selected organisation references into sourced
-architecture reviews and configuration inputs. Architects resolve missing answers
-and policy conflicts before handing work to an engineering team.
+**Find missing architecture decisions and policy conflicts before engineering
+handoff, then export supported configuration inputs with traceable evidence.**
 
-Neo4j stores the evidence; optional Neo4j GraphRAG and local LLMs help explore it.
+For architects collecting client answers, platform engineers receiving a design,
+and policy owners reviewing it. An unanswered connectivity question or a region
+outside the organisation standard is easy to lose in meeting notes. This tool
+turns explicit answers and selected references into a review: what is missing,
+what conflicts, and which source supports each finding. The architect corrects
+the answers before engineers receive configuration inputs and a decision trace.
+
 Supported exports are AWS Landing Zone Accelerator (LZA) configuration and Terraform
-module variable JSON, each with a decision trace. Nothing deploys or runs Terraform.
+module variable JSON. Neo4j stores the evidence; optional GraphRAG helps explore it.
+The core workflow needs **no LLM or cloud credentials**.
+
+## Where it fits alongside CNOE and your pipeline
+
+[CNOE's reference implementation](https://cnoe.io/docs/reference-implementation/local)
+combines a developer portal, templates and workflow orchestration. Use this project
+as a review step before handing inputs to such a platform or your existing LZA or
+Terraform workflow. Its contribution is the checked decisions and their evidence.
+Engineers still own the consuming templates, integration checks, approvals,
+deployment and drift handling. Connecting the exported files to CNOE is owner
+integration work; no CNOE adapter is bundled. Nothing here deploys or runs Terraform.
 
 **Status: guided local prototype.** The example workflow is tested. Real client
 adoption and model answer quality still need evaluation; output requires owner review.
 
-Questions, bug reports and contributions are welcome. See [Contributing](#contributing).
+Start with the [worked CLI example](samples/organisation/README.md),
+make a [small first contribution](CONTRIBUTING.md#first-contribution-one-question-one-policy-one-test),
+or run the [two-engineer trial](docs/engineer-trial.md).
 
 ## Quickstart
 
-Requires Docker with Compose. No Python or LLM setup is needed. Run the commands
-in order; the first review and export deliberately fail to demonstrate the gates.
+Requires Docker with Compose running and unused ports 18474/18687 (change them if
+occupied). The first build downloads images and packages. No host Python, OPA, LLM
+or cloud credentials are needed. Run the commands in order; the first review and
+export deliberately fail to demonstrate the gates. Use an unused output directory.
 
 ```bash
 git clone https://github.com/ersahinco/iac-llm-wrapper.git
 cd iac-llm-wrapper
-export COMPOSE_PROJECT_NAME=iac-quickstart
+export COMPOSE_PROJECT_NAME=iac-quickstart-$(date +%Y%m%d-%H%M%S)
 export NEO4J_BROWSER_PORT=18474 NEO4J_BOLT_PORT=18687
 docker compose build app
-docker compose run --rm app ingest samples/organisation/client.md \
+docker compose run --rm -T app ingest samples/organisation/client.md \
   --organisation samples/organisation/organisation.yaml
-docker compose run --rm app review  # expected exit 1: one gap and one conflict
-docker compose run --rm app emit --out build/quickstart  # expected exit 2: blocked
-docker compose run --rm app ingest samples/organisation/confirmed.md
-docker compose run --rm app review
-docker compose run --rm app emit --out build/quickstart
+docker compose run --rm -T app review  # expected exit 1: one gap and one conflict
+docker compose run --rm -T app emit --out build/quickstart  # expected exit 2: blocked
+docker compose run --rm -T app ingest samples/organisation/confirmed.md
+docker compose run --rm -T app review
+docker compose run --rm -T app emit --out build/quickstart
 docker compose stop
 ```
 
@@ -44,8 +64,9 @@ name and unused ports for each case: **ingestion replaces every node in that
 project's database**. Replacement is atomic; a failed ingest preserves the prior
 case. Stopping retains the data volume. The image includes OPA and LZA schemas.
 
-The [organisation guide](samples/organisation/README.md) explains the evidence,
-policy contract and [graph view](samples/organisation/README.md#see-the-graph).
+The [organisation guide](samples/organisation/README.md) shows actual CLI output,
+the two answer changes, generated configuration and source evidence in the trace.
+It also explains the policy contract and [graph view](samples/organisation/README.md#see-the-graph).
 
 ## Use your own case
 
@@ -259,7 +280,9 @@ Use `COMMAND --help` for options and stop Compose with `docker compose stop`.
 [Open an issue](https://github.com/ersahinco/iac-llm-wrapper/issues) for questions,
 bugs or ideas. Documentation fixes, clearer examples, bug reports and focused code
 changes are all useful; you do not need to be an expert in the whole project.
-[CONTRIBUTING.md](CONTRIBUTING.md) covers setup, isolated tests and pull requests.
+[CONTRIBUTING.md](CONTRIBUTING.md) covers setup, isolated tests and pull requests;
+its [worked first contribution](CONTRIBUTING.md#first-contribution-one-question-one-policy-one-test)
+follows one existing question through its policy and a regression test.
 Start with an observed problem or small sanitised case. Keep evidence, human
 confirmation and explicit output contracts; reuse existing tools before adding
 custom code. The [design guide](docs/design.md) explains the boundaries and extension points;

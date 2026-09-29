@@ -4,6 +4,9 @@ This synthetic case adds policy to the four-question VPC example. It checks the
 requested VPC against a supplied routing-domain allocation list, restricts instance
 types by environment, and keeps security advice and recorded exceptions visible.
 
+For a small contribution, follow the [monitoring question through its policy and
+test](../../CONTRIBUTING.md#first-contribution-one-question-one-policy-one-test).
+
 Use a separate case and unused ports. Ingestion replaces that case's whole graph.
 OPA is included in the Compose app; no model or cloud credentials are needed.
 

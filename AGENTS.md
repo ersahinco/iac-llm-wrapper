@@ -105,6 +105,11 @@ an observed need.
 - Guided local prototype: sourced gap/conflict review, explicit architect answers,
   six LZA 1.16.3 files plus a trace, or mapped module variables plus a trace.
   Hybrid networking and Entra ID remain integration context.
+- README explains the pre-handoff value and relationship to CNOE/owner pipelines.
+  The organisation walkthrough includes captured CLI output and configuration/trace
+  excerpts. CONTRIBUTING follows the monitoring question through its existing policy
+  and a document-to-policy regression test. A blank two-engineer trial guide measures
+  setup friction, useful findings and comparable effort; no human trial has run.
 - Native Typer options handle connection defaults. Pydantic reads GraphRAG objects
   directly; Cypher loads catalog relationships and orders gap dependencies.
   Review converts answers once and keeps each value with its first source.
@@ -124,10 +129,17 @@ an observed need.
 
 ### Latest verification
 
-- 2026-09-29: all 240 tests passed without skips with real Neo4j and OPA on isolated
-  project `iac-complete-review-20260929` (ports 59274/59287). Ruff, formatting,
+- 2026-09-29: all 244 tests passed without skips with real Neo4j and OPA on isolated
+  project `iac-value-tests-20260929` (ports 59574/59587). Ruff, formatting,
   mypy, strict OPA and Rego formatting passed. Upstream Neo4j/GraphRAG warnings
   remain on host Python 3.14; model responses in automated tests are controlled.
+- The organisation CLI journey ran without LLM/cloud credentials on isolated
+  `iac-value-20260929` (ports 59374/59387): one gap/one conflict, blocked emission,
+  corrected answers and seven output files. Documented CLI/YAML excerpts match
+  the captured output; source hash and 42 local links/anchors verified. The focused
+  contribution command passes six real-OPA cases. Evidence is in `build/value-review/`.
+  Changes are docs, monitoring question wording/hint and four regression cases;
+  runtime code, dependencies, MIT licensing and upstream notices are unchanged.
 - Model and extraction schemas are unchanged. New graph checks retain facts and
   assessments when evidence links or policy answers are absent. Native Rego
   membership preserves findings across 72 valid/missing/malformed combinations;
@@ -143,12 +155,14 @@ an observed need.
   nine upstream schema/provenance files unchanged and include both licenses and
   upstream notices. Evidence is in `build/open-source-review/`. CI also builds
   distributions. Runtime code and dependencies are unchanged.
-- The isolated test project is stopped at session end; its volume is retained.
+- Both new isolated projects are stopped at session end; their volumes are retained.
   Saved cases and unrelated services were not changed. Earlier real Checkov/Trivy
   evidence remains in `build/security-discussion/`.
 - The user authorised implementation, tests, commit and push for these changes.
 
 ### Next
 
-Try one small sanitised client integration with an architect. Record observed
-friction and missing requirements before adding further capabilities.
+Run `docs/engineer-trial.md` with two independent engineers, then try one small
+sanitised client integration with an architect if the observations justify it.
+Record actual friction, useful findings and missing requirements before adding
+further capabilities. Practical value, time savings and adoption remain unproven.

@@ -24,6 +24,78 @@ By submitting a contribution, you agree to license your original work under the
 project's [MIT License](LICENSE). Retain the original licenses and notices for
 third-party material, including the [bundled LZA schemas](src/intent_engine/schemas/SOURCE.txt).
 
+## First contribution: one question, one policy, one test
+
+Start with the existing [workload example](samples/vpc/README.md). Its monitoring
+question is a small, complete path through this project: a human answer becomes
+a typed value, a selected OPA policy checks it, and a test protects the distinction
+between an explicit `false` and an unanswered question.
+
+**Worked change: clarify the monitoring question and protect missing/unusable
+answers.** This change is already included, so you can inspect and run it before
+applying the same approach to another observed ambiguity. It adds no runtime code.
+
+1. In [samples/vpc/organisation.yaml](samples/vpc/organisation.yaml), the
+   `detailed_monitoring` question now asks whether the owner requested monitoring,
+   explicitly asks for `true` or `false`, and explains the effect of leaving it
+   unanswered. Keep `type: bool` and no default: a reference or a hint must never
+   stand in for the owner's answer. Questions specific to a selected organisation
+   belong here; the four general VPC questions remain in `decisions.yaml`.
+2. Follow the `monitoring` policy entry in that same file to
+   [samples/vpc/policy.rego](samples/vpc/policy.rego), `monitoring_assessment`.
+   Its evidence points to the exact comment on line 5. The existing check already
+   has the intended behavior below, so it needs no change. If you change a policy
+   later, preserve its selected ID, scope and valid evidence line/quote, and return
+   one assessment for it even when an answer is missing. Prose alone creates no check.
+3. In [tests/test_workload_policy.py](tests/test_workload_policy.py),
+   `test_monitoring_requires_an_explicit_usable_answer` copies the corrected packet
+   into pytest's temporary directory and varies only that answer. It reads the
+   document, extracts facts, coerces values and calls real OPA. The assertions check
+   facts, unusable-value findings, policy status and whether the policy blocks.
+   This protects behavior a reviewer cares about, without asserting the hint's wording.
+
+| Packet answer | Expected behavior |
+| --- | --- |
+| Line absent | No monitoring Fact; `not-assessed` policy blocks export; graph review also asks the missing question |
+| `detailed_monitoring: undecided` | Stated but unusable; `UNUSABLE_VALUE` plus `not-assessed`, blocking |
+| `detailed_monitoring: false` | Usable answer; visible advisory `warning`, no monitoring-policy blocker |
+| `detailed_monitoring: true` | Usable answer; monitoring policy `passed` |
+
+The new test covers the document-to-policy boundary. Existing
+`test_workload_warnings_and_exceptions_survive_review_and_export` in
+[tests/test_graph.py](tests/test_graph.py) covers CLI review, successful export of
+`monitoring: false`, and warnings retained in the trace. Other missing answers or
+policy conflicts can still block the case.
+
+Only the question text/hint and the focused test change for this contribution.
+The example packets remain explicit answers; the existing
+[instance input contract](samples/vpc/instance-inputs.json) already maps
+`detailed_monitoring` to `monitoring`. No emitter, schema, dependency or policy
+implementation change is needed.
+
+After the host setup below and installing OPA, run the focused check:
+
+```bash
+opa version
+env -u NEO4J_PASSWORD uv run --locked --extra dev --extra graphrag pytest \
+  tests/test_workload_policy.py -k monitoring -v
+opa check --strict samples/vpc/policy.rego
+opa fmt --fail --list samples/vpc/policy.rego
+```
+
+The focus selects six cases, including the four packet variants above. A skip
+because OPA is missing is not validation. No database is used by this focused
+command. To check CLI/export behavior too, use the isolated full-suite setup below.
+After editing selected organisation inputs, CLI users must re-ingest with
+`--organisation samples/vpc/organisation.yaml` to refresh their stored snapshot.
+
+For a similar first PR, state the observed ambiguity, the changed question/check,
+and which missing, invalid or contradictory input your test distinguishes.
+Acceptance means the focused test and relevant local checks pass, explicit false
+answers remain warnings, missing answers still block, and the workload walkthrough
+still exports the same supported inputs with evidence. Include commands/results
+in the PR description; do not describe this as independent user feedback.
+
 ## Local checks
 
 Use Python 3.11+ and [uv](https://docs.astral.sh/uv/). From the repository root:

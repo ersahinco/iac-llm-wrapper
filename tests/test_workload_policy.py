@@ -63,6 +63,37 @@ def test_scoped_policy_outcomes(updates, policy, status, phrase):
 
 
 @pytest.mark.parametrize(
+    "answer,expected_status,invalid_codes",
+    [
+        (None, "not-assessed", []),
+        ("undecided", "not-assessed", ["UNUSABLE_VALUE"]),
+        ("false", "warning", []),
+        ("true", "passed", []),
+    ],
+)
+def test_monitoring_requires_an_explicit_usable_answer(
+    tmp_path, answer, expected_status, invalid_codes
+):
+    base = load_catalog(SAMPLE / "decisions.yaml")
+    org = load_organisation(SAMPLE / "organisation.yaml", base)
+    catalog = organisation_catalog(base, org)
+    packet = tmp_path / "client.md"
+    text = (SAMPLE / "confirmed-policy.md").read_text()
+    replacement = "" if answer is None else f"- detailed_monitoring: {answer}"
+    packet.write_text(text.replace("- detailed_monitoring: false", replacement))
+    facts = extract_facts(read_document(packet), catalog)
+    assert any(f.decision_key == "detailed_monitoring" for f in facts) == (answer is not None)
+    values, invalid = typed_values(catalog, facts)
+    assert [c.code for c in invalid] == invalid_codes
+    result = next(r for r in assess(org, values) if r.policy_id == "monitoring")
+    assert result.status == expected_status
+    blockers = policy_conflicts(org, [result], facts, str(packet))
+    assert [c.code for c in blockers] == (
+        ["ORG_POLICY_NOT_ASSESSED"] if expected_status == "not-assessed" else []
+    )
+
+
+@pytest.mark.parametrize(
     "change",
     [
         "missing-allocations",

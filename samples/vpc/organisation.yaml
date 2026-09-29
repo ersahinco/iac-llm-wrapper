@@ -26,7 +26,8 @@ questions:
     label: Detailed monitoring
     category: security
     type: bool
-    question: Should the instance have detailed monitoring?
+    question: Has the workload owner requested detailed monitoring for this instance (true or false)?
+    hint: Record an explicit answer. False keeps a cost/detection warning; an unanswered question blocks export.
 policies:
   - id: existing-networks
     decision_keys: [network_cidr, routing_domain]
