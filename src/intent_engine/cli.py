@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict
 from pathlib import Path
+from typing import NoReturn
 
 import typer
 
@@ -35,7 +36,7 @@ app = typer.Typer(add_completion=False, help=__doc__)
 _KNOWN_FAILURES = (CatalogError, IngestError, GraphUnavailable, GraphEmpty, EmitBlocked, ScanError)
 
 
-def _fail(message: str) -> None:
+def _fail(message: str) -> NoReturn:
     typer.secho(message, fg=typer.colors.RED, err=True)
     raise typer.Exit(code=2)
 
@@ -117,7 +118,6 @@ def ingest(
             counts = graph.counts()
     except _KNOWN_FAILURES as exc:
         _fail(str(exc))
-        return
 
     typer.echo(f"ingested {parsed.path} (sha256 {parsed.sha256[:12]})")
     if org is not None:
@@ -148,7 +148,6 @@ def index(
             count = index_case(graph, embedding_model, base_url)
     except Exception as exc:
         _fail(f"index unavailable: {exc}")
-        return
     typer.echo(f"indexed {count} source statements with {embedding_model}; re-index after ingest")
 
 
@@ -170,7 +169,6 @@ def ask(
             result = ask_case(graph, question, model, base_url, top_k)
     except Exception as exc:
         _fail(f"answer unavailable: {exc}")
-        return
     if as_json:
         typer.echo(json.dumps(result, indent=2))
         return
@@ -214,7 +212,6 @@ def status(
             counts = graph.counts()
     except _KNOWN_FAILURES as exc:
         _fail(str(exc))
-        return
     typer.echo(f"document: {path} (sha256 {sha256[:12]})")
     typer.echo("graph: " + ", ".join(f"{label}={total}" for label, total in counts.items()))
 
@@ -238,7 +235,6 @@ def review(
         scans = scan_bundle(scan_path) if scan_path is not None else []
     except _KNOWN_FAILURES as exc:
         _fail(str(exc))
-        return
 
     if as_json:
         payload = result.model_dump()
@@ -331,7 +327,6 @@ def emit(
         written = emit_bundle(resolution, result, out, network_config=network_config)
     except _KNOWN_FAILURES as exc:
         _fail(str(exc))
-        return
     defaulted = [entry["decision"] for entry in resolution.trace if entry["origin"] == "default"]
     for path in written:
         typer.echo(f"wrote {path}")
@@ -361,7 +356,6 @@ def export_tfvars(
         paths = emit_tfvars(resolution, result, contract, out)
     except _KNOWN_FAILURES as exc:
         _fail(str(exc))
-        return
     for path in paths:
         typer.echo(f"wrote {path}")
     _render_policy_warnings(result, resolution.assessments)
@@ -409,7 +403,6 @@ def scan(
         results = scan_bundle(bundle, policy)
     except _KNOWN_FAILURES as exc:
         _fail(str(exc))
-        return
     if as_json:
         typer.echo(json.dumps([asdict(result) for result in results], indent=2))
     else:

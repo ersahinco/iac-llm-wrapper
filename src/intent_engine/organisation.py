@@ -19,7 +19,6 @@ from .models import (
     Assessment,
     Conflict,
     Decision,
-    EstateSystem,
     Evidence,
     Fact,
     Integration,
@@ -60,20 +59,17 @@ def load_organisation(path: Path, catalog: dict[str, Decision]) -> Organisation:
 
 
 def _validate_scope(org: Organisation, catalog: dict[str, Decision]) -> None:
-    system_ids = [system.id for system in org.systems]
-    if len(set(system_ids)) != len(system_ids):
-        raise ValueError("duplicate system IDs")
-    for group in (org.integrations, org.policies):
+    for kind, group in (
+        ("system", org.systems),
+        ("integration", org.integrations),
+        ("policy", org.policies),
+    ):
         if len({item.id for item in group}) != len(group):
-            raise ValueError("duplicate integration or policy IDs")
+            raise ValueError(f"duplicate {kind} IDs")
+        for item in group:
+            evidence_text(org, item.evidence)  # Validate sources before graph replacement.
     decisions = organisation_catalog(catalog, org)
-    items: list[EstateSystem | Integration | Policy] = [
-        *org.systems,
-        *org.integrations,
-        *org.policies,
-    ]
-    for item in items:
-        evidence_text(org, item.evidence)  # Validate exact source before graph replacement.
+    system_ids = {system.id for system in org.systems}
     for integration in org.integrations:
         if integration.source not in system_ids or integration.target not in system_ids:
             raise ValueError(f"{integration.id}: unknown integration endpoint")

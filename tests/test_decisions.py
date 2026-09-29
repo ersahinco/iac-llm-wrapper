@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from intent_engine.analysis import applicable_keys, semantic_conflicts
+from intent_engine.analysis import applicable_keys, semantic_conflicts, typed_values
 from intent_engine.catalog import CatalogError, coerce, load_catalog
 from intent_engine.ingest import IngestError, extract_facts, read_document
 from intent_engine.models import Decision, Fact
@@ -43,6 +43,19 @@ def test_broken_catalog_names_the_defect(tmp_path):
         encoding="utf-8",
     )
     with pytest.raises(CatalogError, match="gated by unknown"):
+        load_catalog(path)
+
+
+@pytest.mark.parametrize("gated", [False, True])
+def test_enum_catalog_requires_options_with_or_without_a_gate(tmp_path, gated):
+    path = tmp_path / "decisions.yaml"
+    path.write_text(
+        "- key: mode\n  label: Mode\n  category: test\n  type: string\n  question: Mode?\n"
+        "- key: region\n  label: Region\n  category: test\n  type: enum\n  question: Where?\n"
+        + ("  gate: {decision: mode, equals: enabled}\n" if gated else ""),
+        encoding="utf-8",
+    )
+    with pytest.raises(CatalogError, match="enum decision 'region' declares no options"):
         load_catalog(path)
 
 
@@ -109,7 +122,9 @@ def test_missing_and_empty_documents_are_different_errors(tmp_path):
 
 
 def test_sample_packet_is_conflict_free(catalog, sample_facts):
-    assert semantic_conflicts(catalog, sample_facts) == []
+    values, invalid = typed_values(catalog, sample_facts)
+    assert not invalid
+    assert semantic_conflicts(values) == []
 
 
 def test_gate_uses_stated_value_then_default(catalog):
@@ -118,7 +133,8 @@ def test_gate_uses_stated_value_then_default(catalog):
 
 
 def test_unusable_value_is_not_a_gap(catalog):
-    conflicts = semantic_conflicts(catalog, _facts(centralized_logging="probably"))
+    values, conflicts = typed_values(catalog, _facts(centralized_logging="probably"))
+    assert "centralized_logging" not in values
     assert _codes(conflicts) == {"UNUSABLE_VALUE"}
     assert conflicts[0].evidence == ["test:1"]
 
@@ -139,7 +155,9 @@ def test_unusable_value_is_not_a_gap(catalog):
     ],
 )
 def test_each_rule_names_its_own_cause(catalog, sample_facts, overrides, expected):
-    conflicts = semantic_conflicts(catalog, _override(sample_facts, **overrides))
+    values, invalid = typed_values(catalog, _override(sample_facts, **overrides))
+    assert not invalid
+    conflicts = semantic_conflicts(values)
     assert expected in _codes(conflicts)
 
 
@@ -153,9 +171,13 @@ def test_each_rule_names_its_own_cause(catalog, sample_facts, overrides, expecte
 )
 def test_identity_policies_must_be_explicit(catalog, sample_facts, mapping, code):
     facts = _override(sample_facts, identity_center_policy_mappings=mapping)
-    assert code in _codes(semantic_conflicts(catalog, facts))
+    values, invalid = typed_values(catalog, facts)
+    assert not invalid
+    assert code in _codes(semantic_conflicts(values))
 
 
 def test_data_regions_must_be_enabled(catalog, sample_facts):
     facts = _override(sample_facts, data_regions="us-east-1")
-    assert "DATA_REGION_NOT_ENABLED" in _codes(semantic_conflicts(catalog, facts))
+    values, invalid = typed_values(catalog, facts)
+    assert not invalid
+    assert "DATA_REGION_NOT_ENABLED" in _codes(semantic_conflicts(values))

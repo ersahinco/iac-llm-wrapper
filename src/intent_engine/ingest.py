@@ -100,8 +100,6 @@ def extract_facts(document: Document, catalog: dict[str, Decision]) -> list[Fact
 
 def _split_pair(text: str) -> tuple[str, str] | None:
     body = _LIST_MARKER.sub("", text, count=1)
-    if ":" not in body:
-        return None
     left, _, right = body.partition(":")
     value = right.strip()
     if not value or not left.strip():

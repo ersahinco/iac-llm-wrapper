@@ -122,6 +122,11 @@ an observed need.
   owner/reason exceptions as warnings. The bundled LZA scan keeps generic advice
   without a second region allowlist. Existing stored cases require an explicit
   `--organisation` refresh to adopt the updated example policy.
+- Function review removed eight helpers and 115 runtime lines. Review converts
+  answers once; export checks resolved values directly without synthetic Facts.
+  Selected values and trace evidence use the same first fact. Account email maps
+  and scan YAML are parsed once; OPA artifact checks use stdin. Neo4j catalog/gap
+  mapping uses native serialization. Ungated enums also require options.
 - Live Ollama embeddinggemma and qwen2.5:7b previously produced incorrect answers
   despite valid citations. Live semantic reliability and independent architect
   feedback remain unproven. Retrieval remains bounded to 500 statements, 4,000
@@ -131,18 +136,21 @@ an observed need.
 
 ### Latest verification
 
-- 2026-09-28: all 228 tests passed without skips on isolated Compose project
-  `iac-policy-cleanup-20260928` (ports 58774/58887), with real Neo4j and OPA.
-  Ruff, mypy, strict OPA and policy formatting checks passed. Host Python 3.14
-  emits upstream Neo4j/GraphRAG deprecation warnings.
+- 2026-09-29: all 231 tests passed without skips on isolated Compose project
+  `iac-function-review-20260929` (ports 58974/58987), with real Neo4j and OPA.
+  Ruff, formatting, mypy, strict OPA and policy formatting checks passed. Host
+  Python 3.14 emits upstream Neo4j/GraphRAG deprecation warnings.
 - Regression checks cover required security controls, missing/unusable answers,
   scoped exceptions with owner/reason, general artifact warnings, and catalog
   mismatch rejection in review and both exports. An end-to-end case approved
   `ap-southeast-2` and a GuardDuty exception, then exported with the warning intact
   and no conflicting artifact-region warning.
-- Evidence is ignored under `build/policy-cleanup/`. Saved cases and unrelated
-  services were not changed. The isolated test project is stopped at session end;
-  its volume is retained. No dependencies were added.
+- New regression checks reject enums without options with or without gates and
+  retain the first repeated answer's source in the export trace. All 122 original
+  runtime functions have review decisions in `build/function-review/review.md`.
+- Evidence is ignored under `build/function-review/` and `build/policy-cleanup/`.
+  Saved cases and unrelated services were not changed. The isolated test project
+  is stopped at session end; its volume is retained. No dependencies were added.
 - Earlier real Checkov/Trivy walkthrough evidence remains in
   `build/security-discussion/`; native scanner adapters and exceptions are retained.
 - The user authorised implementation, tests, commit and push for these changes.

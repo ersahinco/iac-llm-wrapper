@@ -28,61 +28,48 @@ _ACCOUNT_KEYS = (
 )
 
 
-def raw_values(facts: list[Fact]) -> dict[str, str]:
+def first_facts(facts: list[Fact]) -> dict[str, Fact]:
     """First stated answer per decision. Duplicates are reported as conflicts."""
-    values: dict[str, str] = {}
+    values: dict[str, Fact] = {}
     for fact in facts:
-        values.setdefault(fact.decision_key, fact.value)
+        values.setdefault(fact.decision_key, fact)
     return values
 
 
-def effective_values(catalog: dict[str, Decision], facts: list[Fact]) -> dict[str, str]:
-    """Stated answers, falling back to catalog defaults for gate evaluation only."""
-    stated = raw_values(facts)
-    return {
+def applicable_keys(catalog: dict[str, Decision], facts: list[Fact]) -> list[str]:
+    """Use defaults for gate evaluation only; they do not answer decisions."""
+    stated = {key: fact.value for key, fact in first_facts(facts).items()}
+    values = {
         key: stated.get(key) or (decision.default or "")
         for key, decision in catalog.items()
         if stated.get(key) or decision.default
     }
-
-
-def applicable_keys(catalog: dict[str, Decision], facts: list[Fact]) -> list[str]:
-    values = effective_values(catalog, facts)
-    applicable: list[str] = []
-    for key, decision in catalog.items():
-        gate = decision.gate
-        if gate is None or values.get(gate.decision) == gate.equals:
-            applicable.append(key)
-    return applicable
-
-
-def _origin(facts: list[Fact]) -> dict[str, str]:
-    where: dict[str, str] = {}
-    for fact in facts:
-        where.setdefault(fact.decision_key, f"{fact.section}:{fact.line}")
-    return where
+    return [
+        key
+        for key, decision in catalog.items()
+        if decision.gate is None or values.get(decision.gate.decision) == decision.gate.equals
+    ]
 
 
 def typed_values(
     catalog: dict[str, Decision], facts: list[Fact]
 ) -> tuple[dict[str, Any], list[Conflict]]:
     """Coerce stated answers. Values that cannot be coerced become conflicts."""
-    where = _origin(facts)
     typed: dict[str, Any] = {}
     invalid: list[Conflict] = []
-    for key, raw in raw_values(facts).items():
+    for key, fact in first_facts(facts).items():
         decision = catalog.get(key)
         if decision is None:
             continue
         try:
-            typed[key] = coerce(decision, raw)
+            typed[key] = coerce(decision, fact.value)
         except ValueError as exc:
             invalid.append(
                 Conflict(
                     code="UNUSABLE_VALUE",
                     message=str(exc),
                     decision_keys=[key],
-                    evidence=[where.get(key, "unknown location")],
+                    evidence=[f"{fact.section}:{fact.line}"],
                 )
             )
     return typed, invalid
@@ -251,10 +238,14 @@ def _rule_assignments(values: dict[str, Any]) -> list[Conflict]:
 
 def _rule_account_emails(values: dict[str, Any]) -> list[Conflict]:
     entries = values.get("account_emails") or []
+    if not entries:
+        return []  # Missing input is a catalog gap.
     accounts = _declared_accounts(values)
+    covered: set[str] = set()
     conflicts: list[Conflict] = []
     for entry in entries:
         account, separator, email = (part.strip() for part in entry.partition("="))
+        covered.add(account)
         if not separator or not account or not email:
             conflicts.append(
                 Conflict(
@@ -275,24 +266,15 @@ def _rule_account_emails(values: dict[str, Any]) -> list[Conflict]:
                     decision_keys=["account_emails"],
                 )
             )
-    return conflicts
-
-
-def _rule_missing_account_emails(values: dict[str, Any]) -> list[Conflict]:
-    entries = values.get("account_emails") or []
-    if not entries:
-        return []
-    covered = {entry.partition("=")[0].strip() for entry in entries}
-    uncovered = sorted(_declared_accounts(values) - covered)
-    if not uncovered:
-        return []
-    return [
-        Conflict(
-            code="ACCOUNT_EMAIL_MISSING",
-            message=(f"declared accounts have no approved root email: {', '.join(uncovered)}"),
-            decision_keys=["account_emails"],
+    if uncovered := sorted(accounts - covered):
+        conflicts.append(
+            Conflict(
+                code="ACCOUNT_EMAIL_MISSING",
+                message=f"declared accounts have no approved root email: {', '.join(uncovered)}",
+                decision_keys=["account_emails"],
+            )
         )
-    ]
+    return conflicts
 
 
 def _rule_workload_ou(values: dict[str, Any]) -> list[Conflict]:
@@ -396,7 +378,6 @@ _RULES: tuple[Callable[[dict[str, Any]], list[Conflict]], ...] = (
     _rule_private_subnets,
     _rule_assignments,
     _rule_account_emails,
-    _rule_missing_account_emails,
     _rule_workload_ou,
     _rule_duplicate_accounts,
     _rule_policy_mappings,
@@ -404,12 +385,9 @@ _RULES: tuple[Callable[[dict[str, Any]], list[Conflict]], ...] = (
 )
 
 
-def semantic_conflicts(catalog: dict[str, Decision], facts: list[Fact]) -> list[Conflict]:
-    typed, invalid = typed_values(catalog, facts)
-    conflicts = list(invalid)
-    for rule in _RULES:
-        conflicts.extend(rule(typed))
-    return conflicts
+def semantic_conflicts(values: dict[str, Any]) -> list[Conflict]:
+    """Check already-coerced answers, including explicitly allowed defaults."""
+    return [conflict for rule in _RULES for conflict in rule(values)]
 
 
 def review(graph: KnowledgeGraph, catalog: dict[str, Decision]) -> Review:
@@ -423,8 +401,8 @@ def review(graph: KnowledgeGraph, catalog: dict[str, Decision]) -> Review:
             for integration in organisation.integrations:
                 if gap.decision_key in integration.decision_keys:
                     gap.evidence.append(evidence_text(organisation, integration.evidence))
-    typed, _ = typed_values(catalog, facts)
-    conflicts = graph.contradictions() + semantic_conflicts(catalog, facts)
+    typed, invalid = typed_values(catalog, facts)
+    conflicts = graph.contradictions() + invalid + semantic_conflicts(typed)
     unusable = {key for conflict in conflicts for key in conflict.decision_keys}
     assessments = assess(organisation, {k: v for k, v in typed.items() if k not in unusable})
     conflicts += policy_conflicts(organisation, assessments, facts, path)

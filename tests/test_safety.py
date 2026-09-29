@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from intent_engine.analysis import applicable_keys, semantic_conflicts
+from intent_engine.analysis import applicable_keys, semantic_conflicts, typed_values
 from intent_engine.catalog import load_catalog
 from intent_engine.emit import emit_bundle, resolve
 from intent_engine.ingest import extract_facts, read_document
@@ -100,7 +100,9 @@ def test_invalid_subnets_block_resolution_even_with_a_stale_clean_review(subnets
         f.model_copy(update={"value": subnets}) if f.decision_key == "private_subnets" else f
         for f in extract_facts(doc, catalog)
     ]
-    assert code in {c.code for c in semantic_conflicts(catalog, facts)}
+    values, invalid = typed_values(catalog, facts)
+    assert not invalid
+    assert code in {c.code for c in semantic_conflicts(values)}
     review = Review(
         document=doc.path,
         sha256=doc.sha256,
@@ -118,7 +120,9 @@ def test_valid_subnets_export_with_parent_containment(tmp_path):
     catalog = load_catalog(VPC / "decisions.yaml")
     doc = read_document(VPC / "confirmed.md")
     facts = extract_facts(doc, catalog)
-    assert not semantic_conflicts(catalog, facts)
+    values, invalid = typed_values(catalog, facts)
+    assert not invalid
+    assert not semantic_conflicts(values)
     review = Review(
         document=doc.path,
         sha256=doc.sha256,
@@ -139,4 +143,6 @@ def test_parent_host_bits_are_not_silently_normalized():
         f.model_copy(update={"value": "10.42.1.1/16"}) if f.decision_key == "network_cidr" else f
         for f in extract_facts(doc, catalog)
     ]
-    assert "NETWORK_CIDR_MALFORMED" in {c.code for c in semantic_conflicts(catalog, facts)}
+    values, invalid = typed_values(catalog, facts)
+    assert not invalid
+    assert "NETWORK_CIDR_MALFORMED" in {c.code for c in semantic_conflicts(values)}

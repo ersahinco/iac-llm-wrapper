@@ -15,7 +15,6 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
-import tempfile
 from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
@@ -68,14 +67,10 @@ def bundle_input(bundle_dir: Path) -> dict[str, Any]:
     return document
 
 
-def default_policy() -> Path:
-    return Path(str(resources.files("intent_engine").joinpath("policy/lza.rego")))
-
-
-def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
+def _run(command: list[str], *, stdin: str | None = None) -> subprocess.CompletedProcess[str]:
     try:
         return subprocess.run(  # noqa: S603 - fixed argument list, no shell
-            command, capture_output=True, text=True, timeout=_TIMEOUT, check=False
+            command, input=stdin, capture_output=True, text=True, timeout=_TIMEOUT, check=False
         )
     except subprocess.TimeoutExpired:
         return subprocess.CompletedProcess(command, 2, "", f"timed out after {_TIMEOUT}s")
@@ -83,30 +78,25 @@ def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(command, 2, "", f"could not run: {exc}")
 
 
-def run_opa(bundle_dir: Path, policy: Path | None = None) -> ToolResult:
+def run_opa(document: dict[str, Any], policy: Path | None = None) -> ToolResult:
     if shutil.which("opa") is None:
         return ToolResult("opa", "not-installed", "opa is not on PATH")
-    policy_path = policy or default_policy()
+    policy_path = policy or Path(str(resources.files("intent_engine").joinpath("policy/lza.rego")))
     if not policy_path.is_file():
         return ToolResult("opa", "error", f"{policy_path}: policy file not found")
 
-    document = bundle_input(bundle_dir)
-    with tempfile.TemporaryDirectory() as workspace:
-        input_path = Path(workspace) / "input.json"
-        input_path.write_text(json.dumps(document, indent=2), encoding="utf-8")
-        completed = _run(
-            [
-                "opa",
-                "eval",
-                "--format",
-                "json",
-                "--data",
-                str(policy_path),
-                "--input",
-                str(input_path),
-                "data.lza.deny",
-            ]
-        )
+    completed = _run(
+        [
+            "opa",
+            "eval",
+            "--format=json",
+            "--data",
+            str(policy_path),
+            "--stdin-input",
+            "data.lza.deny",
+        ],
+        stdin=json.dumps(document),
+    )
 
     if completed.returncode != 0:
         return ToolResult("opa", "error", completed.stderr.strip() or "opa eval failed")
@@ -121,12 +111,7 @@ def run_opa(bundle_dir: Path, policy: Path | None = None) -> ToolResult:
 
 
 def _parse_opa(payload: Any) -> list[str]:
-    """Read the deny set.
-
-    An undefined rule and an empty deny set look alike in a summary and are not
-    the same thing: one means the policy said nothing was wrong, the other means
-    no policy ran. Only the second is silent, so only the second is an error.
-    """
+    """An empty deny set passes; an undefined rule was not assessed."""
     results = payload.get("result") if isinstance(payload, dict) else None
     if not results:
         raise ScanError(
@@ -140,7 +125,7 @@ def _parse_opa(payload: Any) -> list[str]:
         raise ScanError(
             f"data.lza.deny evaluated to {type(value).__name__}, expected a set of messages"
         )
-    return sorted(str(item) for item in value)
+    return sorted(value)
 
 
 def run_checkov(bundle_dir: Path) -> ToolResult:
@@ -398,7 +383,7 @@ def scan_bundle(bundle_dir: Path, policy: Path | None = None) -> list[ToolResult
         errors = validate_configs({_BUNDLE_INPUTS[key]: value for key, value in documents.items()})
         results = [
             _result("lza-schema", errors, scope=f"LZA {LZA_VERSION} configuration shape only"),
-            run_opa(bundle_dir, policy),
+            run_opa(documents, policy),
         ]
     elif policy:
         raise ScanError("--policy expects an LZA bundle with all six configuration files")

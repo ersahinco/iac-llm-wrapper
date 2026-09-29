@@ -103,8 +103,9 @@ def test_security_requirements_belong_to_selected_policy(control):
     facts = [
         f.model_copy(update={"value": "false"}) if f.decision_key == control else f for f in facts
     ]
-    assert not semantic_conflicts(catalog, facts)
-    values, _ = typed_values(catalog, facts)
+    values, invalid = typed_values(catalog, facts)
+    assert not invalid
+    assert not semantic_conflicts(values)
     assert assess(None, values) == []
     result = {r.policy_id: r for r in assess(org, values)}["security-controls"]
     assert result.status == "conflict"

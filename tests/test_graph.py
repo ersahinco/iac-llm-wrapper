@@ -252,7 +252,7 @@ def test_review_and_exports_reject_a_different_catalog(
 
 @pytest.mark.skipif(shutil.which("opa") is None, reason="OPA not installed")
 def test_selected_policy_exception_and_region_survive_export(graph, tmp_path):
-    from intent_engine.scan import run_opa
+    from intent_engine.scan import bundle_input, run_opa
 
     sample = Path(__file__).resolve().parents[1] / "samples" / "organisation"
     for source in sample.iterdir():
@@ -303,7 +303,7 @@ def test_selected_policy_exception_and_region_survive_export(graph, tmp_path):
         "security-controls": "warning",
     }
     # Artifact advice stays visible, but cannot impose a second region allowlist.
-    scan = run_opa(output)
+    scan = run_opa(bundle_input(output))
     assert not scan.blocking
     assert len(scan.findings) == 1 and "GuardDuty" in scan.findings[0]
 

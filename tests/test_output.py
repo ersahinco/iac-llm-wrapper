@@ -11,7 +11,7 @@ from ruamel.yaml import YAML
 from typer.testing import CliRunner
 
 from intent_engine import scan
-from intent_engine.analysis import semantic_conflicts
+from intent_engine.analysis import semantic_conflicts, typed_values
 from intent_engine.cli import app
 from intent_engine.contract import CONFIG_FILES, LZA_VERSION, validate_configs
 from intent_engine.emit import EmitBlocked, emit_bundle, resolve
@@ -86,6 +86,15 @@ def test_stated_decisions_are_traceable_to_the_document(
     assert trace["sourceDocument"] == review.document
     assert entries["topology"]["origin"] == "document"
     assert entries["network_cidr"]["evidence"].startswith("Network:")
+
+
+def test_repeated_answer_keeps_its_first_source_in_export(catalog, sample_facts, make_review):
+    first = next(f for f in sample_facts if f.decision_key == "network_cidr")
+    repeated = first.model_copy(update={"section": "Repeated", "line": 999})
+    resolution = resolve(catalog, make_review([*sample_facts, repeated]))
+    entry = next(e for e in resolution.trace if e["decision"] == first.decision_key)
+    assert entry["value"] == first.value
+    assert entry["evidence"] == f"{first.section}:{first.line}"
 
 
 def test_single_vpc_drops_the_transit_gateway(catalog, sample_facts, make_review, tmp_path):
@@ -203,7 +212,7 @@ def test_policy_denies_a_weakened_bundle(catalog, sample_facts, make_review, tmp
     """A passing policy has to be able to fail. Prove it against the real binary."""
     review = make_review(sample_facts)
     emit_bundle(resolve(catalog, review), review, tmp_path)
-    assert scan.run_opa(tmp_path).status == "passed"
+    assert scan.run_opa(bundle_input(tmp_path)).status == "passed"
 
     weakened = tmp_path / "global-config.yaml"
     weakened.write_text(
@@ -212,7 +221,7 @@ def test_policy_denies_a_weakened_bundle(catalog, sample_facts, make_review, tmp
         ),
         encoding="utf-8",
     )
-    result = scan.run_opa(tmp_path)
+    result = scan.run_opa(bundle_input(tmp_path))
     assert result.status == "findings"
     assert any("terminationProtection" in finding for finding in result.findings)
 
@@ -223,7 +232,7 @@ def test_policy_denies_a_weakened_bundle(catalog, sample_facts, make_review, tmp
 )
 def test_absent_tool_is_not_reported_as_a_pass(monkeypatch, tmp_path, runner, tool):
     monkeypatch.setattr(scan.shutil, "which", lambda _: None)
-    result = runner(tmp_path)
+    result = runner({} if tool == "opa" else tmp_path)
     assert result.status == "not-installed"
     assert result.blocking is True
     assert tool in result.detail
@@ -242,10 +251,12 @@ def test_security_advice_remains_without_selected_policy(
     catalog, sample_facts, make_review, tmp_path, control, advice
 ):
     facts = _add(sample_facts, **{control: "false"})
-    assert semantic_conflicts(catalog, facts) == []
+    values, invalid = typed_values(catalog, facts)
+    assert not invalid
+    assert semantic_conflicts(values) == []
     review = make_review(facts)
     emit_bundle(resolve(catalog, review), review, tmp_path)
-    result = scan.run_opa(tmp_path)
+    result = scan.run_opa(bundle_input(tmp_path))
     assert result.status == "findings" and not result.blocking
     assert any(advice in finding for finding in result.findings)
 
@@ -257,7 +268,9 @@ def test_defaults_are_revalidated_for_conflicts(catalog, sample_facts, make_revi
     catalog = dict(catalog)
     catalog["home_region"] = catalog["home_region"].model_copy(update={"default": "us-east-1"})
     facts = _drop(sample_facts, "home_region")
-    assert semantic_conflicts(catalog, facts) == []
+    values, invalid = typed_values(catalog, facts)
+    assert not invalid
+    assert semantic_conflicts(values) == []
     with pytest.raises(EmitBlocked, match="HOME_REGION_NOT_ENABLED"):
         resolve(catalog, make_review(facts), allow_defaults=True)
 
@@ -270,7 +283,9 @@ def test_default_account_cannot_collide_with_workload(catalog, sample_facts, mak
         else f
         for f in facts
     ]
-    assert semantic_conflicts(catalog, facts) == []
+    values, invalid = typed_values(catalog, facts)
+    assert not invalid
+    assert semantic_conflicts(values) == []
     with pytest.raises(EmitBlocked, match="ACCOUNT_NAME_RESERVED"):
         resolve(catalog, make_review(facts), allow_defaults=True)
 
@@ -496,7 +511,7 @@ def test_policy_rejects_missing_or_mistyped_fields(
         parent[path[-1]] = {"unexpected": "object"}
     with target.open("w") as handle:
         _YAML.dump(data, handle)
-    result = scan.run_opa(tmp_path)
+    result = scan.run_opa(bundle_input(tmp_path))
     assert result.status == "findings", result
 
 
@@ -507,7 +522,7 @@ def test_minimal_mapping_bundle_cannot_pass_policy(tmp_path):
     (tmp_path / "global-config.yaml").write_text(
         "homeRegion: eu-central-1\nenabledRegions: [eu-central-1]\n", encoding="utf-8"
     )
-    result = scan.run_opa(tmp_path)
+    result = scan.run_opa(bundle_input(tmp_path))
     assert result.status == "findings"
     assert any("terminationProtection" in item for item in result.findings)
 

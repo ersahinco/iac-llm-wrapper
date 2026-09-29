@@ -15,11 +15,11 @@ from typing import Any
 
 from ruamel.yaml import YAML, YAMLError
 
-from .analysis import integration_context, raw_values, semantic_conflicts
+from .analysis import first_facts, integration_context, semantic_conflicts
 from .catalog import coerce
 from .contract import CONFIG_FILES, LZA_COMMIT, LZA_VERSION, validate_configs
-from .models import Assessment, Decision, Fact, Review
-from .organisation import assess, policy_conflicts
+from .models import Assessment, Decision, Review
+from .organisation import assess
 from .output import EmitBlocked, write_bundle
 
 _HEADER = (
@@ -47,14 +47,14 @@ def resolve(
         codes = ", ".join(sorted({conflict.code for conflict in review.conflicts}))
         raise EmitBlocked(f"unresolved conflicts block emission: {codes}")
 
-    stated = raw_values(review.facts)
-    evidence = {fact.decision_key: f"{fact.section}:{fact.line}" for fact in review.facts}
+    stated = first_facts(review.facts)
     resolution = Resolution(values={})
     missing: list[str] = []
 
     for key in review.applicable:
         decision = catalog[key]
-        raw = stated.get(key)
+        fact = stated.get(key)
+        raw = fact.value if fact else None
         origin = "document"
         if raw is None:
             if not allow_defaults or decision.default is None:
@@ -71,7 +71,7 @@ def resolve(
                 "decision": key,
                 "value": raw,
                 "origin": origin,
-                "evidence": evidence.get(key, "catalog default"),
+                "evidence": f"{fact.section}:{fact.line}" if fact else "catalog default",
             }
         )
 
@@ -79,23 +79,12 @@ def resolve(
         listed = "\n  - ".join(missing)
         raise EmitBlocked(f"unanswered applicable decisions block emission:\n  - {listed}")
     # Defaults can introduce conflicts that did not exist among the stated facts.
-    resolved_facts = review.facts + [
-        Fact(
-            decision_key=entry["decision"],
-            value=entry["value"],
-            section="catalog default",
-            line=0,
-            origin="default",
-        )
-        for entry in resolution.trace
-        if entry["origin"] == "default"
-    ]
-    conflicts = semantic_conflicts(catalog, resolved_facts)
+    conflicts = semantic_conflicts(resolution.values)
     if conflicts:
         codes = ", ".join(sorted({conflict.code for conflict in conflicts}))
         raise EmitBlocked(f"resolved decisions block emission: {codes}")
-    assessments = resolution.assessments = assess(review.organisation, resolution.values)
-    if policy_conflicts(review.organisation, assessments, resolved_facts, review.document):
+    resolution.assessments = assess(review.organisation, resolution.values)
+    if any(a.status in {"conflict", "not-assessed"} for a in resolution.assessments):
         raise EmitBlocked("organisation policy assessment blocks resolved values")
     return resolution
 
@@ -151,22 +140,18 @@ def emit_bundle(
         context["layers"]["network"]["ownerAction"] = (
             "Validate routing and connectivity in the owner pipeline."
         )
-    documents.update(
-        {
-            "decision-trace.yaml": {
-                "sourceDocument": review.document,
-                "sourceSha256": review.sha256,
-                "decisions": trace,
-                "integrationContext": context,
-                "organisation": review.organisation.model_dump(
-                    exclude={"references": {"__all__": {"content"}}}
-                )
-                if review.organisation
-                else None,
-                "policyAssessments": [a.model_dump() for a in resolution.assessments],
-            },
-        }
-    )
+    documents["decision-trace.yaml"] = {
+        "sourceDocument": review.document,
+        "sourceSha256": review.sha256,
+        "decisions": trace,
+        "integrationContext": context,
+        "organisation": review.organisation.model_dump(
+            exclude={"references": {"__all__": {"content"}}}
+        )
+        if review.organisation
+        else None,
+        "policyAssessments": [a.model_dump() for a in resolution.assessments],
+    }
     if (out_dir / "handoff.yaml").exists() or (out_dir / "handoff.yaml").is_symlink():
         raise EmitBlocked("output contains a legacy handoff.yaml; use a fresh output directory")
     return write_bundle(
@@ -231,29 +216,17 @@ def _render_yaml(name: str, data: dict[str, Any], sha256: str) -> str:
     return handle.getvalue()
 
 
-def _emails(values: dict[str, Any]) -> dict[str, str]:
-    mapping: dict[str, str] = {}
-    for entry in values.get("account_emails") or []:
-        account, _, email = entry.partition("=")
-        mapping[account.strip()] = email.strip()
-    return mapping
-
-
-def _email_for(values: dict[str, Any], account: str) -> str:
-    email = _emails(values).get(account)
+def _account(emails: dict[str, str], name: str, ou: str, description: str) -> dict[str, str]:
+    email = emails.get(name)
     if not email:
         raise EmitBlocked(
-            f"account '{account}' has no approved root email in account_emails; "
+            f"account '{name}' has no approved root email in account_emails; "
             "account emails are owner input and are never generated"
         )
-    return email
-
-
-def _account(values: dict[str, Any], name: str, ou: str, description: str) -> dict[str, Any]:
     return {
         "name": name,
         "description": description,
-        "email": _email_for(values, name),
+        "email": email,
         "organizationalUnit": ou,
     }
 
@@ -276,12 +249,16 @@ def _organization_config(values: dict[str, Any]) -> dict[str, Any]:
 
 
 def _accounts_config(values: dict[str, Any]) -> dict[str, Any]:
+    emails = {}
+    for entry in values["account_emails"]:
+        account, _, email = entry.partition("=")
+        emails[account.strip()] = email.strip()
     mandatory = [
-        _account(values, "Management", "Root", "Organization management account"),
-        _account(values, values["log_archive_account"], "Security", "Central log archive"),
-        _account(values, values["audit_account"], "Security", "Security audit account"),
+        _account(emails, "Management", "Root", "Organization management account"),
+        _account(emails, values["log_archive_account"], "Security", "Central log archive"),
+        _account(emails, values["audit_account"], "Security", "Security audit account"),
         _account(
-            values,
+            emails,
             values["security_tooling_account"],
             "Security",
             "Delegated security tooling administration",
@@ -289,19 +266,19 @@ def _accounts_config(values: dict[str, Any]) -> dict[str, Any]:
     ]
     if values.get("network_account"):
         mandatory.append(
-            _account(values, values["network_account"], "Infrastructure", "Shared networking")
+            _account(emails, values["network_account"], "Infrastructure", "Shared networking")
         )
     return {
         "mandatoryAccounts": mandatory,
         "workloadAccounts": [
-            _account(values, name, _WORKLOAD_OU, "Workload account")
+            _account(emails, name, _WORKLOAD_OU, "Workload account")
             for name in values.get("workload_accounts") or []
         ],
     }
 
 
 def _global_config(values: dict[str, Any]) -> dict[str, Any]:
-    centralized = bool(values["centralized_logging"])
+    centralized = values["centralized_logging"]
     return {
         "homeRegion": values["home_region"],
         "enabledRegions": values["enabled_regions"],
@@ -406,6 +383,13 @@ def _network_config(values: dict[str, Any]) -> dict[str, Any]:
 
 def _security_config(values: dict[str, Any]) -> dict[str, Any]:
     strict = values["compliance_overlay"] != "none"
+    standards = []
+    if values["security_hub_enabled"]:
+        standards.append(
+            {"name": "AWS Foundational Security Best Practices v1.0.0", "enable": True}
+        )
+        if strict:
+            standards.append({"name": "CIS AWS Foundations Benchmark v1.4.0", "enable": True})
     return {
         "homeRegion": values["home_region"],
         "accessAnalyzer": {"enable": True},
@@ -430,9 +414,9 @@ def _security_config(values: dict[str, Any]) -> dict[str, Any]:
             "scpRevertChangesConfig": {"enable": True},
             "macie": {"enable": strict, "excludeRegions": []},
             "guardduty": {
-                "enable": bool(values["guardduty_enabled"]),
+                "enable": values["guardduty_enabled"],
                 "excludeRegions": [],
-                "s3Protection": {"enable": bool(values["guardduty_enabled"])},
+                "s3Protection": {"enable": values["guardduty_enabled"]},
                 "exportConfiguration": {
                     "enable": False,
                     "destinationType": "S3",
@@ -440,19 +424,10 @@ def _security_config(values: dict[str, Any]) -> dict[str, Any]:
                 },
             },
             "securityHub": {
-                "enable": bool(values["security_hub_enabled"]),
+                "enable": values["security_hub_enabled"],
                 "regionAggregation": True,
                 "excludeRegions": [],
-                "standards": _standards(values),
+                "standards": standards,
             },
         },
     }
-
-
-def _standards(values: dict[str, Any]) -> list[dict[str, Any]]:
-    if not values["security_hub_enabled"]:
-        return []
-    standards = [{"name": "AWS Foundational Security Best Practices v1.0.0", "enable": True}]
-    if values["compliance_overlay"] != "none":
-        standards.append({"name": "CIS AWS Foundations Benchmark v1.4.0", "enable": True})
-    return standards

@@ -18,13 +18,6 @@ class CatalogError(Exception):
     """The decision catalog itself is wrong. Not a document problem."""
 
 
-def _read_yaml(text: str, origin: str) -> Any:
-    try:
-        return YAML(typ="safe").load(text)
-    except YAMLError as exc:
-        raise CatalogError(f"{origin}: not valid YAML: {exc}") from exc
-
-
 def load_catalog(path: Path | None = None) -> dict[str, Decision]:
     """Return decisions by key. Raises CatalogError on a malformed catalog."""
     if path is None:
@@ -36,7 +29,10 @@ def load_catalog(path: Path | None = None) -> dict[str, Decision]:
             raise CatalogError(f"{origin}: catalog file not found")
         text = path.read_text("utf-8")
 
-    raw = _read_yaml(text, origin)
+    try:
+        raw = YAML(typ="safe").load(text)
+    except YAMLError as exc:
+        raise CatalogError(f"{origin}: not valid YAML: {exc}") from exc
     if not isinstance(raw, list) or not raw:
         raise CatalogError(f"{origin}: expected a non-empty list of decisions")
 
@@ -58,6 +54,8 @@ def load_catalog(path: Path | None = None) -> dict[str, Decision]:
 
 def _check_references(catalog: dict[str, Decision], origin: str) -> None:
     for decision in catalog.values():
+        if decision.type == "enum" and not decision.options:
+            raise CatalogError(f"{origin}: enum decision '{decision.key}' declares no options")
         for required in decision.requires:
             if required not in catalog:
                 raise CatalogError(
@@ -74,8 +72,6 @@ def _check_references(catalog: dict[str, Decision], origin: str) -> None:
                 f"{origin}: '{decision.key}' gate value '{gate.equals}' is not an option of "
                 f"'{parent.key}' ({', '.join(parent.options)})"
             )
-        if decision.type == "enum" and not decision.options:
-            raise CatalogError(f"{origin}: enum decision '{decision.key}' declares no options")
 
 
 def coerce(decision: Decision, raw: str) -> Any:
@@ -100,7 +96,6 @@ def coerce(decision: Decision, raw: str) -> Any:
 
     if decision.options and value not in decision.options:
         raise ValueError(
-            f"{decision.key}: '{value}' is not an approved option "
-            f"({', '.join(decision.options)})"
+            f"{decision.key}: '{value}' is not an approved option ({', '.join(decision.options)})"
         )
     return value

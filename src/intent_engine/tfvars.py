@@ -32,12 +32,7 @@ def emit_tfvars(
         raise EmitBlocked(f"invalid module input contract: {exc}") from exc
     if errors:
         raise EmitBlocked("module input validation failed: " + "; ".join(errors))
-    outputs = [out_dir / "terraform.tfvars.json", out_dir / "decision-trace.json"]
-    sources = {contract.resolve(), Path(review.document).resolve()}
-    if review.organisation:
-        sources.update(Path(r.path).resolve() for r in review.organisation.references)
-    if any(path.resolve() in sources for path in outputs):
-        raise EmitBlocked("keep source documents and contracts separate from generated files")
+    decisions = {entry["decision"]: entry for entry in resolution.trace}
     trace = {
         "sourceDocument": review.document,
         "sourceSha256": review.sha256,
@@ -51,19 +46,18 @@ def emit_tfvars(
         else None,
         "policyAssessments": [a.model_dump() for a in resolution.assessments],
         "variables": {
-            name: next(
-                entry for entry in resolution.trace if entry["decision"] == spec["x-decision"]
-            )
-            for name, spec in schema["properties"].items()
-            if name in values
+            name: decisions[spec["x-decision"]] for name, spec in schema["properties"].items()
         },
     }
+    documents = {"terraform.tfvars.json": values, "decision-trace.json": trace}
+    sources = {contract.resolve(), Path(review.document).resolve()}
+    if review.organisation:
+        sources.update(Path(r.path).resolve() for r in review.organisation.references)
+    if any((out_dir / name).resolve() in sources for name in documents):
+        raise EmitBlocked("keep source documents and contracts separate from generated files")
     return write_bundle(
         out_dir,
-        {
-            path.name: json.dumps(payload, indent=2) + "\n"
-            for path, payload in zip(outputs, (values, trace), strict=True)
-        },
+        {name: json.dumps(payload, indent=2) + "\n" for name, payload in documents.items()},
     )
 
 

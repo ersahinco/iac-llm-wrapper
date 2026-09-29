@@ -71,9 +71,7 @@ class KnowledgeGraph:
         except (ValueError, ConfigurationError) as exc:
             raise GraphUnavailable(f"{config.uri}: not a usable Bolt URI: {exc}") from exc
 
-        # A rejected password and an absent database need different fixes, so they
-        # get different messages. Close the driver either way; a leaked driver
-        # warns from its destructor long after the real error is gone.
+        # Distinguish rejected credentials from an unavailable database; close on either.
         try:
             driver.verify_connectivity()
         except AuthError as exc:
@@ -106,8 +104,6 @@ class KnowledgeGraph:
         except (Neo4jError, ServiceUnavailable) as exc:
             raise GraphUnavailable(f"query failed: {exc}") from exc
         return [record.data() for record in records]
-
-    # ------------------------------------------------------------------ write
 
     def replace(
         self,
@@ -295,24 +291,9 @@ class KnowledgeGraph:
         tx.run(
             """
             UNWIND $decisions AS d
-            MERGE (n:Decision {key: d.key})
-            SET n.label = d.label, n.category = d.category, n.type = d.type,
-                n.question = d.question, n.options = d.options,
-                n.default = d.default, n.hint = d.hint
+            CREATE (n:Decision) SET n = d
             """,
-            decisions=[
-                {
-                    "key": d.key,
-                    "label": d.label,
-                    "category": d.category,
-                    "type": d.type,
-                    "question": d.question,
-                    "options": d.options,
-                    "default": d.default,
-                    "hint": d.hint,
-                }
-                for d in catalog.values()
-            ],
+            decisions=[d.model_dump(exclude={"gate", "requires"}) for d in catalog.values()],
         ).consume()
         tx.run(
             """
@@ -357,8 +338,6 @@ class KnowledgeGraph:
         ).consume()
 
     def _load_facts(self, tx: ManagedTransaction, facts: list[Fact]) -> None:
-        if not facts:
-            return
         tx.run(
             """
             UNWIND $facts AS f
@@ -373,8 +352,6 @@ class KnowledgeGraph:
             """,
             facts=[f.model_dump() for f in facts],
         ).consume()
-
-    # ------------------------------------------------------------------- read
 
     def document(self) -> tuple[str, str]:
         rows = self._run("MATCH (d:Document) RETURN d.path AS path, d.sha256 AS sha256")
@@ -409,13 +386,7 @@ class KnowledgeGraph:
             applicable=applicable,
         )
         return [
-            Gap(
-                decision_key=row["decision_key"],
-                question=row["question"],
-                category=row["category"],
-                default=row["default"],
-                blocks=sorted(key for key in row["blocks"] if key),
-            )
+            Gap.model_validate({**row, "blocks": sorted(key for key in row["blocks"] if key)})
             for row in rows
         ]
 
