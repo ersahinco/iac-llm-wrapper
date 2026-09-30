@@ -3,14 +3,5 @@
     "python.testing.pytestEnabled": true,
     "python.testing.pytestArgs": ["tests"],
     "ruff.importStrategy": "fromEnvironment",
-    "mypy-type-checker.importStrategy": "fromEnvironment",
-    "yaml.schemas": {
-        "none": [
-            "**/*benchmark*.yaml",
-            "**/llm-trace-summary.yaml",
-            "**/decision-report.yaml",
-            "**/handoff-plan.yaml",
-            "**/golden-journey*.yaml",
-        ]
-    },
+    "mypy-type-checker.importStrategy": "fromEnvironment"
 }
