@@ -39,7 +39,7 @@ iac-llm-wrapper = "intent_engine.cli:app"
 [project.optional-dependencies]
 dev = [
     "pytest>=9.1.1,<10",
-    "ruff>=0.15.21,<0.16",
+    "ruff>=0.15.21,<0.17",
     "mypy>=2.3.0,<3",
 ]
 graphrag = [
