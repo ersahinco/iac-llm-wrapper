@@ -5,6 +5,9 @@ Start with the [quickstart](README.md#quickstart) and
 [design guide](docs/design.md). You can contribute without running an LLM or using
 cloud credentials.
 
+Use whichever editor and development tools you prefer. The same checks and review
+requirements apply to every contribution.
+
 ## Issues and pull requests
 
 - [Open an issue](https://github.com/ersahinco/iac-llm-wrapper/issues) with the command,
@@ -15,6 +18,12 @@ cloud credentials.
   Keep it focused, explain the problem and verification, and use a draft if you
   want early feedback. Maintainers review behavior, clarity and scope; CI runs the
   automated checks.
+
+`main` requires a pull request, one approval, resolved review conversations and
+passing `lint`, `test (3.11)`, `test (3.12)`, `test (3.13)` and `graph` checks.
+Branches must be up to date; new commits dismiss stale approvals. These rules also
+apply to administrators. Force pushes and deletion of `main` are blocked; merged
+pull request branches are deleted automatically.
 
 Be respectful, explain your reasoning, and leave room for questions and learning.
 Use sanitised examples in issues and tests; keep client packets, credentials and
@@ -146,6 +155,6 @@ checks and output mappings need a concrete case and explicit coverage limits.
 Preserve source evidence, human confirmation and export gates. Keep deployment
 and approvals in the consuming team's pipeline.
 
-The code map and invariants are in [AGENTS.md](AGENTS.md). CI runs lint, types,
+The code map and design constraints are in [docs/design.md](docs/design.md). CI runs lint, types,
 Python 3.11–3.13 tests, real Neo4j checks and an LZA export journey. Include the
 checks you ran and any skipped coverage in your pull request.

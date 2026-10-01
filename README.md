@@ -286,7 +286,7 @@ follows one existing question through its policy and a regression test.
 Start with an observed problem or small sanitised case. Keep evidence, human
 confirmation and explicit output contracts; reuse existing tools before adding
 custom code. The [design guide](docs/design.md) explains the boundaries and extension points;
-the [code map](AGENTS.md#code-map) shows where changes belong.
+its [code map](docs/design.md#code-map) shows where changes belong.
 
 ## License
 
