@@ -179,7 +179,7 @@ graphrag = [
 requires-dist = [
     { name = "jsonschema", specifier = ">=4.23,<5" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=2.3.0,<3" },
-    { name = "neo4j", specifier = ">=5.28.3,<6" },
+    { name = "neo4j", specifier = ">=5.28.3,<7" },
     { name = "neo4j-graphrag", extras = ["ollama"], marker = "extra == 'graphrag'", specifier = "==1.21.0" },
     { name = "pydantic", specifier = ">=2.13.4,<3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.1.1,<10" },
@@ -402,14 +402,14 @@ wheels = [
 
 [[package]]
 name = "neo4j"
-version = "5.28.6"
+version = "6.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pytz" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/77/ea/a17b0df723422cb3124bd45e6570d9677eafa38ffa207c3d12f601cbb90e/neo4j-5.28.6.tar.gz", hash = "sha256:224020cb649517cba1b76bf94129ccf84de30e7005932b5ab0cdd9cb566d55b2", size = 233391, upload-time = "2026-09-15T08:47:07.57Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/59/46/7a562799679d0c9bd3f12d28b43591eb953efc975e1241536733c5d8bcd3/neo4j-6.3.1.tar.gz", hash = "sha256:e75530ca0691d69916c56acdb7401df4ee9e1d5084cfcfb3ede796db38667dcd", size = 242885, upload-time = "2026-09-15T08:08:32.67Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cd/9c/ec2a2f4b9fbb6c93d51c785a8c4e4cdca280009b7ad0821ff145e6cb02a5/neo4j-5.28.6-py3-none-any.whl", hash = "sha256:5454b51e0a1de870e7d0cc233b8897bb8b3a273fe32458ccbcde9d5a604f7437", size = 313892, upload-time = "2026-09-15T08:47:04.604Z" },
+    { url = "https://files.pythonhosted.org/packages/08/a5/e33f76f4eb7e72c350e65802151884048325f889ab5d156ce4b6d9bde959/neo4j-6.3.1-py3-none-any.whl", hash = "sha256:a1b702d356f88885c27bdcf7dcd56af76423dbff4e26064e5bf5dbf47af53044", size = 331462, upload-time = "2026-09-15T08:08:31.252Z" },
 ]
 
 [[package]]
@@ -1046,7 +1046,7 @@ resolution-markers = [
     "python_full_version < '3.12'",
 ]
 dependencies = [
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" } },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/7a/97/5a3609c4f8d58b039179648e62dd220f89864f56f7357f5d4f45c29eb2cc/scipy-1.17.1.tar.gz", hash = "sha256:95d8e012d8cb8816c226aef832200b1d45109ed4464303e997c5b13122b297c0", size = 30573822, upload-time = "2026-02-23T00:26:24.851Z" }
 wheels = [
@@ -1121,7 +1121,7 @@ resolution-markers = [
     "python_full_version == '3.12.*'",
 ]
 dependencies = [
-    { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' and python_full_version < '3.15'" },
+    { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" } },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/7e/74/66de6258867beb2ef08f35f9f2ac017a52cacd5081714d239ff1a442d458/scipy-1.18.1.tar.gz", hash = "sha256:52c4b7422442aba924d03ad4019852b08a92e64ea187b933135687bfe2747307", size = 30781235, upload-time = "2026-08-21T23:28:50.599Z" }
 wheels = [
